@@ -1529,16 +1529,18 @@ export default function DashboardPage() {
 
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
-    const updatedRows = {
+    const clearedRow: EditableTimecardRow = {
+      shiftLabel: '',
+      payType: 'DAILY_OT_DT',
+      clockInDate: '',
+      clockInTime: '',
+      clockOutDate: '',
+      clockOutTime: '',
+    };
+
+    const updatedRows: Record<string, EditableTimecardRow> = {
       ...editableTimecardRows,
-      [rowKey]: {
-        shiftLabel: '',
-        payType: 'DAILY_OT_DT',
-        clockInDate: '',
-        clockInTime: '',
-        clockOutDate: '',
-        clockOutTime: '',
-      },
+      [rowKey]: clearedRow,
     };
 
     setEditableTimecardRows(updatedRows);
