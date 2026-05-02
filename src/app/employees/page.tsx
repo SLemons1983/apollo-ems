@@ -28,7 +28,7 @@ type EmployeeProfile = {
   status: string;
   employeeType: string;
   seniorityLabel: string;
-  certifications: CertificationRecord;
+  certifications?: CertificationRecord;
   notes: string;
 };
 

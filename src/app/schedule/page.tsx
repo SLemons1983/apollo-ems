@@ -1430,10 +1430,11 @@ export default function SchedulePage() {
       payPeriodHoursMap,
     );
     const recommendedEmployee = eligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
-    const selectedEmployee = slot.employeeId ? getEmployeeById(slot.employeeId, employees) : null;
-    const selectedEligibility = slot.employeeId ? eligibilityMap[slot.employeeId] : null;
+    const isOpenSlotSelection = isOpenShiftSlot(slot.employeeId);
+    const selectedEmployee = slot.employeeId && !isOpenSlotSelection ? getEmployeeById(slot.employeeId, employees) : null;
+    const selectedEligibility = slot.employeeId && !isOpenSlotSelection ? eligibilityMap[slot.employeeId] : null;
     const isLowerPrioritySelection = Boolean(
-      slot.employeeId && recommendedEmployee && slot.employeeId !== recommendedEmployee.id,
+      slot.employeeId && !isOpenSlotSelection && recommendedEmployee && slot.employeeId !== recommendedEmployee.id,
     );
 
     return (
@@ -1957,6 +1958,7 @@ export default function SchedulePage() {
                                 true,
                                 (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee1', field, value),
                                 slotEligibilityMaps.employee1,
+                                payPeriodHoursMap,
                               )}
 
                               {!isSupervisorShift &&
@@ -1966,6 +1968,7 @@ export default function SchedulePage() {
                                   true,
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee2', field, value),
                                   slotEligibilityMaps.employee2,
+                                  payPeriodHoursMap,
                                 )}
 
                               {!isSupervisorShift &&
@@ -1975,6 +1978,7 @@ export default function SchedulePage() {
                                   extra.showEmployee3 || Boolean(extra.employee3.employeeId),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee3', field, value),
                                   slotEligibilityMaps.employee3,
+                                  payPeriodHoursMap,
                                 )}
 
                               {!isSupervisorShift && !extra.showEmployee3 && !extra.employee3.employeeId && (

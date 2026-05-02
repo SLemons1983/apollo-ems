@@ -2,6 +2,59 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 
+type ImportantLink = {
+  id: string;
+  label: string;
+  url: string;
+};
+
+type GeofenceConfig = {
+  id: string;
+  shiftLabel: string;
+  locationLabel: string;
+  latitude: number;
+  longitude: number;
+  radiusFeet: number;
+};
+
+type SystemConfig = {
+  companyName: string;
+  logoDataUrl: string;
+  importantLinks: ImportantLink[];
+  geofences: GeofenceConfig[];
+};
+
+type ApolloMessageRecipient = {
+  employeeId: string;
+  deliveredAt: string;
+  readAt: string | null;
+};
+
+type ApolloMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  recipients: ApolloMessageRecipient[];
+  audienceLabel: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  relatedType?: string;
+  relatedId?: string;
+  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+};
+
+type AuditLogEntry = {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  details: string;
+};
+
+
 type CompanyAnnouncement = {
   id: string;
   title: string;
@@ -1619,11 +1672,16 @@ export default function SupervisorPage() {
     titleText: string,
     description: string,
     children: React.ReactNode,
+    hasAlert = false,
   ) {
     const isOpen = activeTile === id;
 
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div
+        className={`rounded-2xl border bg-white shadow-sm ${
+          hasAlert ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'
+        }`}
+      >
         <button
           type="button"
           onClick={() => toggleTile(id)}
