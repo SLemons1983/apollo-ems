@@ -82,7 +82,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-002",
@@ -96,7 +97,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-003",
@@ -110,7 +112,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-004",
@@ -124,7 +127,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-005",
@@ -138,7 +142,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-006",
@@ -152,7 +157,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-007",
@@ -166,7 +172,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-008",
@@ -180,7 +187,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-009",
@@ -194,7 +202,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-010",
@@ -208,7 +217,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-011",
@@ -222,7 +232,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-012",
@@ -236,7 +247,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-013",
@@ -250,7 +262,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-014",
@@ -264,7 +277,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-015",
@@ -278,7 +292,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-016",
@@ -292,7 +307,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-017",
@@ -306,7 +322,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-018",
@@ -320,7 +337,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-019",
@@ -334,7 +352,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-020",
@@ -348,7 +367,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-021",
@@ -362,7 +382,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-022",
@@ -376,7 +397,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-023",
@@ -390,7 +412,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-024",
@@ -404,7 +427,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-025",
@@ -418,7 +442,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-026",
@@ -432,7 +457,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-027",
@@ -446,7 +472,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-028",
@@ -460,7 +487,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-029",
@@ -474,7 +502,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-030",
@@ -488,7 +517,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-031",
@@ -502,7 +532,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-032",
@@ -516,7 +547,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-033",
@@ -530,7 +562,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-034",
@@ -544,7 +577,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-035",
@@ -558,7 +592,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-036",
@@ -572,7 +607,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-037",
@@ -586,7 +622,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-038",
@@ -600,7 +637,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-039",
@@ -614,7 +652,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-040",
@@ -628,7 +667,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-041",
@@ -642,7 +682,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Per Diem",
     "employeeType": "Per Diem",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   },
   {
     "id": "emp-042",
@@ -656,7 +697,8 @@ const INITIAL_EMPLOYEES: EmployeeProfile[] = [
     "status": "Full Time",
     "employeeType": "Full Time",
     "seniorityLabel": "Seniority Unassigned",
-    "notes": ""
+    "notes": "",
+    "certifications": { ...EMPTY_CERTIFICATIONS }
   }
 ];
 
