@@ -1475,11 +1475,13 @@ export default function DashboardPage() {
     const rowKey = getEditableRowKey(dateKey);
     const saved = editableTimecardRows[rowKey];
     if (saved) {
+      const legacySaved = saved as EditableTimecardRow & { isTwentyFourHourShift?: boolean };
+
       return {
         ...saved,
         payType:
           saved.payType ??
-          (typeof saved.isTwentyFourHourShift === 'boolean' && saved.isTwentyFourHourShift
+          (typeof legacySaved.isTwentyFourHourShift === 'boolean' && legacySaved.isTwentyFourHourShift
             ? 'TWENTY_FOUR_HOUR'
             : getDefaultPayType(saved.shiftLabel, getEditableRowHours(saved))),
       };
