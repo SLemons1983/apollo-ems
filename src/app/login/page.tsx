@@ -1,4 +1,21 @@
+'use client';
+
+import { supabase } from '@/lib/supabase';
+
 export default function LoginPage() {
+  const handleLogin = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: 'https://apolloems.org/dashboard',
+      },
+    });
+
+    if (error) {
+      window.alert(error.message);
+    }
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -9,7 +26,8 @@ export default function LoginPage() {
 
         <button
           type="button"
-          className="mt-6 w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
+          onClick={handleLogin}
+          className="mt-6 w-full cursor-pointer rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
           Sign in with Google
         </button>
