@@ -853,6 +853,7 @@ export default function DashboardPage() {
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
+  const [authAvatarUrl, setAuthAvatarUrl] = useState('');
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
   const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
@@ -889,6 +890,9 @@ export default function DashboardPage() {
       }
 
       setAuthEmail(data.user?.email?.trim().toLowerCase() ?? '');
+      setAuthAvatarUrl(
+        String(data.user?.user_metadata?.avatar_url ?? data.user?.user_metadata?.picture ?? ''),
+      );
     }
 
     loadAuthenticatedUser();
@@ -899,6 +903,9 @@ export default function DashboardPage() {
       }
 
       setAuthEmail(session?.user?.email?.trim().toLowerCase() ?? '');
+      setAuthAvatarUrl(
+        String(session?.user?.user_metadata?.avatar_url ?? session?.user?.user_metadata?.picture ?? ''),
+      );
     });
 
     return () => {
@@ -2249,13 +2256,22 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-700 shadow-sm">
-                {currentEmployee?.name
-                  ?.split(',')
-                  .map((part) => part.trim()[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join('') || 'ME'}
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-700 shadow-sm">
+                {authAvatarUrl ? (
+                  <img
+                    src={authAvatarUrl}
+                    alt="Google profile photo"
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  currentEmployee?.name
+                    ?.split(',')
+                    .map((part) => part.trim()[0])
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join('') || 'ME'
+                )}
               </div>
             </div>
           </div>
