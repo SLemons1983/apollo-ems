@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type ShiftCategory = 'UNIT' | 'SUPERVISOR';
@@ -25,6 +26,7 @@ type EmployeeRole = 'Paramedic' | 'EMT' | 'Supervisor';
 type EmployeeOption = {
   id: string;
   name: string;
+  email: string;
   role: EmployeeRole;
   scope: 'ALS' | 'BLS';
   employeeType: string;
@@ -37,6 +39,7 @@ type StoredEmployeeProfile = {
   id: string;
   firstName?: string;
   lastName?: string;
+  email?: string;
   role?: string;
   scope?: string;
   employeeType?: string;
@@ -353,7 +356,7 @@ function getDefaultSystemConfig(): SystemConfig {
   };
 }
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
-const CURRENT_EMPLOYEE_ID = 'emp-001';
+const DEFAULT_EMPLOYEE_ID = 'emp-001';
 
 const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'];
 
@@ -799,6 +802,7 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
       .map((profile) => ({
         id: profile.id,
         name: buildEmployeeName(profile),
+        email: (profile.email ?? '').trim().toLowerCase(),
         role: normalizeEmployeeRole(profile.role),
         scope: normalizeEmployeeScope(profile.scope, profile.role),
         employeeType: (profile.employeeType ?? 'Full Time').trim() || 'Full Time',
@@ -848,9 +852,25 @@ export default function DashboardPage() {
   const [showCertificationUpload, setShowCertificationUpload] = useState(false);
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
   const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
+
+  const currentEmployee = useMemo(() => {
+    const normalizedAuthEmail = authEmail.trim().toLowerCase();
+
+    if (normalizedAuthEmail) {
+      const matchedByEmail = employees.find((employee) => employee.email.trim().toLowerCase() === normalizedAuthEmail);
+      if (matchedByEmail) {
+        return matchedByEmail;
+      }
+    }
+
+    return employees.find((employee) => employee.id === DEFAULT_EMPLOYEE_ID) ?? null;
+  }, [authEmail, employees]);
+
+  const currentEmployeeId = currentEmployee?.id ?? DEFAULT_EMPLOYEE_ID;
 
   function reloadPublishedSchedule() {
     const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
@@ -858,6 +878,34 @@ export default function DashboardPage() {
       setScheduleData(normalizeLoadedSchedule(JSON.parse(raw)));
     }
   }
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAuthenticatedUser() {
+      const { data } = await supabase.auth.getUser();
+      if (!isMounted) {
+        return;
+      }
+
+      setAuthEmail(data.user?.email?.trim().toLowerCase() ?? '');
+    }
+
+    loadAuthenticatedUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setAuthEmail(session?.user?.email?.trim().toLowerCase() ?? '');
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -888,7 +936,7 @@ export default function DashboardPage() {
         setOpenShiftRequests(JSON.parse(openShiftRaw));
       }
 
-      const readRaw = window.localStorage.getItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${CURRENT_EMPLOYEE_ID}`);
+      const readRaw = window.localStorage.getItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`);
       if (readRaw) {
         setReadAnnouncementIds(JSON.parse(readRaw));
       }
@@ -929,7 +977,7 @@ export default function DashboardPage() {
     } finally {
       setMounted(true);
     }
-  }, [currentPayPeriod.key]);
+  }, [currentEmployeeId, currentPayPeriod.key]);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -1024,10 +1072,6 @@ export default function DashboardPage() {
 
   const [week1Dates, week2Dates] = useMemo(() => splitIntoWeeks(dates), [dates]);
 
-  const currentEmployee = useMemo(() => {
-    return employees.find((employee) => employee.id === CURRENT_EMPLOYEE_ID) ?? null;
-  }, [employees]);
-
   const certificationStatus = useMemo(() => getCertificationStatus(currentEmployee), [currentEmployee]);
   const isSupervisorUser = currentEmployee?.role === 'Supervisor';
 
@@ -1050,17 +1094,17 @@ export default function DashboardPage() {
     const activeIds = activeAnnouncements.map((announcement) => announcement.id);
     const updated = Array.from(new Set([...readAnnouncementIds, ...activeIds]));
     setReadAnnouncementIds(updated);
-    window.localStorage.setItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${CURRENT_EMPLOYEE_ID}`, JSON.stringify(updated));
+    window.localStorage.setItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`, JSON.stringify(updated));
   }
 
   const currentEmployeeMessages = useMemo(() => {
     return apolloMessages
-      .filter((message) => message.senderId === CURRENT_EMPLOYEE_ID || message.recipients.some((recipient) => recipient.employeeId === CURRENT_EMPLOYEE_ID))
+      .filter((message) => message.senderId === currentEmployeeId || message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [apolloMessages]);
 
   const unreadMessageCount = currentEmployeeMessages.filter(
-    (message) => message.senderId !== CURRENT_EMPLOYEE_ID && message.recipients.some((recipient) => recipient.employeeId === CURRENT_EMPLOYEE_ID && !recipient.readAt),
+    (message) => message.senderId !== currentEmployeeId && message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId && !recipient.readAt),
   ).length;
 
   const conversations = useMemo(() => {
@@ -1078,7 +1122,7 @@ export default function DashboardPage() {
         messages: messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
         latest: messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0],
         unreadCount: messages.filter(
-          (message) => message.senderId !== CURRENT_EMPLOYEE_ID && message.recipients.some((recipient) => recipient.employeeId === CURRENT_EMPLOYEE_ID && !recipient.readAt),
+          (message) => message.senderId !== currentEmployeeId && message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId && !recipient.readAt),
         ).length,
       }))
       .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
@@ -1098,7 +1142,7 @@ export default function DashboardPage() {
       return {
         ...message,
         recipients: message.recipients.map((recipient) =>
-          recipient.employeeId === CURRENT_EMPLOYEE_ID && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
+          recipient.employeeId === currentEmployeeId && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
         ),
       };
     });
@@ -1111,7 +1155,7 @@ export default function DashboardPage() {
     const updated = apolloMessages.map((message) => ({
       ...message,
       recipients: message.recipients.map((recipient) =>
-        recipient.employeeId === CURRENT_EMPLOYEE_ID && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
+        recipient.employeeId === currentEmployeeId && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
       ),
     }));
 
@@ -1119,8 +1163,8 @@ export default function DashboardPage() {
   }
 
   function getMessageStatus(message: ApolloMessage): string {
-    if (message.senderId !== CURRENT_EMPLOYEE_ID) {
-      const mine = message.recipients.find((recipient) => recipient.employeeId === CURRENT_EMPLOYEE_ID);
+    if (message.senderId !== currentEmployeeId) {
+      const mine = message.recipients.find((recipient) => recipient.employeeId === currentEmployeeId);
       return mine?.readAt ? 'Read' : 'Delivered';
     }
 
@@ -1152,7 +1196,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const recipients = getRecipientEmployeesForMode(messageRecipientMode).filter((employee) => employee.id !== CURRENT_EMPLOYEE_ID);
+    const recipients = getRecipientEmployeesForMode(messageRecipientMode).filter((employee) => employee.id !== currentEmployeeId);
     if (recipients.length === 0 && messageRecipientMode !== 'SUPERVISORS') {
       window.alert('No recipients were found for that selection.');
       return;
@@ -1162,12 +1206,12 @@ export default function DashboardPage() {
     const finalRecipients =
       recipients.length > 0
         ? recipients
-        : [{ id: CURRENT_SUPERVISOR_ID, name: 'Supervisor', role: 'Supervisor' as const, scope: 'ALS' as const, employeeType: 'Supervisor', seniorityLabel: '', certifications: EMPTY_CERTIFICATIONS, status: 'Active' }];
+        : [{ id: CURRENT_SUPERVISOR_ID, name: 'Supervisor', email: 'supervisor@sscems.org', role: 'Supervisor' as const, scope: 'ALS' as const, employeeType: 'Supervisor', seniorityLabel: '', certifications: EMPTY_CERTIFICATIONS, status: 'Active' }];
 
     const message: ApolloMessage = {
       id: `message-${Date.now()}`,
       conversationId: `conversation-${Date.now()}`,
-      senderId: CURRENT_EMPLOYEE_ID,
+      senderId: currentEmployeeId,
       senderName: currentEmployee?.name ?? 'Employee',
       senderRole: 'EMPLOYEE',
       recipients: finalRecipients.map((employee) => ({
@@ -1204,11 +1248,11 @@ export default function DashboardPage() {
       ]),
     );
 
-    const recipientIds = existingParticipantIds.filter((id) => id !== CURRENT_EMPLOYEE_ID);
+    const recipientIds = existingParticipantIds.filter((id) => id !== currentEmployeeId);
     const reply: ApolloMessage = {
       id: `message-${Date.now()}`,
       conversationId: selectedConversation.conversationId,
-      senderId: CURRENT_EMPLOYEE_ID,
+      senderId: currentEmployeeId,
       senderName: currentEmployee?.name ?? 'Employee',
       senderRole: 'EMPLOYEE',
       recipients: recipientIds.map((employeeId) => ({
@@ -1253,7 +1297,7 @@ export default function DashboardPage() {
         if (showFullSchedule) {
           return assignment.slots.length > 0 || getOpenSlotCount(assignment) > 0;
         }
-        return assignment.slots.some((slot) => slot.employeeId === CURRENT_EMPLOYEE_ID);
+        return assignment.slots.some((slot) => slot.employeeId === currentEmployeeId);
       });
     }
 
@@ -1269,7 +1313,7 @@ export default function DashboardPage() {
       const dayAssignments = assignmentsByDate[toDateKey(date)] ?? [];
 
       for (const assignment of dayAssignments) {
-        const slot = assignment.slots.find((item) => item.employeeId === CURRENT_EMPLOYEE_ID);
+        const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId);
         if (slot) {
           return {
             date,
@@ -1293,7 +1337,7 @@ export default function DashboardPage() {
       const dayAssignments = assignmentsByDate[dateKey] ?? [];
 
       for (const assignment of dayAssignments) {
-        const slot = assignment.slots.find((item) => item.employeeId === CURRENT_EMPLOYEE_ID);
+        const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId);
         if (!slot) {
           continue;
         }
@@ -1325,7 +1369,7 @@ export default function DashboardPage() {
 
   const currentEmployeePunches = useMemo(() => {
     return timePunches
-      .filter((punch) => punch.employeeId === CURRENT_EMPLOYEE_ID)
+      .filter((punch) => punch.employeeId === currentEmployeeId)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [timePunches]);
 
@@ -1350,7 +1394,7 @@ export default function DashboardPage() {
   }
 
   function getTimecardNoteKey(): string {
-    return `${CURRENT_EMPLOYEE_ID}-${selectedPayPeriod.key}`;
+    return `${currentEmployeeId}-${selectedPayPeriod.key}`;
   }
 
   function saveTimecardNote(value: string) {
@@ -1375,7 +1419,7 @@ export default function DashboardPage() {
 
     const newBreak: MissedMealBreak = {
       id: `missed-meal-${Date.now()}`,
-      employeeId: CURRENT_EMPLOYEE_ID,
+      employeeId: currentEmployeeId,
       dateKey: missedMealDateKey,
       reason: missedMealReason.trim(),
       createdAt: new Date().toISOString(),
@@ -1424,19 +1468,19 @@ export default function DashboardPage() {
   }
 
   const payPeriodMissedMealBreaks = missedMealBreaks.filter(
-    (item) => item.employeeId === CURRENT_EMPLOYEE_ID && dates.some((date) => toDateKey(date) === item.dateKey),
+    (item) => item.employeeId === currentEmployeeId && dates.some((date) => toDateKey(date) === item.dateKey),
   );
 
   const payPeriodCorrections = timecardCorrections.filter(
-    (item) => item.employeeId === CURRENT_EMPLOYEE_ID && item.payPeriodKey === selectedPayPeriod.key,
+    (item) => item.employeeId === currentEmployeeId && item.payPeriodKey === selectedPayPeriod.key,
   );
 
   const submittedTimecard = submittedTimecards.find(
-    (item) => item.employeeId === CURRENT_EMPLOYEE_ID && item.payPeriodKey === selectedPayPeriod.key,
+    (item) => item.employeeId === currentEmployeeId && item.payPeriodKey === selectedPayPeriod.key,
   ) ?? null;
 
   function getEditableRowKey(dateKey: string): string {
-    return `${CURRENT_EMPLOYEE_ID}-${selectedPayPeriod.key}-${dateKey}`;
+    return `${currentEmployeeId}-${selectedPayPeriod.key}-${dateKey}`;
   }
 
   function getIsoDateInputValue(date: Date): string {
@@ -1665,7 +1709,7 @@ export default function DashboardPage() {
       if (row.clockInDate && row.clockInTime) {
         punches.push({
           id: `editable-clock-in-${dateKey}`,
-          employeeId: CURRENT_EMPLOYEE_ID,
+          employeeId: currentEmployeeId,
           type: 'CLOCK_IN',
           timestamp: new Date(`${row.clockInDate}T${row.clockInTime}:00`).toISOString(),
           shiftDateKey: dateKey,
@@ -1681,7 +1725,7 @@ export default function DashboardPage() {
       if (row.clockOutDate && row.clockOutTime) {
         punches.push({
           id: `editable-clock-out-${dateKey}`,
-          employeeId: CURRENT_EMPLOYEE_ID,
+          employeeId: currentEmployeeId,
           type: 'CLOCK_OUT',
           timestamp: new Date(`${row.clockOutDate}T${row.clockOutTime}:00`).toISOString(),
           shiftDateKey: dateKey,
@@ -1724,7 +1768,7 @@ export default function DashboardPage() {
 
     const correction: TimecardCorrectionRequest = {
       id: `correction-${Date.now()}`,
-      employeeId: CURRENT_EMPLOYEE_ID,
+      employeeId: currentEmployeeId,
       payPeriodKey: selectedPayPeriod.key,
       dateKey: correctionDateKey,
       shiftLabel: correctionShiftLabel,
@@ -1769,8 +1813,8 @@ export default function DashboardPage() {
     }
 
     const timecard: SubmittedTimecard = {
-      id: `timecard-${CURRENT_EMPLOYEE_ID}-${selectedPayPeriod.key}-${Date.now()}`,
-      employeeId: CURRENT_EMPLOYEE_ID,
+      id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${Date.now()}`,
+      employeeId: currentEmployeeId,
       employeeName: currentEmployee?.name ?? 'Current Employee',
       payPeriodKey: selectedPayPeriod.key,
       payPeriodStart: selectedPayPeriod.start.toISOString(),
@@ -1806,7 +1850,7 @@ export default function DashboardPage() {
     const dayAssignments = assignmentsByDate[dateKey] ?? [];
 
     return dayAssignments.find((assignment) =>
-      assignment.slots.some((slot) => slot.employeeId === CURRENT_EMPLOYEE_ID),
+      assignment.slots.some((slot) => slot.employeeId === currentEmployeeId),
     ) ?? null;
   }
 
@@ -1843,7 +1887,7 @@ export default function DashboardPage() {
 
       const punch: TimePunch = {
         id: `punch-${Date.now()}`,
-        employeeId: CURRENT_EMPLOYEE_ID,
+        employeeId: currentEmployeeId,
         type,
         timestamp: new Date().toISOString(),
         shiftDateKey: activeShift.dateKey,
@@ -1867,7 +1911,7 @@ export default function DashboardPage() {
     } catch (error) {
       const punch: TimePunch = {
         id: `punch-${Date.now()}`,
-        employeeId: CURRENT_EMPLOYEE_ID,
+        employeeId: currentEmployeeId,
         type,
         timestamp: new Date().toISOString(),
         shiftDateKey: activeShift.dateKey,
@@ -1985,7 +2029,7 @@ export default function DashboardPage() {
   function hasCurrentEmployeeRequestedShift(dateKey: string, shiftKey: string): boolean {
     return openShiftRequests.some(
       (request) =>
-        request.employeeId === CURRENT_EMPLOYEE_ID &&
+        request.employeeId === currentEmployeeId &&
         request.dateKey === dateKey &&
         request.shiftKey === shiftKey &&
         request.status === 'PENDING',
@@ -2000,7 +2044,7 @@ export default function DashboardPage() {
       return;
     }
 
-    if (assignment.slots.some((slot) => slot.employeeId === CURRENT_EMPLOYEE_ID)) {
+    if (assignment.slots.some((slot) => slot.employeeId === currentEmployeeId)) {
       window.alert('You are already assigned to this shift.');
       return;
     }
@@ -2022,7 +2066,7 @@ export default function DashboardPage() {
 
     const request: OpenShiftRequest = {
       id: `open-shift-${Date.now()}`,
-      employeeId: CURRENT_EMPLOYEE_ID,
+      employeeId: currentEmployeeId,
       employeeName: currentEmployee.name,
       dateKey,
       shiftKey: assignment.key,
@@ -2080,7 +2124,7 @@ export default function DashboardPage() {
                             {showFullSchedule &&
                               isFutureOrToday(date) &&
                               getOpenSlotCount(assignment) > 0 &&
-                              !assignment.slots.some((slot) => slot.employeeId === CURRENT_EMPLOYEE_ID) && (
+                              !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId) && (
                                 <button
                                   type="button"
                                   onClick={() => requestOpenShift(date, assignment)}
@@ -2101,7 +2145,7 @@ export default function DashboardPage() {
 
                             {assignment.slots.map((slot, index) => {
                               const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-                              const isCurrentEmployee = slot.employeeId === CURRENT_EMPLOYEE_ID;
+                              const isCurrentEmployee = slot.employeeId === currentEmployeeId;
 
                               return (
                                 <div
@@ -2856,7 +2900,7 @@ export default function DashboardPage() {
                       >
                         <option value="">Select employee</option>
                         {employees
-                          .filter((employee) => employee.id !== CURRENT_EMPLOYEE_ID && employee.status?.toLowerCase() !== 'removed')
+                          .filter((employee) => employee.id !== currentEmployeeId && employee.status?.toLowerCase() !== 'removed')
                           .map((employee) => (
                             <option key={employee.id} value={employee.id}>
                               {employee.name}
@@ -2965,7 +3009,7 @@ export default function DashboardPage() {
 
                     <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
                       {selectedConversation.messages.map((message) => {
-                        const isMine = message.senderId === CURRENT_EMPLOYEE_ID;
+                        const isMine = message.senderId === currentEmployeeId;
                         const isUrgent = message.priority === 'URGENT' || message.relatedType === 'URGENT';
 
                         return (
