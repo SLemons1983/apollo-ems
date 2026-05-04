@@ -1771,7 +1771,7 @@ export default function DashboardPage() {
     const timecard: SubmittedTimecard = {
       id: `timecard-${CURRENT_EMPLOYEE_ID}-${selectedPayPeriod.key}-${Date.now()}`,
       employeeId: CURRENT_EMPLOYEE_ID,
-      employeeName: currentEmployee?.name ?? 'Current Employee',
+      employeeName: currentEmployee?.name ?? 'Employee profile not linked',
       payPeriodKey: selectedPayPeriod.key,
       payPeriodStart: selectedPayPeriod.start.toISOString(),
       payPeriodEnd: selectedPayPeriod.end.toISOString(),
@@ -2164,7 +2164,7 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Dashboard</h1>
               <div className="mt-1 text-sm text-slate-600">
-                {currentEmployee ? currentEmployee.name : 'Current employee'} • Personal dashboard
+                {currentEmployee ? currentEmployee.name : authLoaded ? 'Employee profile not linked' : 'Loading employee profile'} • Personal dashboard
               </div>
 
               {isSupervisorUser && (
@@ -2176,6 +2176,12 @@ export default function DashboardPage() {
                 >
                   Supervisor Tools
                 </a>
+              )}
+
+              {authLoaded && authEmail && !currentEmployee && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
+                  No employee profile is linked to {authEmail}. Check the email field in Employee Profiles.
+                </div>
               )}
             </div>
 
@@ -2207,14 +2213,6 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-700 shadow-sm">
-                {currentEmployee?.name
-                  ?.split(',')
-                  .map((part) => part.trim()[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join('') || 'ME'}
-              </div>
             </div>
           </div>
         </div>
@@ -2425,7 +2423,7 @@ export default function DashboardPage() {
                     <div className="rounded-xl border border-slate-300">
                       <div className="border-b border-slate-300 bg-slate-50 px-3 py-1 text-xs font-bold">Employee's Name:</div>
                       <div className="min-h-[42px] px-3 py-2 text-sm font-semibold text-slate-900">
-                        {currentEmployee?.name ?? 'Current Employee'}
+                        {currentEmployee?.name ?? 'Employee profile not linked'}
                       </div>
                     </div>
 
