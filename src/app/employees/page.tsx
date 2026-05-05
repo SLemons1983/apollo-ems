@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../../lib/supabase';
 
 type CertificationRecord = {
   driversLicense: string;
@@ -32,6 +33,22 @@ type EmployeeProfile = {
   notes: string;
 };
 
+type SupabaseEmployeeRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  scope: string | null;
+  job_title: string | null;
+  status: string | null;
+  employee_type: string | null;
+  seniority_label: string | null;
+  certifications: CertificationRecord | null;
+  notes: string | null;
+};
+
 type EmployeeFormState = {
   firstName: string;
   lastName: string;
@@ -52,7 +69,6 @@ type ScheduleData = Record<string, {
   extras?: unknown[];
 }>;
 
-const STORAGE_KEY = 'apollo-employee-profiles-v2';
 const SCHEDULE_STORAGE_KEY = 'apollo-schedule-page-v6';
 
 const EMPTY_CERTIFICATIONS: CertificationRecord = {
@@ -797,6 +813,55 @@ function normalizeEmployee(employee: EmployeeProfile): EmployeeProfile {
   };
 }
 
+function employeeFromSupabase(row: SupabaseEmployeeRow): EmployeeProfile {
+  return normalizeEmployee({
+    id: row.id,
+    firstName: row.first_name || '',
+    lastName: row.last_name || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    role: row.role || 'EMT',
+    scope: row.scope || defaultScopeForRole(row.role || 'EMT'),
+    jobTitle: row.job_title || '',
+    status: row.status || 'Active',
+    employeeType: row.employee_type || 'Full Time',
+    seniorityLabel: row.seniority_label || 'Seniority Unassigned',
+    certifications: normalizeCertificationRecord(row.certifications || undefined),
+    notes: row.notes || '',
+  });
+}
+
+function employeeToSupabase(employee: EmployeeProfile): SupabaseEmployeeRow {
+  const normalized = normalizeEmployee(employee);
+
+  return {
+    id: normalized.id,
+    first_name: normalized.firstName,
+    last_name: normalized.lastName,
+    email: normalized.email,
+    phone: normalized.phone,
+    role: normalized.role,
+    scope: normalized.scope,
+    job_title: normalized.jobTitle,
+    status: normalized.status,
+    employee_type: normalized.employeeType,
+    seniority_label: normalized.seniorityLabel,
+    certifications: normalizeCertificationRecord(normalized.certifications),
+    notes: normalized.notes,
+  };
+}
+
+async function saveEmployeeToSupabase(employee: EmployeeProfile): Promise<void> {
+  const { error } = await supabase
+    .from('employees')
+    .upsert(employeeToSupabase(employee), { onConflict: 'id' });
+
+  if (error) {
+    console.error('Failed to save employee profile to Supabase:', error);
+    window.alert(`Supabase save failed: ${error.message}`);
+  }
+}
+
 function removeEmployeeFromFutureSchedules(employeeId: string): void {
   try {
     const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
@@ -875,34 +940,55 @@ export default function EmployeeProfilesPage() {
   const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(EMPTY_EMPLOYEE);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-      if (raw) {
-        const parsed = JSON.parse(raw) as EmployeeProfile[];
-        setEmployees(sortEmployees(parsed.map(normalizeEmployee)));
-      } else {
-        setEmployees(sortEmployees(INITIAL_EMPLOYEES.map(normalizeEmployee)));
+    async function loadEmployeesFromSupabase() {
+      try {
+        const { data, error } = await supabase
+          .from('employees')
+          .select('*')
+          .order('last_name', { ascending: true })
+          .order('first_name', { ascending: true });
+
+        if (error) {
+          throw error;
+        }
+
+        if (!data || data.length === 0) {
+          const seedEmployees = sortEmployees(INITIAL_EMPLOYEES.map(normalizeEmployee));
+          const { error: seedError } = await supabase
+            .from('employees')
+            .upsert(seedEmployees.map(employeeToSupabase), { onConflict: 'id' });
+
+          if (seedError) {
+            throw seedError;
+          }
+
+          if (!cancelled) {
+            setEmployees(seedEmployees);
+          }
+        } else if (!cancelled) {
+          setEmployees(sortEmployees((data as SupabaseEmployeeRow[]).map(employeeFromSupabase)));
+        }
+      } catch (error) {
+        console.error('Failed to load employee profiles from Supabase:', error);
+        if (!cancelled) {
+          setEmployees(sortEmployees(INITIAL_EMPLOYEES.map(normalizeEmployee)));
+          window.alert('Employee profiles could not load from Supabase. Apollo loaded the built-in employee list as a temporary fallback.');
+        }
+      } finally {
+        if (!cancelled) {
+          setMounted(true);
+        }
       }
-    } catch (error) {
-      console.error('Failed to load employee profiles:', error);
-      setEmployees(sortEmployees(INITIAL_EMPLOYEES.map(normalizeEmployee)));
-    } finally {
-      setMounted(true);
     }
+
+    loadEmployeesFromSupabase();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  useEffect(() => {
-    if (!mounted) {
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
-    } catch (error) {
-      console.error('Failed to save employee profiles:', error);
-    }
-  }, [employees, mounted]);
 
   const filteredEmployees = useMemo(() => {
     const term = normalizeText(search);
@@ -1019,7 +1105,7 @@ export default function EmployeeProfilesPage() {
     });
   };
 
-  const handleAddEmployee = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddEmployee = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!newEmployee.firstName.trim() || !newEmployee.lastName.trim()) {
@@ -1052,6 +1138,16 @@ export default function EmployeeProfilesPage() {
       notes: newEmployee.notes.trim(),
     });
 
+    const { error } = await supabase
+      .from('employees')
+      .insert(employeeToSupabase(employeeToAdd));
+
+    if (error) {
+      console.error('Failed to add employee profile to Supabase:', error);
+      window.alert(`Supabase add failed: ${error.message}`);
+      return;
+    }
+
     setEmployees((current) => sortEmployees([...current, employeeToAdd]));
     setNewEmployee(EMPTY_EMPLOYEE);
     setShowAddForm(false);
@@ -1059,6 +1155,8 @@ export default function EmployeeProfilesPage() {
   };
 
   const handleEmployeeFieldChange = (employeeId: string, field: keyof EmployeeProfile, value: string) => {
+    let employeeToSave: EmployeeProfile | null = null;
+
     setEmployees((current) =>
       sortEmployees(
         current.map((employee) => {
@@ -1075,10 +1173,15 @@ export default function EmployeeProfilesPage() {
             updated.scope = defaultScopeForRole(value);
           }
 
-          return normalizeEmployee(updated);
+          employeeToSave = normalizeEmployee(updated);
+          return employeeToSave;
         }),
       ),
     );
+
+    if (employeeToSave) {
+      void saveEmployeeToSupabase(employeeToSave);
+    }
   };
 
   const handleEmployeeCertificationChange = (
@@ -1086,21 +1189,31 @@ export default function EmployeeProfilesPage() {
     field: keyof CertificationRecord,
     value: string,
   ) => {
+    let employeeToSave: EmployeeProfile | null = null;
+
     setEmployees((current) =>
       sortEmployees(
-        current.map((employee) =>
-          employee.id === employeeId
-            ? normalizeEmployee({
-                ...employee,
-                certifications: {
-                  ...normalizeCertificationRecord(employee.certifications),
-                  [field]: value,
-                },
-              })
-            : employee,
-        ),
+        current.map((employee) => {
+          if (employee.id !== employeeId) {
+            return employee;
+          }
+
+          employeeToSave = normalizeEmployee({
+            ...employee,
+            certifications: {
+              ...normalizeCertificationRecord(employee.certifications),
+              [field]: value,
+            },
+          });
+
+          return employeeToSave;
+        }),
       ),
     );
+
+    if (employeeToSave) {
+      void saveEmployeeToSupabase(employeeToSave);
+    }
   };
 
   const handleNewEmployeeCertificationChange = (field: keyof CertificationRecord, value: string) => {
@@ -1189,7 +1302,7 @@ export default function EmployeeProfilesPage() {
     );
   }
 
-  const handleRemoveEmployee = (employeeId: string, employeeName: string) => {
+  const handleRemoveEmployee = async (employeeId: string, employeeName: string) => {
     const acknowledgement = window.confirm(
       `Remove ${employeeName}?\n\nThis will remove the employee from Employee Profiles and also remove them from ALL FUTURE schedules starting today forward.\n\nPast schedules will stay unchanged.\n\nClick OK to continue.`,
     );
@@ -1206,6 +1319,17 @@ export default function EmployeeProfilesPage() {
       return;
     }
 
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', employeeId);
+
+    if (error) {
+      console.error('Failed to remove employee profile from Supabase:', error);
+      window.alert(`Supabase delete failed: ${error.message}`);
+      return;
+    }
+
     removeEmployeeFromFutureSchedules(employeeId);
     setEmployees((current) => current.filter((employee) => employee.id !== employeeId));
     setExpandedEmployeeId((current) => (current === employeeId ? null : current));
@@ -1214,6 +1338,12 @@ export default function EmployeeProfilesPage() {
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1850px]">
+        {!mounted && (
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700">
+            Loading employee profiles from Supabase...
+          </div>
+        )}
+
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
