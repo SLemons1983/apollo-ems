@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-
+import { supabase } from '@/lib/supabase';
 type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type UnitVehicle = '305' | '310' | '315' | '320' | '325' | '330' | '335' | '';
 type SupervisorVehicle = '300' | '301' | '302' | '303' | '';
@@ -1138,40 +1138,122 @@ export default function SchedulePage() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
 
   useEffect(() => {
+  const loadData = async () => {
     try {
+      // Load employees (already Supabase elsewhere, fallback safe)
       setEmployees(loadEmployeesFromProfiles());
 
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setScheduleData(normalizeLoadedData(JSON.parse(raw)));
+      // 🔥 LOAD SCHEDULE FROM SUPABASE
+      const { data: schedules, error: schedError } = await supabase
+        .from('schedules')
+        .select('*');
+
+      const { data: assignments, error: assignError } = await supabase
+        .from('schedule_assignments')
+        .select('*');
+
+      if (schedError || assignError) {
+        console.error('Supabase load failed:', schedError || assignError);
+      } else {
+        const rebuilt: ScheduleData = {};
+
+        for (const sched of schedules || []) {
+          rebuilt[sched.date_key] = createEmptyDaySchedule();
+        }
+
+        for (const row of assignments || []) {
+          if (!rebuilt[row.date_key]) {
+            rebuilt[row.date_key] = createEmptyDaySchedule();
+          }
+
+          const day = rebuilt[row.date_key];
+
+          const shiftName = row.shift_key as ShiftName;
+
+          if (day.standard[shiftName]) {
+            const shift = day.standard[shiftName];
+
+            const slotKey =
+              row.slot_number === 1
+                ? 'employee1'
+                : row.slot_number === 2
+                ? 'employee2'
+                : 'employee3';
+
+            shift[slotKey] = {
+              employeeId: row.employee_id || '',
+              startTime: row.start_time,
+              endTime: row.end_time,
+              note: row.note || '',
+            };
+
+            shift.vehicle = row.vehicle || '';
+            shift.allowExtendedHours = row.allow_extended_hours || false;
+          }
+        }
+
+        setScheduleData(rebuilt);
       }
     } catch (error) {
-      console.error('Failed to load saved schedule data:', error);
+      console.error('Schedule load error:', error);
     } finally {
       setMounted(true);
     }
+  };
 
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === EMPLOYEE_STORAGE_KEY) {
-        setEmployees(loadEmployeesFromProfiles());
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  loadData();
+}, []);
 
   useEffect(() => {
-    if (!mounted) {
-      return;
-    }
+  if (!mounted) return;
 
+  const saveToSupabase = async () => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(scheduleData));
+      for (const [dateKey, day] of Object.entries(scheduleData)) {
+        // Upsert schedule
+        await supabase.from('schedules').upsert({
+          id: dateKey,
+          date_key: dateKey,
+        });
+
+        for (const shiftName of SHIFT_ORDER) {
+          const shift = day.standard[shiftName];
+
+          const slots = [
+            shift.employee1,
+            shift.employee2,
+            shift.employee3,
+          ];
+
+          for (let i = 0; i < slots.length; i++) {
+            const slot = slots[i];
+
+            if (!slot.employeeId) continue;
+
+            await supabase.from('schedule_assignments').upsert({
+              id: `${dateKey}-${shiftName}-${i + 1}`,
+              schedule_id: dateKey,
+              date_key: dateKey,
+              shift_key: shiftName,
+              shift_label: SHIFT_DISPLAY_NAMES[shiftName],
+              slot_number: i + 1,
+              employee_id: slot.employeeId,
+              start_time: slot.startTime,
+              end_time: slot.endTime,
+              note: slot.note,
+              vehicle: shift.vehicle,
+              allow_extended_hours: shift.allowExtendedHours,
+            });
+          }
+        }
+      }
     } catch (error) {
-      console.error('Failed to save schedule data:', error);
+      console.error('Supabase save failed:', error);
     }
-  }, [mounted, scheduleData]);
+  };
+
+  saveToSupabase();
+}, [scheduleData]);
 
   const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
