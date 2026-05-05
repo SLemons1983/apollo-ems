@@ -48,6 +48,19 @@ type StoredEmployeeProfile = {
   status?: string;
 };
 
+type SupabaseEmployeeRow = {
+  id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+  scope: string | null;
+  employee_type: string | null;
+  seniority_label: string | null;
+  certifications: Partial<CertificationRecord> | null;
+  status: string | null;
+};
+
 type EmployeeSlot = {
   employeeId: string;
   startTime: string;
@@ -543,6 +556,43 @@ function buildEmployeeName(profile: StoredEmployeeProfile): string {
   return `${first} ${last}`.trim() || profile.id || 'Unnamed Employee';
 }
 
+function buildSupabaseEmployeeName(employee: SupabaseEmployeeRow): string {
+  const first = (employee.first_name ?? '').trim();
+  const last = (employee.last_name ?? '').trim();
+  if (last && first) return `${last}, ${first}`;
+  return `${first} ${last}`.trim() || employee.id || 'Unnamed Employee';
+}
+
+function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
+  return {
+    id: employee.id,
+    name: buildSupabaseEmployeeName(employee),
+    email: (employee.email ?? '').trim().toLowerCase(),
+    role: normalizeEmployeeRole(employee.role ?? undefined),
+    scope: normalizeEmployeeScope(employee.scope ?? undefined, employee.role ?? undefined),
+    employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
+    seniorityLabel: (employee.seniority_label ?? 'Seniority Unassigned').trim() || 'Seniority Unassigned',
+    certifications: normalizeCertificationRecord(employee.certifications ?? undefined),
+    status: (employee.status ?? 'Active').trim() || 'Active',
+  };
+}
+
+async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id,email,first_name,last_name,role,scope,employee_type,seniority_label,certifications,status')
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as SupabaseEmployeeRow[])
+    .map((employee) => mapSupabaseEmployee(employee))
+    .filter((employee) => employee.id);
+}
+
 function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment {
   if (!raw || typeof raw !== 'object') {
     return createEmptyShift(false);
@@ -909,7 +959,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     try {
-      setEmployees(loadEmployeesFromProfiles());
+      loadEmployeesFromSupabase()
+        .then((loadedEmployees) => {
+          setEmployees(loadedEmployees);
+        })
+        .catch((error) => {
+          console.error('Failed to load employee profiles from Supabase:', error);
+          setEmployees(loadEmployeesFromProfiles());
+        });
 
       reloadPublishedSchedule();
 
