@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type ImportantLink = {
   id: string;
@@ -144,6 +145,16 @@ type StoredEmployeeProfile = {
   scope?: string;
   employeeType?: string;
   status?: string;
+};
+
+type SupabaseEmployeeRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+  scope: string | null;
+  employee_type: string | null;
+  status: string | null;
 };
 
 type EmployeeOption = {
@@ -311,6 +322,42 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
   }
 }
 
+
+function buildSupabaseEmployeeName(employee: SupabaseEmployeeRow): string {
+  const first = (employee.first_name ?? '').trim();
+  const last = (employee.last_name ?? '').trim();
+  if (last && first) return `${last}, ${first}`;
+  return `${first} ${last}`.trim() || employee.id || 'Unnamed Employee';
+}
+
+function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
+  return {
+    id: employee.id,
+    name: buildSupabaseEmployeeName(employee),
+    role: normalizeRole(employee.role ?? undefined),
+    scope: normalizeScope(employee.scope ?? undefined, employee.role ?? undefined),
+    employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
+    status: (employee.status ?? 'Active').trim() || 'Active',
+  };
+}
+
+async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id,first_name,last_name,role,scope,employee_type,status')
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as SupabaseEmployeeRow[])
+    .map((employee) => mapSupabaseEmployee(employee))
+    .filter((employee) => employee.id && employee.status.toLowerCase() !== 'removed')
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function getDefaultSystemConfig(): SystemConfig {
   return {
     companyName: 'Sequoia Safety Council',
@@ -445,7 +492,15 @@ export default function SupervisorPage() {
         setAuditLog(JSON.parse(auditRaw));
       }
 
-      setEmployees(loadEmployeesFromProfiles());
+      loadEmployeesFromSupabase()
+        .then((loadedEmployees) => {
+          setEmployees(loadedEmployees);
+        })
+        .catch((employeeError) => {
+          console.error('Failed to load employees from Supabase. Falling back to localStorage:', employeeError);
+          setEmployees(loadEmployeesFromProfiles());
+        });
+
       setSelectedPayPeriodKey(currentPayPeriod.key);
     } catch (error) {
       console.error('Failed to load supervisor data:', error);
