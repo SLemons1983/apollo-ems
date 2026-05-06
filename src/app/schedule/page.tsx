@@ -350,20 +350,20 @@ function getOpenShiftLabel(employeeId: string): string {
   return '';
 }
 
-function createEmptyEmployeeSlot(endTime = DEFAULT_END_TIME): EmployeeSlot {
+function createEmptyEmployeeSlot(): EmployeeSlot {
   return {
     employeeId: '',
     startTime: DEFAULT_START_TIME,
-    endTime,
+    endTime: DEFAULT_END_TIME,
     note: '',
   };
 }
 
-function createEmptyShift(showEmployee3 = false, defaultEndTime = DEFAULT_END_TIME): ShiftAssignment {
+function createEmptyShift(showEmployee3 = false): ShiftAssignment {
   return {
-    employee1: createEmptyEmployeeSlot(defaultEndTime),
-    employee2: createEmptyEmployeeSlot(defaultEndTime),
-    employee3: createEmptyEmployeeSlot(defaultEndTime),
+    employee1: createEmptyEmployeeSlot(),
+    employee2: createEmptyEmployeeSlot(),
+    employee3: createEmptyEmployeeSlot(),
     showEmployee3,
     vehicle: '',
     allowExtendedHours: false,
@@ -875,10 +875,6 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
   }
 
   for (const slot of targetSlots) {
-    if (isOpenShiftSlot(slot.employeeId)) {
-      continue;
-    }
-
     const employee = getEmployeeById(slot.employeeId, employees);
 
     for (const other of getAssignmentRefsForDay(day)) {
@@ -892,7 +888,7 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
 
       const otherSlots = getAssignedSlotsForAssignment(other.category, other.shift);
 
-      if (otherSlots.some((otherSlot) => !isOpenShiftSlot(otherSlot.employeeId) && otherSlot.employeeId === slot.employeeId)) {
+      if (otherSlots.some((otherSlot) => otherSlot.employeeId === slot.employeeId)) {
         messages.push(`${employee?.name ?? 'Employee'} is also assigned to ${other.label} on the same day.`);
       }
     }
@@ -936,9 +932,6 @@ function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: s
       }
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-        if (isOpenShiftSlot(slot.employeeId)) {
-          continue;
-        }
         if (slot.employeeId === employeeId) {
           hasShift = true;
           hours += calculateSlotHours(slot.startTime, slot.endTime);
@@ -1006,10 +999,6 @@ function getContinuousHoursResult(
   const slots = getAssignedSlotsForAssignment(target.category, target.shift);
 
   for (const slot of slots) {
-    if (isOpenShiftSlot(slot.employeeId)) {
-      continue;
-    }
-
     const employee = getEmployeeById(slot.employeeId, employees);
     const summary = buildEmployeeDailyUnitSummary(scheduleData, slot.employeeId);
     const { totalHours, hasApproval } = getChainHours(summary, dateKey);
@@ -1112,9 +1101,6 @@ function getEmployeePayPeriodHours(
       }
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-        if (isOpenShiftSlot(slot.employeeId)) {
-          continue;
-        }
         if (slot.employeeId === employeeId) {
           hours += calculateSlotHours(slot.startTime, slot.endTime);
         }
@@ -1197,6 +1183,13 @@ export default function SchedulePage() {
   const [mounted, setMounted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
+
+  function markUnsavedChanges() {
+    setHasUnsavedChanges(true);
+    setSaveStatus('Unsaved changes. Click Confirm Changes to save.');
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -1327,137 +1320,139 @@ export default function SchedulePage() {
     };
   }, []);
 
-  useEffect(() => {
+  async function saveScheduleToSupabase() {
     if (!mounted) {
       return;
     }
 
-    const saveToSupabase = async () => {
-      try {
-        const normalizedSchedule = normalizeLoadedData(scheduleData);
+    setSaveStatus('Saving schedule changes...');
 
-        for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
-          const { error: scheduleError } = await supabase.from('schedules').upsert({
-            id: dateKey,
+    try {
+      const normalizedSchedule = normalizeLoadedData(scheduleData);
+
+      for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
+        const { error: scheduleError } = await supabase.from('schedules').upsert({
+          id: dateKey,
+          date_key: dateKey,
+          updated_at: new Date().toISOString(),
+        });
+
+        if (scheduleError) {
+          throw scheduleError;
+        }
+
+        const rows: any[] = [];
+
+        for (const shiftName of SHIFT_ORDER) {
+          const shift = day.standard[shiftName];
+          const slots = [shift.employee1, shift.employee2, shift.employee3];
+
+          slots.forEach((slot, index) => {
+            if (!slot.employeeId) {
+              return;
+            }
+
+            const isOpenSlot = isOpenShiftSlot(slot.employeeId);
+            rows.push({
+              id: `${dateKey}-${shiftName}-${index + 1}`,
+              schedule_id: dateKey,
+              date_key: dateKey,
+              shift_key: shiftName,
+              shift_label: SHIFT_DISPLAY_NAMES[shiftName],
+              slot_number: index + 1,
+              employee_id: isOpenSlot ? null : slot.employeeId,
+              start_time: slot.startTime || DEFAULT_START_TIME,
+              end_time: slot.endTime || DEFAULT_END_TIME,
+              note: slot.note || '',
+              vehicle: shift.vehicle || '',
+              allow_extended_hours: Boolean(shift.allowExtendedHours),
+              is_open_slot: isOpenSlot,
+              open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
+              updated_at: new Date().toISOString(),
+            });
+          });
+        }
+
+        for (const extra of day.extras) {
+          const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
+          const slots = [extra.employee1, extra.employee2, extra.employee3];
+
+          rows.push({
+            id: `${dateKey}-${extraShiftKey}-0`,
+            schedule_id: dateKey,
             date_key: dateKey,
+            shift_key: extraShiftKey,
+            shift_label: extra.label,
+            slot_number: 0,
+            employee_id: null,
+            start_time: DEFAULT_START_TIME,
+            end_time: DEFAULT_END_TIME,
+            note: '',
+            vehicle: extra.vehicle || '',
+            allow_extended_hours: Boolean(extra.allowExtendedHours),
+            is_open_slot: false,
+            open_slot_scope: null,
             updated_at: new Date().toISOString(),
           });
 
-          if (scheduleError) {
-            throw scheduleError;
-          }
+          slots.forEach((slot, index) => {
+            if (!slot.employeeId) {
+              return;
+            }
 
-          const { error: deleteError } = await supabase
-            .from('schedule_assignments')
-            .delete()
-            .eq('date_key', dateKey);
-
-          if (deleteError) {
-            throw deleteError;
-          }
-
-          const rows: any[] = [];
-
-          for (const shiftName of SHIFT_ORDER) {
-            const shift = day.standard[shiftName];
-            const slots = [shift.employee1, shift.employee2, shift.employee3];
-
-            slots.forEach((slot, index) => {
-              if (!slot.employeeId) {
-                return;
-              }
-
-              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-              rows.push({
-                id: `${dateKey}-${shiftName}-${index + 1}`,
-                schedule_id: dateKey,
-                date_key: dateKey,
-                shift_key: shiftName,
-                shift_label: SHIFT_DISPLAY_NAMES[shiftName],
-                slot_number: index + 1,
-                employee_id: isOpenSlot ? null : slot.employeeId,
-                start_time: slot.startTime || DEFAULT_START_TIME,
-                end_time: slot.endTime || DEFAULT_END_TIME,
-                note: slot.note || '',
-                vehicle: shift.vehicle || '',
-                allow_extended_hours: Boolean(shift.allowExtendedHours),
-                is_open_slot: isOpenSlot,
-                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-                updated_at: new Date().toISOString(),
-              });
-            });
-          }
-
-          for (const extra of day.extras) {
-            const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
-            const slots = [extra.employee1, extra.employee2, extra.employee3];
-
+            const isOpenSlot = isOpenShiftSlot(slot.employeeId);
             rows.push({
-              id: `${dateKey}-${extraShiftKey}-0`,
+              id: `${dateKey}-${extraShiftKey}-${index + 1}`,
               schedule_id: dateKey,
               date_key: dateKey,
               shift_key: extraShiftKey,
               shift_label: extra.label,
-              slot_number: 0,
-              employee_id: null,
-              start_time: DEFAULT_START_TIME,
-              end_time: DEFAULT_END_TIME,
-              note: '',
+              slot_number: index + 1,
+              employee_id: isOpenSlot ? null : slot.employeeId,
+              start_time: slot.startTime || DEFAULT_START_TIME,
+              end_time: slot.endTime || DEFAULT_END_TIME,
+              note: slot.note || '',
               vehicle: extra.vehicle || '',
               allow_extended_hours: Boolean(extra.allowExtendedHours),
-              is_open_slot: false,
-              open_slot_scope: null,
+              is_open_slot: isOpenSlot,
+              open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
               updated_at: new Date().toISOString(),
             });
+          });
+        }
 
-            slots.forEach((slot, index) => {
-              if (!slot.employeeId) {
-                return;
-              }
+        const { error: deleteError } = await supabase
+          .from('schedule_assignments')
+          .delete()
+          .eq('date_key', dateKey);
 
-              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-              rows.push({
-                id: `${dateKey}-${extraShiftKey}-${index + 1}`,
-                schedule_id: dateKey,
-                date_key: dateKey,
-                shift_key: extraShiftKey,
-                shift_label: extra.label,
-                slot_number: index + 1,
-                employee_id: isOpenSlot ? null : slot.employeeId,
-                start_time: slot.startTime || DEFAULT_START_TIME,
-                end_time: slot.endTime || DEFAULT_END_TIME,
-                note: slot.note || '',
-                vehicle: extra.vehicle || '',
-                allow_extended_hours: Boolean(extra.allowExtendedHours),
-                is_open_slot: isOpenSlot,
-                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-                updated_at: new Date().toISOString(),
-              });
-            });
-          }
+        if (deleteError) {
+          throw deleteError;
+        }
 
-          if (rows.length > 0) {
-            const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows);
+        if (rows.length > 0) {
+          const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows);
 
-            if (assignmentError) {
-              throw assignmentError;
-            }
+          if (assignmentError) {
+            throw assignmentError;
           }
         }
-      } catch (error) {
-        console.error('Supabase schedule save failed:', error);
       }
-    };
 
-    saveToSupabase();
-  }, [mounted, scheduleData]);
+      setHasUnsavedChanges(false);
+      setSaveStatus(`Schedule saved at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`);
+    } catch (error) {
+      console.error('Supabase schedule save failed:', error);
+      setSaveStatus('Schedule save failed. Check console and try again.');
+      window.alert('Schedule save failed. Please check the console for details and try again.');
+    }
+  }
 
+  const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
-  const dates = useMemo(() => Array.from({ length: 14 }, (_, index) => addDays(visiblePayPeriod.start, index)), [visiblePayPeriod]);
 
   const goToCurrentPayPeriod = () => {
-    const current = getPayPeriodInfo(new Date());
-    setAnchorDate(new Date(current.start));
+    setAnchorDate(getGlobalPayPeriodStart(new Date()));
   };
   const visibleYear = visiblePayPeriod.end.getFullYear();
   const payPeriodOptions = useMemo(() => {
@@ -1487,6 +1482,7 @@ export default function SchedulePage() {
     field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours',
     value: string | boolean,
   ) => {
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1513,6 +1509,7 @@ export default function SchedulePage() {
     field: keyof EmployeeSlot,
     value: string,
   ) => {
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1543,6 +1540,7 @@ export default function SchedulePage() {
     field: keyof ExtraShiftAssignment,
     value: string | boolean,
   ) => {
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1573,6 +1571,7 @@ export default function SchedulePage() {
     field: keyof EmployeeSlot,
     value: string,
   ) => {
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1613,6 +1612,7 @@ export default function SchedulePage() {
     const typeInput = window.prompt('Enter shift type: UNIT or SUPERVISOR', 'UNIT');
     const category: ShiftCategory = typeInput?.trim().toUpperCase() === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
 
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1641,6 +1641,7 @@ export default function SchedulePage() {
       return;
     }
 
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -1653,6 +1654,7 @@ export default function SchedulePage() {
   };
 
   const handleCopyPreviousDay = (dateKey: string, previousDateKey: string) => {
+    markUnsavedChanges();
     setScheduleData((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       const previousDay = getDaySchedule(next, previousDateKey);
@@ -1864,6 +1866,25 @@ export default function SchedulePage() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={saveScheduleToSupabase}
+                disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  hasUnsavedChanges
+                    ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                    : 'cursor-not-allowed bg-slate-200 text-slate-500'
+                }`}
+              >
+                Confirm Changes
+              </button>
+
+              <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                hasUnsavedChanges ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+              }`}>
+                {saveStatus}
               </div>
 
               <button

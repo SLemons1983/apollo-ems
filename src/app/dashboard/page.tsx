@@ -61,22 +61,6 @@ type SupabaseEmployeeRow = {
   status: string | null;
 };
 
-type SupabaseScheduleAssignmentRow = {
-  id: string;
-  date_key: string;
-  shift_key: string;
-  shift_label: string;
-  slot_number: number;
-  employee_id: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  note: string | null;
-  vehicle: string | null;
-  allow_extended_hours: boolean | null;
-  is_open_slot: boolean | null;
-  open_slot_scope: string | null;
-};
-
 type EmployeeSlot = {
   employeeId: string;
   startTime: string;
@@ -139,6 +123,30 @@ type OpenShiftRequest = {
   requestedAt: string;
   status: 'PENDING' | 'APPROVED' | 'DENIED';
   supervisorNote?: string;
+};
+
+
+type VacationRequest = {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  date_key: string;
+  shift_label: string;
+  start_time: string;
+  end_time: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  supervisor_note: string | null;
+  requested_at: string;
+};
+
+type SelectedVacationShift = {
+  dateKey: string;
+  dateLabel: string;
+  shiftKey: string;
+  shiftLabel: string;
+  startTime: string;
+  endTime: string;
 };
 
 type CompanyAnnouncement = {
@@ -305,8 +313,6 @@ const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
 const SYSTEM_CONFIG_STORAGE_KEY = 'apollo-system-config-v1';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
-const PAY_PERIOD_REFERENCE_NUMBER = 9;
-const PAY_PERIOD_REFERENCE_START = '2026-04-12';
 
 const DEFAULT_GEOFENCE_RADIUS_FEET = 500;
 
@@ -712,95 +718,6 @@ function normalizeLoadedSchedule(raw: unknown): ScheduleData {
   return output;
 }
 
-async function loadScheduleFromSupabase(): Promise<ScheduleData> {
-  const { data, error } = await supabase
-    .from('schedule_assignments')
-    .select('id,date_key,shift_key,shift_label,slot_number,employee_id,start_time,end_time,note,vehicle,allow_extended_hours,is_open_slot,open_slot_scope')
-    .order('date_key', { ascending: true })
-    .order('shift_key', { ascending: true })
-    .order('slot_number', { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const rebuilt: ScheduleData = {};
-
-  for (const row of (data ?? []) as SupabaseScheduleAssignmentRow[]) {
-    const dateKey = row.date_key;
-    if (!rebuilt[dateKey]) {
-      rebuilt[dateKey] = createEmptyDaySchedule();
-    }
-
-    const day = rebuilt[dateKey];
-    const employeeId = row.is_open_slot
-      ? row.open_slot_scope === 'ALS'
-        ? OPEN_ALS_SLOT_ID
-        : row.open_slot_scope === 'BLS'
-          ? OPEN_BLS_SLOT_ID
-          : ''
-      : row.employee_id ?? '';
-
-    const slot: EmployeeSlot = {
-      employeeId,
-      startTime: row.start_time || '06:00',
-      endTime: row.end_time || '06:00',
-      note: row.note || '',
-    };
-
-    if (row.shift_key.startsWith('EXTRA::')) {
-      const [, categoryText, extraId] = row.shift_key.split('::');
-      const category: ShiftCategory = categoryText === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
-      let extra = day.extras.find((item) => item.id === extraId);
-
-      if (!extra) {
-        extra = {
-          id: extraId || `extra-${Date.now()}`,
-          label: row.shift_label || 'Extra Shift',
-          category,
-          employee1: createEmptyEmployeeSlot(),
-          employee2: createEmptyEmployeeSlot(),
-          employee3: createEmptyEmployeeSlot(),
-          showEmployee3: false,
-          vehicle: (row.vehicle || '') as VehicleValue,
-          allowExtendedHours: Boolean(row.allow_extended_hours),
-        };
-        day.extras.push(extra);
-      }
-
-      extra.label = row.shift_label || extra.label;
-      extra.category = category;
-      extra.vehicle = (row.vehicle || '') as VehicleValue;
-      extra.allowExtendedHours = Boolean(row.allow_extended_hours);
-
-      if (row.slot_number === 1) extra.employee1 = slot;
-      if (row.slot_number === 2) extra.employee2 = slot;
-      if (row.slot_number === 3) {
-        extra.employee3 = slot;
-        extra.showEmployee3 = Boolean(slot.employeeId);
-      }
-    } else {
-      const shiftName = row.shift_key as ShiftName;
-      if (!day.standard[shiftName]) {
-        continue;
-      }
-
-      const shift = day.standard[shiftName];
-      shift.vehicle = (row.vehicle || '') as VehicleValue;
-      shift.allowExtendedHours = Boolean(row.allow_extended_hours);
-
-      if (row.slot_number === 1) shift.employee1 = slot;
-      if (row.slot_number === 2) shift.employee2 = slot;
-      if (row.slot_number === 3) {
-        shift.employee3 = slot;
-        shift.showEmployee3 = Boolean(slot.employeeId);
-      }
-    }
-  }
-
-  return normalizeLoadedSchedule(rebuilt);
-}
-
 function getDaySchedule(data: ScheduleData, dateKey: string): DaySchedule {
   return normalizeDaySchedule(data[dateKey]);
 }
@@ -846,31 +763,21 @@ function formatShortDate(date: Date): string {
   });
 }
 
-function getGlobalPayPeriodStart(date: Date): Date {
-  const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
-  const sunday = getSundayStart(date);
-  const diffDays = Math.round((sunday.getTime() - referenceStart.getTime()) / (1000 * 60 * 60 * 24));
-  const offsetWithinCycle = ((diffDays % 14) + 14) % 14;
-  return addDays(sunday, -offsetWithinCycle);
-}
-
-function buildPayPeriodOptions(baseDate: Date, count = 28): PayPeriodOption[] {
-  const currentStart = getGlobalPayPeriodStart(baseDate);
-  const start = addDays(currentStart, -14 * 6);
+function buildPayPeriodOptions(baseDate: Date, count = 12): PayPeriodOption[] {
+  const year = baseDate.getFullYear();
+  const januaryFirst = new Date(year, 0, 1);
+  const firstSunday = getSundayStart(addDays(januaryFirst, (7 - januaryFirst.getDay()) % 7));
   const options: PayPeriodOption[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const periodStart = addDays(start, index * 14);
-    const end = addDays(periodStart, 13);
-    const diffDays = Math.round((periodStart.getTime() - new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`).getTime()) / (1000 * 60 * 60 * 24));
-    const number = PAY_PERIOD_REFERENCE_NUMBER + Math.floor(diffDays / 14);
-    const year = periodStart.getFullYear();
+    const start = addDays(firstSunday, index * 14);
+    const end = addDays(start, 13);
 
     options.push({
-      key: `${year}-pp-${number}`,
+      key: `${year}-pp-${index + 1}`,
       year,
-      number,
-      start: periodStart,
+      number: index + 1,
+      start,
       end,
     });
   }
@@ -1020,6 +927,9 @@ export default function DashboardPage() {
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
+  const [selectedVacationShift, setSelectedVacationShift] = useState<SelectedVacationShift | null>(null);
+  const [vacationReason, setVacationReason] = useState('');
+  const [vacationRequestStatus, setVacationRequestStatus] = useState('');
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
   const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
@@ -1038,14 +948,101 @@ export default function DashboardPage() {
 
   async function reloadPublishedSchedule() {
     try {
-      const loaded = await loadScheduleFromSupabase();
-      setScheduleData(loaded);
-    } catch (error) {
-      console.error('Failed to load schedule from Supabase:', error);
-      const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
-      if (raw) {
-        setScheduleData(normalizeLoadedSchedule(JSON.parse(raw)));
+      const { data: schedules, error: scheduleError } = await supabase
+        .from('schedules')
+        .select('id,date_key')
+        .order('date_key', { ascending: true });
+
+      if (scheduleError) {
+        throw scheduleError;
       }
+
+      const { data: assignments, error: assignmentError } = await supabase
+        .from('schedule_assignments')
+        .select('*')
+        .order('date_key', { ascending: true })
+        .order('shift_key', { ascending: true })
+        .order('slot_number', { ascending: true });
+
+      if (assignmentError) {
+        throw assignmentError;
+      }
+
+      const rebuilt: ScheduleData = {};
+      for (const schedule of schedules ?? []) {
+        rebuilt[String(schedule.date_key)] = createEmptyDaySchedule();
+      }
+
+      for (const row of assignments ?? []) {
+        const dateKey = String(row.date_key);
+        if (!rebuilt[dateKey]) {
+          rebuilt[dateKey] = createEmptyDaySchedule();
+        }
+
+        const savedEmployeeId = row.is_open_slot
+          ? row.open_slot_scope === 'ALS'
+            ? OPEN_ALS_SLOT_ID
+            : row.open_slot_scope === 'BLS'
+              ? OPEN_BLS_SLOT_ID
+              : ''
+          : row.employee_id ?? '';
+
+        const slot: EmployeeSlot = {
+          employeeId: savedEmployeeId,
+          startTime: row.start_time || '06:00',
+          endTime: row.end_time || '06:00',
+          note: row.note || '',
+        };
+
+        const day = rebuilt[dateKey];
+        if (String(row.shift_key).startsWith('EXTRA::')) {
+          const [, categoryText, extraId] = String(row.shift_key).split('::');
+          const category: ShiftCategory = categoryText === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
+          let extra = day.extras.find((item) => item.id === extraId);
+
+          if (!extra) {
+            extra = {
+              id: extraId || `extra-${Date.now()}`,
+              label: row.shift_label || 'Extra Shift',
+              category,
+              employee1: createEmptyEmployeeSlot(),
+              employee2: createEmptyEmployeeSlot(),
+              employee3: createEmptyEmployeeSlot(),
+              showEmployee3: false,
+              vehicle: row.vehicle || '',
+              allowExtendedHours: Boolean(row.allow_extended_hours),
+            };
+            day.extras.push(extra);
+          }
+
+          extra.label = row.shift_label || extra.label;
+          extra.category = category;
+          extra.vehicle = row.vehicle || '';
+          extra.allowExtendedHours = Boolean(row.allow_extended_hours);
+          if (row.slot_number === 1) extra.employee1 = slot;
+          if (row.slot_number === 2) extra.employee2 = slot;
+          if (row.slot_number === 3) {
+            extra.employee3 = slot;
+            extra.showEmployee3 = Boolean(slot.employeeId);
+          }
+        } else {
+          const shiftName = row.shift_key as ShiftName;
+          if (!day.standard[shiftName]) continue;
+          const shift = day.standard[shiftName];
+          shift.vehicle = row.vehicle || '';
+          shift.allowExtendedHours = Boolean(row.allow_extended_hours);
+          if (row.slot_number === 1) shift.employee1 = slot;
+          if (row.slot_number === 2) shift.employee2 = slot;
+          if (row.slot_number === 3) {
+            shift.employee3 = slot;
+            shift.showEmployee3 = Boolean(slot.employeeId);
+          }
+        }
+      }
+
+      setScheduleData(normalizeLoadedSchedule(rebuilt));
+    } catch (error) {
+      console.error('Failed to load published schedule from Supabase:', error);
     }
   }
 
@@ -1091,7 +1088,7 @@ export default function DashboardPage() {
           setEmployees(loadEmployeesFromProfiles());
         });
 
-      void reloadPublishedSchedule();
+      reloadPublishedSchedule();
 
       const announcementRaw = window.localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
       if (announcementRaw) {
@@ -2259,6 +2256,37 @@ export default function DashboardPage() {
     saveOpenShiftRequests([request, ...openShiftRequests]);
   }
 
+  async function submitVacationRequest() {
+    if (!currentEmployee || !selectedVacationShift) {
+      return;
+    }
+
+    const request: VacationRequest = {
+      id: `vacation-${currentEmployee.id}-${selectedVacationShift.dateKey}-${Date.now()}`,
+      employee_id: currentEmployee.id,
+      employee_name: currentEmployee.name,
+      date_key: selectedVacationShift.dateKey,
+      shift_label: selectedVacationShift.shiftLabel,
+      start_time: selectedVacationShift.startTime,
+      end_time: selectedVacationShift.endTime,
+      reason: vacationReason.trim(),
+      status: 'PENDING',
+      supervisor_note: null,
+      requested_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('vacation_requests').insert(request);
+    if (error) {
+      console.error('Failed to submit vacation request:', error);
+      setVacationRequestStatus('Vacation request could not be submitted. Please try again.');
+      return;
+    }
+
+    setVacationRequestStatus('Vacation request submitted to supervisors.');
+    setVacationReason('');
+    setSelectedVacationShift(null);
+  }
+
   function renderScheduleWeek(weekLabel: string, weekDates: Date[]) {
     return (
       <div key={weekLabel} className="rounded-2xl border border-slate-200 bg-white">
@@ -2330,7 +2358,34 @@ export default function DashboardPage() {
                               return (
                                 <div
                                   key={`${assignment.key}-${slot.employeeId}-${index}`}
-                                  className={`rounded-lg border px-2.5 py-2 ${
+                                  role={isCurrentEmployee ? 'button' : undefined}
+                                  tabIndex={isCurrentEmployee ? 0 : undefined}
+                                  onClick={() => {
+                                    if (!isCurrentEmployee) return;
+                                    setVacationRequestStatus('');
+                                    setSelectedVacationShift({
+                                      dateKey,
+                                      dateLabel: formatShortDate(date),
+                                      shiftKey: assignment.key,
+                                      shiftLabel: assignment.label,
+                                      startTime: slot.startTime,
+                                      endTime: slot.endTime,
+                                    });
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (!isCurrentEmployee || (event.key !== 'Enter' && event.key !== ' ')) return;
+                                    event.preventDefault();
+                                    setVacationRequestStatus('');
+                                    setSelectedVacationShift({
+                                      dateKey,
+                                      dateLabel: formatShortDate(date),
+                                      shiftKey: assignment.key,
+                                      shiftLabel: assignment.label,
+                                      startTime: slot.startTime,
+                                      endTime: slot.endTime,
+                                    });
+                                  }}
+                                  className={`rounded-lg border px-2.5 py-2 ${isCurrentEmployee ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200' : ''} ${
                                     isCurrentEmployee
                                       ? 'border-emerald-200 bg-emerald-50'
                                       : isOpenSlot
@@ -2360,6 +2415,12 @@ export default function DashboardPage() {
                                     </div>
                                   )}
 
+                                  {isCurrentEmployee && (
+                                    <div className="mt-1 text-[11px] font-semibold text-emerald-700">
+                                      Click to request vacation
+                                    </div>
+                                  )}
+
                                   {isCurrentEmployee && slot.note && (
                                     <div className="mt-1 text-xs text-slate-600">{slot.note}</div>
                                   )}
@@ -2382,6 +2443,51 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+      {selectedVacationShift && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="text-lg font-bold text-slate-900">Request Vacation for Shift</div>
+            <div className="mt-2 text-sm text-slate-600">
+              {selectedVacationShift.shiftLabel} • {selectedVacationShift.dateLabel} • {selectedVacationShift.startTime}-{selectedVacationShift.endTime}
+            </div>
+            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Reason / note to supervisor
+            </label>
+            <textarea
+              value={vacationReason}
+              onChange={(event) => setVacationReason(event.target.value)}
+              rows={4}
+              placeholder="Optional note..."
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+            />
+            {vacationRequestStatus && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                {vacationRequestStatus}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedVacationShift(null);
+                  setVacationReason('');
+                  setVacationRequestStatus('');
+                }}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitVacationRequest}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Submit Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -2533,7 +2639,10 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedPayPeriodKey(currentPayPeriod.key)}
+                    onClick={() => {
+                      setSelectedPayPeriodKey(currentPayPeriod.key);
+                      reloadPublishedSchedule();
+                    }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Current Pay Period
@@ -2937,7 +3046,10 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedPayPeriodKey(currentPayPeriod.key)}
+                    onClick={() => {
+                      setSelectedPayPeriodKey(currentPayPeriod.key);
+                      reloadPublishedSchedule();
+                    }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Current
@@ -2945,7 +3057,7 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={() => void reloadPublishedSchedule()}
+                    onClick={reloadPublishedSchedule}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Refresh Schedule
