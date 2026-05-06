@@ -307,6 +307,33 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
   }
 }
 
+async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id,first_name,last_name,role,scope,employee_type,seniority_label,certifications,status')
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const loaded = (data ?? [])
+    .map((employee: any) => ({
+      id: employee.id,
+      name: `${employee.last_name ?? ''}, ${employee.first_name ?? ''}`.replace(/^,\s*/, '').trim() || employee.id || 'Unnamed Employee',
+      role: normalizeEmployeeRole(employee.role ?? undefined),
+      scope: normalizeEmployeeScope(employee.scope ?? undefined, employee.role ?? undefined),
+      employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
+      seniorityLabel: (employee.seniority_label ?? 'Seniority Unassigned').trim() || 'Seniority Unassigned',
+      certifications: normalizeCertificationRecord(employee.certifications ?? undefined),
+      status: (employee.status ?? 'Active').trim() || 'Active',
+    }))
+    .filter((employee) => employee.id && employee.status !== 'Inactive');
+
+  return sortEmployeesByName(loaded.length > 0 ? loaded : DEFAULT_EMPLOYEES);
+}
+
 function isOpenShiftSlot(employeeId: string): boolean {
   return employeeId === OPEN_ALS_SLOT_ID || employeeId === OPEN_BLS_SLOT_ID;
 }
@@ -1138,122 +1165,258 @@ export default function SchedulePage() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
 
   useEffect(() => {
-  const loadData = async () => {
-    try {
-      // Load employees (already Supabase elsewhere, fallback safe)
-      setEmployees(loadEmployeesFromProfiles());
+    let isActive = true;
 
-      // 🔥 LOAD SCHEDULE FROM SUPABASE
-      const { data: schedules, error: schedError } = await supabase
-        .from('schedules')
-        .select('*');
+    const loadData = async () => {
+      try {
+        loadEmployeesFromSupabase()
+          .then((loadedEmployees) => {
+            if (isActive) setEmployees(loadedEmployees);
+          })
+          .catch((error) => {
+            console.error('Failed to load employees from Supabase. Using local fallback:', error);
+            if (isActive) setEmployees(loadEmployeesFromProfiles());
+          });
 
-      const { data: assignments, error: assignError } = await supabase
-        .from('schedule_assignments')
-        .select('*');
+        const { data: schedules, error: scheduleError } = await supabase
+          .from('schedules')
+          .select('id,date_key')
+          .order('date_key', { ascending: true });
 
-      if (schedError || assignError) {
-        console.error('Supabase load failed:', schedError || assignError);
-      } else {
+        if (scheduleError) {
+          throw scheduleError;
+        }
+
+        const { data: assignments, error: assignmentError } = await supabase
+          .from('schedule_assignments')
+          .select('*')
+          .order('date_key', { ascending: true })
+          .order('shift_key', { ascending: true })
+          .order('slot_number', { ascending: true });
+
+        if (assignmentError) {
+          throw assignmentError;
+        }
+
         const rebuilt: ScheduleData = {};
 
-        for (const sched of schedules || []) {
-          rebuilt[sched.date_key] = createEmptyDaySchedule();
+        for (const schedule of schedules ?? []) {
+          rebuilt[String(schedule.date_key)] = createEmptyDaySchedule();
         }
 
-        for (const row of assignments || []) {
-          if (!rebuilt[row.date_key]) {
-            rebuilt[row.date_key] = createEmptyDaySchedule();
+        for (const row of assignments ?? []) {
+          const dateKey = String(row.date_key);
+          if (!rebuilt[dateKey]) {
+            rebuilt[dateKey] = createEmptyDaySchedule();
           }
 
-          const day = rebuilt[row.date_key];
+          const day = rebuilt[dateKey];
+          const savedEmployeeId = row.is_open_slot
+            ? row.open_slot_scope === 'ALS'
+              ? OPEN_ALS_SLOT_ID
+              : row.open_slot_scope === 'BLS'
+                ? OPEN_BLS_SLOT_ID
+                : ''
+            : row.employee_id ?? '';
 
-          const shiftName = row.shift_key as ShiftName;
+          const slot: EmployeeSlot = {
+            employeeId: savedEmployeeId,
+            startTime: row.start_time || DEFAULT_START_TIME,
+            endTime: row.end_time || DEFAULT_END_TIME,
+            note: row.note || '',
+          };
 
-          if (day.standard[shiftName]) {
+          if (String(row.shift_key).startsWith('EXTRA::')) {
+            const [, categoryText, extraId] = String(row.shift_key).split('::');
+            const category: ShiftCategory = categoryText === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
+            let extra = day.extras.find((item) => item.id === extraId);
+
+            if (!extra) {
+              extra = {
+                id: extraId || createExtraShiftId(),
+                label: row.shift_label || 'Extra Shift',
+                category,
+                employee1: createEmptyEmployeeSlot(),
+                employee2: createEmptyEmployeeSlot(),
+                employee3: createEmptyEmployeeSlot(),
+                showEmployee3: false,
+                vehicle: (row.vehicle || '') as VehicleValue,
+                allowExtendedHours: Boolean(row.allow_extended_hours),
+              };
+              day.extras.push(extra);
+            }
+
+            extra.label = row.shift_label || extra.label;
+            extra.category = category;
+            extra.vehicle = (row.vehicle || '') as VehicleValue;
+            extra.allowExtendedHours = Boolean(row.allow_extended_hours);
+
+            if (row.slot_number === 1) extra.employee1 = slot;
+            if (row.slot_number === 2) extra.employee2 = slot;
+            if (row.slot_number === 3) {
+              extra.employee3 = slot;
+              extra.showEmployee3 = Boolean(slot.employeeId);
+            }
+          } else {
+            const shiftName = row.shift_key as ShiftName;
+            if (!day.standard[shiftName]) {
+              continue;
+            }
+
             const shift = day.standard[shiftName];
+            shift.vehicle = (row.vehicle || '') as VehicleValue;
+            shift.allowExtendedHours = Boolean(row.allow_extended_hours);
 
-            const slotKey =
-              row.slot_number === 1
-                ? 'employee1'
-                : row.slot_number === 2
-                ? 'employee2'
-                : 'employee3';
-
-            shift[slotKey] = {
-              employeeId: row.employee_id || '',
-              startTime: row.start_time,
-              endTime: row.end_time,
-              note: row.note || '',
-            };
-
-            shift.vehicle = row.vehicle || '';
-            shift.allowExtendedHours = row.allow_extended_hours || false;
+            if (row.slot_number === 1) shift.employee1 = slot;
+            if (row.slot_number === 2) shift.employee2 = slot;
+            if (row.slot_number === 3) {
+              shift.employee3 = slot;
+              shift.showEmployee3 = Boolean(slot.employeeId);
+            }
           }
         }
 
-        setScheduleData(rebuilt);
+        if (isActive) {
+          setScheduleData(normalizeLoadedData(rebuilt));
+        }
+      } catch (error) {
+        console.error('Failed to load schedule from Supabase:', error);
+      } finally {
+        if (isActive) setMounted(true);
       }
-    } catch (error) {
-      console.error('Schedule load error:', error);
-    } finally {
-      setMounted(true);
-    }
-  };
+    };
 
-  loadData();
-}, []);
+    loadData();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
-  if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-  const saveToSupabase = async () => {
-    try {
-      for (const [dateKey, day] of Object.entries(scheduleData)) {
-        // Upsert schedule
-        await supabase.from('schedules').upsert({
-          id: dateKey,
-          date_key: dateKey,
-        });
+    const saveToSupabase = async () => {
+      try {
+        const normalizedSchedule = normalizeLoadedData(scheduleData);
 
-        for (const shiftName of SHIFT_ORDER) {
-          const shift = day.standard[shiftName];
+        for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
+          const { error: scheduleError } = await supabase.from('schedules').upsert({
+            id: dateKey,
+            date_key: dateKey,
+            updated_at: new Date().toISOString(),
+          });
 
-          const slots = [
-            shift.employee1,
-            shift.employee2,
-            shift.employee3,
-          ];
+          if (scheduleError) {
+            throw scheduleError;
+          }
 
-          for (let i = 0; i < slots.length; i++) {
-            const slot = slots[i];
+          const { error: deleteError } = await supabase
+            .from('schedule_assignments')
+            .delete()
+            .eq('date_key', dateKey);
 
-            if (!slot.employeeId) continue;
+          if (deleteError) {
+            throw deleteError;
+          }
 
-            await supabase.from('schedule_assignments').upsert({
-              id: `${dateKey}-${shiftName}-${i + 1}`,
-              schedule_id: dateKey,
-              date_key: dateKey,
-              shift_key: shiftName,
-              shift_label: SHIFT_DISPLAY_NAMES[shiftName],
-              slot_number: i + 1,
-              employee_id: slot.employeeId,
-              start_time: slot.startTime,
-              end_time: slot.endTime,
-              note: slot.note,
-              vehicle: shift.vehicle,
-              allow_extended_hours: shift.allowExtendedHours,
+          const rows: any[] = [];
+
+          for (const shiftName of SHIFT_ORDER) {
+            const shift = day.standard[shiftName];
+            const slots = [shift.employee1, shift.employee2, shift.employee3];
+
+            slots.forEach((slot, index) => {
+              if (!slot.employeeId) {
+                return;
+              }
+
+              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
+              rows.push({
+                id: `${dateKey}-${shiftName}-${index + 1}`,
+                schedule_id: dateKey,
+                date_key: dateKey,
+                shift_key: shiftName,
+                shift_label: SHIFT_DISPLAY_NAMES[shiftName],
+                slot_number: index + 1,
+                employee_id: isOpenSlot ? null : slot.employeeId,
+                start_time: slot.startTime || DEFAULT_START_TIME,
+                end_time: slot.endTime || DEFAULT_END_TIME,
+                note: slot.note || '',
+                vehicle: shift.vehicle || '',
+                allow_extended_hours: Boolean(shift.allowExtendedHours),
+                is_open_slot: isOpenSlot,
+                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
+                updated_at: new Date().toISOString(),
+              });
             });
           }
-        }
-      }
-    } catch (error) {
-      console.error('Supabase save failed:', error);
-    }
-  };
 
-  saveToSupabase();
-}, [scheduleData]);
+          for (const extra of day.extras) {
+            const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
+            const slots = [extra.employee1, extra.employee2, extra.employee3];
+
+            rows.push({
+              id: `${dateKey}-${extraShiftKey}-0`,
+              schedule_id: dateKey,
+              date_key: dateKey,
+              shift_key: extraShiftKey,
+              shift_label: extra.label,
+              slot_number: 0,
+              employee_id: null,
+              start_time: DEFAULT_START_TIME,
+              end_time: DEFAULT_END_TIME,
+              note: '',
+              vehicle: extra.vehicle || '',
+              allow_extended_hours: Boolean(extra.allowExtendedHours),
+              is_open_slot: false,
+              open_slot_scope: null,
+              updated_at: new Date().toISOString(),
+            });
+
+            slots.forEach((slot, index) => {
+              if (!slot.employeeId) {
+                return;
+              }
+
+              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
+              rows.push({
+                id: `${dateKey}-${extraShiftKey}-${index + 1}`,
+                schedule_id: dateKey,
+                date_key: dateKey,
+                shift_key: extraShiftKey,
+                shift_label: extra.label,
+                slot_number: index + 1,
+                employee_id: isOpenSlot ? null : slot.employeeId,
+                start_time: slot.startTime || DEFAULT_START_TIME,
+                end_time: slot.endTime || DEFAULT_END_TIME,
+                note: slot.note || '',
+                vehicle: extra.vehicle || '',
+                allow_extended_hours: Boolean(extra.allowExtendedHours),
+                is_open_slot: isOpenSlot,
+                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
+                updated_at: new Date().toISOString(),
+              });
+            });
+          }
+
+          if (rows.length > 0) {
+            const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows);
+
+            if (assignmentError) {
+              throw assignmentError;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Supabase schedule save failed:', error);
+      }
+    };
+
+    saveToSupabase();
+  }, [mounted, scheduleData]);
 
   const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
