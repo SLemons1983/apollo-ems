@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type UnitVehicle = '305' | '310' | '315' | '320' | '325' | '330' | '335' | '';
@@ -146,6 +146,27 @@ const SUPERVISOR_VEHICLES: SupervisorVehicle[] = ['', '300', '301', '302', '303'
 
 const DEFAULT_START_TIME = '06:00';
 const DEFAULT_END_TIME = '06:00';
+
+function normalizeMilitaryTime(value: string, fallback = DEFAULT_START_TIME): string {
+  const trimmed = (value || '').trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) {
+    return fallback;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return fallback;
+  }
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function getDefaultEndTimeForShift(shiftName?: ShiftName, slotKey?: 'employee1' | 'employee2' | 'employee3'): string {
+  return shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '18:00' : DEFAULT_END_TIME;
+}
+
 const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
 
@@ -1180,6 +1201,7 @@ function createExtraShiftId(): string {
 export default function SchedulePage() {
   const [anchorDate, setAnchorDate] = useState<Date>(() => getSundayStart(new Date()));
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
+  const scheduleDataRef = useRef<ScheduleData>({});
   const [mounted, setMounted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -1190,6 +1212,10 @@ export default function SchedulePage() {
     setHasUnsavedChanges(true);
     setSaveStatus('Unsaved changes. Click Confirm Changes to save.');
   }
+
+  useEffect(() => {
+    scheduleDataRef.current = scheduleData;
+  }, [scheduleData]);
 
   useEffect(() => {
     let isActive = true;
@@ -1328,7 +1354,7 @@ export default function SchedulePage() {
     setSaveStatus('Saving schedule changes...');
 
     try {
-      const normalizedSchedule = normalizeLoadedData(scheduleData);
+      const normalizedSchedule = normalizeLoadedData(scheduleDataRef.current);
 
       for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
         const { error: scheduleError } = await supabase.from('schedules').upsert({
@@ -1361,8 +1387,8 @@ export default function SchedulePage() {
               shift_label: SHIFT_DISPLAY_NAMES[shiftName],
               slot_number: index + 1,
               employee_id: isOpenSlot ? null : slot.employeeId,
-              start_time: slot.startTime || DEFAULT_START_TIME,
-              end_time: slot.endTime || DEFAULT_END_TIME,
+              start_time: normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME),
+              end_time: normalizeMilitaryTime(slot.endTime, DEFAULT_END_TIME),
               note: slot.note || '',
               vehicle: shift.vehicle || '',
               allow_extended_hours: Boolean(shift.allowExtendedHours),
@@ -1409,8 +1435,8 @@ export default function SchedulePage() {
               shift_label: extra.label,
               slot_number: index + 1,
               employee_id: isOpenSlot ? null : slot.employeeId,
-              start_time: slot.startTime || DEFAULT_START_TIME,
-              end_time: slot.endTime || DEFAULT_END_TIME,
+              start_time: normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME),
+              end_time: normalizeMilitaryTime(slot.endTime, DEFAULT_END_TIME),
               note: slot.note || '',
               vehicle: extra.vehicle || '',
               allow_extended_hours: Boolean(extra.allowExtendedHours),
@@ -1525,8 +1551,8 @@ export default function SchedulePage() {
       }
 
       if (field === 'employeeId' && !value) {
-        shift[slotKey].startTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '06:00' : DEFAULT_START_TIME;
-        shift[slotKey].endTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '18:00' : DEFAULT_END_TIME;
+        shift[slotKey].startTime = DEFAULT_START_TIME;
+        shift[slotKey].endTime = getDefaultEndTimeForShift(shiftName, slotKey);
         shift[slotKey].note = '';
       }
 
@@ -1800,9 +1826,13 @@ export default function SchedulePage() {
                 Start
               </label>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-2][0-9]:[0-5][0-9]"
+                placeholder="06:00"
                 value={slot.startTime}
                 onChange={(event) => onChange('startTime', event.target.value)}
+                onBlur={(event) => onChange('startTime', normalizeMilitaryTime(event.target.value, DEFAULT_START_TIME))}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
               />
             </div>
@@ -1812,9 +1842,13 @@ export default function SchedulePage() {
                 End
               </label>
               <input
-                type="time"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-2][0-9]:[0-5][0-9]"
+                placeholder="06:00"
                 value={slot.endTime}
                 onChange={(event) => onChange('endTime', event.target.value)}
+                onBlur={(event) => onChange('endTime', normalizeMilitaryTime(event.target.value, DEFAULT_END_TIME))}
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
               />
             </div>

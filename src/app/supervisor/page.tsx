@@ -2,38 +2,139 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
-type UnitVehicle = '305' | '310' | '315' | '320' | '325' | '330' | '335' | '';
-type SupervisorVehicle = '300' | '301' | '302' | '303' | '';
-type VehicleValue = UnitVehicle | SupervisorVehicle;
-type StaffingLevel = 'ALS' | 'BLS' | 'SUP';
-type ShiftCategory = 'UNIT' | 'SUPERVISOR';
 
-type EmployeeRole = 'Paramedic' | 'EMT' | 'Supervisor';
-
-type CertificationRecord = {
-  driversLicense: string;
-  ambulanceDriversLicense: string;
-  ahaBlsCpr: string;
-  medicalExaminerCertificate: string;
-  annualTbScreen: string;
-  californiaParamedicLicense: string;
-  ccemsaParamedicLicense: string;
-  acls: string;
-  pals: string;
-  californiaEmtLicense: string;
-  ccemsaEmtLicense: string;
+type ImportantLink = {
+  id: string;
+  label: string;
+  url: string;
 };
 
-type EmployeeOption = {
+type GeofenceConfig = {
   id: string;
-  name: string;
-  role: EmployeeRole;
-  scope: 'ALS' | 'BLS';
-  employeeType: string;
-  seniorityLabel: string;
-  certifications: CertificationRecord;
-  status?: string;
+  shiftLabel: string;
+  locationLabel: string;
+  latitude: number;
+  longitude: number;
+  radiusFeet: number;
+};
+
+type SystemConfig = {
+  companyName: string;
+  logoDataUrl: string;
+  importantLinks: ImportantLink[];
+  geofences: GeofenceConfig[];
+};
+
+type ApolloMessageRecipient = {
+  employeeId: string;
+  deliveredAt: string;
+  readAt: string | null;
+};
+
+type ApolloMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  recipients: ApolloMessageRecipient[];
+  audienceLabel: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  relatedType?: string;
+  relatedId?: string;
+  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+};
+
+type AuditLogEntry = {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  details: string;
+};
+
+
+type CompanyAnnouncement = {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  expiresAt: string;
+  postedBy: string;
+};
+
+type TimePunch = {
+  id: string;
+  employeeId: string;
+  type: 'CLOCK_IN' | 'CLOCK_OUT';
+  timestamp: string;
+  shiftDateKey: string;
+  shiftLabel: string;
+  locationLabel: string;
+  latitude: number | null;
+  longitude: number | null;
+  distanceFeet: number | null;
+  geofenceStatus: 'APPROVED' | 'OUTSIDE_GEOFENCE' | 'LOCATION_UNAVAILABLE';
+};
+
+type MissedMealBreak = {
+  id: string;
+  employeeId: string;
+  dateKey: string;
+  reason: string;
+  createdAt: string;
+};
+
+type TimecardCorrectionRequest = {
+  id: string;
+  employeeId: string;
+  payPeriodKey: string;
+  dateKey: string;
+  shiftLabel: string;
+  correctionType: 'ADD_CLOCK_IN' | 'ADD_CLOCK_OUT' | 'CORRECT_CLOCK_IN' | 'CORRECT_CLOCK_OUT' | 'REMOVE_PUNCH';
+  requestedDate: string;
+  requestedTime: string;
+  reason: string;
+  createdAt: string;
+};
+
+type PayBreakdown = {
+  regularHours: number;
+  overtimeHours: number;
+  doubleTimeHours: number;
+  missedMealPenaltyHours: number;
+  week1: {
+    regularHours: number;
+    overtimeHours: number;
+    doubleTimeHours: number;
+  };
+  week2: {
+    regularHours: number;
+    overtimeHours: number;
+    doubleTimeHours: number;
+  };
+};
+
+type SubmittedTimecard = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  payPeriodKey: string;
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  submittedAt: string;
+  totalHours: number;
+  payBreakdown?: PayBreakdown;
+  punches: TimePunch[];
+  missedMealBreaks: MissedMealBreak[];
+  corrections: TimecardCorrectionRequest[];
+  note: string;
+  status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
+  supervisorComment?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
 };
 
 type StoredEmployeeProfile = {
@@ -43,697 +144,78 @@ type StoredEmployeeProfile = {
   role?: string;
   scope?: string;
   employeeType?: string;
-  seniorityLabel?: string;
-  certifications?: Partial<CertificationRecord>;
   status?: string;
 };
 
-type EmployeeSlot = {
-  employeeId: string;
-  startTime: string;
-  endTime: string;
-  note: string;
-};
-
-type ShiftAssignment = {
-  employee1: EmployeeSlot;
-  employee2: EmployeeSlot;
-  employee3: EmployeeSlot;
-  showEmployee3: boolean;
-  vehicle: VehicleValue;
-  allowExtendedHours: boolean;
-};
-
-type DayAssignments = Record<ShiftName, ShiftAssignment>;
-
-type ExtraShiftAssignment = {
+type SupabaseEmployeeRow = {
   id: string;
-  label: string;
-  category: ShiftCategory;
-  employee1: EmployeeSlot;
-  employee2: EmployeeSlot;
-  employee3: EmployeeSlot;
-  showEmployee3: boolean;
-  vehicle: VehicleValue;
-  allowExtendedHours: boolean;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+  scope: string | null;
+  employee_type: string | null;
+  status: string | null;
 };
 
-type DaySchedule = {
-  standard: DayAssignments;
-  extras: ExtraShiftAssignment[];
+type EmployeeOption = {
+  id: string;
+  name: string;
+  role: 'Paramedic' | 'EMT' | 'Supervisor';
+  scope: 'ALS' | 'BLS';
+  employeeType: string;
+  status: string;
 };
 
-type ScheduleData = Record<string, DaySchedule>;
-
-type AssignmentRef = {
+type PayPeriodOption = {
   key: string;
-  label: string;
-  category: ShiftCategory;
-  shift: {
-    employee1: EmployeeSlot;
-    employee2: EmployeeSlot;
-    employee3: EmployeeSlot;
-    showEmployee3: boolean;
-    vehicle: VehicleValue;
-    allowExtendedHours: boolean;
-  };
-};
-
-type ContinuousHoursResult = {
-  warnings: string[];
-  approvals: string[];
-};
-
-type EmployeeDaySummary = {
-  hours: number;
-  hasShift: boolean;
-  hasExtendedApproval: boolean;
-};
-
-type EligibilityResult = {
-  eligible: boolean;
-  reason: string;
-  warning?: string;
-};
-
-type PayPeriodInfo = {
+  year: number;
   number: number;
   start: Date;
   end: Date;
 };
 
-const STORAGE_KEY = 'apollo-schedule-page-v6';
-const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
-const PAY_PERIOD_REFERENCE_NUMBER = 9;
-const PAY_PERIOD_REFERENCE_START = '2026-04-12';
-
-const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'];
-const UNIT_SHIFTS = new Set<ShiftName>(['R1', 'R2', 'P', 'OC']);
-const SUPERVISOR_SHIFTS = new Set<ShiftName>(['ADMIN_SUP', 'FIELD_SUP']);
-
-const SHIFT_DISPLAY_NAMES: Record<ShiftName, string> = {
-  R1: 'Reedley 1',
-  R2: 'Reedley 2',
-  P: 'Parlier',
-  OC: 'Orange Cove',
-  GM: 'GM',
-  ADMIN_SUP: 'Administrative Supervisor',
-  FIELD_SUP: 'Field Supervisor',
+type OpenShiftRequest = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  dateKey: string;
+  shiftKey: string;
+  shiftLabel: string;
+  payPeriodKey: string;
+  requestedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  supervisorNote?: string;
 };
 
-const UNIT_VEHICLES: UnitVehicle[] = ['', '305', '310', '315', '320', '325', '330', '335'];
-const SUPERVISOR_VEHICLES: SupervisorVehicle[] = ['', '300', '301', '302', '303'];
+type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'ADMIN_SUP' | 'FIELD_SUP';
 
-const DEFAULT_START_TIME = '06:00';
-const DEFAULT_END_TIME = '06:00';
+type BuilderShift = {
+  employee1: string;
+  employee2: string;
+};
+
+type BuilderDay = Record<BuilderShiftKey, BuilderShift>;
+
+type BuilderSchedule = Record<string, BuilderDay>;
+
+type BuilderWarning = {
+  id: string;
+  severity: 'warning' | 'danger';
+  message: string;
+};
+
+const SCHEDULE_STORAGE_KEY = 'apollo-schedule-page-v6';
+const ANNOUNCEMENTS_STORAGE_KEY = 'apollo-company-announcements-v1';
+const SUBMITTED_TIMECARDS_STORAGE_KEY = 'apollo-submitted-timecards-v1';
+const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
+const APOLLO_MESSAGES_STORAGE_KEY = 'apollo-messages-v2';
+const SYSTEM_CONFIG_STORAGE_KEY = 'apollo-system-config-v1';
+const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
+const AUDIT_LOG_STORAGE_KEY = 'apollo-audit-log-v1';
+const CURRENT_SUPERVISOR_ID = 'supervisor-001';
+const CURRENT_SUPERVISOR_EMPLOYEE_ID = 'emp-001';
 const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
-
-const EMPTY_CERTIFICATIONS: CertificationRecord = {
-  driversLicense: '',
-  ambulanceDriversLicense: '',
-  ahaBlsCpr: '',
-  medicalExaminerCertificate: '',
-  annualTbScreen: '',
-  californiaParamedicLicense: '',
-  ccemsaParamedicLicense: '',
-  acls: '',
-  pals: '',
-  californiaEmtLicense: '',
-  ccemsaEmtLicense: '',
-};
-
-const CERTIFICATION_LABELS: Record<keyof CertificationRecord, string> = {
-  driversLicense: 'Drivers License',
-  ambulanceDriversLicense: 'Ambulance Drivers License',
-  ahaBlsCpr: 'AHA BLS CPR Card',
-  medicalExaminerCertificate: 'Medical Examiners Certificate',
-  annualTbScreen: 'Annual TB Screen',
-  californiaParamedicLicense: 'California Paramedic License',
-  ccemsaParamedicLicense: 'CCEMSA Paramedic License',
-  acls: 'ACLS',
-  pals: 'PALS',
-  californiaEmtLicense: 'California EMT License',
-  ccemsaEmtLicense: 'CCEMSA EMT License',
-};
-
-const DEFAULT_EMPLOYEES: EmployeeOption[] = [
-  { id: 'emp-001', name: 'Rivera, Alex', role: 'Paramedic', scope: 'ALS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-002', name: 'Lee, Jordan', role: 'EMT', scope: 'BLS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-003', name: 'Brooks, Taylor', role: 'Paramedic', scope: 'ALS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-004', name: 'Morgan, Casey', role: 'EMT', scope: 'BLS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-005', name: 'Foster, Riley', role: 'EMT', scope: 'BLS', employeeType: 'Per Diem', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-006', name: 'Diaz, Morgan', role: 'Paramedic', scope: 'ALS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-007', name: 'Cooper, Jamie', role: 'Supervisor', scope: 'BLS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-008', name: 'Price, Cameron', role: 'Supervisor', scope: 'BLS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-009', name: 'Bennett, Avery', role: 'EMT', scope: 'BLS', employeeType: 'Per Diem', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-010', name: 'Collins, Drew', role: 'Paramedic', scope: 'ALS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-011', name: 'Hughes, Parker', role: 'EMT', scope: 'BLS', employeeType: 'Per Diem', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-  { id: 'emp-012', name: 'Ward, Reese', role: 'Supervisor', scope: 'BLS', employeeType: 'Full Time', seniorityLabel: 'Seniority Unassigned', certifications: EMPTY_CERTIFICATIONS, status: 'Active' },
-];
-
-function normalizeEmployeeRole(value: string | undefined): EmployeeRole {
-  const normalized = (value ?? '').trim().toLowerCase();
-  if (normalized === 'paramedic') return 'Paramedic';
-  if (normalized === 'supervisor') return 'Supervisor';
-  return 'EMT';
-}
-
-function normalizeEmployeeScope(scopeValue: string | undefined, roleValue: string | undefined): 'ALS' | 'BLS' {
-  const normalizedScope = (scopeValue ?? '').trim().toUpperCase();
-  if (normalizedScope === 'ALS') return 'ALS';
-  if (normalizedScope === 'BLS') return 'BLS';
-
-  return normalizeEmployeeRole(roleValue) === 'Paramedic' ? 'ALS' : 'BLS';
-}
-
-function buildEmployeeName(profile: StoredEmployeeProfile): string {
-  const first = (profile.firstName ?? '').trim();
-  const last = (profile.lastName ?? '').trim();
-  const full = last && first ? `${last}, ${first}` : `${first} ${last}`.trim();
-  return full || profile.id || 'Unnamed Employee';
-}
-
-function normalizeCertificationRecord(value: Partial<CertificationRecord> | undefined): CertificationRecord {
-  return {
-    driversLicense: value?.driversLicense || '',
-    ambulanceDriversLicense: value?.ambulanceDriversLicense || '',
-    ahaBlsCpr: value?.ahaBlsCpr || '',
-    medicalExaminerCertificate: value?.medicalExaminerCertificate || '',
-    annualTbScreen: value?.annualTbScreen || '',
-    californiaParamedicLicense: value?.californiaParamedicLicense || '',
-    ccemsaParamedicLicense: value?.ccemsaParamedicLicense || '',
-    acls: value?.acls || '',
-    pals: value?.pals || '',
-    californiaEmtLicense: value?.californiaEmtLicense || '',
-    ccemsaEmtLicense: value?.ccemsaEmtLicense || '',
-  };
-}
-
-function getRequiredCertificationKeys(scope: 'ALS' | 'BLS'): Array<keyof CertificationRecord> {
-  const common: Array<keyof CertificationRecord> = [
-    'driversLicense',
-    'ambulanceDriversLicense',
-    'ahaBlsCpr',
-    'medicalExaminerCertificate',
-    'annualTbScreen',
-  ];
-
-  const alsOnly: Array<keyof CertificationRecord> = [
-    'californiaParamedicLicense',
-    'ccemsaParamedicLicense',
-    'acls',
-    'pals',
-  ];
-
-  const blsOnly: Array<keyof CertificationRecord> = [
-    'californiaEmtLicense',
-    'ccemsaEmtLicense',
-  ];
-
-  return scope === 'ALS' ? [...common, ...alsOnly] : [...common, ...blsOnly];
-}
-
-function getEmployeeCertificationIssues(employee: EmployeeOption): string[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return getRequiredCertificationKeys(employee.scope)
-    .filter((key) => {
-      const value = employee.certifications[key];
-      if (!value) {
-        return true;
-      }
-      const expiration = new Date(`${value}T00:00:00`);
-      return Number.isNaN(expiration.getTime()) || expiration < today;
-    })
-    .map((key) => CERTIFICATION_LABELS[key]);
-}
-
-function sortEmployeesByName(list: EmployeeOption[]): EmployeeOption[] {
-  return [...list].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function loadEmployeesFromProfiles(): EmployeeOption[] {
-  if (typeof window === 'undefined') {
-    return sortEmployeesByName(DEFAULT_EMPLOYEES);
-  }
-
-  try {
-    const raw = window.localStorage.getItem(EMPLOYEE_STORAGE_KEY);
-    if (!raw) {
-      return sortEmployeesByName(DEFAULT_EMPLOYEES);
-    }
-
-    const parsed = JSON.parse(raw) as StoredEmployeeProfile[];
-
-    const loaded = parsed
-      .map((profile) => ({
-        id: profile.id,
-        name: buildEmployeeName(profile),
-        role: normalizeEmployeeRole(profile.role),
-        scope: normalizeEmployeeScope(profile.scope, profile.role),
-        employeeType: (profile.employeeType ?? 'Full Time').trim() || 'Full Time',
-        seniorityLabel: (profile.seniorityLabel ?? 'Seniority Unassigned').trim() || 'Seniority Unassigned',
-        certifications: normalizeCertificationRecord(profile.certifications),
-        status: (profile.status ?? 'Active').trim() || 'Active',
-      }))
-      .filter((employee) => employee.id && employee.status !== 'Inactive');
-
-    return sortEmployeesByName(loaded.length > 0 ? loaded : DEFAULT_EMPLOYEES);
-  } catch (error) {
-    console.error('Failed to load employees from profiles:', error);
-    return sortEmployeesByName(DEFAULT_EMPLOYEES);
-  }
-}
-
-async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id,first_name,last_name,role,scope,employee_type,seniority_label,certifications,status')
-    .order('last_name', { ascending: true })
-    .order('first_name', { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  const loaded = (data ?? [])
-    .map((employee: any) => ({
-      id: employee.id,
-      name: `${employee.last_name ?? ''}, ${employee.first_name ?? ''}`.replace(/^,\s*/, '').trim() || employee.id || 'Unnamed Employee',
-      role: normalizeEmployeeRole(employee.role ?? undefined),
-      scope: normalizeEmployeeScope(employee.scope ?? undefined, employee.role ?? undefined),
-      employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
-      seniorityLabel: (employee.seniority_label ?? 'Seniority Unassigned').trim() || 'Seniority Unassigned',
-      certifications: normalizeCertificationRecord(employee.certifications ?? undefined),
-      status: (employee.status ?? 'Active').trim() || 'Active',
-    }))
-    .filter((employee) => employee.id && employee.status !== 'Inactive');
-
-  return sortEmployeesByName(loaded.length > 0 ? loaded : DEFAULT_EMPLOYEES);
-}
-
-function isOpenShiftSlot(employeeId: string): boolean {
-  return employeeId === OPEN_ALS_SLOT_ID || employeeId === OPEN_BLS_SLOT_ID;
-}
-
-function getOpenShiftLabel(employeeId: string): string {
-  if (employeeId === OPEN_ALS_SLOT_ID) {
-    return 'Open ALS';
-  }
-
-  if (employeeId === OPEN_BLS_SLOT_ID) {
-    return 'Open BLS';
-  }
-
-  return '';
-}
-
-function createEmptyEmployeeSlot(): EmployeeSlot {
-  return {
-    employeeId: '',
-    startTime: DEFAULT_START_TIME,
-    endTime: DEFAULT_END_TIME,
-    note: '',
-  };
-}
-
-function createEmptyShift(showEmployee3 = false): ShiftAssignment {
-  return {
-    employee1: createEmptyEmployeeSlot(),
-    employee2: createEmptyEmployeeSlot(),
-    employee3: createEmptyEmployeeSlot(),
-    showEmployee3,
-    vehicle: '',
-    allowExtendedHours: false,
-  };
-}
-
-function createAdminSupervisorSlot(): EmployeeSlot {
-  return {
-    employeeId: '',
-    startTime: '06:00',
-    endTime: '18:00',
-    note: '',
-  };
-}
-
-function createAdminSupervisorShift(): ShiftAssignment {
-  return {
-    employee1: createAdminSupervisorSlot(),
-    employee2: createEmptyEmployeeSlot(),
-    employee3: createEmptyEmployeeSlot(),
-    showEmployee3: false,
-    vehicle: '',
-    allowExtendedHours: false,
-  };
-}
-
-function createEmptyDayAssignments(): DayAssignments {
-  return {
-    R1: createEmptyShift(false),
-    R2: createEmptyShift(false),
-    P: createEmptyShift(false),
-    OC: createEmptyShift(false),
-    GM: createEmptyShift(false),
-    ADMIN_SUP: createAdminSupervisorShift(),
-    FIELD_SUP: createEmptyShift(false),
-  };
-}
-
-function createEmptyDaySchedule(): DaySchedule {
-  return {
-    standard: createEmptyDayAssignments(),
-    extras: [],
-  };
-}
-
-function cloneScheduleData(data: ScheduleData): ScheduleData {
-  return JSON.parse(JSON.stringify(data)) as ScheduleData;
-}
-
-function parseTimeToMinutes(timeValue: string): number {
-  const [hoursText, minutesText] = (timeValue || DEFAULT_START_TIME).split(':');
-  const hours = Number(hoursText);
-  const minutes = Number(minutesText);
-
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
-    return 360;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function calculateSlotHours(startTime: string, endTime: string): number {
-  const startMinutes = parseTimeToMinutes(startTime);
-  const endMinutes = parseTimeToMinutes(endTime);
-
-  let duration = endMinutes - startMinutes;
-  if (duration <= 0) {
-    duration += 24 * 60;
-  }
-
-  const hours = duration / 60;
-  return Math.min(Math.max(hours, 0), 24);
-}
-
-function formatHours(hours: number): string {
-  if (Number.isInteger(hours)) {
-    return `${hours}`;
-  }
-  return hours.toFixed(1);
-}
-
-function requiresSupervisorNote(slot: EmployeeSlot): boolean {
-  if (!slot.employeeId) {
-    return false;
-  }
-
-  return slot.endTime !== DEFAULT_END_TIME;
-}
-
-function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
-  if (!raw || typeof raw !== 'object') {
-    return createEmptyEmployeeSlot();
-  }
-
-  const maybeSlot = raw as Partial<EmployeeSlot> & {
-    employeeId?: string;
-    startTime?: string;
-    endTime?: string;
-    note?: string;
-  };
-
-  return {
-    employeeId: maybeSlot.employeeId ?? '',
-    startTime: maybeSlot.startTime ?? DEFAULT_START_TIME,
-    endTime: maybeSlot.endTime ?? DEFAULT_END_TIME,
-    note: maybeSlot.note ?? '',
-  };
-}
-
-function normalizeLegacyEmployeeSlot(
-  employeeId: string | undefined,
-  startTime: string | undefined,
-  endTime: string | undefined,
-  note: string | undefined,
-): EmployeeSlot {
-  return {
-    employeeId: employeeId ?? '',
-    startTime: startTime ?? DEFAULT_START_TIME,
-    endTime: endTime ?? DEFAULT_END_TIME,
-    note: note ?? '',
-  };
-}
-
-function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment {
-  if (!raw || typeof raw !== 'object') {
-    return createEmptyShift(false);
-  }
-
-  const maybeShift = raw as Partial<ShiftAssignment> & {
-    employee1Id?: string;
-    employee2Id?: string;
-    employee3Id?: string;
-    hours?: number;
-    employee1StartTime?: string;
-    employee1EndTime?: string;
-    employee1Note?: string;
-    employee2StartTime?: string;
-    employee2EndTime?: string;
-    employee2Note?: string;
-    employee3StartTime?: string;
-    employee3EndTime?: string;
-    employee3Note?: string;
-  };
-
-  const employee1 =
-    maybeShift.employee1 && typeof maybeShift.employee1 === 'object'
-      ? normalizeEmployeeSlot(maybeShift.employee1)
-      : normalizeLegacyEmployeeSlot(
-          maybeShift.employee1Id,
-          maybeShift.employee1StartTime,
-          maybeShift.employee1EndTime,
-          maybeShift.employee1Note,
-        );
-
-  const employee2 =
-    category === 'SUPERVISOR'
-      ? createEmptyEmployeeSlot()
-      : maybeShift.employee2 && typeof maybeShift.employee2 === 'object'
-        ? normalizeEmployeeSlot(maybeShift.employee2)
-        : normalizeLegacyEmployeeSlot(
-            maybeShift.employee2Id,
-            maybeShift.employee2StartTime,
-            maybeShift.employee2EndTime,
-            maybeShift.employee2Note,
-          );
-
-  const employee3 =
-    category === 'SUPERVISOR'
-      ? createEmptyEmployeeSlot()
-      : maybeShift.employee3 && typeof maybeShift.employee3 === 'object'
-        ? normalizeEmployeeSlot(maybeShift.employee3)
-        : normalizeLegacyEmployeeSlot(
-            maybeShift.employee3Id,
-            maybeShift.employee3StartTime,
-            maybeShift.employee3EndTime,
-            maybeShift.employee3Note,
-          );
-
-  return {
-    employee1,
-    employee2,
-    employee3,
-    showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybeShift.showEmployee3 || employee3.employeeId),
-    vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
-    allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
-  };
-}
-
-function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
-  if (!raw || typeof raw !== 'object') {
-    return {
-      id: `extra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      label: 'Extra Shift',
-      category: 'UNIT',
-      employee1: createEmptyEmployeeSlot(),
-      employee2: createEmptyEmployeeSlot(),
-      employee3: createEmptyEmployeeSlot(),
-      showEmployee3: false,
-      vehicle: '',
-      allowExtendedHours: false,
-    };
-  }
-
-  const maybe = raw as Partial<ExtraShiftAssignment>;
-  const category: ShiftCategory = maybe.category === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
-  const normalized = normalizeShift(maybe, category);
-
-  return {
-    id: maybe.id ?? `extra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    label: maybe.label?.trim() || 'Extra Shift',
-    category,
-    employee1: normalized.employee1,
-    employee2: normalized.employee2,
-    employee3: normalized.employee3,
-    showEmployee3: normalized.showEmployee3,
-    vehicle: normalized.vehicle,
-    allowExtendedHours: normalized.allowExtendedHours,
-  };
-}
-
-function normalizeDaySchedule(raw: unknown): DaySchedule {
-  if (!raw || typeof raw !== 'object') {
-    return createEmptyDaySchedule();
-  }
-
-  const maybeDay = raw as Partial<DaySchedule> & Partial<DayAssignments>;
-
-  if ('standard' in maybeDay && maybeDay.standard) {
-    const standard = maybeDay.standard as Partial<DayAssignments>;
-    const extras = Array.isArray(maybeDay.extras) ? maybeDay.extras : [];
-
-    return {
-      standard: {
-        R1: normalizeShift(standard.R1, 'UNIT'),
-        R2: normalizeShift(standard.R2, 'UNIT'),
-        P: normalizeShift(standard.P, 'UNIT'),
-        OC: normalizeShift(standard.OC, 'UNIT'),
-        GM: normalizeShift(standard.GM, 'SUPERVISOR'),
-        ADMIN_SUP: normalizeShift(standard.ADMIN_SUP, 'SUPERVISOR'),
-        FIELD_SUP: normalizeShift(standard.FIELD_SUP, 'SUPERVISOR'),
-      },
-      extras: extras.map((extra) => normalizeExtraShift(extra)),
-    };
-  }
-
-  return {
-    standard: {
-      R1: normalizeShift(maybeDay.R1, 'UNIT'),
-      R2: normalizeShift(maybeDay.R2, 'UNIT'),
-      P: normalizeShift(maybeDay.P, 'UNIT'),
-      OC: normalizeShift(maybeDay.OC, 'UNIT'),
-      GM: normalizeShift(maybeDay.GM, 'SUPERVISOR'),
-      ADMIN_SUP: normalizeShift(maybeDay.ADMIN_SUP, 'SUPERVISOR'),
-      FIELD_SUP: normalizeShift(maybeDay.FIELD_SUP, 'SUPERVISOR'),
-    },
-    extras: [],
-  };
-}
-
-function normalizeLoadedData(raw: unknown): ScheduleData {
-  if (!raw || typeof raw !== 'object') {
-    return {};
-  }
-
-  const input = raw as Record<string, unknown>;
-  const output: ScheduleData = {};
-
-  for (const [dateKey, value] of Object.entries(input)) {
-    output[dateKey] = normalizeDaySchedule(value);
-  }
-
-  return output;
-}
-
-function ensureDateExists(data: ScheduleData, dateKey: string): ScheduleData {
-  if (data[dateKey]) {
-    return data;
-  }
-
-  const next = cloneScheduleData(data);
-  next[dateKey] = createEmptyDaySchedule();
-  return next;
-}
-
-function getDaySchedule(data: ScheduleData, dateKey: string): DaySchedule {
-  return normalizeDaySchedule(data[dateKey]);
-}
-
-function getSundayStart(date: Date): Date {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  copy.setHours(0, 0, 0, 0);
-  copy.setDate(copy.getDate() - day);
-  return copy;
-}
-
-function addDays(date: Date, days: number): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function toDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function parseDateKey(dateKey: string): Date {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function formatDayLabel(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'numeric',
-    day: 'numeric',
-  });
-}
-
-function getBiWeeklyDates(anchorDate: Date): Date[] {
-  const start = getSundayStart(anchorDate);
-  return Array.from({ length: 14 }, (_, index) => addDays(start, index));
-}
-
-function getEmployeeById(id: string, employees: EmployeeOption[]): EmployeeOption | undefined {
-  return employees.find((employee) => employee.id === id);
-}
-
-function getGlobalPayPeriodStart(date: Date): Date {
-  const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
-  const sunday = getSundayStart(date);
-  const diffDays = Math.round((sunday.getTime() - referenceStart.getTime()) / (1000 * 60 * 60 * 24));
-  const offsetWithinCycle = ((diffDays % 14) + 14) % 14;
-  return addDays(sunday, -offsetWithinCycle);
-}
-
-function getPayPeriodInfo(date: Date): PayPeriodInfo {
-  const periodStart = getGlobalPayPeriodStart(date);
-  const periodEnd = addDays(periodStart, 13);
-
-  const janFirst = new Date(date.getFullYear(), 0, 1);
-  const firstPayPeriodStartOfYear = getGlobalPayPeriodStart(janFirst);
-  const diffDays = Math.round(
-    (periodStart.getTime() - firstPayPeriodStartOfYear.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  const number = Math.floor(diffDays / 14) + 1;
-
-  return {
-    number,
-    start: periodStart,
-    end: periodEnd,
-  };
-}
-
-function getPayPeriodsForYear(year: number): PayPeriodInfo[] {
-  const janFirst = new Date(year, 0, 1);
-  const nextJanFirst = new Date(year + 1, 0, 1);
-  const firstStart = getGlobalPayPeriodStart(janFirst);
-  const firstStartNextYear = getGlobalPayPeriodStart(nextJanFirst);
-
-  const periods: PayPeriodInfo[] = [];
-  for (let currentStart = new Date(firstStart); currentStart < firstStartNextYear; currentStart = addDays(currentStart, 14)) {
-    periods.push(getPayPeriodInfo(currentStart));
-  }
-
-  return periods;
-}
 
 function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
@@ -743,1588 +225,2503 @@ function formatShortDate(date: Date): string {
   });
 }
 
-function formatPayPeriodOptionLabel(payPeriod: PayPeriodInfo, year: number): string {
-  return `${year} · Pay Period ${payPeriod.number} (${formatShortDate(payPeriod.start)} - ${formatShortDate(payPeriod.end)})`;
+function addDays(date: Date, days: number): Date {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
 }
 
-function isFullTimeEmployee(employeeType: string): boolean {
-  return employeeType.toLowerCase().includes('full');
+function getSundayStart(date: Date): Date {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  copy.setDate(copy.getDate() - copy.getDay());
+  return copy;
 }
 
-function getPayPeriodHoursThreshold(employeeType: string): number {
-  return isFullTimeEmployee(employeeType) ? 120 : 48;
-}
+function buildPayPeriodOptions(baseDate: Date, count = 28): PayPeriodOption[] {
+  const year = baseDate.getFullYear();
+  const januaryFirst = new Date(year, 0, 1);
+  const firstSunday = getSundayStart(addDays(januaryFirst, (7 - januaryFirst.getDay()) % 7));
+  const options: PayPeriodOption[] = [];
 
-function getAwardBucket(employeeType: string, payPeriodHours: number): number {
-  const threshold = getPayPeriodHoursThreshold(employeeType);
-  const isFullTime = isFullTimeEmployee(employeeType);
-  const isUnderThreshold = payPeriodHours < threshold;
+  for (let index = 0; index < count; index += 1) {
+    const start = addDays(firstSunday, index * 14);
+    const end = addDays(start, 13);
 
-  if (isFullTime && isUnderThreshold) return 1;
-  if (!isFullTime && payPeriodHours <= threshold) return 2;
-  if (isFullTime && !isUnderThreshold) return 3;
-  return 4;
-}
-
-function getAwardBucketLabel(employeeType: string, payPeriodHours: number): string {
-  const bucket = getAwardBucket(employeeType, payPeriodHours);
-  const threshold = getPayPeriodHoursThreshold(employeeType);
-  if (bucket === 1) return `Tier 1 · FT < ${threshold}h`;
-  if (bucket === 2) return `Tier 2 · PD ≤ ${threshold}h`;
-  if (bucket === 3) return `Tier 3 · FT ≥ ${threshold}h`;
-  return `Tier 4 · PD > ${threshold}h`;
-}
-
-function getSenioritySortValue(seniorityLabel: string): number {
-  const match = seniorityLabel.match(/(\d+)(?!.*\d)/);
-  if (!match) {
-    return Number.POSITIVE_INFINITY;
+    options.push({
+      key: `${year}-pp-${index + 1}`,
+      year,
+      number: index + 1,
+      start,
+      end,
+    });
   }
 
-  const value = Number(match[1]);
-  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
+  return options;
 }
 
-function sortEmployeesByAwardPriority(
-  list: EmployeeOption[],
-  payPeriodHoursMap: Record<string, number>,
-): EmployeeOption[] {
-  return [...list].sort((a, b) => {
-    const aHours = payPeriodHoursMap[a.id] ?? 0;
-    const bHours = payPeriodHoursMap[b.id] ?? 0;
-    const aPriority = getAwardBucket(a.employeeType, aHours);
-    const bPriority = getAwardBucket(b.employeeType, bHours);
+function getCurrentPayPeriodOption(options: PayPeriodOption[], currentDate: Date): PayPeriodOption {
+  const today = new Date(currentDate);
+  today.setHours(0, 0, 0, 0);
 
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    if (aHours !== bHours) return aHours - bHours;
-
-    const aSeniority = getSenioritySortValue(a.seniorityLabel || 'Seniority Unassigned');
-    const bSeniority = getSenioritySortValue(b.seniorityLabel || 'Seniority Unassigned');
-    if (aSeniority !== bSeniority) return aSeniority - bSeniority;
-
-    return a.name.localeCompare(b.name);
-  });
+  return (
+    options.find((option) => {
+      const start = new Date(option.start);
+      const end = new Date(option.end);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+      return today >= start && today <= end;
+    }) ?? options[0]
+  );
 }
 
-function getVehicleOptions(category: ShiftCategory): VehicleValue[] {
-  return category === 'UNIT' ? UNIT_VEHICLES : SUPERVISOR_VEHICLES;
+function buildEmployeeName(profile: StoredEmployeeProfile): string {
+  const first = (profile.firstName ?? '').trim();
+  const last = (profile.lastName ?? '').trim();
+  if (last && first) return `${last}, ${first}`;
+  return `${first} ${last}`.trim() || profile.id || 'Unnamed Employee';
 }
 
-function getAssignedSlotsForAssignment(category: ShiftCategory, shift: AssignmentRef['shift']): EmployeeSlot[] {
-  if (category === 'SUPERVISOR') {
-    return shift.employee1.employeeId ? [shift.employee1] : [];
-  }
-
-  const slots = [shift.employee1, shift.employee2];
-  if (shift.showEmployee3 || shift.employee3.employeeId) {
-    slots.push(shift.employee3);
-  }
-
-  return slots.filter((slot) => slot.employeeId);
+function normalizeRole(value: string | undefined): 'Paramedic' | 'EMT' | 'Supervisor' {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized === 'paramedic') return 'Paramedic';
+  if (normalized === 'supervisor') return 'Supervisor';
+  return 'EMT';
 }
 
-function getAssignmentRefsForDay(day: DaySchedule): AssignmentRef[] {
-  const standardRefs: AssignmentRef[] = SHIFT_ORDER.map((shiftName) => ({
-    key: `standard-${shiftName}`,
-    label: SHIFT_DISPLAY_NAMES[shiftName],
-    category: UNIT_SHIFTS.has(shiftName) ? 'UNIT' : 'SUPERVISOR',
-    shift: day.standard[shiftName],
-  }));
-
-  const extraRefs: AssignmentRef[] = day.extras.map((extra) => ({
-    key: `extra-${extra.id}`,
-    label: extra.label,
-    category: extra.category,
-    shift: extra,
-  }));
-
-  return [...standardRefs, ...extraRefs];
+function normalizeScope(scopeValue: string | undefined, roleValue: string | undefined): 'ALS' | 'BLS' {
+  const normalized = (scopeValue ?? '').trim().toUpperCase();
+  if (normalized === 'ALS') return 'ALS';
+  if (normalized === 'BLS') return 'BLS';
+  return normalizeRole(roleValue) === 'Paramedic' ? 'ALS' : 'BLS';
 }
 
-function getStaffingLevel(category: ShiftCategory, shift: AssignmentRef['shift'], employees: EmployeeOption[]): StaffingLevel {
-  if (category === 'SUPERVISOR') {
-    return 'SUP';
-  }
+function loadEmployeesFromProfiles(): EmployeeOption[] {
+  try {
+    const raw = window.localStorage.getItem(EMPLOYEE_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
 
-  const employee1 = getEmployeeById(shift.employee1.employeeId, employees);
-  const employee2 = getEmployeeById(shift.employee2.employeeId, employees);
+    const parsed = JSON.parse(raw) as StoredEmployeeProfile[];
 
-  if (employee1?.scope === 'ALS' || employee2?.scope === 'ALS') {
-    return 'ALS';
-  }
-
-  return 'BLS';
-}
-
-function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, employees: EmployeeOption[]): string[] {
-  if (target.category !== 'UNIT') {
+    return parsed
+      .map((profile) => ({
+        id: profile.id,
+        name: buildEmployeeName(profile),
+        role: normalizeRole(profile.role),
+        scope: normalizeScope(profile.scope, profile.role),
+        employeeType: (profile.employeeType ?? 'Full Time').trim() || 'Full Time',
+        status: (profile.status ?? 'Active').trim() || 'Active',
+      }))
+      .filter((employee) => employee.id && employee.status.toLowerCase() !== 'removed')
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Failed to load employees:', error);
     return [];
   }
-
-  const messages: string[] = [];
-  const targetSlots = getAssignedSlotsForAssignment(target.category, target.shift);
-
-  const seenInSameShift = new Set<string>();
-  for (const slot of targetSlots) {
-    if (seenInSameShift.has(slot.employeeId)) {
-      const employee = getEmployeeById(slot.employeeId, employees);
-      messages.push(`${employee?.name ?? 'Employee'} is assigned twice in ${target.label}.`);
-      continue;
-    }
-    seenInSameShift.add(slot.employeeId);
-  }
-
-  for (const slot of targetSlots) {
-    const employee = getEmployeeById(slot.employeeId, employees);
-
-    for (const other of getAssignmentRefsForDay(day)) {
-      if (other.key === target.key) {
-        continue;
-      }
-
-      if (other.category !== 'UNIT') {
-        continue;
-      }
-
-      const otherSlots = getAssignedSlotsForAssignment(other.category, other.shift);
-
-      if (otherSlots.some((otherSlot) => otherSlot.employeeId === slot.employeeId)) {
-        messages.push(`${employee?.name ?? 'Employee'} is also assigned to ${other.label} on the same day.`);
-      }
-    }
-  }
-
-  return Array.from(new Set(messages));
 }
 
-function getVehicleConflictMessages(day: DaySchedule, target: AssignmentRef): string[] {
-  if (!target.shift.vehicle) {
-    return [];
-  }
 
-  const messages: string[] = [];
-
-  for (const other of getAssignmentRefsForDay(day)) {
-    if (other.key === target.key) {
-      continue;
-    }
-
-    if (other.shift.vehicle && other.shift.vehicle === target.shift.vehicle) {
-      messages.push(`Vehicle ${target.shift.vehicle} is also assigned to ${other.label} on the same day.`);
-    }
-  }
-
-  return Array.from(new Set(messages));
+function buildSupabaseEmployeeName(employee: SupabaseEmployeeRow): string {
+  const first = (employee.first_name ?? '').trim();
+  const last = (employee.last_name ?? '').trim();
+  if (last && first) return `${last}, ${first}`;
+  return `${first} ${last}`.trim() || employee.id || 'Unnamed Employee';
 }
 
-function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: string): Record<string, EmployeeDaySummary> {
-  const summary: Record<string, EmployeeDaySummary> = {};
-
-  for (const dateKey of Object.keys(scheduleData)) {
-    const day = getDaySchedule(scheduleData, dateKey);
-    let hours = 0;
-    let hasShift = false;
-    let hasExtendedApproval = false;
-
-    for (const assignment of getAssignmentRefsForDay(day)) {
-      if (assignment.category !== 'UNIT') {
-        continue;
-      }
-
-      for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-        if (slot.employeeId === employeeId) {
-          hasShift = true;
-          hours += calculateSlotHours(slot.startTime, slot.endTime);
-          if (assignment.shift.allowExtendedHours) {
-            hasExtendedApproval = true;
-          }
-        }
-      }
-    }
-
-    if (hasShift) {
-      summary[dateKey] = {
-        hours,
-        hasShift,
-        hasExtendedApproval,
-      };
-    }
-  }
-
-  return summary;
-}
-
-function getChainHours(summary: Record<string, EmployeeDaySummary>, targetDateKey: string): { totalHours: number; hasApproval: boolean } {
-  const targetDate = parseDateKey(targetDateKey);
-  let totalHours = summary[targetDateKey]?.hours ?? 0;
-  let hasApproval = summary[targetDateKey]?.hasExtendedApproval ?? false;
-
-  let cursor = addDays(targetDate, -1);
-  while (true) {
-    const key = toDateKey(cursor);
-    if (!summary[key]?.hasShift) {
-      break;
-    }
-    totalHours += summary[key].hours;
-    hasApproval = hasApproval || summary[key].hasExtendedApproval;
-    cursor = addDays(cursor, -1);
-  }
-
-  cursor = addDays(targetDate, 1);
-  while (true) {
-    const key = toDateKey(cursor);
-    if (!summary[key]?.hasShift) {
-      break;
-    }
-    totalHours += summary[key].hours;
-    hasApproval = hasApproval || summary[key].hasExtendedApproval;
-    cursor = addDays(cursor, 1);
-  }
-
-  return { totalHours, hasApproval };
-}
-
-function getContinuousHoursResult(
-  scheduleData: ScheduleData,
-  dateKey: string,
-  target: AssignmentRef,
-  employees: EmployeeOption[],
-): ContinuousHoursResult {
-  if (target.category !== 'UNIT') {
-    return { warnings: [], approvals: [] };
-  }
-
-  const warnings: string[] = [];
-  const approvals: string[] = [];
-  const slots = getAssignedSlotsForAssignment(target.category, target.shift);
-
-  for (const slot of slots) {
-    const employee = getEmployeeById(slot.employeeId, employees);
-    const summary = buildEmployeeDailyUnitSummary(scheduleData, slot.employeeId);
-    const { totalHours, hasApproval } = getChainHours(summary, dateKey);
-
-    if (totalHours > 48) {
-      if (hasApproval) {
-        approvals.push(
-          `${employee?.name ?? 'Employee'} is scheduled for ${formatHours(totalHours)} continuous hours, and extended hours are approved.`,
-        );
-      } else {
-        warnings.push(
-          `${employee?.name ?? 'Employee'} would reach ${formatHours(totalHours)} continuous scheduled hours across consecutive days.`,
-        );
-      }
-    }
-  }
-
+function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
   return {
-    warnings: Array.from(new Set(warnings)),
-    approvals: Array.from(new Set(approvals)),
+    id: employee.id,
+    name: buildSupabaseEmployeeName(employee),
+    role: normalizeRole(employee.role ?? undefined),
+    scope: normalizeScope(employee.scope ?? undefined, employee.role ?? undefined),
+    employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
+    status: (employee.status ?? 'Active').trim() || 'Active',
   };
 }
 
-function getRequiredNoteMessages(target: AssignmentRef, employees: EmployeeOption[]): string[] {
-  const messages: string[] = [];
+async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id,first_name,last_name,role,scope,employee_type,status')
+    .order('last_name', { ascending: true })
+    .order('first_name', { ascending: true });
 
-  const slots = getAssignedSlotsForAssignment(target.category, target.shift);
-  for (const slot of slots) {
-    if (requiresSupervisorNote(slot) && !slot.note.trim()) {
-      const employee = getEmployeeById(slot.employeeId, employees);
-      messages.push(`${employee?.name ?? 'Employee'} has a custom end time and requires a supervisor note.`);
-    }
+  if (error) {
+    throw error;
   }
 
-  return Array.from(new Set(messages));
+  return ((data ?? []) as SupabaseEmployeeRow[])
+    .map((employee) => mapSupabaseEmployee(employee))
+    .filter((employee) => employee.id && employee.status.toLowerCase() !== 'removed')
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function getCertificationMessages(target: AssignmentRef, employees: EmployeeOption[]): string[] {
-  const messages: string[] = [];
-
-  for (const slot of getAssignedSlotsForAssignment(target.category, target.shift)) {
-    const employee = getEmployeeById(slot.employeeId, employees);
-    if (!employee) {
-      continue;
-    }
-
-    const issues = getEmployeeCertificationIssues(employee);
-    if (issues.length > 0) {
-      messages.push(`${employee.name} has missing or expired required credentials: ${issues.join(', ')}.`);
-    }
-  }
-
-  return Array.from(new Set(messages));
-}
-
-function getAssignmentHoursForEmployeeOnDate(
-  scheduleData: ScheduleData,
-  dateKey: string,
-  employeeId: string,
-  excludedAssignmentKey?: string,
-): number {
-  const day = getDaySchedule(scheduleData, dateKey);
-  let hours = 0;
-
-  for (const assignment of getAssignmentRefsForDay(day)) {
-    if (assignment.category !== 'UNIT') {
-      continue;
-    }
-
-    if (excludedAssignmentKey && assignment.key === excludedAssignmentKey) {
-      continue;
-    }
-
-    for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-      if (slot.employeeId === employeeId) {
-        hours += calculateSlotHours(slot.startTime, slot.endTime);
-      }
-    }
-  }
-
-  return hours;
-}
-
-function getEmployeePayPeriodHours(
-  scheduleData: ScheduleData,
-  dateKey: string,
-  employeeId: string,
-  excludedAssignmentKey?: string,
-): number {
-  const payPeriod = getPayPeriodInfo(parseDateKey(dateKey));
-  let hours = 0;
-
-  for (let cursor = new Date(payPeriod.start); cursor <= payPeriod.end; cursor = addDays(cursor, 1)) {
-    const currentDateKey = toDateKey(cursor);
-    const day = getDaySchedule(scheduleData, currentDateKey);
-
-    for (const assignment of getAssignmentRefsForDay(day)) {
-      if (excludedAssignmentKey && currentDateKey === dateKey && assignment.key === excludedAssignmentKey) {
-        continue;
-      }
-
-      for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-        if (slot.employeeId === employeeId) {
-          hours += calculateSlotHours(slot.startTime, slot.endTime);
-        }
-      }
-    }
-  }
-
-  return hours;
-}
-
-function getEligibilityForEmployee(
-  scheduleData: ScheduleData,
-  dateKey: string,
-  employeeId: string,
-  target: AssignmentRef,
-  employees: EmployeeOption[],
-  excludedAssignmentKey?: string,
-): EligibilityResult {
-  const employee = getEmployeeById(employeeId, employees);
-  if (!employee) {
-    return { eligible: false, reason: 'employee not found' };
-  }
-
-  if (employee.status && employee.status !== 'Active') {
-    return { eligible: false, reason: `status: ${employee.status}` };
-  }
-
-  const certificationIssues = getEmployeeCertificationIssues(employee);
-  if (certificationIssues.length > 0) {
-    return { eligible: false, reason: `missing/expired: ${certificationIssues.join(', ')}` };
-  }
-
-  if (target.category === 'SUPERVISOR' && employee.role !== 'Supervisor') {
-    return { eligible: false, reason: 'supervisor shift requires supervisor role' };
-  }
-
-  const sameDayHours = getAssignmentHoursForEmployeeOnDate(scheduleData, dateKey, employeeId, excludedAssignmentKey);
-  if (sameDayHours > 0) {
-    return { eligible: false, reason: 'already scheduled that day' };
-  }
-
-  if (target.category !== 'UNIT') {
-    return { eligible: true, reason: '' };
-  }
-
-  const summary = buildEmployeeDailyUnitSummary(scheduleData, employeeId);
-  const targetAssignmentHours = getAssignedSlotsForAssignment(target.category, target.shift)
-    .filter((slot) => slot.employeeId === employeeId)
-    .reduce((total, slot) => total + calculateSlotHours(slot.startTime, slot.endTime), 0);
-
-  const hasCurrentDayExistingHours = summary[dateKey]?.hours ?? 0;
-  const adjustedCurrentDayHours = Math.max(hasCurrentDayExistingHours - targetAssignmentHours, 0);
-
-  summary[dateKey] = {
-    hours: adjustedCurrentDayHours + 24,
-    hasShift: true,
-    hasExtendedApproval: summary[dateKey]?.hasExtendedApproval ?? false,
+function getDefaultSystemConfig(): SystemConfig {
+  return {
+    companyName: 'Sequoia Safety Council',
+    logoDataUrl: '',
+    importantLinks: [
+      {
+        id: 'ccemsa-policies',
+        label: 'CCEMSA Policies',
+        url: 'https://www.fresnocountyca.gov/Departments/Public-Health/Community-Health/Emergency-Medical-Services',
+      },
+      {
+        id: 'child-abuse-reporting',
+        label: 'Child Abuse Reporting',
+        url: 'https://oag.ca.gov/childabuse',
+      },
+      {
+        id: 'adult-protective-services',
+        label: 'Adult Protective Services',
+        url: 'https://www.cdss.ca.gov/reporting/report-abuse/adult-protective-services',
+      },
+    ],
+    geofences: [
+      {
+        id: 'reedley-1',
+        shiftLabel: 'Reedley 1',
+        locationLabel: 'Reedley Station',
+        latitude: 36.60163763301681,
+        longitude: -119.44390972540988,
+        radiusFeet: 500,
+      },
+      {
+        id: 'reedley-2',
+        shiftLabel: 'Reedley 2',
+        locationLabel: 'Reedley Station',
+        latitude: 36.60163763301681,
+        longitude: -119.44390972540988,
+        radiusFeet: 500,
+      },
+      {
+        id: 'parlier',
+        shiftLabel: 'Parlier',
+        locationLabel: 'Parlier Station',
+        latitude: 36.608647190346666,
+        longitude: -119.52968530322042,
+        radiusFeet: 500,
+      },
+      {
+        id: 'orange-cove',
+        shiftLabel: 'Orange Cove',
+        locationLabel: 'Orange Cove Station',
+        latitude: 36.62257333716054,
+        longitude: -119.32320178090212,
+        radiusFeet: 500,
+      },
+    ],
   };
-
-  const { totalHours, hasApproval } = getChainHours(summary, dateKey);
-
-  if (totalHours > 48 && !hasApproval) {
-    return {
-      eligible: true,
-      reason: '',
-      warning: `would exceed 48 continuous hours (${formatHours(totalHours)}h)`,
-    };
-  }
-
-  return { eligible: true, reason: '' };
 }
 
-function createExtraShiftId(): string {
-  return `extra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function makeDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-export default function SchedulePage() {
-  const [anchorDate, setAnchorDate] = useState<Date>(() => getSundayStart(new Date()));
-  const [scheduleData, setScheduleData] = useState<ScheduleData>({});
-  const [mounted, setMounted] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+export default function SupervisorPage() {
+  const [activeTile, setActiveTile] = useState<string | null>(null);
+  const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
+  const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
+  const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
+  const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [returnComments, setReturnComments] = useState<Record<string, string>>({});
+  const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
+  const [builderStartDate, setBuilderStartDate] = useState('');
+  const [builderEndDate, setBuilderEndDate] = useState('');
+  const [builderSchedule, setBuilderSchedule] = useState<BuilderSchedule>({});
+  const [messageRecipientMode, setMessageRecipientMode] = useState('ALL_ACTIVE');
+  const [messageRecipientEmployeeId, setMessageRecipientEmployeeId] = useState('');
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [messagePriority, setMessagePriority] = useState<'NORMAL' | 'IMPORTANT' | 'URGENT'>('NORMAL');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [replyBody, setReplyBody] = useState('');
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [expiresAt, setExpiresAt] = useState(makeDateInputValue(addDays(new Date(), 7)));
+
+  const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
+  const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
+
+  const selectedPayPeriod = useMemo(() => {
+    return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
+  }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
 
   useEffect(() => {
-    let isActive = true;
-
-    const loadData = async () => {
-      try {
-        loadEmployeesFromSupabase()
-          .then((loadedEmployees) => {
-            if (isActive) setEmployees(loadedEmployees);
-          })
-          .catch((error) => {
-            console.error('Failed to load employees from Supabase. Using local fallback:', error);
-            if (isActive) setEmployees(loadEmployeesFromProfiles());
-          });
-
-        const { data: schedules, error: scheduleError } = await supabase
-          .from('schedules')
-          .select('id,date_key')
-          .order('date_key', { ascending: true });
-
-        if (scheduleError) {
-          throw scheduleError;
-        }
-
-        const { data: assignments, error: assignmentError } = await supabase
-          .from('schedule_assignments')
-          .select('*')
-          .order('date_key', { ascending: true })
-          .order('shift_key', { ascending: true })
-          .order('slot_number', { ascending: true });
-
-        if (assignmentError) {
-          throw assignmentError;
-        }
-
-        const rebuilt: ScheduleData = {};
-
-        for (const schedule of schedules ?? []) {
-          rebuilt[String(schedule.date_key)] = createEmptyDaySchedule();
-        }
-
-        for (const row of assignments ?? []) {
-          const dateKey = String(row.date_key);
-          if (!rebuilt[dateKey]) {
-            rebuilt[dateKey] = createEmptyDaySchedule();
-          }
-
-          const day = rebuilt[dateKey];
-          const savedEmployeeId = row.is_open_slot
-            ? row.open_slot_scope === 'ALS'
-              ? OPEN_ALS_SLOT_ID
-              : row.open_slot_scope === 'BLS'
-                ? OPEN_BLS_SLOT_ID
-                : ''
-            : row.employee_id ?? '';
-
-          const slot: EmployeeSlot = {
-            employeeId: savedEmployeeId,
-            startTime: row.start_time || DEFAULT_START_TIME,
-            endTime: row.end_time || DEFAULT_END_TIME,
-            note: row.note || '',
-          };
-
-          if (String(row.shift_key).startsWith('EXTRA::')) {
-            const [, categoryText, extraId] = String(row.shift_key).split('::');
-            const category: ShiftCategory = categoryText === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
-            let extra = day.extras.find((item) => item.id === extraId);
-
-            if (!extra) {
-              extra = {
-                id: extraId || createExtraShiftId(),
-                label: row.shift_label || 'Extra Shift',
-                category,
-                employee1: createEmptyEmployeeSlot(),
-                employee2: createEmptyEmployeeSlot(),
-                employee3: createEmptyEmployeeSlot(),
-                showEmployee3: false,
-                vehicle: (row.vehicle || '') as VehicleValue,
-                allowExtendedHours: Boolean(row.allow_extended_hours),
-              };
-              day.extras.push(extra);
-            }
-
-            extra.label = row.shift_label || extra.label;
-            extra.category = category;
-            extra.vehicle = (row.vehicle || '') as VehicleValue;
-            extra.allowExtendedHours = Boolean(row.allow_extended_hours);
-
-            if (row.slot_number === 1) extra.employee1 = slot;
-            if (row.slot_number === 2) extra.employee2 = slot;
-            if (row.slot_number === 3) {
-              extra.employee3 = slot;
-              extra.showEmployee3 = Boolean(slot.employeeId);
-            }
-          } else {
-            const shiftName = row.shift_key as ShiftName;
-            if (!day.standard[shiftName]) {
-              continue;
-            }
-
-            const shift = day.standard[shiftName];
-            shift.vehicle = (row.vehicle || '') as VehicleValue;
-            shift.allowExtendedHours = Boolean(row.allow_extended_hours);
-
-            if (row.slot_number === 1) shift.employee1 = slot;
-            if (row.slot_number === 2) shift.employee2 = slot;
-            if (row.slot_number === 3) {
-              shift.employee3 = slot;
-              shift.showEmployee3 = Boolean(slot.employeeId);
-            }
-          }
-        }
-
-        if (isActive) {
-          setScheduleData(normalizeLoadedData(rebuilt));
-        }
-      } catch (error) {
-        console.error('Failed to load schedule from Supabase:', error);
-      } finally {
-        if (isActive) setMounted(true);
+    try {
+      const raw = window.localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
+      if (raw) {
+        setAnnouncements(JSON.parse(raw));
       }
-    };
 
-    loadData();
+      const submittedRaw = window.localStorage.getItem(SUBMITTED_TIMECARDS_STORAGE_KEY);
+      if (submittedRaw) {
+        setSubmittedTimecards(JSON.parse(submittedRaw));
+      }
 
-    return () => {
-      isActive = false;
-    };
-  }, []);
+      const messagesRaw = window.localStorage.getItem(APOLLO_MESSAGES_STORAGE_KEY);
+      if (messagesRaw) {
+        setApolloMessages(JSON.parse(messagesRaw));
+      }
 
-  useEffect(() => {
-    if (!mounted) {
+      const configRaw = window.localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
+      if (configRaw) {
+        setSystemConfig({
+          ...getDefaultSystemConfig(),
+          ...JSON.parse(configRaw),
+        });
+      }
+
+      const openShiftRaw = window.localStorage.getItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY);
+      if (openShiftRaw) {
+        setOpenShiftRequests(JSON.parse(openShiftRaw));
+      }
+
+      const auditRaw = window.localStorage.getItem(AUDIT_LOG_STORAGE_KEY);
+      if (auditRaw) {
+        setAuditLog(JSON.parse(auditRaw));
+      }
+
+      loadEmployeesFromSupabase()
+        .then((loadedEmployees) => {
+          setEmployees(loadedEmployees);
+        })
+        .catch((employeeError) => {
+          console.error('Failed to load employees from Supabase. Falling back to localStorage:', employeeError);
+          setEmployees(loadEmployeesFromProfiles());
+        });
+
+      setSelectedPayPeriodKey(currentPayPeriod.key);
+    } catch (error) {
+      console.error('Failed to load supervisor data:', error);
+    }
+  }, [currentPayPeriod.key]);
+
+  const activeAnnouncements = useMemo(() => {
+    const now = new Date();
+
+    return announcements
+      .filter((announcement) => new Date(announcement.expiresAt) >= now)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [announcements]);
+
+  const expiredAnnouncements = useMemo(() => {
+    const now = new Date();
+
+    return announcements
+      .filter((announcement) => new Date(announcement.expiresAt) < now)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [announcements]);
+
+  const selectedPayPeriodTimecards = useMemo(() => {
+    return submittedTimecards.filter((timecard) => timecard.payPeriodKey === selectedPayPeriod.key);
+  }, [selectedPayPeriod.key, submittedTimecards]);
+
+  const pendingTimecards = useMemo(() => {
+    return selectedPayPeriodTimecards
+      .filter((timecard) => timecard.status === 'PENDING_SUPERVISOR_REVIEW')
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [selectedPayPeriodTimecards]);
+
+  const reviewedTimecards = useMemo(() => {
+    return selectedPayPeriodTimecards
+      .filter((timecard) => timecard.status !== 'PENDING_SUPERVISOR_REVIEW')
+      .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
+  }, [selectedPayPeriodTimecards]);
+
+  const employeesNotSubmitted = useMemo(() => {
+    const submittedEmployeeIds = new Set(selectedPayPeriodTimecards.map((timecard) => timecard.employeeId));
+    return employees.filter((employee) => employee.status.toLowerCase() === 'active' && !submittedEmployeeIds.has(employee.id));
+  }, [employees, selectedPayPeriodTimecards]);
+
+  function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
+    setSubmittedTimecards(nextTimecards);
+    window.localStorage.setItem(SUBMITTED_TIMECARDS_STORAGE_KEY, JSON.stringify(nextTimecards));
+  }
+
+  function approveTimecard(timecardId: string) {
+    const timecard = submittedTimecards.find((item) => item.id === timecardId);
+
+    if (timecard?.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID) {
+      window.alert('You cannot approve your own timecard. It must be reviewed by another supervisor or GM.');
       return;
     }
 
-    const saveToSupabase = async () => {
-      try {
-        const normalizedSchedule = normalizeLoadedData(scheduleData);
-
-        for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
-          const { error: scheduleError } = await supabase.from('schedules').upsert({
-            id: dateKey,
-            date_key: dateKey,
-            updated_at: new Date().toISOString(),
-          });
-
-          if (scheduleError) {
-            throw scheduleError;
+    const nextTimecards = submittedTimecards.map((item) =>
+      item.id === timecardId
+        ? {
+            ...item,
+            status: 'APPROVED' as const,
+            reviewedAt: new Date().toISOString(),
+            reviewedBy: 'Supervisor',
+            supervisorComment: '',
           }
-
-          const { error: deleteError } = await supabase
-            .from('schedule_assignments')
-            .delete()
-            .eq('date_key', dateKey);
-
-          if (deleteError) {
-            throw deleteError;
-          }
-
-          const rows: any[] = [];
-
-          for (const shiftName of SHIFT_ORDER) {
-            const shift = day.standard[shiftName];
-            const slots = [shift.employee1, shift.employee2, shift.employee3];
-
-            slots.forEach((slot, index) => {
-              if (!slot.employeeId) {
-                return;
-              }
-
-              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-              rows.push({
-                id: `${dateKey}-${shiftName}-${index + 1}`,
-                schedule_id: dateKey,
-                date_key: dateKey,
-                shift_key: shiftName,
-                shift_label: SHIFT_DISPLAY_NAMES[shiftName],
-                slot_number: index + 1,
-                employee_id: isOpenSlot ? null : slot.employeeId,
-                start_time: slot.startTime || DEFAULT_START_TIME,
-                end_time: slot.endTime || DEFAULT_END_TIME,
-                note: slot.note || '',
-                vehicle: shift.vehicle || '',
-                allow_extended_hours: Boolean(shift.allowExtendedHours),
-                is_open_slot: isOpenSlot,
-                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-                updated_at: new Date().toISOString(),
-              });
-            });
-          }
-
-          for (const extra of day.extras) {
-            const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
-            const slots = [extra.employee1, extra.employee2, extra.employee3];
-
-            rows.push({
-              id: `${dateKey}-${extraShiftKey}-0`,
-              schedule_id: dateKey,
-              date_key: dateKey,
-              shift_key: extraShiftKey,
-              shift_label: extra.label,
-              slot_number: 0,
-              employee_id: null,
-              start_time: DEFAULT_START_TIME,
-              end_time: DEFAULT_END_TIME,
-              note: '',
-              vehicle: extra.vehicle || '',
-              allow_extended_hours: Boolean(extra.allowExtendedHours),
-              is_open_slot: false,
-              open_slot_scope: null,
-              updated_at: new Date().toISOString(),
-            });
-
-            slots.forEach((slot, index) => {
-              if (!slot.employeeId) {
-                return;
-              }
-
-              const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-              rows.push({
-                id: `${dateKey}-${extraShiftKey}-${index + 1}`,
-                schedule_id: dateKey,
-                date_key: dateKey,
-                shift_key: extraShiftKey,
-                shift_label: extra.label,
-                slot_number: index + 1,
-                employee_id: isOpenSlot ? null : slot.employeeId,
-                start_time: slot.startTime || DEFAULT_START_TIME,
-                end_time: slot.endTime || DEFAULT_END_TIME,
-                note: slot.note || '',
-                vehicle: extra.vehicle || '',
-                allow_extended_hours: Boolean(extra.allowExtendedHours),
-                is_open_slot: isOpenSlot,
-                open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-                updated_at: new Date().toISOString(),
-              });
-            });
-          }
-
-          if (rows.length > 0) {
-            const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows);
-
-            if (assignmentError) {
-              throw assignmentError;
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Supabase schedule save failed:', error);
-      }
-    };
-
-    saveToSupabase();
-  }, [mounted, scheduleData]);
-
-  const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
-  const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
-
-  const goToCurrentPayPeriod = () => {
-    setAnchorDate(getGlobalPayPeriodStart(new Date()));
-  };
-  const visibleYear = visiblePayPeriod.end.getFullYear();
-  const payPeriodOptions = useMemo(() => {
-    const years = [visibleYear - 1, visibleYear, visibleYear + 1];
-    return years.flatMap((year) =>
-      getPayPeriodsForYear(year).map((payPeriod) => ({
-        year,
-        ...payPeriod,
-      })),
+        : item,
     );
-  }, [visibleYear]);
-  const selectedPayPeriodValue = `${visibleYear}|${toDateKey(visiblePayPeriod.start)}`;
 
-  useEffect(() => {
-    setScheduleData((current) => {
-      let next = current;
-      for (const date of dates) {
-        next = ensureDateExists(next, toDateKey(date));
-      }
-      return normalizeLoadedData(next);
+    saveSubmittedTimecards(nextTimecards);
+  }
+
+  function saveApolloMessages(nextMessages: ApolloMessage[]) {
+    setApolloMessages(nextMessages);
+    window.localStorage.setItem(APOLLO_MESSAGES_STORAGE_KEY, JSON.stringify(nextMessages));
+  }
+
+  const supervisorMessages = useMemo(() => {
+    return apolloMessages
+      .filter((message) => message.senderId === CURRENT_SUPERVISOR_ID || message.recipients.some((recipient) => recipient.employeeId === CURRENT_SUPERVISOR_ID))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [apolloMessages]);
+
+  const supervisorUnreadCount = supervisorMessages.filter(
+    (message) => message.senderId !== CURRENT_SUPERVISOR_ID && message.recipients.some((recipient) => recipient.employeeId === CURRENT_SUPERVISOR_ID && !recipient.readAt),
+  ).length;
+
+  const supervisorConversations = useMemo(() => {
+    const grouped = new Map<string, ApolloMessage[]>();
+
+    supervisorMessages.forEach((message) => {
+      const list = grouped.get(message.conversationId) ?? [];
+      list.push(message);
+      grouped.set(message.conversationId, list);
     });
-  }, [dates]);
 
-  const handleStandardShiftChange = (
-    dateKey: string,
-    shiftName: ShiftName,
-    field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours',
-    value: string | boolean,
-  ) => {
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        next[dateKey] = createEmptyDaySchedule();
-      }
+    return Array.from(grouped.entries())
+      .map(([conversationId, messages]) => ({
+        conversationId,
+        messages: messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+        latest: messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0],
+        unreadCount: messages.filter(
+          (message) => message.senderId !== CURRENT_SUPERVISOR_ID && message.recipients.some((recipient) => recipient.employeeId === CURRENT_SUPERVISOR_ID && !recipient.readAt),
+        ).length,
+      }))
+      .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
+  }, [supervisorMessages]);
 
-      const shift = next[dateKey].standard[shiftName];
-      (shift[field] as string | boolean) = value;
+  const selectedSupervisorConversation =
+    supervisorConversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? supervisorConversations[0] ?? null;
 
-      if (SUPERVISOR_SHIFTS.has(shiftName)) {
-        shift.employee2 = createEmptyEmployeeSlot();
-        shift.employee3 = createEmptyEmployeeSlot();
-        shift.showEmployee3 = false;
-      }
+  function getMessageStatus(message: ApolloMessage, viewerId: string): string {
+    if (message.senderId !== viewerId) {
+      const mine = message.recipients.find((recipient) => recipient.employeeId === viewerId);
+      return mine?.readAt ? 'Read' : 'Delivered';
+    }
 
-      return next;
+    const recipientCount = message.recipients.length;
+    const readCount = message.recipients.filter((recipient) => recipient.readAt).length;
+    if (recipientCount > 0 && readCount === recipientCount) return 'Read';
+    if (message.recipients.some((recipient) => recipient.deliveredAt)) return 'Delivered';
+    return 'Sent';
+  }
+
+  function markSupervisorConversationRead(conversationId: string) {
+    const now = new Date().toISOString();
+    const updated = apolloMessages.map((message) => {
+      if (message.conversationId !== conversationId) return message;
+      return {
+        ...message,
+        recipients: message.recipients.map((recipient) =>
+          recipient.employeeId === CURRENT_SUPERVISOR_ID && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
+        ),
+      };
     });
-  };
 
-  const handleStandardSlotChange = (
-    dateKey: string,
-    shiftName: ShiftName,
-    slotKey: 'employee1' | 'employee2' | 'employee3',
-    field: keyof EmployeeSlot,
-    value: string,
-  ) => {
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        next[dateKey] = createEmptyDaySchedule();
-      }
+    saveApolloMessages(updated);
+  }
 
-      const shift = next[dateKey].standard[shiftName];
-      shift[slotKey][field] = value;
+  function getRecipientsForMode(mode: string): EmployeeOption[] {
+    const activeEmployees = employees.filter((employee) => employee.status.toLowerCase() === 'active');
+    if (mode === 'INDIVIDUAL') return activeEmployees.filter((employee) => employee.id === messageRecipientEmployeeId);
+    if (mode === 'FULLTIME') return activeEmployees.filter((employee) => employee.employeeType.toLowerCase().includes('full'));
+    if (mode === 'PERDIEM') return activeEmployees.filter((employee) => employee.employeeType.toLowerCase().includes('per'));
+    if (mode === 'PARAMEDIC') return activeEmployees.filter((employee) => employee.role === 'Paramedic' || employee.scope === 'ALS');
+    if (mode === 'EMT') return activeEmployees.filter((employee) => employee.role === 'EMT' || employee.scope === 'BLS');
+    if (mode === 'SUPERVISORS') return activeEmployees.filter((employee) => employee.role === 'Supervisor');
+    return activeEmployees;
+  }
 
-      if (field === 'employeeId' && value && shiftName === 'ADMIN_SUP' && slotKey === 'employee1') {
-        shift[slotKey].startTime = '06:00';
-        shift[slotKey].endTime = '18:00';
-      }
-
-      if (field === 'employeeId' && !value) {
-        shift[slotKey].startTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '06:00' : DEFAULT_START_TIME;
-        shift[slotKey].endTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '18:00' : DEFAULT_END_TIME;
-        shift[slotKey].note = '';
-      }
-
-      return next;
-    });
-  };
-
-  const handleExtraShiftChange = (
-    dateKey: string,
-    extraId: string,
-    field: keyof ExtraShiftAssignment,
-    value: string | boolean,
-  ) => {
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        next[dateKey] = createEmptyDaySchedule();
-      }
-
-      const extra = next[dateKey].extras.find((item) => item.id === extraId);
-      if (!extra) {
-        return current;
-      }
-
-      (extra[field] as string | boolean) = value;
-
-      if (field === 'category' && value === 'SUPERVISOR') {
-        extra.employee2 = createEmptyEmployeeSlot();
-        extra.employee3 = createEmptyEmployeeSlot();
-        extra.showEmployee3 = false;
-      }
-
-      return next;
-    });
-  };
-
-  const handleExtraSlotChange = (
-    dateKey: string,
-    extraId: string,
-    slotKey: 'employee1' | 'employee2' | 'employee3',
-    field: keyof EmployeeSlot,
-    value: string,
-  ) => {
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        next[dateKey] = createEmptyDaySchedule();
-      }
-
-      const extra = next[dateKey].extras.find((item) => item.id === extraId);
-      if (!extra) {
-        return current;
-      }
-
-      extra[slotKey][field] = value;
-
-      if (field === 'employeeId' && !value) {
-        extra[slotKey].startTime = DEFAULT_START_TIME;
-        extra[slotKey].endTime = DEFAULT_END_TIME;
-        extra[slotKey].note = '';
-      }
-
-      return next;
-    });
-  };
-
-  const handleAddEmployeeSlot = (dateKey: string, shiftName: ShiftName) => {
-    handleStandardShiftChange(dateKey, shiftName, 'showEmployee3', true);
-  };
-
-  const handleAddEmployeeSlotToExtra = (dateKey: string, extraId: string) => {
-    handleExtraShiftChange(dateKey, extraId, 'showEmployee3', true);
-  };
-
-  const handleAddShift = (dateKey: string) => {
-    const label = window.prompt('Enter the extra shift name (example: Standby or LDT):', 'Standby');
-    if (!label || !label.trim()) {
+  function sendSupervisorMessage() {
+    if (!messageSubject.trim() || !messageBody.trim()) {
+      window.alert('Enter a subject and message before sending.');
       return;
     }
 
-    const typeInput = window.prompt('Enter shift type: UNIT or SUPERVISOR', 'UNIT');
-    const category: ShiftCategory = typeInput?.trim().toUpperCase() === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
+    const recipients = getRecipientsForMode(messageRecipientMode);
+    if (recipients.length === 0) {
+      window.alert('No recipients were found for that selection.');
+      return;
+    }
 
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        next[dateKey] = createEmptyDaySchedule();
+    const createdAt = new Date().toISOString();
+    const message: ApolloMessage = {
+      id: `message-${Date.now()}`,
+      conversationId: `conversation-${Date.now()}`,
+      senderId: CURRENT_SUPERVISOR_ID,
+      senderName: 'Supervisor',
+      senderRole: 'SUPERVISOR',
+      recipients: recipients.map((employee) => ({
+        employeeId: employee.id,
+        deliveredAt: createdAt,
+        readAt: null,
+      })),
+      audienceLabel: messageRecipientMode === 'INDIVIDUAL' ? recipients[0]?.name ?? 'Individual' : messageRecipientMode.replace('_', ' '),
+      title: messageSubject.trim(),
+      body: messageBody.trim(),
+      createdAt,
+      relatedType: messagePriority === 'URGENT' ? 'URGENT' : 'GENERAL',
+      priority: messagePriority,
+    };
+
+    saveApolloMessages([message, ...apolloMessages]);
+    setMessageSubject('');
+    setMessageBody('');
+    setMessageRecipientEmployeeId('');
+    setMessageRecipientMode('ALL_ACTIVE');
+    setMessagePriority('NORMAL');
+    setSelectedConversationId(message.conversationId);
+  }
+
+  function sendSupervisorReply() {
+    if (!selectedSupervisorConversation || !replyBody.trim()) {
+      return;
+    }
+
+    const createdAt = new Date().toISOString();
+    const existingParticipantIds = Array.from(
+      new Set([
+        ...selectedSupervisorConversation.messages.map((message) => message.senderId),
+        ...selectedSupervisorConversation.messages.flatMap((message) => message.recipients.map((recipient) => recipient.employeeId)),
+      ]),
+    );
+
+    const recipientIds = existingParticipantIds.filter((id) => id !== CURRENT_SUPERVISOR_ID);
+    const reply: ApolloMessage = {
+      id: `message-${Date.now()}`,
+      conversationId: selectedSupervisorConversation.conversationId,
+      senderId: CURRENT_SUPERVISOR_ID,
+      senderName: 'Supervisor',
+      senderRole: 'SUPERVISOR',
+      recipients: recipientIds.map((employeeId) => ({
+        employeeId,
+        deliveredAt: createdAt,
+        readAt: null,
+      })),
+      audienceLabel: selectedSupervisorConversation.latest.audienceLabel,
+      title: selectedSupervisorConversation.latest.title,
+      body: replyBody.trim(),
+      createdAt,
+      relatedType: selectedSupervisorConversation.latest.relatedType,
+      relatedId: selectedSupervisorConversation.latest.relatedId,
+      priority: selectedSupervisorConversation.latest.priority,
+    };
+
+    saveApolloMessages([reply, ...apolloMessages]);
+    setReplyBody('');
+    setSelectedConversationId(selectedSupervisorConversation.conversationId);
+  }
+
+  function getIsoDateInputValue(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
+  function getBuilderDateRange(start: string, end: string): string[] {
+    const dates: string[] = [];
+    const current = new Date(`${start}T00:00:00`);
+    const last = new Date(`${end}T00:00:00`);
+
+    if (Number.isNaN(current.getTime()) || Number.isNaN(last.getTime()) || current > last) {
+      return dates;
+    }
+
+    while (current <= last) {
+      dates.push(getIsoDateInputValue(current));
+      current.setDate(current.getDate() + 1);
+    }
+
+    return dates;
+  }
+
+  function getBuilderTemplateDateKeys(): string[] {
+    if (!builderStartDate) {
+      return [];
+    }
+
+    return Array.from({ length: 14 }, (_, index) => {
+      const date = new Date(`${builderStartDate}T00:00:00`);
+      date.setDate(date.getDate() + index);
+      return getIsoDateInputValue(date);
+    });
+  }
+
+  function createEmptyBuilderDay(): BuilderDay {
+    return {
+      R1: { employee1: '', employee2: '' },
+      R2: { employee1: '', employee2: '' },
+      P: { employee1: '', employee2: '' },
+      OC: { employee1: '', employee2: '' },
+      ADMIN_SUP: { employee1: '', employee2: '' },
+      FIELD_SUP: { employee1: '', employee2: '' },
+    };
+  }
+
+  function initializeScheduleBuilder() {
+    if (!builderStartDate || !builderEndDate) {
+      window.alert('Select a start date and end date before building the layout.');
+      return;
+    }
+
+    const launchDates = getBuilderDateRange(builderStartDate, builderEndDate);
+
+    if (launchDates.length === 0) {
+      window.alert('Select a valid date range.');
+      return;
+    }
+
+    if (launchDates.length < 14) {
+      window.alert('The Schedule Builder needs at least a 14-day date range.');
+      return;
+    }
+
+    const nextSchedule: BuilderSchedule = {};
+    getBuilderTemplateDateKeys().forEach((dateKey) => {
+      nextSchedule[dateKey] = createEmptyBuilderDay();
+    });
+
+    setBuilderSchedule(nextSchedule);
+  }
+
+  function updateBuilderSlot(dateKey: string, shiftKey: BuilderShiftKey, slot: keyof BuilderShift, employeeId: string) {
+    setBuilderSchedule((current) => ({
+      ...current,
+      [dateKey]: {
+        ...current[dateKey],
+        [shiftKey]: {
+          ...current[dateKey][shiftKey],
+          [slot]: employeeId,
+        },
+      },
+    }));
+  }
+
+  function getBuilderEmployeeName(employeeId: string): string {
+    if (!employeeId) {
+      return '';
+    }
+
+    if (employeeId === OPEN_ALS_SLOT_ID) {
+      return 'Open ALS';
+    }
+
+    if (employeeId === OPEN_BLS_SLOT_ID) {
+      return 'Open BLS';
+    }
+
+    return employees.find((employee) => employee.id === employeeId)?.name ?? employeeId;
+  }
+
+  function buildScheduleSlot(employeeId: string, startTime = '06:00', endTime = '06:00') {
+    return {
+      employeeId,
+      startTime,
+      endTime,
+      note: '',
+    };
+  }
+
+  function buildEmptyScheduleShift() {
+    return {
+      employee1: buildScheduleSlot(''),
+      employee2: buildScheduleSlot(''),
+      employee3: buildScheduleSlot(''),
+      showEmployee3: false,
+      vehicle: '',
+      allowExtendedHours: false,
+    };
+  }
+
+  function getBuilderShiftLabel(shiftKey: BuilderShiftKey): string {
+    if (shiftKey === 'R1') return 'Reedley 1';
+    if (shiftKey === 'R2') return 'Reedley 2';
+    if (shiftKey === 'P') return 'Parlier';
+    if (shiftKey === 'OC') return 'Orange Cove';
+    if (shiftKey === 'ADMIN_SUP') return 'Administrative Supervisor';
+    return 'Field Supervisor';
+  }
+
+  function getBuilderEmployeeAssignments() {
+    const assignments: Record<
+      string,
+      {
+        employeeName: string;
+        totalHours: number;
+        week1Hours: number;
+        week2Hours: number;
+        assignedDateKeys: string[];
+        weekendDateKeys: string[];
+      }
+    > = {};
+
+    Object.entries(builderSchedule).forEach(([dateKey, day], dayIndex) => {
+      const date = new Date(`${dateKey}T00:00:00`);
+      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+      const weekNumber = dayIndex < 7 ? 1 : 2;
+
+      (Object.keys(day) as BuilderShiftKey[]).forEach((shiftKey) => {
+        const shift = day[shiftKey];
+        [shift.employee1, shift.employee2].forEach((employeeId) => {
+          if (!employeeId || employeeId === OPEN_ALS_SLOT_ID || employeeId === OPEN_BLS_SLOT_ID) return;
+
+          if (!assignments[employeeId]) {
+            assignments[employeeId] = {
+              employeeName: getBuilderEmployeeName(employeeId),
+              totalHours: 0,
+              week1Hours: 0,
+              week2Hours: 0,
+              assignedDateKeys: [],
+              weekendDateKeys: [],
+            };
+          }
+
+          assignments[employeeId].totalHours += 24;
+          assignments[employeeId].assignedDateKeys.push(dateKey);
+
+          if (weekNumber === 1) {
+            assignments[employeeId].week1Hours += 24;
+          } else {
+            assignments[employeeId].week2Hours += 24;
+          }
+
+          if (isWeekend) {
+            assignments[employeeId].weekendDateKeys.push(dateKey);
+          }
+        });
+      });
+    });
+
+    return assignments;
+  }
+
+  function getBuilderWarnings(): BuilderWarning[] {
+    const warnings: BuilderWarning[] = [];
+    const assignments = getBuilderEmployeeAssignments();
+
+    Object.entries(assignments).forEach(([employeeId, assignment]) => {
+      const hasExpectedTotal = assignment.totalHours === 120;
+      const hasExpectedWeeklySplit =
+        (assignment.week1Hours === 48 && assignment.week2Hours === 72) ||
+        (assignment.week1Hours === 72 && assignment.week2Hours === 48);
+
+      if (!hasExpectedTotal || !hasExpectedWeeklySplit) {
+        warnings.push({
+          id: `hours-${employeeId}`,
+          severity: 'warning',
+          message: `${assignment.employeeName} is scheduled ${assignment.totalHours} hours (${assignment.week1Hours}/${assignment.week2Hours}). Expected 120 hours with a 48/72 or 72/48 split.`,
+        });
       }
 
-      next[dateKey].extras.push({
-        id: createExtraShiftId(),
-        label: label.trim(),
-        category,
-        employee1: createEmptyEmployeeSlot(),
-        employee2: createEmptyEmployeeSlot(),
-        employee3: createEmptyEmployeeSlot(),
-        showEmployee3: false,
-        vehicle: '',
-        allowExtendedHours: false,
-      });
+      const sortedDates = Array.from(new Set(assignment.assignedDateKeys)).sort();
+      let consecutiveDays = 1;
 
-      return next;
+      for (let index = 1; index < sortedDates.length; index += 1) {
+        const previous = new Date(`${sortedDates[index - 1]}T00:00:00`);
+        const current = new Date(`${sortedDates[index]}T00:00:00`);
+        const dayDifference = Math.round((current.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (dayDifference === 1) {
+          consecutiveDays += 1;
+        } else {
+          consecutiveDays = 1;
+        }
+
+        if (consecutiveDays > 2) {
+          warnings.push({
+            id: `consecutive-${employeeId}-${sortedDates[index]}`,
+            severity: 'danger',
+            message: `${assignment.employeeName} appears to exceed 48 consecutive hours around ${sortedDates[index]}.`,
+          });
+          break;
+        }
+      }
+
+      if (assignment.weekendDateKeys.length === 0) {
+        warnings.push({
+          id: `weekend-${employeeId}`,
+          severity: 'warning',
+          message: `${assignment.employeeName} is not scheduled for a Saturday or Sunday in this 2-week template.`,
+        });
+      }
     });
-  };
 
-  const handleRemoveExtraShift = (dateKey: string, extraId: string, label: string) => {
-    const confirmed = window.confirm(`Remove extra shift "${label}" from this day?`);
+    return warnings;
+  }
+
+  function getLaunchedScheduleDayFromBuilderDay(day: BuilderDay) {
+    return {
+      standard: {
+        R1: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.R1.employee1),
+          employee2: buildScheduleSlot(day.R1.employee2),
+        },
+        R2: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.R2.employee1),
+          employee2: buildScheduleSlot(day.R2.employee2),
+        },
+        P: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.P.employee1),
+          employee2: buildScheduleSlot(day.P.employee2),
+        },
+        OC: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.OC.employee1),
+          employee2: buildScheduleSlot(day.OC.employee2),
+        },
+        GM: buildEmptyScheduleShift(),
+        ADMIN_SUP: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.ADMIN_SUP.employee1, '06:00', '18:00'),
+        },
+        FIELD_SUP: {
+          ...buildEmptyScheduleShift(),
+          employee1: buildScheduleSlot(day.FIELD_SUP.employee1),
+        },
+      },
+      extras: [],
+    };
+  }
+
+  function launchBuilderSchedule() {
+    const templateDateKeys = Object.keys(builderSchedule).sort();
+    const launchDateKeys = getBuilderDateRange(builderStartDate, builderEndDate);
+
+    if (templateDateKeys.length === 0) {
+      window.alert('Build a schedule layout before launching.');
+      return;
+    }
+
+    if (launchDateKeys.length === 0) {
+      window.alert('Select a valid start and end date before launching.');
+      return;
+    }
+
+    const warningCount = getBuilderWarnings().length;
+    const firstConfirm = window.confirm(
+      `Launch this schedule from ${launchDateKeys[0]} through ${launchDateKeys[launchDateKeys.length - 1]}? This will overwrite and replace any currently published schedule in that date range.${warningCount > 0 ? `\n\nThere are ${warningCount} schedule warning(s).` : ''}`,
+    );
+
+    if (!firstConfirm) {
+      return;
+    }
+
+    const acknowledgement = window.prompt('Type LAUNCH to confirm publishing this schedule.');
+    if (acknowledgement !== 'LAUNCH') {
+      window.alert('Schedule launch cancelled.');
+      return;
+    }
+
+    const existingRaw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
+    const existingSchedule = existingRaw ? JSON.parse(existingRaw) : {};
+    const nextSchedule = {
+      ...existingSchedule,
+    };
+
+    launchDateKeys.forEach((dateKey, index) => {
+      const templateDateKey = templateDateKeys[index % templateDateKeys.length];
+      const templateDay = builderSchedule[templateDateKey];
+      nextSchedule[dateKey] = getLaunchedScheduleDayFromBuilderDay(templateDay);
+    });
+
+    window.localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(nextSchedule));
+    addAuditEntry('SCHEDULE_LAUNCHED', `Schedule launched for ${launchDateKeys[0]} through ${launchDateKeys[launchDateKeys.length - 1]}`);
+    window.alert('Schedule launched successfully.');
+  }
+
+  const builderDateKeys = Object.keys(builderSchedule).sort();
+  const builderWarnings = getBuilderWarnings();
+
+  const pendingOpenShiftRequests = useMemo(() => {
+    return openShiftRequests
+      .filter((request) => request.status === 'PENDING')
+      .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  }, [openShiftRequests]);
+
+  const reviewedOpenShiftRequests = useMemo(() => {
+    return openShiftRequests
+      .filter((request) => request.status !== 'PENDING')
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  }, [openShiftRequests]);
+
+  function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
+    setOpenShiftRequests(nextRequests);
+    window.localStorage.setItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY, JSON.stringify(nextRequests));
+  }
+
+  function updateOpenShiftRequestStatus(requestId: string, status: OpenShiftRequest['status']) {
+    const request = openShiftRequests.find((item) => item.id === requestId);
+    if (!request) {
+      return;
+    }
+
+    const confirmed =
+      status === 'APPROVED'
+        ? window.confirm(`Approve ${request.employeeName} for ${request.shiftLabel} on ${request.dateKey}? Confirm the final assignment on the Schedule page.`)
+        : window.confirm(`Deny ${request.employeeName}'s request for ${request.shiftLabel} on ${request.dateKey}?`);
+
     if (!confirmed) {
       return;
     }
 
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        return current;
-      }
+    const nextRequests = openShiftRequests.map((item) =>
+      item.id === requestId
+        ? {
+            ...item,
+            status,
+            supervisorNote:
+              status === 'APPROVED'
+                ? 'Approved by supervisor. Confirm assignment on Schedule page.'
+                : 'Denied by supervisor.',
+          }
+        : item,
+    );
 
-      next[dateKey].extras = next[dateKey].extras.filter((item) => item.id !== extraId);
-      return next;
-    });
-  };
+    saveOpenShiftRequests(nextRequests);
+    addAuditEntry(
+      status === 'APPROVED' ? 'OPEN_SHIFT_REQUEST_APPROVED' : 'OPEN_SHIFT_REQUEST_DENIED',
+      `${request.employeeName} — ${request.shiftLabel} on ${request.dateKey}`,
+    );
+  }
 
-  const handleCopyPreviousDay = (dateKey: string, previousDateKey: string) => {
-    setScheduleData((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      const previousDay = getDaySchedule(next, previousDateKey);
-      next[dateKey] = JSON.parse(JSON.stringify(previousDay)) as DaySchedule;
+  function returnTimecard(timecardId: string) {
+    const timecard = submittedTimecards.find((item) => item.id === timecardId);
+    const comment = (returnComments[timecardId] ?? '').trim();
 
-      for (const shiftName of SHIFT_ORDER) {
-        if (SUPERVISOR_SHIFTS.has(shiftName)) {
-          next[dateKey].standard[shiftName].employee2 = createEmptyEmployeeSlot();
-          next[dateKey].standard[shiftName].employee3 = createEmptyEmployeeSlot();
-          next[dateKey].standard[shiftName].showEmployee3 = false;
-        }
-      }
-
-      next[dateKey].extras = next[dateKey].extras.map((extra) => {
-        if (extra.category === 'SUPERVISOR') {
-          return {
-            ...extra,
-            employee2: createEmptyEmployeeSlot(),
-            employee3: createEmptyEmployeeSlot(),
-            showEmployee3: false,
-          };
-        }
-        return extra;
-      });
-
-      return next;
-    });
-  };
-
-
-  const handlePayPeriodChange = (value: string) => {
-    const [, startDateKey] = value.split('|');
-    if (!startDateKey) {
+    if (!timecard) {
       return;
     }
 
-    setAnchorDate(parseDateKey(startDateKey));
-  };
-
-  function renderEmployeeSlotEditor(
-    slot: EmployeeSlot,
-    slotLabel: string,
-    isVisible: boolean,
-    onChange: (field: keyof EmployeeSlot, value: string) => void,
-    eligibilityMap: Record<string, EligibilityResult>,
-    payPeriodHoursMap: Record<string, number>,
-  ) {
-    if (!isVisible) {
-      return null;
+    if (!comment) {
+      window.alert('Enter a message before returning this timecard for correction.');
+      return;
     }
 
-    const slotHours = slot.employeeId ? calculateSlotHours(slot.startTime, slot.endTime) : 0;
-    const noteRequired = requiresSupervisorNote(slot);
-    const eligibleEmployees = sortEmployeesByAwardPriority(
-      employees.filter((employee) => {
-        const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
-        const isCurrentSelection = slot.employeeId === employee.id;
-        return eligibility.eligible || isCurrentSelection;
+    const confirmed = window.confirm(
+      'Return this timecard for correction and send this message to the employee through Apollo Messages?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const nextTimecards = submittedTimecards.map((item) =>
+      item.id === timecardId
+        ? {
+            ...item,
+            status: 'RETURNED' as const,
+            reviewedAt: new Date().toISOString(),
+            reviewedBy: 'Supervisor',
+            supervisorComment: comment,
+          }
+        : item,
+    );
+
+    const createdAt = new Date().toISOString();
+    const message: ApolloMessage = {
+      id: `message-${Date.now()}`,
+      conversationId: `timecard-${timecard.id}`,
+      senderId: CURRENT_SUPERVISOR_ID,
+      senderName: 'Supervisor',
+      senderRole: 'SUPERVISOR',
+      recipients: [
+        {
+          employeeId: timecard.employeeId,
+          deliveredAt: createdAt,
+          readAt: null,
+        },
+      ],
+      audienceLabel: timecard.employeeName,
+      title: 'Timecard Returned for Correction',
+      body: `Your timecard for ${formatShortDate(new Date(timecard.payPeriodStart))} to ${formatShortDate(
+        new Date(timecard.payPeriodEnd),
+      )} was returned for correction.\n\nSupervisor message:\n${comment}`,
+      createdAt,
+      relatedType: 'TIMECARD_RETURNED',
+      relatedId: timecard.id,
+      priority: 'IMPORTANT',
+    };
+
+    saveSubmittedTimecards(nextTimecards);
+    saveApolloMessages([message, ...apolloMessages]);
+
+    setReturnComments((current) => ({
+      ...current,
+      [timecardId]: '',
+    }));
+  }
+
+  function getPunchPairForDate(timecard: SubmittedTimecard, dateKey: string) {
+    const punches = timecard.punches
+      .filter((punch) => punch.shiftDateKey === dateKey)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const clockIn = punches.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+    const clockOut = [...punches].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+    const shiftLabel = clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '';
+
+    return { clockIn, clockOut, shiftLabel };
+  }
+
+  function getHoursBetween(clockIn: TimePunch | null, clockOut: TimePunch | null): string {
+    if (!clockIn || !clockOut) {
+      return '';
+    }
+
+    const start = new Date(clockIn.timestamp);
+    const end = new Date(clockOut.timestamp);
+    const hours = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+    return hours.toFixed(2);
+  }
+
+  function getPayBreakdown(timecard: SubmittedTimecard): PayBreakdown {
+    if (timecard.payBreakdown) {
+      return timecard.payBreakdown;
+    }
+
+    return {
+      regularHours: timecard.totalHours,
+      overtimeHours: 0,
+      doubleTimeHours: 0,
+      missedMealPenaltyHours: timecard.missedMealBreaks.length,
+      week1: {
+        regularHours: timecard.totalHours,
+        overtimeHours: 0,
+        doubleTimeHours: 0,
+      },
+      week2: {
+        regularHours: 0,
+        overtimeHours: 0,
+        doubleTimeHours: 0,
+      },
+    };
+  }
+
+  function hasManualEditFlag(timecard: SubmittedTimecard): boolean {
+    return timecard.punches.some((punch) => punch.locationLabel === 'Employee edited timecard');
+  }
+
+  function hasGeofenceReviewFlag(timecard: SubmittedTimecard): boolean {
+    return timecard.punches.some((punch) => punch.geofenceStatus !== 'APPROVED');
+  }
+
+  function hasMissingPunchFlag(timecard: SubmittedTimecard, weeks: { label: string; dates: Date[] }[]): boolean {
+    return weeks.some((week) =>
+      week.dates.some((date) => {
+        const pair = getPunchPairForDate(timecard, getDateKeyFromDate(date));
+        return Boolean(pair.shiftLabel && (!pair.clockIn || !pair.clockOut));
       }),
-      payPeriodHoursMap,
     );
-    const recommendedEmployee = eligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
-    const isOpenSlotSelection = isOpenShiftSlot(slot.employeeId);
-    const selectedEmployee = slot.employeeId && !isOpenSlotSelection ? getEmployeeById(slot.employeeId, employees) : null;
-    const selectedEligibility = slot.employeeId && !isOpenSlotSelection ? eligibilityMap[slot.employeeId] : null;
-    const isLowerPrioritySelection = Boolean(
-      slot.employeeId && !isOpenSlotSelection && recommendedEmployee && slot.employeeId !== recommendedEmployee.id,
-    );
+  }
+
+  function getDateKeyFromDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function printTimecard(timecardId: string) {
+    const printable = document.getElementById(`printable-${timecardId}`);
+    if (!printable) {
+      window.print();
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Timecard</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #334155; padding: 4px; text-align: center; }
+            .no-print { display: none; }
+            .card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+          </style>
+        </head>
+        <body>${printable.innerHTML}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  function renderSubmittedTimecard(timecard: SubmittedTimecard) {
+    const payPeriodStart = new Date(timecard.payPeriodStart);
+    const allDates = Array.from({ length: 14 }, (_, index) => addDays(payPeriodStart, index));
+    const weeks = [
+      { label: 'Week-1', dates: allDates.slice(0, 7) },
+      { label: 'Week-2', dates: allDates.slice(7, 14) },
+    ];
+
+    const breakdown = getPayBreakdown(timecard);
+    const hasManualEdits = hasManualEditFlag(timecard);
+    const hasGeofenceFlags = hasGeofenceReviewFlag(timecard);
+    const hasMissingPunches = hasMissingPunchFlag(timecard, weeks);
+    const hasMissedMeals = timecard.missedMealBreaks.length > 0;
+    const hasFlags = hasManualEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
+    const isOwnSupervisorTimecard = timecard.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID;
 
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{slotLabel}</label>
-          <div className="flex items-center gap-2">
-            {recommendedEmployee && !slot.employeeId && (
-              <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                Recommended: {recommendedEmployee.name}
+      <div id={`printable-${timecard.id}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="text-base font-bold text-slate-900">{timecard.employeeName}</div>
+            <div className="mt-1 text-sm text-slate-600">
+              Pay Period: {formatShortDate(new Date(timecard.payPeriodStart))} to {formatShortDate(new Date(timecard.payPeriodEnd))}
+            </div>
+            <div className="mt-1 text-sm text-slate-600">
+              Submitted: {new Date(timecard.submittedAt).toLocaleString('en-US', {
+                month: 'numeric',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800">
+              {timecard.totalHours.toFixed(2)} hrs
+            </div>
+            <div
+              className={`rounded-xl px-3 py-2 text-sm font-bold ${
+                timecard.status === 'APPROVED'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : timecard.status === 'RETURNED'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-blue-100 text-blue-700'
+              }`}
+            >
+              {timecard.status === 'PENDING_SUPERVISOR_REVIEW'
+                ? 'Pending Review'
+                : timecard.status === 'APPROVED'
+                  ? 'Approved'
+                  : 'Returned'}
+            </div>
+            {hasFlags && (
+              <div className="rounded-xl bg-red-100 px-3 py-2 text-sm font-bold text-red-700">
+                Review Flags
               </div>
             )}
-            {slot.employeeId ? (
-              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {formatHours(slotHours)}h
+            {isOwnSupervisorTimecard && (
+              <div className="rounded-xl bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700">
+                Own Timecard — Needs Another Approver
               </div>
-            ) : (
-              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">0h</div>
+            )}
+            {timecard.status === 'APPROVED' && (
+              <button
+                type="button"
+                onClick={() => printTimecard(timecard.id)}
+                className="no-print rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+              >
+                Print / Save PDF
+              </button>
             )}
           </div>
         </div>
 
-        <div className="space-y-3">
-          <select
-            value={slot.employeeId}
-            onChange={(event) => onChange('employeeId', event.target.value)}
-            className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition focus:border-slate-500 ${
-              slot.employeeId === OPEN_ALS_SLOT_ID
-                ? 'border-blue-200 bg-blue-50 text-blue-800'
-                : slot.employeeId === OPEN_BLS_SLOT_ID
-                  ? 'border-red-200 bg-red-50 text-red-800'
-                  : 'border-slate-300 bg-white text-slate-900'
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Hours</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{timecard.totalHours.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Regular</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{breakdown.regularHours.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overtime</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{breakdown.overtimeHours.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Double Time</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{breakdown.doubleTimeHours.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Missed Meal</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{breakdown.missedMealPenaltyHours.toFixed(2)}</div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Week 1</div>
+            <div className="mt-1 text-sm text-slate-700">
+              Reg {breakdown.week1.regularHours.toFixed(2)} • OT {breakdown.week1.overtimeHours.toFixed(2)} • DT {breakdown.week1.doubleTimeHours.toFixed(2)}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Week 2</div>
+            <div className="mt-1 text-sm text-slate-700">
+              Reg {breakdown.week2.regularHours.toFixed(2)} • OT {breakdown.week2.overtimeHours.toFixed(2)} • DT {breakdown.week2.doubleTimeHours.toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        {hasFlags && (
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+            <div className="text-sm font-bold text-red-800">Supervisor Review Flags</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {hasManualEdits && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                  Manual Edit Detected
+                </span>
+              )}
+              {hasGeofenceFlags && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                  Outside Geofence — Requires Supervisor Review
+                </span>
+              )}
+              {hasMissingPunches && (
+                <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                  Missing Punch
+                </span>
+              )}
+              {hasMissedMeals && (
+                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                  Missed Meal Pending Approval
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 overflow-auto rounded-xl border border-slate-300">
+          <div className="min-w-[980px] p-4">
+            {weeks.map((week) => (
+              <div key={`${timecard.id}-${week.label}`} className="mb-5">
+                <div className="border border-slate-400 bg-slate-100 py-1 text-center text-xs font-bold">
+                  {week.label}
+                </div>
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift #</th>
+                      <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift</th>
+                      <th colSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Date &amp; Time In</th>
+                      <th colSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Date &amp; Time Out</th>
+                      <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Total Hours</th>
+                      <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Flag</th>
+                    </tr>
+                    <tr>
+                      <th className="border border-slate-400 bg-slate-50 px-2 py-1">Date</th>
+                      <th className="border border-slate-400 bg-slate-50 px-2 py-1">Time</th>
+                      <th className="border border-slate-400 bg-slate-50 px-2 py-1">Date</th>
+                      <th className="border border-slate-400 bg-slate-50 px-2 py-1">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {week.dates.map((date, index) => {
+                      const dateKey = getDateKeyFromDate(date);
+                      const pair = getPunchPairForDate(timecard, dateKey);
+                      const clockInDate = pair.clockIn ? new Date(pair.clockIn.timestamp) : null;
+                      const clockOutDate = pair.clockOut ? new Date(pair.clockOut.timestamp) : null;
+                      const hasMissingPunch = Boolean(pair.shiftLabel && (!pair.clockIn || !pair.clockOut));
+                      const hasGeofenceFlag = Boolean(
+                        pair.clockIn?.geofenceStatus !== 'APPROVED' || pair.clockOut?.geofenceStatus !== 'APPROVED',
+                      );
+                      const hasManualEdit = Boolean(
+                        pair.clockIn?.locationLabel === 'Employee edited timecard' ||
+                          pair.clockOut?.locationLabel === 'Employee edited timecard',
+                      );
+
+                      return (
+                        <tr key={`${timecard.id}-${week.label}-${dateKey}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
+                          <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{index + 1}</td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">{pair.shiftLabel}</td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">{clockInDate ? formatShortDate(clockInDate) : ''}</td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">
+                            {clockInDate ? clockInDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">{clockOutDate ? formatShortDate(clockOutDate) : ''}</td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">
+                            {clockOutDate ? clockOutDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{getHoursBetween(pair.clockIn, pair.clockOut)}</td>
+                          <td className="border border-slate-400 px-2 py-1 text-center">
+                            {hasMissingPunch ? (
+                              <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">Missing</span>
+                            ) : hasGeofenceFlag ? (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-700">Geofence</span>
+                            ) : hasManualEdit ? (
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-700">Edited</span>
+                            ) : pair.shiftLabel ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700">OK</span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+
+            {timecard.missedMealBreaks.length > 0 && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div className="text-sm font-bold text-amber-800">Missed Meal Breaks</div>
+                <div className="mt-2 space-y-2">
+                  {timecard.missedMealBreaks.map((item) => (
+                    <div key={item.id} className="text-sm text-amber-800">
+                      <span className="font-semibold">{item.dateKey}:</span> {item.reason}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {timecard.note && (
+              <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-sm font-bold text-slate-900">Employee Note</div>
+                <div className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{timecard.note}</div>
+              </div>
+            )}
+
+            {timecard.supervisorComment && (
+              <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <div className="text-sm font-bold text-amber-800">Supervisor Comment</div>
+                <div className="mt-1 whitespace-pre-wrap text-sm text-amber-800">{timecard.supervisorComment}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {timecard.status === 'PENDING_SUPERVISOR_REVIEW' && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+              <textarea
+                value={returnComments[timecard.id] ?? ''}
+                onChange={(event) =>
+                  setReturnComments((current) => ({
+                    ...current,
+                    [timecard.id]: event.target.value,
+                  }))
+                }
+                rows={2}
+                placeholder="Message to employee explaining what needs to be corrected..."
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+              />
+
+              <button
+                type="button"
+                onClick={() => returnTimecard(timecard.id)}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+              >
+                Return for Correction
+              </button>
+
+              <button
+                type="button"
+                disabled={isOwnSupervisorTimecard}
+                onClick={() => approveTimecard(timecard.id)}
+                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {isOwnSupervisorTimecard ? 'Needs Other Approver' : 'Approve'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function saveAuditLog(nextLog: AuditLogEntry[]) {
+    setAuditLog(nextLog);
+    window.localStorage.setItem(AUDIT_LOG_STORAGE_KEY, JSON.stringify(nextLog));
+  }
+
+  function addAuditEntry(action: string, details: string) {
+    const entry: AuditLogEntry = {
+      id: `audit-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      actor: 'Supervisor',
+      action,
+      details,
+    };
+
+    saveAuditLog([entry, ...auditLog].slice(0, 250));
+  }
+
+  function saveSystemConfig(nextConfig: SystemConfig, action = 'SYSTEM_CONFIG_UPDATED', details = 'System configuration updated') {
+    setSystemConfig(nextConfig);
+    window.localStorage.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig));
+    addAuditEntry(action, details);
+  }
+
+  function updateCompanyName(value: string) {
+    saveSystemConfig(
+      { ...systemConfig, companyName: value },
+      'COMPANY_NAME_UPDATED',
+      `Company name changed to "${value}"`,
+    );
+  }
+
+  function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      saveSystemConfig(
+        { ...systemConfig, logoDataUrl: String(reader.result ?? '') },
+        'COMPANY_LOGO_UPDATED',
+        `Company logo uploaded: ${file.name}`,
+      );
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearLogo() {
+    if (!window.confirm('Remove the current company logo from Apollo?')) return;
+    saveSystemConfig({ ...systemConfig, logoDataUrl: '' }, 'COMPANY_LOGO_REMOVED', 'Company logo removed');
+  }
+
+  function addImportantLink() {
+    if (!newLinkLabel.trim() || !newLinkUrl.trim()) {
+      window.alert('Enter both a label and URL before adding a link.');
+      return;
+    }
+
+    saveSystemConfig(
+      {
+        ...systemConfig,
+        importantLinks: [
+          ...systemConfig.importantLinks,
+          { id: `link-${Date.now()}`, label: newLinkLabel.trim(), url: newLinkUrl.trim() },
+        ],
+      },
+      'IMPORTANT_LINK_ADDED',
+      `Added important link: ${newLinkLabel.trim()}`,
+    );
+
+    setNewLinkLabel('');
+    setNewLinkUrl('');
+  }
+
+  function updateImportantLink(id: string, partial: Partial<ImportantLink>) {
+    const existing = systemConfig.importantLinks.find((link) => link.id === id);
+    saveSystemConfig(
+      {
+        ...systemConfig,
+        importantLinks: systemConfig.importantLinks.map((link) => (link.id === id ? { ...link, ...partial } : link)),
+      },
+      'IMPORTANT_LINK_UPDATED',
+      `Updated important link: ${existing?.label ?? id}`,
+    );
+  }
+
+  function removeImportantLink(id: string) {
+    const existing = systemConfig.importantLinks.find((link) => link.id === id);
+    if (!window.confirm(`Delete important link "${existing?.label ?? 'selected link'}"? This removes it from the Employee Dashboard.`)) return;
+
+    saveSystemConfig(
+      { ...systemConfig, importantLinks: systemConfig.importantLinks.filter((link) => link.id !== id) },
+      'IMPORTANT_LINK_DELETED',
+      `Deleted important link: ${existing?.label ?? id}`,
+    );
+  }
+
+  function updateGeofence(id: string, partial: Partial<GeofenceConfig>) {
+    const existing = systemConfig.geofences.find((geofence) => geofence.id === id);
+    saveSystemConfig(
+      {
+        ...systemConfig,
+        geofences: systemConfig.geofences.map((geofence) => (geofence.id === id ? { ...geofence, ...partial } : geofence)),
+      },
+      'GEOFENCE_UPDATED',
+      `Updated geofence: ${existing?.shiftLabel ?? id}`,
+    );
+  }
+
+  function addGeofence() {
+    saveSystemConfig(
+      {
+        ...systemConfig,
+        geofences: [
+          ...systemConfig.geofences,
+          { id: `geofence-${Date.now()}`, shiftLabel: 'New Location', locationLabel: 'New Location', latitude: 0, longitude: 0, radiusFeet: 500 },
+        ],
+      },
+      'GEOFENCE_ADDED',
+      'Added new geofence',
+    );
+  }
+
+  function removeGeofence(id: string) {
+    const existing = systemConfig.geofences.find((geofence) => geofence.id === id);
+    if (!window.confirm(`Delete geofence "${existing?.shiftLabel ?? 'selected geofence'}"? Employees assigned to that shift may no longer have an approved clock-in location.`)) return;
+
+    saveSystemConfig(
+      { ...systemConfig, geofences: systemConfig.geofences.filter((geofence) => geofence.id !== id) },
+      'GEOFENCE_DELETED',
+      `Deleted geofence: ${existing?.shiftLabel ?? id}`,
+    );
+  }
+
+  function saveAnnouncements(nextAnnouncements: CompanyAnnouncement[]) {
+    setAnnouncements(nextAnnouncements);
+    window.localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(nextAnnouncements));
+  }
+
+  function createAnnouncement() {
+    if (!title.trim() || !message.trim() || !expiresAt) {
+      return;
+    }
+
+    const expiresDate = new Date(`${expiresAt}T23:59:59`);
+
+    const announcement: CompanyAnnouncement = {
+      id: `announcement-${Date.now()}`,
+      title: title.trim(),
+      message: message.trim(),
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresDate.toISOString(),
+      postedBy: 'Supervisor',
+    };
+
+    saveAnnouncements([announcement, ...announcements]);
+    setTitle('');
+    setMessage('');
+    setExpiresAt(makeDateInputValue(addDays(new Date(), 7)));
+  }
+
+  function deleteAnnouncement(announcementId: string) {
+    saveAnnouncements(announcements.filter((announcement) => announcement.id !== announcementId));
+  }
+
+  function toggleTile(tileId: string) {
+    setActiveTile((current) => (current === tileId ? null : tileId));
+  }
+
+  function renderTile(
+    id: string,
+    titleText: string,
+    description: string,
+    children: React.ReactNode,
+    hasAlert = false,
+  ) {
+    const isOpen = activeTile === id;
+
+    return (
+      <div
+        className={`rounded-2xl border bg-white shadow-sm ${
+          hasAlert ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => toggleTile(id)}
+          className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 text-left transition hover:bg-slate-50"
+        >
+          <div>
+            <div className="text-base font-bold text-slate-900">{titleText}</div>
+            <div className="mt-1 text-sm text-slate-600">{description}</div>
+          </div>
+
+          <div
+            className={`rounded-xl border px-3 py-1.5 text-sm font-semibold ${
+              isOpen ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700'
             }`}
           >
-            <option value="">Select employee</option>
-            <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
-            <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
-            {eligibleEmployees.map((employee) => {
-              const payPeriodHours = payPeriodHoursMap[employee.id] ?? 0;
-              const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
-              const isRecommended = recommendedEmployee?.id === employee.id;
-              const label = `${employee.name} — PP ${formatHours(payPeriodHours)}h — ${getAwardBucketLabel(
-                employee.employeeType,
-                payPeriodHours,
-              )}${isRecommended ? ' — Recommended' : ''}${eligibility.warning ? ` — Warning: ${eligibility.warning}` : ''}`;
-
-              return (
-                <option key={employee.id} value={employee.id}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
-
-          {slot.employeeId && selectedEligibility?.warning && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              {selectedEligibility.warning}
-            </div>
-          )}
-
-          {isLowerPrioritySelection && recommendedEmployee && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              Higher priority employee available: {recommendedEmployee.name}. Selection is still allowed, but should be treated as a supervisor override if used.
-            </div>
-          )}
-
-          {slot.employeeId && selectedEligibility && !selectedEligibility.eligible && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-2 text-xs font-semibold text-red-700">
-              {selectedEmployee?.name ?? 'Selected employee'} is not eligible: {selectedEligibility.reason}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Start
-              </label>
-              <input
-                type="time"
-                value={slot.startTime}
-                onChange={(event) => onChange('startTime', event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                End
-              </label>
-              <input
-                type="time"
-                value={slot.endTime}
-                onChange={(event) => onChange('endTime', event.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-              />
-            </div>
+            {isOpen ? 'Close' : 'Open'}
           </div>
+        </button>
 
-          {showNotes && (
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Supervisor Note {noteRequired ? '(required)' : '(optional)'}
-              </label>
-              <textarea
-                value={slot.note}
-                onChange={(event) => onChange('note', event.target.value)}
-                disabled={!slot.employeeId}
-                rows={2}
-                placeholder={noteRequired ? 'Explain why the end time is not 06:00' : 'Add note if needed'}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
-              />
-            </div>
-          )}
-        </div>
+        {isOpen && <div className="border-t border-slate-200 p-5">{children}</div>}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
-      <div className="mx-auto max-w-[1900px]">
+      <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Schedule</h1>
-
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="min-w-[340px]">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Pay Period
-                </label>
-                <select
-                  value={selectedPayPeriodValue}
-                  onChange={(event) => handlePayPeriodChange(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
-                >
-                  {payPeriodOptions.map((option) => (
-                    <option key={`${option.year}-${toDateKey(option.start)}`} value={`${option.year}|${toDateKey(option.start)}`}>
-                      {formatPayPeriodOptionLabel(option, option.year)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="button"
-                onClick={goToCurrentPayPeriod}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Current Pay Period
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowNotes((s) => !s)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                {showNotes ? 'Hide Shift Details' : 'Show Shift Details'}
-              </button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Supervisor</h1>
+            <div className="mt-1 text-sm text-slate-600">
+              Supervisor tools using the same tile format as the employee dashboard.
             </div>
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
-            <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</div>
-            </div>
-
-            {dates.map((date, index) => {
-              const dateKey = toDateKey(date);
-              const previousDateKey = index > 0 ? toDateKey(dates[index - 1]) : '';
-
-              return (
-                <div key={dateKey} className="sticky top-0 z-30 border-b border-r border-slate-200 bg-slate-50 p-4">
-                  <div className="space-y-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
-                      <div className="mt-1 text-xs text-slate-500">{dateKey}</div>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!previousDateKey) return;
-                          handleCopyPreviousDay(dateKey, previousDateKey);
-                        }}
-                        disabled={!previousDateKey}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Copy Previous Day
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleAddShift(dateKey)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
-                      >
-                        Add Shift
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {SHIFT_ORDER.map((shiftName) => (
-              <React.Fragment key={shiftName}>
-                <div className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-4">
-                  <div className="flex h-full flex-col justify-center">
-                    <div className="text-base font-bold text-slate-900">{SHIFT_DISPLAY_NAMES[shiftName]}</div>
-                  </div>
-                </div>
-
-                {dates.map((date) => {
-                  const dateKey = toDateKey(date);
-                  const day = getDaySchedule(scheduleData, dateKey);
-                  const shift = day.standard[shiftName];
-                  const category: ShiftCategory = UNIT_SHIFTS.has(shiftName) ? 'UNIT' : 'SUPERVISOR';
-                  const assignmentRef: AssignmentRef = {
-                    key: `standard-${shiftName}`,
-                    label: SHIFT_DISPLAY_NAMES[shiftName],
-                    category,
-                    shift,
-                  };
-
-                  const slotEligibilityMaps = {
-                    employee1: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                    employee2: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                    employee3: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                  };
-
-                  const payPeriodHoursMap = Object.fromEntries(
-                    employees.map((employee) => [
-                      employee.id,
-                      getEmployeePayPeriodHours(scheduleData, dateKey, employee.id, assignmentRef.key),
-                    ]),
-                  ) as Record<string, number>;
-
-                  const staffingLevel = getStaffingLevel(category, shift, employees);
-                  const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
-                  const vehicleMessages = getVehicleConflictMessages(day, assignmentRef);
-                  const continuousHours = getContinuousHoursResult(scheduleData, dateKey, assignmentRef, employees);
-                  const requiredNoteMessages = getRequiredNoteMessages(assignmentRef, employees);
-                  const certificationMessages = getCertificationMessages(assignmentRef, employees);
-                  const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
-                  const approvalMessages = continuousHours.approvals;
-                  const isSupervisorShift = category === 'SUPERVISOR';
-
-                  return (
-                    <div key={`${shiftName}-${dateKey}`} className="border-b border-r border-slate-200 bg-white p-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between gap-2">
-                          <div
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              staffingLevel === 'ALS'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : staffingLevel === 'BLS'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-sky-100 text-sky-700'
-                            }`}
-                          >
-                            {staffingLevel}
-                          </div>
-
-                          {warningMessages.length > 0 ? (
-                            <div className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                              Warning
-                            </div>
-                          ) : approvalMessages.length > 0 ? (
-                            <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                              Approved
-                            </div>
-                          ) : (
-                            <div className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                              Clear
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-3">
-                          {renderEmployeeSlotEditor(
-                            shift.employee1,
-                            'Employee 1',
-                            true,
-                            (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee1', field, value),
-                            slotEligibilityMaps.employee1,
-                            payPeriodHoursMap,
-                          )}
-
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
-                              shift.employee2,
-                              'Employee 2',
-                              true,
-                              (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee2', field, value),
-                              slotEligibilityMaps.employee2,
-                              payPeriodHoursMap,
-                            )}
-
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
-                              shift.employee3,
-                              'Employee 3',
-                              shift.showEmployee3 || Boolean(shift.employee3.employeeId),
-                              (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee3', field, value),
-                              slotEligibilityMaps.employee3,
-                              payPeriodHoursMap,
-                            )}
-
-                          {!isSupervisorShift && !shift.showEmployee3 && !shift.employee3.employeeId && (
-                            <button
-                              type="button"
-                              onClick={() => handleAddEmployeeSlot(dateKey, shiftName)}
-                              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                            >
-                              Add Employee
-                            </button>
-                          )}
-
-                          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={shift.allowExtendedHours}
-                              onChange={(event) =>
-                                handleStandardShiftChange(dateKey, shiftName, 'allowExtendedHours', event.target.checked)
-                              }
-                              className="h-4 w-4"
-                            />
-                            Allow extended hours
-                          </label>
-
-                          <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Vehicle
-                            </label>
-                            <select
-                              value={shift.vehicle}
-                              onChange={(event) =>
-                                handleStandardShiftChange(dateKey, shiftName, 'vehicle', event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                            >
-                              {getVehicleOptions(category).map((vehicle) => (
-                                <option key={vehicle || 'none'} value={vehicle}>
-                                  {vehicle || 'No vehicle selected'}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {warningMessages.length > 0 && (
-                          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
-                            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
-                              Conflict Warnings
-                            </div>
-                            <ul className="space-y-1 text-xs text-red-700">
-                              {warningMessages.map((message) => (
-                                <li key={message}>• {message}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {approvalMessages.length > 0 && (
-                          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                              Extended Hours Approved
-                            </div>
-                            <ul className="space-y-1 text-xs text-emerald-700">
-                              {approvalMessages.map((message) => (
-                                <li key={message}>• {message}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            ))}
-
-            <div className="sticky left-0 z-10 border-r border-slate-200 bg-white p-4">
-              <div className="flex h-full flex-col justify-center">
-                <div className="text-base font-bold text-slate-900">EXTRA SHIFTS</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">Day-specific additions</div>
+        <div className="space-y-4">
+          {renderTile(
+            'schedule-management',
+            'Schedule Management',
+            pendingOpenShiftRequests.length > 0
+              ? `${pendingOpenShiftRequests.length} open shift request${pendingOpenShiftRequests.length === 1 ? '' : 's'} pending.`
+              : 'Open the supervisor schedule board and review open shift requests.',
+            <div className="space-y-5">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <a
+                  href="/schedule"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                >
+                  Open Schedule
+                </a>
               </div>
-            </div>
 
-            {dates.map((date) => {
-              const dateKey = toDateKey(date);
-              const day = getDaySchedule(scheduleData, dateKey);
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">Schedule Builder</div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      Build a 2-week schedule template. All shifts launch as 24-hour shifts except Administrative Supervisor, which launches as 06:00-18:00. Apollo repeats the template until the selected end date and publishes it to supervisors and employees.
+                    </div>
+                  </div>
 
-              return (
-                <div key={`extras-${dateKey}`} className="border-r border-slate-200 bg-white p-3 align-top">
-                  <div className="space-y-3">
-                    {day.extras.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500">
-                        No extra shifts
+                  <button
+                    type="button"
+                    onClick={launchBuilderSchedule}
+                    disabled={builderDateKeys.length === 0}
+                    className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Launch Schedule
+                  </button>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={builderStartDate}
+                      onChange={(event) => setBuilderStartDate(event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Repeat Until / End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={builderEndDate}
+                      onChange={(event) => setBuilderEndDate(event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <button
+                      type="button"
+                      onClick={initializeScheduleBuilder}
+                      className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 md:w-auto"
+                    >
+                      Build Layout
+                    </button>
+                  </div>
+                </div>
+
+                {builderDateKeys.length > 0 && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-sm font-bold text-slate-900">Schedule Builder Warnings</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      These warnings help catch schedule issues before launch. They do not block launch, but launching requires acknowledgement.
+                    </div>
+
+                    {builderWarnings.length === 0 ? (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+                        No schedule warnings found in this 2-week template.
                       </div>
                     ) : (
-                      day.extras.map((extra) => {
-                        const assignmentRef: AssignmentRef = {
-                          key: `extra-${extra.id}`,
-                          label: extra.label,
-                          category: extra.category,
-                          shift: extra,
-                        };
+                      <div className="mt-3 space-y-2">
+                        {builderWarnings.map((warning) => (
+                          <div
+                            key={warning.id}
+                            className={`rounded-xl border p-3 text-sm font-semibold ${
+                              warning.severity === 'danger'
+                                ? 'border-red-200 bg-red-50 text-red-700'
+                                : 'border-amber-200 bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {warning.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                        const slotEligibilityMaps = {
-                          employee1: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                          employee2: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                          employee3: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                        };
+                {builderDateKeys.length > 0 && (
+                  <div className="mt-5 space-y-6">
+                    <div className="overflow-auto rounded-xl border border-slate-200">
+                      <div className="min-w-[1200px]">
+                        <div className="border-b border-slate-200 bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+                          Week 1
+                        </div>
 
-                        const payPeriodHoursMap = Object.fromEntries(
-                          employees.map((employee) => [
-                            employee.id,
-                            getEmployeePayPeriodHours(scheduleData, dateKey, employee.id, assignmentRef.key),
-                          ]),
-                        ) as Record<string, number>;
+                        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                          {builderDateKeys.slice(0, 7).map((dateKey) => (
+                            <div
+                              key={`builder-header-week1-${dateKey}`}
+                              className="border-r border-slate-200 p-3 text-center text-sm font-bold text-slate-900 last:border-r-0"
+                            >
+                              {new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}
+                            </div>
+                          ))}
+                        </div>
 
-                        const staffingLevel = getStaffingLevel(extra.category, extra, employees);
-                        const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
-                        const vehicleMessages = getVehicleConflictMessages(day, assignmentRef);
-                        const continuousHours = getContinuousHoursResult(scheduleData, dateKey, assignmentRef, employees);
-                        const requiredNoteMessages = getRequiredNoteMessages(assignmentRef, employees);
-                        const certificationMessages = getCertificationMessages(assignmentRef, employees);
-                        const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
-                        const approvalMessages = continuousHours.approvals;
-                        const isSupervisorShift = extra.category === 'SUPERVISOR';
-
-                        return (
-                          <div key={extra.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                            <div className="mb-3 flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <input
-                                  type="text"
-                                  value={extra.label}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'label', event.target.value)
-                                  }
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-500"
-                                />
-                                <div className="mt-2 flex items-center gap-2">
-                                  <div
-                                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                      staffingLevel === 'ALS'
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : staffingLevel === 'BLS'
-                                          ? 'bg-amber-100 text-amber-700'
-                                          : 'bg-sky-100 text-sky-700'
-                                    }`}
-                                  >
-                                    {staffingLevel}
+                        <div className="grid grid-cols-7">
+                          {builderDateKeys.slice(0, 7).map((dateKey) => (
+                            <div key={`builder-week1-${dateKey}`} className="space-y-3 border-r border-slate-200 p-3 last:border-r-0">
+                              {(['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
+                                <div key={`${dateKey}-${shiftKey}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                  <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    {getBuilderShiftLabel(shiftKey)}
                                   </div>
 
                                   <select
-                                    value={extra.category}
-                                    onChange={(event) =>
-                                      handleExtraShiftChange(dateKey, extra.id, 'category', event.target.value)
-                                    }
-                                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                                    value={builderSchedule[dateKey][shiftKey].employee1}
+                                    onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee1', event.target.value)}
+                                    className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-slate-500"
                                   >
-                                    <option value="UNIT">UNIT</option>
-                                    <option value="SUPERVISOR">SUPERVISOR</option>
+                                    <option value="">Employee 1</option>
+                                    <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
+                                    <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
+                                    {employees.map((employee) => (
+                                      <option key={employee.id} value={employee.id}>
+                                        {employee.name}
+                                      </option>
+                                    ))}
                                   </select>
-                                </div>
-                              </div>
 
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExtraShift(dateKey, extra.id, extra.label)}
-                                className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                                  {!['ADMIN_SUP', 'FIELD_SUP'].includes(shiftKey) && (
+                                    <select
+                                      value={builderSchedule[dateKey][shiftKey].employee2}
+                                      onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee2', event.target.value)}
+                                      className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-slate-500"
+                                    >
+                                      <option value="">Employee 2</option>
+                                      <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
+                                      <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
+                                      {employees.map((employee) => (
+                                        <option key={employee.id} value={employee.id}>
+                                          {employee.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {builderDateKeys.length > 7 && (
+                      <div className="overflow-auto rounded-xl border border-slate-200">
+                        <div className="min-w-[1200px]">
+                          <div className="border-b border-slate-200 bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+                            Week 2
+                          </div>
+
+                          <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+                            {builderDateKeys.slice(7, 14).map((dateKey) => (
+                              <div
+                                key={`builder-header-week2-${dateKey}`}
+                                className="border-r border-slate-200 p-3 text-center text-sm font-bold text-slate-900 last:border-r-0"
                               >
-                                Remove
-                              </button>
+                                {new Date(`${dateKey}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-7">
+                            {builderDateKeys.slice(7, 14).map((dateKey) => (
+                              <div key={`builder-week2-${dateKey}`} className="space-y-3 border-r border-slate-200 p-3 last:border-r-0">
+                                {(['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
+                                  <div key={`${dateKey}-${shiftKey}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                      {getBuilderShiftLabel(shiftKey)}
+                                    </div>
+
+                                    <select
+                                      value={builderSchedule[dateKey][shiftKey].employee1}
+                                      onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee1', event.target.value)}
+                                      className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-slate-500"
+                                    >
+                                      <option value="">Employee 1</option>
+                                      <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
+                                      <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
+                                      {employees.map((employee) => (
+                                        <option key={employee.id} value={employee.id}>
+                                          {employee.name}
+                                        </option>
+                                      ))}
+                                    </select>
+
+                                    {!['ADMIN_SUP', 'FIELD_SUP'].includes(shiftKey) && (
+                                      <select
+                                        value={builderSchedule[dateKey][shiftKey].employee2}
+                                        onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee2', event.target.value)}
+                                        className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 outline-none focus:border-slate-500"
+                                      >
+                                        <option value="">Employee 2</option>
+                                        <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
+                                        <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
+                                        {employees.map((employee) => (
+                                          <option key={employee.id} value={employee.id}>
+                                            {employee.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {builderDateKeys.length > 0 && (
+                  <div className="mt-3 text-xs text-slate-500">
+                    Builder template loaded for {builderDateKeys[0]} through {builderDateKeys[builderDateKeys.length - 1]}. Launching repeats this 2-week template through the selected end date and overwrites the published schedule in that date range.
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-bold text-slate-900">Pending Open Shift Requests</div>
+
+                {pendingOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No pending open shift requests.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingOpenShiftRequests.map((request) => (
+                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              {request.shiftLabel} • {request.dateKey}
                             </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Requested {new Date(request.requestedAt).toLocaleString('en-US', {
+                                month: 'numeric',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </div>
 
-                            <div className="space-y-3">
-                              {renderEmployeeSlotEditor(
-                                extra.employee1,
-                                'Employee 1',
-                                true,
-                                (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee1', field, value),
-                                slotEligibilityMaps.employee1,
-                                payPeriodHoursMap,
-                              )}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateOpenShiftRequestStatus(request.id, 'DENIED')}
+                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                            >
+                              Deny
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateOpenShiftRequestStatus(request.id, 'APPROVED')}
+                              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                            >
+                              Approve
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-                              {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
-                                  extra.employee2,
-                                  'Employee 2',
-                                  true,
-                                  (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee2', field, value),
-                                  slotEligibilityMaps.employee2,
-                                  payPeriodHoursMap,
-                                )}
+              <div>
+                <div className="mb-2 text-sm font-bold text-slate-900">Recent Open Shift Decisions</div>
+                {reviewedOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No reviewed open shift requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {reviewedOpenShiftRequests.slice(0, 8).map((request) => (
+                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                        <span className="font-bold text-slate-900">{request.employeeName}</span>
+                        <span className="text-slate-600"> — {request.shiftLabel} on {request.dateKey}</span>
+                        <span
+                          className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                            request.status === 'APPROVED'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {request.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>,
+            pendingOpenShiftRequests.length > 0,
+          )}
 
-                              {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
-                                  extra.employee3,
-                                  'Employee 3',
-                                  extra.showEmployee3 || Boolean(extra.employee3.employeeId),
-                                  (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee3', field, value),
-                                  slotEligibilityMaps.employee3,
-                                  payPeriodHoursMap,
-                                )}
+          {renderTile(
+            'messaging',
+            'Messages',
+            supervisorUnreadCount > 0
+              ? `${supervisorUnreadCount} unread Apollo message${supervisorUnreadCount === 1 ? '' : 's'}.`
+              : 'Send and receive Apollo messages.',
+            <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-bold text-slate-900">New Message</div>
+                  <div className="mt-3 grid gap-3">
+                    <select
+                      value={messageRecipientMode}
+                      onChange={(event) => setMessageRecipientMode(event.target.value)}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    >
+                      <option value="ALL_ACTIVE">All Active Employees</option>
+                      <option value="INDIVIDUAL">Individual Employee</option>
+                      <option value="FULLTIME">Full-Time Employees</option>
+                      <option value="PERDIEM">Per Diem Employees</option>
+                      <option value="PARAMEDIC">Paramedics / ALS</option>
+                      <option value="EMT">EMTs / BLS</option>
+                      <option value="SUPERVISORS">Supervisors</option>
+                    </select>
 
-                              {!isSupervisorShift && !extra.showEmployee3 && !extra.employee3.employeeId && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddEmployeeSlotToExtra(dateKey, extra.id)}
-                                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                                >
-                                  Add Employee
-                                </button>
-                              )}
+                    {messageRecipientMode === 'INDIVIDUAL' && (
+                      <select
+                        value={messageRecipientEmployeeId}
+                        onChange={(event) => setMessageRecipientEmployeeId(event.target.value)}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                      >
+                        <option value="">Select employee</option>
+                        {employees.map((employee) => (
+                          <option key={employee.id} value={employee.id}>
+                            {employee.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
 
-                              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  checked={extra.allowExtendedHours}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'allowExtendedHours', event.target.checked)
-                                  }
-                                  className="h-4 w-4"
-                                />
-                                Allow extended hours
-                              </label>
+                    <select
+                      value={messagePriority}
+                      onChange={(event) => setMessagePriority(event.target.value as 'NORMAL' | 'IMPORTANT' | 'URGENT')}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    >
+                      <option value="NORMAL">Normal</option>
+                      <option value="IMPORTANT">Important</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
 
-                              <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Vehicle
-                                </label>
-                                <select
-                                  value={extra.vehicle}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'vehicle', event.target.value)
-                                  }
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                >
-                                  {getVehicleOptions(extra.category).map((vehicle) => (
-                                    <option key={vehicle || 'none'} value={vehicle}>
-                                      {vehicle || 'No vehicle selected'}
-                                    </option>
-                                  ))}
-                                </select>
+                    <input
+                      type="text"
+                      value={messageSubject}
+                      onChange={(event) => setMessageSubject(event.target.value)}
+                      placeholder="Subject"
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+
+                    <textarea
+                      value={messageBody}
+                      onChange={(event) => setMessageBody(event.target.value)}
+                      rows={4}
+                      placeholder="Write your message..."
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={sendSupervisorMessage}
+                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                    >
+                      Send Message
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-3 text-sm font-bold text-slate-900">Conversations</div>
+
+                  <div className="max-h-[520px] space-y-2 overflow-auto">
+                    {supervisorConversations.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                        No Apollo messages yet.
+                      </div>
+                    ) : (
+                      supervisorConversations.map((conversation) => (
+                        <button
+                          type="button"
+                          key={conversation.conversationId}
+                          onClick={() => {
+                            setSelectedConversationId(conversation.conversationId);
+                            markSupervisorConversationRead(conversation.conversationId);
+                          }}
+                          className={`w-full rounded-xl border p-3 text-left transition ${
+                            selectedSupervisorConversation?.conversationId === conversation.conversationId
+                              ? 'border-slate-900 bg-slate-100'
+                              : conversation.unreadCount > 0
+                                ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">{conversation.latest.title}</div>
+                              <div className="mt-1 line-clamp-2 text-xs text-slate-600">{conversation.latest.body}</div>
+                              <div className="mt-2 text-xs text-slate-500">
+                                {conversation.latest.senderName} • {formatShortDate(new Date(conversation.latest.createdAt))}
                               </div>
                             </div>
-
-                            {warningMessages.length > 0 && (
-                              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
-                                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
-                                  Conflict Warnings
-                                </div>
-                                <ul className="space-y-1 text-xs text-red-700">
-                                  {warningMessages.map((message) => (
-                                    <li key={message}>• {message}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-
-                            {approvalMessages.length > 0 && (
-                              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                                  Extended Hours Approved
-                                </div>
-                                <ul className="space-y-1 text-xs text-emerald-700">
-                                  {approvalMessages.map((message) => (
-                                    <li key={message}>• {message}</li>
-                                  ))}
-                                </ul>
+                            {conversation.unreadCount > 0 && (
+                              <div className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+                                {conversation.unreadCount}
                               </div>
                             )}
                           </div>
-                        );
-                      })
+                        </button>
+                      ))
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                {!selectedSupervisorConversation ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                    Select a conversation to view messages.
+                  </div>
+                ) : (
+                  <div>
+                    <div className="mb-4 border-b border-slate-200 pb-3">
+                      <div className="text-base font-bold text-slate-900">{selectedSupervisorConversation.latest.title}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Audience: {selectedSupervisorConversation.latest.audienceLabel}
+                      </div>
+                    </div>
+
+                    <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
+                      {selectedSupervisorConversation.messages.map((message) => {
+                        const isMine = message.senderId === CURRENT_SUPERVISOR_ID;
+                        const isUrgent = message.priority === 'URGENT' || message.relatedType === 'URGENT';
+
+                        return (
+                          <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                              className={`max-w-[82%] rounded-2xl px-4 py-3 ${
+                                isMine
+                                  ? 'bg-slate-900 text-white'
+                                  : isUrgent
+                                    ? 'bg-red-50 text-red-800 ring-1 ring-red-200'
+                                    : 'bg-slate-100 text-slate-800'
+                              }`}
+                            >
+                              <div className="text-xs font-semibold opacity-80">{message.senderName}</div>
+                              <div className="mt-1 whitespace-pre-wrap text-sm">{message.body}</div>
+                              <div className={`mt-2 text-right text-[11px] ${isMine ? 'text-slate-300' : 'text-slate-500'}`}>
+                                {formatShortDate(new Date(message.createdAt))} • {getMessageStatus(message, CURRENT_SUPERVISOR_ID)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Reply
+                      </label>
+                      <textarea
+                        value={replyBody}
+                        onChange={(event) => setReplyBody(event.target.value)}
+                        rows={3}
+                        placeholder="Write a reply..."
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                      />
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={sendSupervisorReply}
+                          disabled={!replyBody.trim()}
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        >
+                          Send Reply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>,
+            supervisorUnreadCount > 0,
+          )}
+
+          {renderTile(
+            'company-announcements',
+            'Company Announcements',
+            'Create time-limited announcements that display on the employee dashboard.',
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Announcement Title
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                      placeholder="Example: Mandatory training reminder"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Display Until
+                    </label>
+                    <input
+                      type="date"
+                      value={expiresAt}
+                      onChange={(event) => setExpiresAt(event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Message
+                    </label>
+                    <textarea
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                      rows={5}
+                      placeholder="Write the announcement employees should see..."
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={createAnnouncement}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                  >
+                    Post Announcement
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">Active Announcements</div>
+
+                {activeAnnouncements.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No active announcements.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activeAnnouncements.map((announcement) => (
+                      <div key={announcement.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">{announcement.title}</div>
+                            <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{announcement.message}</div>
+                            <div className="mt-3 text-xs text-slate-500">
+                              Posted {formatShortDate(new Date(announcement.createdAt))} • Expires {formatShortDate(new Date(announcement.expiresAt))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => deleteAnnouncement(announcement.id)}
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">Expired Announcements</div>
+
+                {expiredAnnouncements.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No expired announcements.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {expiredAnnouncements.slice(0, 5).map((announcement) => (
+                      <div key={announcement.id} className="rounded-xl border border-slate-200 bg-white p-4 opacity-75">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">{announcement.title}</div>
+                            <div className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{announcement.message}</div>
+                            <div className="mt-3 text-xs text-slate-500">
+                              Expired {formatShortDate(new Date(announcement.expiresAt))}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => deleteAnnouncement(announcement.id)}
+                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>,
+          )}
+
+          {renderTile(
+            'timecard-review',
+            'Timecard Review',
+            pendingTimecards.length > 0
+              ? `${pendingTimecards.length} timecard${pendingTimecards.length === 1 ? '' : 's'} pending supervisor review.`
+              : 'Review, approve, or return submitted employee timecards.',
+            <div className="space-y-5">
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Selected Pay Period</div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={selectedPayPeriod.key}
+                    onChange={(event) => setSelectedPayPeriodKey(event.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                  >
+                    {payPeriodOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {`Pay Period ${option.number} (${formatShortDate(option.start)} - ${formatShortDate(option.end)})`}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPayPeriodKey(currentPayPeriod.key)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Current Pay Period
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                Supervisors submit their own timecards from their personal dashboard. Their own timecard must be approved by another supervisor or GM.
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">Employees Not Submitted</div>
+                {employeesNotSubmitted.length === 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                    All active employees have submitted a timecard for this pay period.
+                  </div>
+                ) : (
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {employeesNotSubmitted.map((employee) => (
+                      <div key={employee.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                        {employee.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">Pending Review</div>
+
+                {pendingTimecards.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No submitted timecards are pending review.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingTimecards.map((timecard) => renderSubmittedTimecard(timecard))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">Reviewed Timecards</div>
+
+                {reviewedTimecards.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No reviewed timecards yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviewedTimecards.slice(0, 10).map((timecard) => renderSubmittedTimecard(timecard))}
+                  </div>
+                )}
+              </div>
+            </div>,
+          )}
+
+          {renderTile(
+            'employee-management',
+            'Employee Profiles',
+            'Manage employees, seniority, certifications, and employment status.',
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <a
+                href="/employees"
+                className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Open Employee Profiles
+              </a>
+            </div>,
+          )}
+
+          {renderTile(
+            'system-configuration',
+            'System Configuration',
+            'Configure company branding, permissions reference, important links, geofences, and review the activity log.',
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">Roles & Permissions Reference</div>
+                <div className="mt-1 text-xs text-slate-600">
+                  Employee accounts use the dashboard only. Supervisor, Admin, and GM accounts share the same Supervisor Tools permissions.
+                </div>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">Employee</div>
+                    <div className="mt-2 text-sm text-slate-600">
+                      Dashboard only: announcements, personal timecard, schedule, messages, incident report, handbook, and links.
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">Supervisor / Admin / GM</div>
+                    <div className="mt-2 text-sm text-slate-600">
+                      Can approve timecards, post announcements, edit system configuration, manage schedule rules, and use Supervisor Tools.
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <div className="text-sm font-bold text-amber-800">Approval Rule</div>
+                    <div className="mt-2 text-sm text-amber-800">
+                      Supervisors cannot approve their own timecard. It must be reviewed by another supervisor or GM.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">Company Branding</div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_240px]">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Company Name</label>
+                    <input
+                      type="text"
+                      value={systemConfig.companyName}
+                      onChange={(event) => updateCompanyName(event.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    />
+
+                    <label className="mt-4 mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Upload Logo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={clearLogo}
+                      disabled={!systemConfig.logoDataUrl}
+                      className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      Remove Logo
+                    </button>
+
+                    <div className="mt-2 text-xs text-slate-500">
+                      Production logo files should move to Supabase Storage.
+                    </div>
+                  </div>
+
+                  <div className="flex min-h-[170px] items-center justify-center rounded-2xl border border-slate-200 bg-white p-4">
+                    {systemConfig.logoDataUrl ? (
+                      <img src={systemConfig.logoDataUrl} alt="Company logo preview" className="max-h-36 max-w-full object-contain" />
+                    ) : (
+                      <div className="text-center text-sm font-bold text-slate-400">No Logo Uploaded</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">Important Links</div>
+                <div className="mt-1 text-xs text-slate-600">These links display in the Employee Dashboard Important Links tile.</div>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.5fr_auto]">
+                  <input
+                    type="text"
+                    value={newLinkLabel}
+                    onChange={(event) => setNewLinkLabel(event.target.value)}
+                    placeholder="Link label"
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                  <input
+                    type="url"
+                    value={newLinkUrl}
+                    onChange={(event) => setNewLinkUrl(event.target.value)}
+                    placeholder="https://..."
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                  <button type="button" onClick={addImportantLink} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">
+                    Add Link
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {systemConfig.importantLinks.map((link) => (
+                    <div key={link.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 lg:grid-cols-[1fr_1.5fr_auto]">
+                      <input
+                        type="text"
+                        value={link.label}
+                        onChange={(event) => updateImportantLink(link.id, { label: event.target.value })}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                      />
+                      <input
+                        type="url"
+                        value={link.url}
+                        onChange={(event) => updateImportantLink(link.id, { url: event.target.value })}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                      />
+                      <button type="button" onClick={() => removeImportantLink(link.id)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">Geofencing</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      Approved clock-in locations. GPS failure, outside radius, and manual overrides should still clock the employee but require supervisor review.
+                    </div>
+                  </div>
+                  <button type="button" onClick={addGeofence} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">
+                    Add Geofence
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="hidden gap-3 px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 xl:grid xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
+                    <div>Shift</div>
+                    <div>Location Name</div>
+                    <div>Latitude</div>
+                    <div>Longitude</div>
+                    <div>Radius (ft)</div>
+                    <div></div>
+                  </div>
+
+                  {systemConfig.geofences.map((geofence) => (
+                    <div key={geofence.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
+                      <input type="text" value={geofence.shiftLabel} onChange={(event) => updateGeofence(geofence.id, { shiftLabel: event.target.value })} placeholder="Shift" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <input type="text" value={geofence.locationLabel} onChange={(event) => updateGeofence(geofence.id, { locationLabel: event.target.value })} placeholder="Location" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <input type="number" value={geofence.latitude} onChange={(event) => updateGeofence(geofence.id, { latitude: Number(event.target.value) })} placeholder="Latitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <input type="number" value={geofence.longitude} onChange={(event) => updateGeofence(geofence.id, { longitude: Number(event.target.value) })} placeholder="Longitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <input type="number" value={geofence.radiusFeet} onChange={(event) => updateGeofence(geofence.id, { radiusFeet: Number(event.target.value) })} placeholder="Radius ft" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <button type="button" onClick={() => removeGeofence(geofence.id)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">System Activity Log</div>
+                <div className="mt-1 text-xs text-slate-600">
+                  Tracks system configuration changes now. Later this will also include schedule changes, certification edits, timecard approvals/returns, and rule overrides.
+                </div>
+
+                <div className="mt-4 max-h-[360px] space-y-3 overflow-auto">
+                  {auditLog.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                      No activity has been logged yet.
+                    </div>
+                  ) : (
+                    auditLog.map((entry) => (
+                      <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">{entry.action}</div>
+                            <div className="mt-1 text-sm text-slate-600">{entry.details}</div>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {entry.actor} • {new Date(entry.timestamp).toLocaleString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>,
+          )}
+
         </div>
       </div>
     </div>
