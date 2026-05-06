@@ -61,6 +61,22 @@ type SupabaseEmployeeRow = {
   status: string | null;
 };
 
+type SupabaseScheduleAssignmentRow = {
+  id: string;
+  date_key: string;
+  shift_key: string;
+  shift_label: string;
+  slot_number: number;
+  employee_id: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  note: string | null;
+  vehicle: string | null;
+  allow_extended_hours: boolean | null;
+  is_open_slot: boolean | null;
+  open_slot_scope: string | null;
+};
+
 type EmployeeSlot = {
   employeeId: string;
   startTime: string;
@@ -289,6 +305,8 @@ const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
 const SYSTEM_CONFIG_STORAGE_KEY = 'apollo-system-config-v1';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
+const PAY_PERIOD_REFERENCE_NUMBER = 9;
+const PAY_PERIOD_REFERENCE_START = '2026-04-12';
 
 const DEFAULT_GEOFENCE_RADIUS_FEET = 500;
 
@@ -694,6 +712,95 @@ function normalizeLoadedSchedule(raw: unknown): ScheduleData {
   return output;
 }
 
+async function loadScheduleFromSupabase(): Promise<ScheduleData> {
+  const { data, error } = await supabase
+    .from('schedule_assignments')
+    .select('id,date_key,shift_key,shift_label,slot_number,employee_id,start_time,end_time,note,vehicle,allow_extended_hours,is_open_slot,open_slot_scope')
+    .order('date_key', { ascending: true })
+    .order('shift_key', { ascending: true })
+    .order('slot_number', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const rebuilt: ScheduleData = {};
+
+  for (const row of (data ?? []) as SupabaseScheduleAssignmentRow[]) {
+    const dateKey = row.date_key;
+    if (!rebuilt[dateKey]) {
+      rebuilt[dateKey] = createEmptyDaySchedule();
+    }
+
+    const day = rebuilt[dateKey];
+    const employeeId = row.is_open_slot
+      ? row.open_slot_scope === 'ALS'
+        ? OPEN_ALS_SLOT_ID
+        : row.open_slot_scope === 'BLS'
+          ? OPEN_BLS_SLOT_ID
+          : ''
+      : row.employee_id ?? '';
+
+    const slot: EmployeeSlot = {
+      employeeId,
+      startTime: row.start_time || '06:00',
+      endTime: row.end_time || '06:00',
+      note: row.note || '',
+    };
+
+    if (row.shift_key.startsWith('EXTRA::')) {
+      const [, categoryText, extraId] = row.shift_key.split('::');
+      const category: ShiftCategory = categoryText === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
+      let extra = day.extras.find((item) => item.id === extraId);
+
+      if (!extra) {
+        extra = {
+          id: extraId || `extra-${Date.now()}`,
+          label: row.shift_label || 'Extra Shift',
+          category,
+          employee1: createEmptyEmployeeSlot(),
+          employee2: createEmptyEmployeeSlot(),
+          employee3: createEmptyEmployeeSlot(),
+          showEmployee3: false,
+          vehicle: (row.vehicle || '') as VehicleValue,
+          allowExtendedHours: Boolean(row.allow_extended_hours),
+        };
+        day.extras.push(extra);
+      }
+
+      extra.label = row.shift_label || extra.label;
+      extra.category = category;
+      extra.vehicle = (row.vehicle || '') as VehicleValue;
+      extra.allowExtendedHours = Boolean(row.allow_extended_hours);
+
+      if (row.slot_number === 1) extra.employee1 = slot;
+      if (row.slot_number === 2) extra.employee2 = slot;
+      if (row.slot_number === 3) {
+        extra.employee3 = slot;
+        extra.showEmployee3 = Boolean(slot.employeeId);
+      }
+    } else {
+      const shiftName = row.shift_key as ShiftName;
+      if (!day.standard[shiftName]) {
+        continue;
+      }
+
+      const shift = day.standard[shiftName];
+      shift.vehicle = (row.vehicle || '') as VehicleValue;
+      shift.allowExtendedHours = Boolean(row.allow_extended_hours);
+
+      if (row.slot_number === 1) shift.employee1 = slot;
+      if (row.slot_number === 2) shift.employee2 = slot;
+      if (row.slot_number === 3) {
+        shift.employee3 = slot;
+        shift.showEmployee3 = Boolean(slot.employeeId);
+      }
+    }
+  }
+
+  return normalizeLoadedSchedule(rebuilt);
+}
+
 function getDaySchedule(data: ScheduleData, dateKey: string): DaySchedule {
   return normalizeDaySchedule(data[dateKey]);
 }
@@ -739,21 +846,31 @@ function formatShortDate(date: Date): string {
   });
 }
 
-function buildPayPeriodOptions(baseDate: Date, count = 12): PayPeriodOption[] {
-  const year = baseDate.getFullYear();
-  const januaryFirst = new Date(year, 0, 1);
-  const firstSunday = getSundayStart(addDays(januaryFirst, (7 - januaryFirst.getDay()) % 7));
+function getGlobalPayPeriodStart(date: Date): Date {
+  const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
+  const sunday = getSundayStart(date);
+  const diffDays = Math.round((sunday.getTime() - referenceStart.getTime()) / (1000 * 60 * 60 * 24));
+  const offsetWithinCycle = ((diffDays % 14) + 14) % 14;
+  return addDays(sunday, -offsetWithinCycle);
+}
+
+function buildPayPeriodOptions(baseDate: Date, count = 28): PayPeriodOption[] {
+  const currentStart = getGlobalPayPeriodStart(baseDate);
+  const start = addDays(currentStart, -14 * 6);
   const options: PayPeriodOption[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const start = addDays(firstSunday, index * 14);
-    const end = addDays(start, 13);
+    const periodStart = addDays(start, index * 14);
+    const end = addDays(periodStart, 13);
+    const diffDays = Math.round((periodStart.getTime() - new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`).getTime()) / (1000 * 60 * 60 * 24));
+    const number = PAY_PERIOD_REFERENCE_NUMBER + Math.floor(diffDays / 14);
+    const year = periodStart.getFullYear();
 
     options.push({
-      key: `${year}-pp-${index + 1}`,
+      key: `${year}-pp-${number}`,
       year,
-      number: index + 1,
-      start,
+      number,
+      start: periodStart,
       end,
     });
   }
@@ -919,10 +1036,16 @@ export default function DashboardPage() {
 
   const currentEmployeeId = currentEmployee?.id ?? '';
 
-  function reloadPublishedSchedule() {
-    const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
-    if (raw) {
-      setScheduleData(normalizeLoadedSchedule(JSON.parse(raw)));
+  async function reloadPublishedSchedule() {
+    try {
+      const loaded = await loadScheduleFromSupabase();
+      setScheduleData(loaded);
+    } catch (error) {
+      console.error('Failed to load schedule from Supabase:', error);
+      const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
+      if (raw) {
+        setScheduleData(normalizeLoadedSchedule(JSON.parse(raw)));
+      }
     }
   }
 
@@ -968,7 +1091,7 @@ export default function DashboardPage() {
           setEmployees(loadEmployeesFromProfiles());
         });
 
-      reloadPublishedSchedule();
+      void reloadPublishedSchedule();
 
       const announcementRaw = window.localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
       if (announcementRaw) {
@@ -2822,7 +2945,7 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={reloadPublishedSchedule}
+                    onClick={() => void reloadPublishedSchedule()}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Refresh Schedule

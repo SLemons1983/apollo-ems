@@ -350,21 +350,41 @@ function getOpenShiftLabel(employeeId: string): string {
   return '';
 }
 
-function createEmptyEmployeeSlot(): EmployeeSlot {
+function createEmptyEmployeeSlot(endTime = DEFAULT_END_TIME): EmployeeSlot {
   return {
     employeeId: '',
     startTime: DEFAULT_START_TIME,
-    endTime: DEFAULT_END_TIME,
+    endTime,
     note: '',
   };
 }
 
-function createEmptyShift(showEmployee3 = false): ShiftAssignment {
+function createEmptyShift(showEmployee3 = false, defaultEndTime = DEFAULT_END_TIME): ShiftAssignment {
   return {
-    employee1: createEmptyEmployeeSlot(),
+    employee1: createEmptyEmployeeSlot(defaultEndTime),
+    employee2: createEmptyEmployeeSlot(defaultEndTime),
+    employee3: createEmptyEmployeeSlot(defaultEndTime),
+    showEmployee3,
+    vehicle: '',
+    allowExtendedHours: false,
+  };
+}
+
+function createAdminSupervisorSlot(): EmployeeSlot {
+  return {
+    employeeId: '',
+    startTime: '06:00',
+    endTime: '18:00',
+    note: '',
+  };
+}
+
+function createAdminSupervisorShift(): ShiftAssignment {
+  return {
+    employee1: createAdminSupervisorSlot(),
     employee2: createEmptyEmployeeSlot(),
     employee3: createEmptyEmployeeSlot(),
-    showEmployee3,
+    showEmployee3: false,
     vehicle: '',
     allowExtendedHours: false,
   };
@@ -377,7 +397,7 @@ function createEmptyDayAssignments(): DayAssignments {
     P: createEmptyShift(false),
     OC: createEmptyShift(false),
     GM: createEmptyShift(false),
-    ADMIN_SUP: createEmptyShift(false),
+    ADMIN_SUP: createAdminSupervisorShift(),
     FIELD_SUP: createEmptyShift(false),
   };
 }
@@ -855,6 +875,10 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
   }
 
   for (const slot of targetSlots) {
+    if (isOpenShiftSlot(slot.employeeId)) {
+      continue;
+    }
+
     const employee = getEmployeeById(slot.employeeId, employees);
 
     for (const other of getAssignmentRefsForDay(day)) {
@@ -868,7 +892,7 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
 
       const otherSlots = getAssignedSlotsForAssignment(other.category, other.shift);
 
-      if (otherSlots.some((otherSlot) => otherSlot.employeeId === slot.employeeId)) {
+      if (otherSlots.some((otherSlot) => !isOpenShiftSlot(otherSlot.employeeId) && otherSlot.employeeId === slot.employeeId)) {
         messages.push(`${employee?.name ?? 'Employee'} is also assigned to ${other.label} on the same day.`);
       }
     }
@@ -912,6 +936,9 @@ function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: s
       }
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
+        if (isOpenShiftSlot(slot.employeeId)) {
+          continue;
+        }
         if (slot.employeeId === employeeId) {
           hasShift = true;
           hours += calculateSlotHours(slot.startTime, slot.endTime);
@@ -979,6 +1006,10 @@ function getContinuousHoursResult(
   const slots = getAssignedSlotsForAssignment(target.category, target.shift);
 
   for (const slot of slots) {
+    if (isOpenShiftSlot(slot.employeeId)) {
+      continue;
+    }
+
     const employee = getEmployeeById(slot.employeeId, employees);
     const summary = buildEmployeeDailyUnitSummary(scheduleData, slot.employeeId);
     const { totalHours, hasApproval } = getChainHours(summary, dateKey);
@@ -1081,6 +1112,9 @@ function getEmployeePayPeriodHours(
       }
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
+        if (isOpenShiftSlot(slot.employeeId)) {
+          continue;
+        }
         if (slot.employeeId === employeeId) {
           hours += calculateSlotHours(slot.startTime, slot.endTime);
         }
@@ -1418,11 +1452,12 @@ export default function SchedulePage() {
     saveToSupabase();
   }, [mounted, scheduleData]);
 
-  const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
+  const dates = useMemo(() => Array.from({ length: 14 }, (_, index) => addDays(visiblePayPeriod.start, index)), [visiblePayPeriod]);
 
   const goToCurrentPayPeriod = () => {
-    setAnchorDate(getSundayStart(new Date()));
+    const current = getPayPeriodInfo(new Date());
+    setAnchorDate(new Date(current.start));
   };
   const visibleYear = visiblePayPeriod.end.getFullYear();
   const payPeriodOptions = useMemo(() => {
@@ -1487,9 +1522,14 @@ export default function SchedulePage() {
       const shift = next[dateKey].standard[shiftName];
       shift[slotKey][field] = value;
 
+      if (field === 'employeeId' && value && shiftName === 'ADMIN_SUP' && slotKey === 'employee1') {
+        shift[slotKey].startTime = '06:00';
+        shift[slotKey].endTime = '18:00';
+      }
+
       if (field === 'employeeId' && !value) {
-        shift[slotKey].startTime = DEFAULT_START_TIME;
-        shift[slotKey].endTime = DEFAULT_END_TIME;
+        shift[slotKey].startTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '06:00' : DEFAULT_START_TIME;
+        shift[slotKey].endTime = shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '18:00' : DEFAULT_END_TIME;
         shift[slotKey].note = '';
       }
 
@@ -1761,8 +1801,7 @@ export default function SchedulePage() {
                 type="time"
                 value={slot.startTime}
                 onChange={(event) => onChange('startTime', event.target.value)}
-                disabled={!slot.employeeId}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
               />
             </div>
 
@@ -1774,8 +1813,7 @@ export default function SchedulePage() {
                 type="time"
                 value={slot.endTime}
                 onChange={(event) => onChange('endTime', event.target.value)}
-                disabled={!slot.employeeId}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
               />
             </div>
           </div>
