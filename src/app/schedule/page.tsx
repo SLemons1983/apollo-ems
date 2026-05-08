@@ -708,7 +708,7 @@ function formatDayLabel(date: Date): string {
 }
 
 function getBiWeeklyDates(anchorDate: Date): Date[] {
-  const start = getSundayStart(anchorDate);
+  const start = getGlobalPayPeriodStart(anchorDate);
   return Array.from({ length: 14 }, (_, index) => addDays(start, index));
 }
 
@@ -1199,7 +1199,8 @@ function createExtraShiftId(): string {
 }
 
 export default function SchedulePage() {
-  const [anchorDate, setAnchorDate] = useState<Date>(() => getSundayStart(new Date()));
+  const [anchorDate, setAnchorDate] = useState<Date>(() => getGlobalPayPeriodStart(new Date()));
+  const [payPeriodReady, setPayPeriodReady] = useState(false);
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
   const scheduleDataRef = useRef<ScheduleData>({});
   const [mounted, setMounted] = useState(false);
@@ -1213,9 +1214,23 @@ export default function SchedulePage() {
     setSaveStatus('Unsaved changes. Click Confirm Changes to save.');
   }
 
+  function setScheduleDataSafely(updater: ScheduleData | ((current: ScheduleData) => ScheduleData)) {
+    setScheduleData((current) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      scheduleDataRef.current = next;
+      return next;
+    });
+  }
+
   useEffect(() => {
     scheduleDataRef.current = scheduleData;
   }, [scheduleData]);
+
+  useEffect(() => {
+    const currentPayPeriodStart = getGlobalPayPeriodStart(new Date());
+    setAnchorDate(currentPayPeriodStart);
+    setPayPeriodReady(true);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -1330,7 +1345,7 @@ export default function SchedulePage() {
         }
 
         if (isActive) {
-          setScheduleData(normalizeLoadedData(rebuilt));
+          setScheduleDataSafely(normalizeLoadedData(rebuilt));
         }
       } catch (error) {
         console.error('Failed to load schedule from Supabase:', error);
@@ -1345,6 +1360,47 @@ export default function SchedulePage() {
       isActive = false;
     };
   }, []);
+
+  function hasMeaningfulSlotData(slot: EmployeeSlot, shiftName?: ShiftName, slotKey?: 'employee1' | 'employee2' | 'employee3'): boolean {
+    const defaultEndTime = getDefaultEndTimeForShift(shiftName, slotKey);
+    return Boolean(
+      slot.employeeId ||
+        normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME) !== DEFAULT_START_TIME ||
+        normalizeMilitaryTime(slot.endTime, defaultEndTime) !== defaultEndTime ||
+        slot.note?.trim(),
+    );
+  }
+
+  function buildAssignmentRow(params: {
+    dateKey: string;
+    shiftKey: string;
+    shiftLabel: string;
+    slotNumber: number;
+    slot: EmployeeSlot;
+    vehicle: VehicleValue;
+    allowExtendedHours: boolean;
+    defaultEndTime?: string;
+  }) {
+    const isOpenSlot = isOpenShiftSlot(params.slot.employeeId);
+
+    return {
+      id: `${params.dateKey}-${params.shiftKey}-${params.slotNumber}`,
+      schedule_id: params.dateKey,
+      date_key: params.dateKey,
+      shift_key: params.shiftKey,
+      shift_label: params.shiftLabel,
+      slot_number: params.slotNumber,
+      employee_id: isOpenSlot ? null : params.slot.employeeId || null,
+      start_time: normalizeMilitaryTime(params.slot.startTime, DEFAULT_START_TIME),
+      end_time: normalizeMilitaryTime(params.slot.endTime, params.defaultEndTime ?? DEFAULT_END_TIME),
+      note: params.slot.note || '',
+      vehicle: params.vehicle || '',
+      allow_extended_hours: Boolean(params.allowExtendedHours),
+      is_open_slot: isOpenSlot,
+      open_slot_scope: params.slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : params.slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
+      updated_at: new Date().toISOString(),
+    };
+  }
 
   async function saveScheduleToSupabase() {
     if (!mounted) {
@@ -1371,37 +1427,61 @@ export default function SchedulePage() {
 
         for (const shiftName of SHIFT_ORDER) {
           const shift = day.standard[shiftName];
-          const slots = [shift.employee1, shift.employee2, shift.employee3];
+          const slots: Array<['employee1' | 'employee2' | 'employee3', EmployeeSlot]> = [
+            ['employee1', shift.employee1],
+            ['employee2', shift.employee2],
+            ['employee3', shift.employee3],
+          ];
 
-          slots.forEach((slot, index) => {
-            if (!slot.employeeId) {
+          rows.push({
+            id: `${dateKey}-${shiftName}-0`,
+            schedule_id: dateKey,
+            date_key: dateKey,
+            shift_key: shiftName,
+            shift_label: SHIFT_DISPLAY_NAMES[shiftName],
+            slot_number: 0,
+            employee_id: null,
+            start_time: DEFAULT_START_TIME,
+            end_time: getDefaultEndTimeForShift(shiftName, 'employee1'),
+            note: '',
+            vehicle: shift.vehicle || '',
+            allow_extended_hours: Boolean(shift.allowExtendedHours),
+            is_open_slot: false,
+            open_slot_scope: null,
+            updated_at: new Date().toISOString(),
+          });
+
+          slots.forEach(([slotKey, slot], index) => {
+            if (SUPERVISOR_SHIFTS.has(shiftName) && slotKey !== 'employee1') {
               return;
             }
 
-            const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-            rows.push({
-              id: `${dateKey}-${shiftName}-${index + 1}`,
-              schedule_id: dateKey,
-              date_key: dateKey,
-              shift_key: shiftName,
-              shift_label: SHIFT_DISPLAY_NAMES[shiftName],
-              slot_number: index + 1,
-              employee_id: isOpenSlot ? null : slot.employeeId,
-              start_time: normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME),
-              end_time: normalizeMilitaryTime(slot.endTime, DEFAULT_END_TIME),
-              note: slot.note || '',
-              vehicle: shift.vehicle || '',
-              allow_extended_hours: Boolean(shift.allowExtendedHours),
-              is_open_slot: isOpenSlot,
-              open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-              updated_at: new Date().toISOString(),
-            });
+            if (!hasMeaningfulSlotData(slot, shiftName, slotKey)) {
+              return;
+            }
+
+            rows.push(
+              buildAssignmentRow({
+                dateKey,
+                shiftKey: shiftName,
+                shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+                slotNumber: index + 1,
+                slot,
+                vehicle: shift.vehicle || '',
+                allowExtendedHours: Boolean(shift.allowExtendedHours),
+                defaultEndTime: getDefaultEndTimeForShift(shiftName, slotKey),
+              }),
+            );
           });
         }
 
         for (const extra of day.extras) {
           const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
-          const slots = [extra.employee1, extra.employee2, extra.employee3];
+          const slots: Array<['employee1' | 'employee2' | 'employee3', EmployeeSlot]> = [
+            ['employee1', extra.employee1],
+            ['employee2', extra.employee2],
+            ['employee3', extra.employee3],
+          ];
 
           rows.push({
             id: `${dateKey}-${extraShiftKey}-0`,
@@ -1421,29 +1501,26 @@ export default function SchedulePage() {
             updated_at: new Date().toISOString(),
           });
 
-          slots.forEach((slot, index) => {
-            if (!slot.employeeId) {
+          slots.forEach(([slotKey, slot], index) => {
+            if (extra.category === 'SUPERVISOR' && slotKey !== 'employee1') {
               return;
             }
 
-            const isOpenSlot = isOpenShiftSlot(slot.employeeId);
-            rows.push({
-              id: `${dateKey}-${extraShiftKey}-${index + 1}`,
-              schedule_id: dateKey,
-              date_key: dateKey,
-              shift_key: extraShiftKey,
-              shift_label: extra.label,
-              slot_number: index + 1,
-              employee_id: isOpenSlot ? null : slot.employeeId,
-              start_time: normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME),
-              end_time: normalizeMilitaryTime(slot.endTime, DEFAULT_END_TIME),
-              note: slot.note || '',
-              vehicle: extra.vehicle || '',
-              allow_extended_hours: Boolean(extra.allowExtendedHours),
-              is_open_slot: isOpenSlot,
-              open_slot_scope: slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
-              updated_at: new Date().toISOString(),
-            });
+            if (!hasMeaningfulSlotData(slot)) {
+              return;
+            }
+
+            rows.push(
+              buildAssignmentRow({
+                dateKey,
+                shiftKey: extraShiftKey,
+                shiftLabel: extra.label,
+                slotNumber: index + 1,
+                slot,
+                vehicle: extra.vehicle || '',
+                allowExtendedHours: Boolean(extra.allowExtendedHours),
+              }),
+            );
           });
         }
 
@@ -1457,7 +1534,7 @@ export default function SchedulePage() {
         }
 
         if (rows.length > 0) {
-          const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows);
+          const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows, { onConflict: 'id' });
 
           if (assignmentError) {
             throw assignmentError;
@@ -1474,11 +1551,16 @@ export default function SchedulePage() {
     }
   }
 
-  const dates = useMemo(() => getBiWeeklyDates(anchorDate), [anchorDate]);
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
+  const visiblePayPeriodStartKey = toDateKey(visiblePayPeriod.start);
+  const dates = useMemo(
+    () => Array.from({ length: 14 }, (_, index) => addDays(visiblePayPeriod.start, index)),
+    [visiblePayPeriodStartKey],
+  );
 
   const goToCurrentPayPeriod = () => {
     setAnchorDate(getGlobalPayPeriodStart(new Date()));
+    setPayPeriodReady(true);
   };
   const visibleYear = visiblePayPeriod.end.getFullYear();
   const payPeriodOptions = useMemo(() => {
@@ -1493,7 +1575,7 @@ export default function SchedulePage() {
   const selectedPayPeriodValue = `${visibleYear}|${toDateKey(visiblePayPeriod.start)}`;
 
   useEffect(() => {
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       let next = current;
       for (const date of dates) {
         next = ensureDateExists(next, toDateKey(date));
@@ -1509,7 +1591,7 @@ export default function SchedulePage() {
     value: string | boolean,
   ) => {
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         next[dateKey] = createEmptyDaySchedule();
@@ -1536,7 +1618,7 @@ export default function SchedulePage() {
     value: string,
   ) => {
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         next[dateKey] = createEmptyDaySchedule();
@@ -1567,7 +1649,7 @@ export default function SchedulePage() {
     value: string | boolean,
   ) => {
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         next[dateKey] = createEmptyDaySchedule();
@@ -1598,7 +1680,7 @@ export default function SchedulePage() {
     value: string,
   ) => {
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         next[dateKey] = createEmptyDaySchedule();
@@ -1639,7 +1721,7 @@ export default function SchedulePage() {
     const category: ShiftCategory = typeInput?.trim().toUpperCase() === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
 
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         next[dateKey] = createEmptyDaySchedule();
@@ -1668,7 +1750,7 @@ export default function SchedulePage() {
     }
 
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
         return current;
@@ -1681,7 +1763,7 @@ export default function SchedulePage() {
 
   const handleCopyPreviousDay = (dateKey: string, previousDateKey: string) => {
     markUnsavedChanges();
-    setScheduleData((current) => {
+    setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       const previousDay = getDaySchedule(next, previousDateKey);
       next[dateKey] = JSON.parse(JSON.stringify(previousDay)) as DaySchedule;
@@ -1717,7 +1799,7 @@ export default function SchedulePage() {
       return;
     }
 
-    setAnchorDate(parseDateKey(startDateKey));
+    setAnchorDate(getGlobalPayPeriodStart(parseDateKey(startDateKey)));
   };
 
   function renderEmployeeSlotEditor(
@@ -1874,6 +1956,16 @@ export default function SchedulePage() {
     );
   }
 
+  if (!payPeriodReady) {
+    return (
+      <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+        <div className="mx-auto max-w-[1900px] rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-sm">
+          Loading current pay period...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
@@ -1881,6 +1973,7 @@ export default function SchedulePage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Schedule</h1>
+              <div className="mt-1 text-xs font-semibold text-red-600">Build marker: schedule-pay-period-v6 | grid starts: {toDateKey(dates[0])}</div>
 
             </div>
 
@@ -1941,7 +2034,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
+          <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</div>
             </div>
