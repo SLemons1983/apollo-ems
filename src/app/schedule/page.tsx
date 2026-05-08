@@ -1973,7 +1973,6 @@ export default function SchedulePage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Schedule</h1>
-              <div className="mt-1 text-xs font-semibold text-red-600">Build marker: schedule-pay-period-v6 | grid starts: {toDateKey(dates[0])}</div>
 
             </div>
 
