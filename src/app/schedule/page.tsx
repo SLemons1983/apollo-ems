@@ -2034,7 +2034,7 @@ export default function SchedulePage() {
     const requestedEmployeeIdSet = new Set(requestedEmployeeIds);
     const requestedEmployees = requestedEmployeeIds
       .map((employeeId) => employees.find((employee) => employee.id === employeeId))
-      .filter((employee): employee is EmployeeProfile => Boolean(employee));
+      .filter((employee): employee is EmployeeOption => Boolean(employee));
 
     const baseEligibleEmployees = sortEmployeesByAwardPriority(
       employees.filter((employee) => {
