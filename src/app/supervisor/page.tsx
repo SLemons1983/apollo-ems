@@ -439,6 +439,7 @@ export default function SupervisorPage() {
   const [builderStartDate, setBuilderStartDate] = useState('');
   const [builderEndDate, setBuilderEndDate] = useState('');
   const [builderSchedule, setBuilderSchedule] = useState<BuilderSchedule>({});
+  const [isScheduleBuilderOpen, setIsScheduleBuilderOpen] = useState(false);
   const [messageRecipientMode, setMessageRecipientMode] = useState('ALL_ACTIVE');
   const [messageRecipientEmployeeId, setMessageRecipientEmployeeId] = useState('');
   const [messageSubject, setMessageSubject] = useState('');
@@ -1803,14 +1804,21 @@ export default function SupervisorPage() {
 
                   <button
                     type="button"
-                    onClick={launchBuilderSchedule}
-                    disabled={builderDateKeys.length === 0}
-                    className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    onClick={() => setIsScheduleBuilderOpen((current) => !current)}
+                    className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
                   >
-                    Launch Schedule
+                    {isScheduleBuilderOpen ? 'Hide Schedule Builder' : 'Open Schedule Builder'}
                   </button>
                 </div>
 
+                {!isScheduleBuilderOpen && (
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+                    Schedule Builder is collapsed. Use Open Schedule Builder when you need to create or launch a repeating schedule template.
+                  </div>
+                )}
+
+                {isScheduleBuilderOpen && (
+                  <>
                 <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -2017,6 +2025,19 @@ export default function SupervisorPage() {
                   <div className="mt-3 text-xs text-slate-500">
                     Builder template loaded for {builderDateKeys[0]} through {builderDateKeys[builderDateKeys.length - 1]}. Launching repeats this 2-week template through the selected end date and overwrites the published schedule in that date range.
                   </div>
+                )}
+
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={launchBuilderSchedule}
+                        disabled={builderDateKeys.length === 0}
+                        className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        Launch Schedule
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
 
