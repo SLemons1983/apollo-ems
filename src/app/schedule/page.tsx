@@ -122,7 +122,42 @@ type PayPeriodInfo = {
   end: Date;
 };
 
+type OpenShiftRequest = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  dateKey: string;
+  shiftKey: string;
+  shiftLabel: string;
+  payPeriodKey: string;
+  requestedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  supervisorNote?: string;
+};
+
+type ApolloMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'EMPLOYEE' | 'SUPERVISOR';
+  recipients: Array<{
+    employeeId: string;
+    deliveredAt: string;
+    readAt: string | null;
+  }>;
+  audienceLabel: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  relatedType: 'GENERAL' | 'SCHEDULE' | 'TIME_CARD' | 'URGENT';
+  priority: 'NORMAL' | 'URGENT';
+};
+
+
 const STORAGE_KEY = 'apollo-schedule-page-v6';
+const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
+const APOLLO_MESSAGES_STORAGE_KEY = 'apollo-messages-v2';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
 const PAY_PERIOD_REFERENCE_NUMBER = 9;
 const PAY_PERIOD_REFERENCE_START = '2026-04-12';
@@ -1208,6 +1243,9 @@ export default function SchedulePage() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
+  const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
+  const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
 
   function markUnsavedChanges() {
     setHasUnsavedChanges(true);
@@ -1237,6 +1275,15 @@ export default function SchedulePage() {
 
     const loadData = async () => {
       try {
+        try {
+          const openShiftRaw = window.localStorage.getItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY);
+          if (openShiftRaw && isActive) {
+            setOpenShiftRequests(JSON.parse(openShiftRaw));
+          }
+        } catch (openShiftError) {
+          console.error('Failed to load open shift requests:', openShiftError);
+        }
+
         loadEmployeesFromSupabase()
           .then((loadedEmployees) => {
             if (isActive) setEmployees(loadedEmployees);
@@ -1551,6 +1598,164 @@ export default function SchedulePage() {
     }
   }
 
+
+  const pendingOpenShiftRequests = useMemo(() => {
+    return openShiftRequests
+      .filter((request) => request.status === 'PENDING')
+      .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  }, [openShiftRequests]);
+
+  const reviewedOpenShiftRequests = useMemo(() => {
+    return openShiftRequests
+      .filter((request) => request.status !== 'PENDING')
+      .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+  }, [openShiftRequests]);
+
+  function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
+    setOpenShiftRequests(nextRequests);
+    window.localStorage.setItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY, JSON.stringify(nextRequests));
+  }
+
+  function saveAutomatedOpenShiftMessage(request: OpenShiftRequest, status: 'APPROVED' | 'DENIED') {
+    const createdAt = new Date().toISOString();
+    const title = status === 'APPROVED' ? 'Open shift request approved' : 'Open shift request denied';
+    const body =
+      status === 'APPROVED'
+        ? `Your open shift request for ${request.shiftLabel} on ${request.dateKey} was approved. The schedule has been updated automatically.`
+        : `Your open shift request for ${request.shiftLabel} on ${request.dateKey} was denied. Please contact a supervisor if you have questions.`;
+
+    const message: ApolloMessage = {
+      id: `message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      conversationId: `conversation-open-shift-${request.id}`,
+      senderId: 'APOLLO_SYSTEM',
+      senderName: 'Apollo System',
+      senderRole: 'SUPERVISOR',
+      recipients: [
+        {
+          employeeId: request.employeeId,
+          deliveredAt: createdAt,
+          readAt: null,
+        },
+      ],
+      audienceLabel: request.employeeName,
+      title,
+      body,
+      createdAt,
+      relatedType: 'SCHEDULE',
+      priority: 'NORMAL',
+    };
+
+    try {
+      const rawMessages = window.localStorage.getItem(APOLLO_MESSAGES_STORAGE_KEY);
+      const existingMessages = rawMessages ? (JSON.parse(rawMessages) as ApolloMessage[]) : [];
+      window.localStorage.setItem(APOLLO_MESSAGES_STORAGE_KEY, JSON.stringify([message, ...existingMessages]));
+    } catch (error) {
+      console.error('Failed to save automated open shift message:', error);
+    }
+  }
+
+  function assignApprovedOpenShiftRequest(current: ScheduleData, request: OpenShiftRequest): { next: ScheduleData; assigned: boolean } {
+    const next = cloneScheduleData(normalizeLoadedData(current));
+    const dateKey = request.dateKey;
+    next[dateKey] = next[dateKey] ?? createEmptyDaySchedule();
+
+    const employee = employees.find((item) => item.id === request.employeeId);
+    const preferredOpenSlotId = employee?.scope === 'BLS' ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+    const fallbackOpenSlotId = preferredOpenSlotId === OPEN_ALS_SLOT_ID ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+
+    const assignIntoShift = (shift: ShiftAssignment | ExtraShiftAssignment, shiftName?: ShiftName): boolean => {
+      const slotKeys: Array<'employee1' | 'employee2' | 'employee3'> = ['employee1', 'employee2', 'employee3'];
+      const isSupervisorShift = shiftName ? SUPERVISOR_SHIFTS.has(shiftName) : 'category' in shift && shift.category === 'SUPERVISOR';
+      const availableSlotKeys = isSupervisorShift ? slotKeys.slice(0, 1) : slotKeys;
+
+      let targetSlotKey = availableSlotKeys.find((slotKey) => shift[slotKey].employeeId === preferredOpenSlotId);
+      targetSlotKey = targetSlotKey ?? availableSlotKeys.find((slotKey) => shift[slotKey].employeeId === fallbackOpenSlotId);
+      targetSlotKey = targetSlotKey ?? availableSlotKeys.find((slotKey) => !shift[slotKey].employeeId);
+
+      if (!targetSlotKey && !isSupervisorShift && !shift.showEmployee3) {
+        shift.showEmployee3 = true;
+        targetSlotKey = 'employee3';
+      }
+
+      if (!targetSlotKey) {
+        return false;
+      }
+
+      const existingSlot = shift[targetSlotKey];
+      shift[targetSlotKey] = {
+        ...existingSlot,
+        employeeId: request.employeeId,
+        startTime: existingSlot.startTime || DEFAULT_START_TIME,
+        endTime: existingSlot.endTime || getDefaultEndTimeForShift(shiftName, targetSlotKey),
+        note: existingSlot.note || `Approved open shift request on ${new Date().toLocaleDateString('en-US')}.`,
+      };
+
+      if (targetSlotKey === 'employee3') {
+        shift.showEmployee3 = true;
+      }
+
+      return true;
+    };
+
+    if (request.shiftKey.startsWith('EXTRA::')) {
+      const extraId = request.shiftKey.split('::')[2];
+      const extra = next[dateKey].extras.find((item) => item.id === extraId || request.shiftKey.endsWith(item.id));
+      return { next, assigned: extra ? assignIntoShift(extra) : false };
+    }
+
+    const standardShiftKey = request.shiftKey as ShiftName;
+    const standardShift = next[dateKey].standard[standardShiftKey];
+    return { next, assigned: standardShift ? assignIntoShift(standardShift, standardShiftKey) : false };
+  }
+
+  async function updateOpenShiftRequestStatus(requestId: string, status: OpenShiftRequest['status']) {
+    const request = openShiftRequests.find((item) => item.id === requestId);
+    if (!request || status === 'PENDING') return;
+
+    const confirmed =
+      status === 'APPROVED'
+        ? window.confirm(`Approve ${request.employeeName} for ${request.shiftLabel} on ${request.dateKey}? This will automatically update the schedule and send the employee a message.`)
+        : window.confirm(`Deny ${request.employeeName}'s request for ${request.shiftLabel} on ${request.dateKey}? This will send the employee a message.`);
+
+    if (!confirmed) return;
+
+    let approvedScheduleAssigned = false;
+    if (status === 'APPROVED') {
+      const assignmentResult = assignApprovedOpenShiftRequest(scheduleDataRef.current, request);
+      approvedScheduleAssigned = assignmentResult.assigned;
+
+      if (!approvedScheduleAssigned) {
+        window.alert('Apollo could not find an available open slot for this request. The request was not approved. Please assign the employee manually first.');
+        return;
+      }
+
+      setScheduleDataSafely(assignmentResult.next);
+    }
+
+    const nextRequests = openShiftRequests.map((item) =>
+      item.id === requestId
+        ? {
+            ...item,
+            status,
+            supervisorNote:
+              status === 'APPROVED'
+                ? 'Approved by supervisor. Schedule updated automatically.'
+                : 'Denied by supervisor.',
+          }
+        : item,
+    );
+
+    saveOpenShiftRequests(nextRequests);
+    saveAutomatedOpenShiftMessage(request, status);
+    setShowRecentOpenShiftDecisions(true);
+
+    if (status === 'APPROVED') {
+      setSaveStatus('Saving approved open shift assignment...');
+      await saveScheduleToSupabase();
+      setHasUnsavedChanges(false);
+    }
+  }
+
   const visiblePayPeriod = useMemo(() => getPayPeriodInfo(anchorDate), [anchorDate]);
   const visiblePayPeriodStartKey = toDateKey(visiblePayPeriod.start);
   const dates = useMemo(
@@ -1809,6 +2014,7 @@ export default function SchedulePage() {
     onChange: (field: keyof EmployeeSlot, value: string) => void,
     eligibilityMap: Record<string, EligibilityResult>,
     payPeriodHoursMap: Record<string, number>,
+    requestContext?: { dateKey: string; shiftKey: string; shiftLabel: string },
   ) {
     if (!isVisible) {
       return null;
@@ -1816,7 +2022,21 @@ export default function SchedulePage() {
 
     const slotHours = slot.employeeId ? calculateSlotHours(slot.startTime, slot.endTime) : 0;
     const noteRequired = requiresSupervisorNote(slot);
-    const eligibleEmployees = sortEmployeesByAwardPriority(
+    const requestedEmployeeIds = requestContext
+      ? pendingOpenShiftRequests
+          .filter((request) => {
+            const sameDate = request.dateKey === requestContext.dateKey;
+            const sameShift = request.shiftKey === requestContext.shiftKey || request.shiftLabel === requestContext.shiftLabel;
+            return sameDate && sameShift;
+          })
+          .map((request) => request.employeeId)
+      : [];
+    const requestedEmployeeIdSet = new Set(requestedEmployeeIds);
+    const requestedEmployees = requestedEmployeeIds
+      .map((employeeId) => employees.find((employee) => employee.id === employeeId))
+      .filter((employee): employee is EmployeeProfile => Boolean(employee));
+
+    const baseEligibleEmployees = sortEmployeesByAwardPriority(
       employees.filter((employee) => {
         const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
         const isCurrentSelection = slot.employeeId === employee.id;
@@ -1824,7 +2044,11 @@ export default function SchedulePage() {
       }),
       payPeriodHoursMap,
     );
-    const recommendedEmployee = eligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
+    const eligibleEmployees = [
+      ...requestedEmployees,
+      ...baseEligibleEmployees.filter((employee) => !requestedEmployeeIdSet.has(employee.id)),
+    ];
+    const recommendedEmployee = baseEligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
     const isOpenSlotSelection = isOpenShiftSlot(slot.employeeId);
     const selectedEmployee = slot.employeeId && !isOpenSlotSelection ? getEmployeeById(slot.employeeId, employees) : null;
     const selectedEligibility = slot.employeeId && !isOpenSlotSelection ? eligibilityMap[slot.employeeId] : null;
@@ -1837,6 +2061,11 @@ export default function SchedulePage() {
         <div className="mb-2 flex items-center justify-between gap-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">{slotLabel}</label>
           <div className="flex items-center gap-2">
+            {requestedEmployees.length > 0 && !slot.employeeId && (
+              <div className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                Requested: {requestedEmployees.map((employee) => employee.name).join(', ')}
+              </div>
+            )}
             {recommendedEmployee && !slot.employeeId && (
               <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                 Recommended: {recommendedEmployee.name}
@@ -1871,10 +2100,11 @@ export default function SchedulePage() {
               const payPeriodHours = payPeriodHoursMap[employee.id] ?? 0;
               const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
               const isRecommended = recommendedEmployee?.id === employee.id;
+              const isRequested = requestedEmployeeIdSet.has(employee.id);
               const label = `${employee.name} — PP ${formatHours(payPeriodHours)}h — ${getAwardBucketLabel(
                 employee.employeeType,
                 payPeriodHours,
-              )}${isRecommended ? ' — Recommended' : ''}${eligibility.warning ? ` — Warning: ${eligibility.warning}` : ''}`;
+              )}${isRequested ? ' — Requested Shift' : ''}${isRecommended ? ' — Recommended' : ''}${eligibility.warning ? ` — Warning: ${eligibility.warning}` : ''}`;
 
               return (
                 <option key={employee.id} value={employee.id}>
@@ -2032,6 +2262,125 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        <div className="mb-6 grid gap-4 xl:grid-cols-2">
+          <div className={`rounded-2xl border p-4 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => setShowPendingOpenShiftRequests((value) => !value)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className={`text-sm font-bold ${pendingOpenShiftRequests.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>
+                  Pending Open Shift Requests
+                </div>
+                <div className={`mt-1 text-xs ${pendingOpenShiftRequests.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
+                  {pendingOpenShiftRequests.length > 0
+                    ? `${pendingOpenShiftRequests.length} request${pendingOpenShiftRequests.length === 1 ? '' : 's'} awaiting review.`
+                    : 'No pending open shift requests.'}
+                </div>
+              </div>
+              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                {showPendingOpenShiftRequests ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+
+            {showPendingOpenShiftRequests && (
+              <div className="mt-4 space-y-3">
+                {pendingOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No pending open shift requests.
+                  </div>
+                ) : (
+                  pendingOpenShiftRequests.map((request) => (
+                    <div key={request.id} className="rounded-xl border border-red-200 bg-white p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
+                          <div className="mt-1 text-sm text-slate-600">
+                            {request.shiftLabel} • {request.dateKey}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Requested {new Date(request.requestedAt).toLocaleString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateOpenShiftRequestStatus(request.id, 'DENIED')}
+                            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                          >
+                            Deny
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateOpenShiftRequestStatus(request.id, 'APPROVED')}
+                            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowRecentOpenShiftDecisions((value) => !value)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className="text-sm font-bold text-slate-900">Recent Open Shift Decisions</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {reviewedOpenShiftRequests.length > 0
+                    ? `${reviewedOpenShiftRequests.length} reviewed request${reviewedOpenShiftRequests.length === 1 ? '' : 's'} available.`
+                    : 'No reviewed open shift requests yet.'}
+                </div>
+              </div>
+              <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+                {showRecentOpenShiftDecisions ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+
+            {showRecentOpenShiftDecisions && (
+              <div className="mt-4 space-y-2">
+                {reviewedOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No reviewed open shift requests yet.
+                  </div>
+                ) : (
+                  reviewedOpenShiftRequests.slice(0, 8).map((request) => (
+                    <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                      <span className="font-bold text-slate-900">{request.employeeName}</span>
+                      <span className="text-slate-600"> — {request.shiftLabel} on {request.dateKey}</span>
+                      <span
+                        className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                          request.status === 'APPROVED'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}
+                      >
+                        {request.status}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
@@ -2173,6 +2522,7 @@ export default function SchedulePage() {
                             (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee1', field, value),
                             slotEligibilityMaps.employee1,
                             payPeriodHoursMap,
+                            { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                           )}
 
                           {!isSupervisorShift &&
@@ -2183,6 +2533,7 @@ export default function SchedulePage() {
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee2', field, value),
                               slotEligibilityMaps.employee2,
                               payPeriodHoursMap,
+                              { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
 
                           {!isSupervisorShift &&
@@ -2193,6 +2544,7 @@ export default function SchedulePage() {
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee3', field, value),
                               slotEligibilityMaps.employee3,
                               payPeriodHoursMap,
+                              { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
 
                           {!isSupervisorShift && !shift.showEmployee3 && !shift.employee3.employeeId && (
@@ -2389,6 +2741,7 @@ export default function SchedulePage() {
                                 (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee1', field, value),
                                 slotEligibilityMaps.employee1,
                                 payPeriodHoursMap,
+                                { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                               )}
 
                               {!isSupervisorShift &&
@@ -2399,6 +2752,7 @@ export default function SchedulePage() {
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee2', field, value),
                                   slotEligibilityMaps.employee2,
                                   payPeriodHoursMap,
+                                  { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
 
                               {!isSupervisorShift &&
@@ -2409,6 +2763,7 @@ export default function SchedulePage() {
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee3', field, value),
                                   slotEligibilityMaps.employee3,
                                   payPeriodHoursMap,
+                                  { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
 
                               {!isSupervisorShift && !extra.showEmployee3 && !extra.employee3.employeeId && (
