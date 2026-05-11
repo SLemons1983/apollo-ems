@@ -2156,7 +2156,7 @@ export default function DashboardPage() {
       status: 'PENDING_SUPERVISOR_REVIEW',
     };
 
-    saveSubmittedTimecards([timecard, ...submittedTimecards]);
+    saveSubmittedTimecards([timecard, ...submittedTimecards.filter((item) => item.id !== returnedTimecard?.id)]);
     setTimecardStatus('Timecard submitted for supervisor review.');
   }
 
@@ -2913,7 +2913,7 @@ export default function DashboardPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Submission Status</div>
                   <div className="mt-1 text-sm font-bold text-slate-900">
-                    {submittedTimecard ? 'Pending Supervisor Review' : 'Not Submitted'}
+                    {submittedTimecard ? 'Pending Supervisor Review' : returnedTimecard ? 'Returned - Corrections Needed' : 'Not Submitted'}
                   </div>
                 </div>
               </div>
@@ -3168,7 +3168,7 @@ export default function DashboardPage() {
                       onClick={submitTimecardForReview}
                       className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      {submittedTimecard ? 'Submitted' : 'Approve & Submit'}
+                      {submittedTimecard ? 'Submitted' : returnedTimecard ? 'Resubmit Timecard' : 'Approve & Submit'}
                     </button>
                   </div>
                 </div>
