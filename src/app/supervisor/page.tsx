@@ -1440,14 +1440,107 @@ export default function SupervisorPage() {
         <head>
           <title>Timecard</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th, td { border: 1px solid #334155; padding: 4px; text-align: center; }
-            .no-print { display: none; }
-            .card { border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+            @page {
+              size: letter landscape;
+              margin: 0.25in;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 0;
+              color: #0f172a;
+              font-size: 9px;
+              line-height: 1.15;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 8px;
+              page-break-inside: avoid;
+            }
+
+            th,
+            td {
+              border: 1px solid #334155;
+              padding: 2px 3px;
+              text-align: center;
+              vertical-align: middle;
+            }
+
+            .no-print {
+              display: none !important;
+            }
+
+            .rounded-2xl,
+            .rounded-xl {
+              border-radius: 4px !important;
+            }
+
+            .p-5,
+            .p-4,
+            .p-3 {
+              padding: 4px !important;
+            }
+
+            .mt-5,
+            .mt-4,
+            .mt-3,
+            .mt-2,
+            .mt-1,
+            .mb-5,
+            .mb-4,
+            .mb-3,
+            .mb-2,
+            .mb-1 {
+              margin-top: 3px !important;
+              margin-bottom: 3px !important;
+            }
+
+            .grid {
+              display: grid;
+            }
+
+            .md\\:grid-cols-2 {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .xl\\:grid-cols-5 {
+              grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+
+            .text-xl {
+              font-size: 11px !important;
+            }
+
+            .text-base,
+            .text-sm {
+              font-size: 9px !important;
+            }
+
+            .text-xs {
+              font-size: 8px !important;
+            }
+
+            .overflow-auto {
+              overflow: visible !important;
+            }
+
+            #print-root {
+              width: 100%;
+              max-height: 7.5in;
+              overflow: hidden;
+              page-break-after: avoid;
+              page-break-inside: avoid;
+            }
           </style>
         </head>
-        <body>${printable.innerHTML}</body>
+        <body><div id="print-root">${printable.innerHTML}</div></body>
       </html>
     `);
     printWindow.document.close();
