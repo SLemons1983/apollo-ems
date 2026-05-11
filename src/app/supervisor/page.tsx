@@ -1666,10 +1666,30 @@ export default function SupervisorPage() {
     setAuditLog((current) => [entry, ...current].slice(0, 250));
   }
 
-  function saveSystemConfig(nextConfig: SystemConfig, action = 'SYSTEM_CONFIG_UPDATED', details = 'System configuration updated') {
+  async function saveSystemConfig(nextConfig: SystemConfig, action = 'SYSTEM_CONFIG_UPDATED', details = 'System configuration updated') {
     setSystemConfig(nextConfig);
-    window.localStorage.setItem(SYSTEM_CONFIG_STORAGE_KEY, JSON.stringify(nextConfig));
-    addAuditEntry(action, details);
+
+    const { error } = await supabase
+      .from('system_config')
+      .upsert(
+        {
+          id: 'default',
+          company_name: nextConfig.companyName,
+          logo_data_url: nextConfig.logoDataUrl,
+          important_links: nextConfig.importantLinks,
+          geofences: nextConfig.geofences,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      );
+
+    if (error) {
+      console.error('Failed to save system config:', error);
+      window.alert(`System configuration save failed: ${error.message}`);
+      return;
+    }
+
+    void addAuditEntry(action, details);
   }
 
   function updateCompanyName(value: string) {
