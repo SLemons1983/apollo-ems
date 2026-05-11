@@ -1773,7 +1773,17 @@ export default function DashboardPage() {
   );
 
   const submittedTimecard = submittedTimecards.find(
-    (item) => item.employeeId === currentEmployeeId && item.payPeriodKey === selectedPayPeriod.key,
+    (item) =>
+      item.employeeId === currentEmployeeId &&
+      item.payPeriodKey === selectedPayPeriod.key &&
+      item.status !== 'RETURNED',
+  ) ?? null;
+
+  const returnedTimecard = submittedTimecards.find(
+    (item) =>
+      item.employeeId === currentEmployeeId &&
+      item.payPeriodKey === selectedPayPeriod.key &&
+      item.status === 'RETURNED',
   ) ?? null;
 
   function getEditableRowKey(dateKey: string): string {
@@ -2156,7 +2166,14 @@ export default function DashboardPage() {
       status: 'PENDING_SUPERVISOR_REVIEW',
     };
 
-    saveSubmittedTimecards([timecard, ...submittedTimecards.filter((item) => item.id !== returnedTimecard?.id)]);
+    const returnedForThisPeriod = submittedTimecards.find(
+      (item) =>
+        item.employeeId === currentEmployeeId &&
+        item.payPeriodKey === selectedPayPeriod.key &&
+        item.status === 'RETURNED',
+    );
+
+    saveSubmittedTimecards([timecard, ...submittedTimecards.filter((item) => item.id !== returnedForThisPeriod?.id)]);
     setTimecardStatus('Timecard submitted for supervisor review.');
   }
 
