@@ -1703,7 +1703,15 @@ export default function SchedulePage() {
       return { next, assigned: extra ? assignIntoShift(extra) : false };
     }
 
-    const standardShiftKey = request.shiftKey as ShiftName;
+    const rawShiftKey = request.shiftKey.replace(/^standard-/, '');
+    const standardShiftKey = (
+      SHIFT_ORDER.find((shiftName) =>
+        shiftName === rawShiftKey ||
+        SHIFT_DISPLAY_NAMES[shiftName] === request.shiftLabel ||
+        SHIFT_DISPLAY_NAMES[shiftName] === request.shiftKey
+      ) ?? rawShiftKey
+    ) as ShiftName;
+
     const standardShift = next[dateKey].standard[standardShiftKey];
     return { next, assigned: standardShift ? assignIntoShift(standardShift, standardShiftKey) : false };
   }
@@ -2034,7 +2042,7 @@ export default function SchedulePage() {
     const requestedEmployeeIdSet = new Set(requestedEmployeeIds);
     const requestedEmployees = requestedEmployeeIds
       .map((employeeId) => employees.find((employee) => employee.id === employeeId))
-      .filter((employee): employee is EmployeeProfile => Boolean(employee));
+      .filter((employee): employee is EmployeeOption => Boolean(employee));
 
     const baseEligibleEmployees = sortEmployeesByAwardPriority(
       employees.filter((employee) => {
