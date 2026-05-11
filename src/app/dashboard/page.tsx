@@ -2638,7 +2638,7 @@ export default function DashboardPage() {
               <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Employee Status</div>
               <div className="mt-2 text-lg font-bold text-slate-900">
                 {currentEmployee
-                  ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope}`
+                  ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope} • Status: ${currentEmployee.status ?? 'Active'}`
                   : 'Employee profile not loaded'}
               </div>
               <div className="mt-1 text-sm text-slate-600">
