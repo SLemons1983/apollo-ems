@@ -862,69 +862,24 @@ async function saveEmployeeToSupabase(employee: EmployeeProfile): Promise<void> 
   }
 }
 
-function removeEmployeeFromFutureSchedules(employeeId: string): void {
-  try {
-    const raw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
-    if (!raw) {
-      return;
-    }
+async function removeEmployeeFromFutureSchedules(employeeId: string): Promise<void> {
+  const todayKey = new Date().toISOString().slice(0, 10);
 
-    const parsed = JSON.parse(raw) as ScheduleData;
-    const todayKey = new Date().toISOString().slice(0, 10);
+  const { error } = await supabase
+    .from('schedule_assignments')
+    .update({
+      employee_id: null,
+      is_open_slot: false,
+      open_slot_scope: null,
+      note: '',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('employee_id', employeeId)
+    .gte('date_key', todayKey);
 
-    const clearSlot = (slot: unknown) => {
-      if (!slot || typeof slot !== 'object') return slot;
-      const maybeSlot = slot as Record<string, unknown>;
-
-      if (maybeSlot.employeeId === employeeId) {
-        return {
-          ...maybeSlot,
-          employeeId: '',
-          startTime: '06:00',
-          endTime: '06:00',
-          note: '',
-        };
-      }
-
-      return slot;
-    };
-
-    const updated: ScheduleData = JSON.parse(JSON.stringify(parsed));
-
-    for (const [dateKey, day] of Object.entries(updated)) {
-      if (dateKey < todayKey) {
-        continue;
-      }
-
-      if (day.standard && typeof day.standard === 'object') {
-        for (const shiftKey of Object.keys(day.standard)) {
-          const shift = day.standard[shiftKey] as Record<string, unknown>;
-          if (!shift || typeof shift !== 'object') continue;
-
-          shift.employee1 = clearSlot(shift.employee1);
-          shift.employee2 = clearSlot(shift.employee2);
-          shift.employee3 = clearSlot(shift.employee3);
-        }
-      }
-
-      if (Array.isArray(day.extras)) {
-        day.extras = day.extras.map((extra) => {
-          if (!extra || typeof extra !== 'object') return extra;
-          const shift = extra as Record<string, unknown>;
-
-          return {
-            ...shift,
-            employee1: clearSlot(shift.employee1),
-            employee2: clearSlot(shift.employee2),
-            employee3: clearSlot(shift.employee3),
-          };
-        });
-      }
-    }
-
-    window.localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(updated));
-  } catch (error) {
-    console.error('Failed to update future schedules after employee removal:', error);
+  if (error) {
+    console.error('Failed to remove employee from future Supabase schedules:', error);
+    window.alert(`Schedule cleanup failed: ${error.message}`);
   }
 }
 
@@ -1330,7 +1285,7 @@ export default function EmployeeProfilesPage() {
       return;
     }
 
-    removeEmployeeFromFutureSchedules(employeeId);
+    void removeEmployeeFromFutureSchedules(employeeId);
     setEmployees((current) => current.filter((employee) => employee.id !== employeeId));
     setExpandedEmployeeId((current) => (current === employeeId ? null : current));
   };
