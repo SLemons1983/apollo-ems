@@ -2041,82 +2041,8 @@ export default function SupervisorPage() {
                 )}
               </div>
 
-              <div>
-                <div className="mb-2 text-sm font-bold text-slate-900">Pending Open Shift Requests</div>
-
-                {pendingOpenShiftRequests.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No pending open shift requests.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingOpenShiftRequests.map((request) => (
-                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                          <div>
-                            <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
-                            <div className="mt-1 text-sm text-slate-600">
-                              {request.shiftLabel} • {request.dateKey}
-                            </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              Requested {new Date(request.requestedAt).toLocaleString('en-US', {
-                                month: 'numeric',
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })}
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => updateOpenShiftRequestStatus(request.id, 'DENIED')}
-                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                            >
-                              Deny
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => updateOpenShiftRequestStatus(request.id, 'APPROVED')}
-                              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
-                            >
-                              Approve
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-2 text-sm font-bold text-slate-900">Recent Open Shift Decisions</div>
-                {reviewedOpenShiftRequests.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No reviewed open shift requests yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {reviewedOpenShiftRequests.slice(0, 8).map((request) => (
-                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-                        <span className="font-bold text-slate-900">{request.employeeName}</span>
-                        <span className="text-slate-600"> — {request.shiftLabel} on {request.dateKey}</span>
-                        <span
-                          className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
-                            request.status === 'APPROVED'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {request.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                Open shift request review and recent decisions have moved to the Schedule page so schedule changes and request decisions stay in one workspace.
               </div>
             </div>,
             pendingOpenShiftRequests.length > 0,
