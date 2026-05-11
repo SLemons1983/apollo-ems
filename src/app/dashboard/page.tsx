@@ -1131,29 +1131,30 @@ export default function DashboardPage() {
         });
       }
 
-      const { data: openShiftData, error: openShiftError } = await supabase
+      supabase
         .from('open_shift_requests')
         .select('*')
-        .order('requested_at', { ascending: false });
-
-      if (openShiftError) {
-        console.error('Failed to load open shift requests:', openShiftError);
-      } else {
-        setOpenShiftRequests(
-          (openShiftData ?? []).map((row: any) => ({
-            id: row.id,
-            employeeId: row.employee_id,
-            employeeName: row.employee_name,
-            dateKey: row.date_key,
-            shiftKey: row.shift_key,
-            shiftLabel: row.shift_label,
-            payPeriodKey: row.pay_period_key,
-            requestedAt: row.requested_at,
-            status: row.status,
-            supervisorNote: row.supervisor_note ?? undefined,
-          })),
-        );
-      }
+        .order('requested_at', { ascending: false })
+        .then(({ data: openShiftData, error: openShiftError }) => {
+          if (openShiftError) {
+            console.error('Failed to load open shift requests:', openShiftError);
+          } else {
+            setOpenShiftRequests(
+              (openShiftData ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                dateKey: row.date_key,
+                shiftKey: row.shift_key,
+                shiftLabel: row.shift_label,
+                payPeriodKey: row.pay_period_key,
+                requestedAt: row.requested_at,
+                status: row.status,
+                supervisorNote: row.supervisor_note ?? undefined,
+              })),
+            );
+          }
+        });
 
       const readRaw = window.localStorage.getItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`);
       if (readRaw) {
