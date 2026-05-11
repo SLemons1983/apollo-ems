@@ -1108,9 +1108,28 @@ export default function DashboardPage() {
         });
       }
 
-      const openShiftRaw = window.localStorage.getItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY);
-      if (openShiftRaw) {
-        setOpenShiftRequests(JSON.parse(openShiftRaw));
+      const { data: openShiftData, error: openShiftError } = await supabase
+        .from('open_shift_requests')
+        .select('*')
+        .order('requested_at', { ascending: false });
+
+      if (openShiftError) {
+        console.error('Failed to load open shift requests:', openShiftError);
+      } else {
+        setOpenShiftRequests(
+          (openShiftData ?? []).map((row: any) => ({
+            id: row.id,
+            employeeId: row.employee_id,
+            employeeName: row.employee_name,
+            dateKey: row.date_key,
+            shiftKey: row.shift_key,
+            shiftLabel: row.shift_label,
+            payPeriodKey: row.pay_period_key,
+            requestedAt: row.requested_at,
+            status: row.status,
+            supervisorNote: row.supervisor_note ?? undefined,
+          })),
+        );
       }
 
       const readRaw = window.localStorage.getItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`);
@@ -1177,9 +1196,6 @@ export default function DashboardPage() {
         });
       }
 
-      if (event.key === OPEN_SHIFT_REQUESTS_STORAGE_KEY && event.newValue) {
-        setOpenShiftRequests(JSON.parse(event.newValue));
-      }
     };
 
     window.addEventListener('storage', handleStorage);
@@ -2176,9 +2192,31 @@ export default function DashboardPage() {
     );
   }
 
-  function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
+  async function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
     setOpenShiftRequests(nextRequests);
-    window.localStorage.setItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY, JSON.stringify(nextRequests));
+
+    const rows = nextRequests.map((request) => ({
+      id: request.id,
+      employee_id: request.employeeId,
+      employee_name: request.employeeName,
+      date_key: request.dateKey,
+      shift_key: request.shiftKey,
+      shift_label: request.shiftLabel,
+      pay_period_key: request.payPeriodKey,
+      requested_at: request.requestedAt,
+      status: request.status,
+      supervisor_note: request.supervisorNote ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('open_shift_requests')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save open shift request:', error);
+      window.alert('Failed to save open shift request.');
+    }
   }
 
   function getMaxSlotsForAssignment(assignment: DisplayAssignment): number {
@@ -2213,7 +2251,7 @@ export default function DashboardPage() {
     );
   }
 
-  function requestOpenShift(date: Date, assignment: DisplayAssignment) {
+  async function requestOpenShift(date: Date, assignment: DisplayAssignment) {
     const dateKey = toDateKey(date);
 
     if (!currentEmployee) {
@@ -2253,7 +2291,7 @@ export default function DashboardPage() {
       status: 'PENDING',
     };
 
-    saveOpenShiftRequests([request, ...openShiftRequests]);
+    await saveOpenShiftRequests([request, ...openShiftRequests]);
   }
 
   async function submitVacationRequest() {
