@@ -2136,7 +2136,7 @@ export default function DashboardPage() {
   }
 
   function submitTimecardForReview() {
-    if (submittedTimecard) {
+    if (submittedTimecard && !returnedTimecard) {
       setTimecardStatus('This timecard has already been submitted for supervisor review.');
       return;
     }
@@ -2930,7 +2930,7 @@ export default function DashboardPage() {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Submission Status</div>
                   <div className="mt-1 text-sm font-bold text-slate-900">
-                    {submittedTimecard ? 'Pending Supervisor Review' : returnedTimecard ? 'Returned - Corrections Needed' : 'Not Submitted'}
+                    {returnedTimecard ? 'Returned - Corrections Needed' : submittedTimecard ? 'Pending Supervisor Review' : 'Not Submitted'}
                   </div>
                 </div>
               </div>
@@ -3181,11 +3181,11 @@ export default function DashboardPage() {
 
                     <button
                       type="button"
-                      disabled={Boolean(submittedTimecard)}
+                      disabled={Boolean(submittedTimecard && !returnedTimecard)}
                       onClick={submitTimecardForReview}
                       className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      {submittedTimecard ? 'Submitted' : returnedTimecard ? 'Resubmit Timecard' : 'Approve & Submit'}
+                      {returnedTimecard ? 'Resubmit Timecard' : submittedTimecard ? 'Submitted' : 'Approve & Submit'}
                     </button>
                   </div>
                 </div>
