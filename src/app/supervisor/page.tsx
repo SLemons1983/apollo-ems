@@ -1790,6 +1790,46 @@ export default function SupervisorPage() {
           </div>
         </div>
 
+        <div className="mt-4 grid gap-3 rounded-xl border border-slate-300 bg-white p-3 text-sm md:grid-cols-2">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Employee Approved / Submitted
+            </div>
+            <div className="mt-1 font-semibold text-slate-900">
+              {new Date(timecard.submittedAt).toLocaleString('en-US', {
+                month: 'numeric',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              Employee: {timecard.employeeName}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Supervisor Approved
+            </div>
+            <div className="mt-1 font-semibold text-slate-900">
+              {timecard.reviewedAt
+                ? new Date(timecard.reviewedAt).toLocaleString('en-US', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                : 'Not approved yet'}
+            </div>
+            <div className="mt-1 text-xs text-slate-500">
+              Supervisor: {timecard.reviewedBy || 'Pending'}
+            </div>
+          </div>
+        </div>
+
         {timecard.status === 'PENDING_SUPERVISOR_REVIEW' && (
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
