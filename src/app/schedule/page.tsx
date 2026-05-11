@@ -1686,13 +1686,29 @@ export default function SchedulePage() {
       priority: 'NORMAL',
     };
 
-    try {
-      const rawMessages = window.localStorage.getItem(APOLLO_MESSAGES_STORAGE_KEY);
-      const existingMessages = rawMessages ? (JSON.parse(rawMessages) as ApolloMessage[]) : [];
-      window.localStorage.setItem(APOLLO_MESSAGES_STORAGE_KEY, JSON.stringify([message, ...existingMessages]));
-    } catch (error) {
-      console.error('Failed to save automated open shift message:', error);
-    }
+    supabase
+      .from('apollo_messages')
+      .insert({
+        id: message.id,
+        conversation_id: message.conversationId,
+        sender_id: message.senderId,
+        sender_name: message.senderName,
+        sender_role: message.senderRole,
+        recipients: message.recipients ?? [],
+        audience_label: message.audienceLabel,
+        title: message.title,
+        body: message.body,
+        created_at: message.createdAt,
+        related_type: message.relatedType ?? null,
+        related_id: null,
+        priority: message.priority ?? 'NORMAL',
+        updated_at: new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save automated open shift message:', error);
+        }
+      });
   }
 
   function assignApprovedOpenShiftRequest(current: ScheduleData, request: OpenShiftRequest): { next: ScheduleData; assigned: boolean } {

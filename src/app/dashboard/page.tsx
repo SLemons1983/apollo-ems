@@ -1095,10 +1095,33 @@ export default function DashboardPage() {
         setAnnouncements(JSON.parse(announcementRaw));
       }
 
-      const messagesRaw = window.localStorage.getItem(APOLLO_MESSAGES_STORAGE_KEY);
-      if (messagesRaw) {
-        setApolloMessages(JSON.parse(messagesRaw));
-      }
+      supabase
+        .from('apollo_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data: messageData, error: messageError }) => {
+          if (messageError) {
+            console.error('Failed to load Apollo messages:', messageError);
+          } else {
+            setApolloMessages(
+              (messageData ?? []).map((row: any) => ({
+                id: row.id,
+                conversationId: row.conversation_id,
+                senderId: row.sender_id,
+                senderName: row.sender_name,
+                senderRole: row.sender_role,
+                recipients: row.recipients ?? [],
+                audienceLabel: row.audience_label,
+                title: row.title,
+                body: row.body,
+                createdAt: row.created_at,
+                relatedType: row.related_type ?? undefined,
+                relatedId: row.related_id ?? undefined,
+                priority: row.priority ?? 'NORMAL',
+              })),
+            );
+          }
+        });
 
       const configRaw = window.localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
       if (configRaw) {
@@ -1185,9 +1208,6 @@ export default function DashboardPage() {
         setAnnouncements(JSON.parse(event.newValue));
       }
 
-      if (event.key === APOLLO_MESSAGES_STORAGE_KEY && event.newValue) {
-        setApolloMessages(JSON.parse(event.newValue));
-      }
 
       if (event.key === SYSTEM_CONFIG_STORAGE_KEY && event.newValue) {
         setSystemConfig({
@@ -1325,7 +1345,33 @@ export default function DashboardPage() {
 
   function saveApolloMessages(nextMessages: ApolloMessage[]) {
     setApolloMessages(nextMessages);
-    window.localStorage.setItem(APOLLO_MESSAGES_STORAGE_KEY, JSON.stringify(nextMessages));
+
+    const rows = nextMessages.map((message) => ({
+      id: message.id,
+      conversation_id: message.conversationId,
+      sender_id: message.senderId,
+      sender_name: message.senderName,
+      sender_role: message.senderRole,
+      recipients: message.recipients ?? [],
+      audience_label: message.audienceLabel,
+      title: message.title,
+      body: message.body,
+      created_at: message.createdAt,
+      related_type: message.relatedType ?? null,
+      related_id: message.relatedId ?? null,
+      priority: message.priority ?? 'NORMAL',
+      updated_at: new Date().toISOString(),
+    }));
+
+    supabase
+      .from('apollo_messages')
+      .upsert(rows, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save Apollo messages:', error);
+          window.alert('Failed to save Apollo message.');
+        }
+      });
   }
 
   function markConversationRead(conversationId: string) {
