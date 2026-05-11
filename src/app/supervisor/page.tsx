@@ -439,7 +439,6 @@ export default function SupervisorPage() {
   const [builderStartDate, setBuilderStartDate] = useState('');
   const [builderEndDate, setBuilderEndDate] = useState('');
   const [builderSchedule, setBuilderSchedule] = useState<BuilderSchedule>({});
-  const [isScheduleBuilderOpen, setIsScheduleBuilderOpen] = useState(false);
   const [messageRecipientMode, setMessageRecipientMode] = useState('ALL_ACTIVE');
   const [messageRecipientEmployeeId, setMessageRecipientEmployeeId] = useState('');
   const [messageSubject, setMessageSubject] = useState('');
@@ -481,10 +480,37 @@ export default function SupervisorPage() {
           }
         });
 
-      const submittedRaw = window.localStorage.getItem(SUBMITTED_TIMECARDS_STORAGE_KEY);
-      if (submittedRaw) {
-        setSubmittedTimecards(JSON.parse(submittedRaw));
-      }
+      supabase
+        .from('submitted_timecards')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .then(({ data: submittedData, error: submittedError }) => {
+          if (submittedError) {
+            console.error('Failed to load submitted timecards:', submittedError);
+          } else {
+            setSubmittedTimecards(
+              (submittedData ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                payPeriodKey: row.pay_period_key,
+                payPeriodStart: row.pay_period_start,
+                payPeriodEnd: row.pay_period_end,
+                submittedAt: row.submitted_at,
+                totalHours: row.total_hours ?? 0,
+                payBreakdown: row.pay_breakdown ?? undefined,
+                punches: row.punches ?? [],
+                missedMealBreaks: row.missed_meal_breaks ?? [],
+                corrections: row.corrections ?? [],
+                note: row.note ?? '',
+                status: row.status,
+                supervisorComment: row.supervisor_comment ?? undefined,
+                reviewedAt: row.reviewed_at ?? undefined,
+                reviewedBy: row.reviewed_by ?? undefined,
+              })),
+            );
+          }
+        });
 
       supabase
         .from('apollo_messages')
@@ -532,10 +558,30 @@ export default function SupervisorPage() {
           }
         });
 
-      const openShiftRaw = window.localStorage.getItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY);
-      if (openShiftRaw) {
-        setOpenShiftRequests(JSON.parse(openShiftRaw));
-      }
+      supabase
+        .from('open_shift_requests')
+        .select('*')
+        .order('requested_at', { ascending: false })
+        .then(({ data: openShiftData, error: openShiftError }) => {
+          if (openShiftError) {
+            console.error('Failed to load open shift requests:', openShiftError);
+          } else {
+            setOpenShiftRequests(
+              (openShiftData ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                dateKey: row.date_key,
+                shiftKey: row.shift_key,
+                shiftLabel: row.shift_label,
+                payPeriodKey: row.pay_period_key,
+                requestedAt: row.requested_at,
+                status: row.status,
+                supervisorNote: row.supervisor_note ?? undefined,
+              })),
+            );
+          }
+        });
 
       supabase
         .from('audit_logs')
@@ -603,7 +649,37 @@ export default function SupervisorPage() {
 
   function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
     setSubmittedTimecards(nextTimecards);
-    window.localStorage.setItem(SUBMITTED_TIMECARDS_STORAGE_KEY, JSON.stringify(nextTimecards));
+
+    const payload = nextTimecards.map((timecard) => ({
+      id: timecard.id,
+      employee_id: timecard.employeeId,
+      employee_name: timecard.employeeName,
+      pay_period_key: timecard.payPeriodKey,
+      pay_period_start: timecard.payPeriodStart,
+      pay_period_end: timecard.payPeriodEnd,
+      submitted_at: timecard.submittedAt,
+      total_hours: timecard.totalHours,
+      pay_breakdown: timecard.payBreakdown ?? null,
+      punches: timecard.punches ?? [],
+      missed_meal_breaks: timecard.missedMealBreaks ?? [],
+      corrections: timecard.corrections ?? [],
+      note: timecard.note ?? '',
+      status: timecard.status,
+      supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
+      reviewed_at: 'reviewedAt' in timecard ? (timecard.reviewedAt ?? null) : null,
+      reviewed_by: 'reviewedBy' in timecard ? (timecard.reviewedBy ?? null) : null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    supabase
+      .from('submitted_timecards')
+      .upsert(payload, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save submitted timecards:', error);
+          window.alert(`Submitted timecard save failed: ${error.message}`);
+        }
+      });
   }
 
   function approveTimecard(timecardId: string) {
@@ -1148,7 +1224,30 @@ export default function SupervisorPage() {
 
   function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
     setOpenShiftRequests(nextRequests);
-    window.localStorage.setItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY, JSON.stringify(nextRequests));
+
+    const rows = nextRequests.map((request) => ({
+      id: request.id,
+      employee_id: request.employeeId,
+      employee_name: request.employeeName,
+      date_key: request.dateKey,
+      shift_key: request.shiftKey,
+      shift_label: request.shiftLabel,
+      pay_period_key: request.payPeriodKey,
+      requested_at: request.requestedAt,
+      status: request.status,
+      supervisor_note: request.supervisorNote ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    supabase
+      .from('open_shift_requests')
+      .upsert(rows, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save open shift requests:', error);
+          window.alert('Failed to save open shift requests.');
+        }
+      });
   }
 
   function updateOpenShiftRequestStatus(requestId: string, status: OpenShiftRequest['status']) {
@@ -1804,7 +1903,26 @@ export default function SupervisorPage() {
 
   function saveAnnouncements(nextAnnouncements: CompanyAnnouncement[]) {
     setAnnouncements(nextAnnouncements);
-    window.localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(nextAnnouncements));
+
+    const rows = nextAnnouncements.map((announcement) => ({
+      id: announcement.id,
+      title: announcement.title,
+      message: announcement.message,
+      created_at: announcement.createdAt,
+      expires_at: announcement.expiresAt,
+      posted_by: announcement.postedBy,
+      updated_at: new Date().toISOString(),
+    }));
+
+    supabase
+      .from('company_announcements')
+      .upsert(rows, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save announcements:', error);
+          window.alert(`Announcement save failed: ${error.message}`);
+        }
+      });
   }
 
   function createAnnouncement() {
@@ -1918,21 +2036,14 @@ export default function SupervisorPage() {
 
                   <button
                     type="button"
-                    onClick={() => setIsScheduleBuilderOpen((current) => !current)}
-                    className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 sm:w-auto"
+                    onClick={launchBuilderSchedule}
+                    disabled={builderDateKeys.length === 0}
+                    className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    {isScheduleBuilderOpen ? 'Hide Schedule Builder' : 'Open Schedule Builder'}
+                    Launch Schedule
                   </button>
                 </div>
 
-                {!isScheduleBuilderOpen && (
-                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-                    Schedule Builder is collapsed. Use Open Schedule Builder when you need to create or launch a repeating schedule template.
-                  </div>
-                )}
-
-                {isScheduleBuilderOpen && (
-                  <>
                 <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -2140,23 +2251,84 @@ export default function SupervisorPage() {
                     Builder template loaded for {builderDateKeys[0]} through {builderDateKeys[builderDateKeys.length - 1]}. Launching repeats this 2-week template through the selected end date and overwrites the published schedule in that date range.
                   </div>
                 )}
+              </div>
 
-                    <div className="mt-4 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={launchBuilderSchedule}
-                        disabled={builderDateKeys.length === 0}
-                        className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                      >
-                        Launch Schedule
-                      </button>
-                    </div>
-                  </>
+              <div>
+                <div className="mb-2 text-sm font-bold text-slate-900">Pending Open Shift Requests</div>
+
+                {pendingOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No pending open shift requests.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingOpenShiftRequests.map((request) => (
+                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              {request.shiftLabel} • {request.dateKey}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              Requested {new Date(request.requestedAt).toLocaleString('en-US', {
+                                month: 'numeric',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateOpenShiftRequestStatus(request.id, 'DENIED')}
+                              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                            >
+                              Deny
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateOpenShiftRequestStatus(request.id, 'APPROVED')}
+                              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                            >
+                              Approve
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                Open shift request review and recent decisions have moved to the Schedule page so schedule changes and request decisions stay in one workspace.
+              <div>
+                <div className="mb-2 text-sm font-bold text-slate-900">Recent Open Shift Decisions</div>
+                {reviewedOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No reviewed open shift requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {reviewedOpenShiftRequests.slice(0, 8).map((request) => (
+                      <div key={request.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                        <span className="font-bold text-slate-900">{request.employeeName}</span>
+                        <span className="text-slate-600"> — {request.shiftLabel} on {request.dateKey}</span>
+                        <span
+                          className={`ml-2 rounded-full px-2 py-0.5 text-xs font-bold ${
+                            request.status === 'APPROVED'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {request.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>,
             pendingOpenShiftRequests.length > 0,

@@ -1207,10 +1207,41 @@ export default function DashboardPage() {
         setTimecardCorrections(JSON.parse(correctionsRaw));
       }
 
-      const submittedRaw = window.localStorage.getItem(SUBMITTED_TIMECARDS_STORAGE_KEY);
-      if (submittedRaw) {
-        setSubmittedTimecards(JSON.parse(submittedRaw));
-      }
+      supabase
+        .from('submitted_timecards')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .then(({ data: submittedData, error: submittedError }) => {
+          if (submittedError) {
+            console.error('Failed to load submitted timecards:', submittedError);
+          } else {
+            setSubmittedTimecards(
+              (submittedData ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                payPeriodKey: row.pay_period_key,
+                payPeriodStart: row.pay_period_start,
+                payPeriodEnd: row.pay_period_end,
+                submittedAt: row.submitted_at,
+                totalHours: row.total_hours ?? 0,
+                payBreakdown: row.pay_breakdown ?? {
+                  regularHours: row.total_hours ?? 0,
+                  overtimeHours: 0,
+                  doubleTimeHours: 0,
+                  missedMealPenaltyHours: 0,
+                  week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
+                  week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
+                },
+                punches: row.punches ?? [],
+                missedMealBreaks: row.missed_meal_breaks ?? [],
+                corrections: row.corrections ?? [],
+                note: row.note ?? '',
+                status: row.status,
+              })),
+            );
+          }
+        });
 
       const editableRowsRaw = window.localStorage.getItem(EDITABLE_TIMECARD_ROWS_STORAGE_KEY);
       if (editableRowsRaw) {
@@ -2061,7 +2092,37 @@ export default function DashboardPage() {
 
   function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
     setSubmittedTimecards(nextTimecards);
-    window.localStorage.setItem(SUBMITTED_TIMECARDS_STORAGE_KEY, JSON.stringify(nextTimecards));
+
+    const payload = nextTimecards.map((timecard) => ({
+      id: timecard.id,
+      employee_id: timecard.employeeId,
+      employee_name: timecard.employeeName,
+      pay_period_key: timecard.payPeriodKey,
+      pay_period_start: timecard.payPeriodStart,
+      pay_period_end: timecard.payPeriodEnd,
+      submitted_at: timecard.submittedAt,
+      total_hours: timecard.totalHours,
+      pay_breakdown: timecard.payBreakdown ?? null,
+      punches: timecard.punches ?? [],
+      missed_meal_breaks: timecard.missedMealBreaks ?? [],
+      corrections: timecard.corrections ?? [],
+      note: timecard.note ?? '',
+      status: timecard.status,
+      supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
+      reviewed_at: 'reviewedAt' in timecard ? (timecard.reviewedAt ?? null) : null,
+      reviewed_by: 'reviewedBy' in timecard ? (timecard.reviewedBy ?? null) : null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    supabase
+      .from('submitted_timecards')
+      .upsert(payload, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save submitted timecards:', error);
+          window.alert(`Submitted timecard save failed: ${error.message}`);
+        }
+      });
   }
 
   function submitTimecardForReview() {
