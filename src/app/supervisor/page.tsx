@@ -460,10 +460,26 @@ export default function SupervisorPage() {
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
-      if (raw) {
-        setAnnouncements(JSON.parse(raw));
-      }
+      supabase
+        .from('company_announcements')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load announcements:', error);
+          } else {
+            setAnnouncements(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                title: row.title,
+                message: row.message,
+                createdAt: row.created_at,
+                expiresAt: row.expires_at,
+                postedBy: row.posted_by,
+              })),
+            );
+          }
+        });
 
       const submittedRaw = window.localStorage.getItem(SUBMITTED_TIMECARDS_STORAGE_KEY);
       if (submittedRaw) {
@@ -498,23 +514,40 @@ export default function SupervisorPage() {
           }
         });
 
-      const configRaw = window.localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
-      if (configRaw) {
-        setSystemConfig({
-          ...getDefaultSystemConfig(),
-          ...JSON.parse(configRaw),
+      supabase
+        .from('system_config')
+        .select('*')
+        .eq('id', 'default')
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load system config:', error);
+          } else if (data) {
+            setSystemConfig({
+              companyName: data.company_name,
+              logoDataUrl: data.logo_data_url,
+              importantLinks: data.important_links ?? [],
+              geofences: data.geofences ?? [],
+            });
+          }
         });
-      }
 
       const openShiftRaw = window.localStorage.getItem(OPEN_SHIFT_REQUESTS_STORAGE_KEY);
       if (openShiftRaw) {
         setOpenShiftRequests(JSON.parse(openShiftRaw));
       }
 
-      const auditRaw = window.localStorage.getItem(AUDIT_LOG_STORAGE_KEY);
-      if (auditRaw) {
-        setAuditLog(JSON.parse(auditRaw));
-      }
+      supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load audit log:', error);
+          } else {
+            setAuditLog(data ?? []);
+          }
+        });
 
       loadEmployeesFromSupabase()
         .then((loadedEmployees) => {
@@ -1606,10 +1639,9 @@ export default function SupervisorPage() {
 
   function saveAuditLog(nextLog: AuditLogEntry[]) {
     setAuditLog(nextLog);
-    window.localStorage.setItem(AUDIT_LOG_STORAGE_KEY, JSON.stringify(nextLog));
   }
 
-  function addAuditEntry(action: string, details: string) {
+  async function addAuditEntry(action: string, details: string) {
     const entry: AuditLogEntry = {
       id: `audit-${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -1618,7 +1650,20 @@ export default function SupervisorPage() {
       details,
     };
 
-    saveAuditLog([entry, ...auditLog].slice(0, 250));
+    const { error } = await supabase.from('audit_logs').insert({
+      id: entry.id,
+      timestamp: entry.timestamp,
+      actor: entry.actor,
+      action,
+      details,
+    });
+
+    if (error) {
+      console.error('Failed to save audit log:', error);
+      return;
+    }
+
+    setAuditLog((current) => [entry, ...current].slice(0, 250));
   }
 
   function saveSystemConfig(nextConfig: SystemConfig, action = 'SYSTEM_CONFIG_UPDATED', details = 'System configuration updated') {

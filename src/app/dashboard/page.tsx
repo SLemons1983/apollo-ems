@@ -1090,10 +1090,26 @@ export default function DashboardPage() {
 
       reloadPublishedSchedule();
 
-      const announcementRaw = window.localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
-      if (announcementRaw) {
-        setAnnouncements(JSON.parse(announcementRaw));
-      }
+      supabase
+        .from('company_announcements')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load announcements:', error);
+          } else {
+            setAnnouncements(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                title: row.title,
+                message: row.message,
+                createdAt: row.created_at,
+                expiresAt: row.expires_at,
+                postedBy: row.posted_by,
+              })),
+            );
+          }
+        });
 
       supabase
         .from('apollo_messages')
@@ -1123,13 +1139,23 @@ export default function DashboardPage() {
           }
         });
 
-      const configRaw = window.localStorage.getItem(SYSTEM_CONFIG_STORAGE_KEY);
-      if (configRaw) {
-        setSystemConfig({
-          ...getDefaultSystemConfig(),
-          ...JSON.parse(configRaw),
+      supabase
+        .from('system_config')
+        .select('*')
+        .eq('id', 'default')
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load system config:', error);
+          } else if (data) {
+            setSystemConfig({
+              companyName: data.company_name,
+              logoDataUrl: data.logo_data_url,
+              importantLinks: data.important_links ?? [],
+              geofences: data.geofences ?? [],
+            });
+          }
         });
-      }
 
       supabase
         .from('open_shift_requests')
