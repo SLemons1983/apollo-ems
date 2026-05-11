@@ -808,7 +808,7 @@ function normalizeEmployee(employee: EmployeeProfile): EmployeeProfile {
     status: employee.status || 'Active',
     employeeType: employee.employeeType || 'Full Time',
     seniorityLabel: normalizeSeniorityLabel(employee.seniorityLabel || ''),
-    certifications: normalizeCertificationRecord(employee.certifications),
+    certifications: normalizeCertificationRecord(editingEmployee.certifications),
     notes: employee.notes || '',
   };
 }
@@ -892,6 +892,8 @@ export default function EmployeeProfilesPage() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const [editingEmployees, setEditingEmployees] = useState<Record<string, EmployeeProfile>>({});
+  const [employeeSaveStatus, setEmployeeSaveStatus] = useState<Record<string, string>>({});
   const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(EMPTY_EMPLOYEE);
 
   useEffect(() => {
@@ -955,7 +957,7 @@ export default function EmployeeProfilesPage() {
         employee.email,
         employee.phone,
         employee.role,
-        employee.scope,
+        editingEmployee.scope,
         employee.jobTitle,
         employee.status,
         employee.employeeType,
@@ -1016,7 +1018,7 @@ export default function EmployeeProfilesPage() {
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
         <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
 
-        <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-72 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-xl group-hover:block">
+        <div className="absolute left-0 top-full z-50 mt-2 hidden w-80 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-2xl group-hover:block">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
             {label} Employees
           </div>
@@ -1024,12 +1026,14 @@ export default function EmployeeProfilesPage() {
           {categoryEmployees.length === 0 ? (
             <div className="text-slate-500">No employees in this category.</div>
           ) : (
-            <div className="max-h-64 space-y-1 overflow-y-auto">
-              {categoryEmployees.map((employee) => (
-                <div key={employee.id} className="rounded-lg bg-slate-50 px-2 py-1.5 text-slate-700">
-                  {buildDisplayName(employee)}
-                </div>
-              ))}
+            <div className="max-h-80 overflow-y-auto pr-1">
+              <div className="space-y-1">
+                {categoryEmployees.map((employee) => (
+                  <div key={employee.id} className="rounded-lg bg-slate-50 px-2 py-2 text-slate-700 transition hover:bg-slate-100">
+                    {buildDisplayName(employee)}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1109,34 +1113,65 @@ export default function EmployeeProfilesPage() {
     setExpandedEmployeeId(employeeToAdd.id);
   };
 
+  function openEmployeeProfile(employee: EmployeeProfile) {
+    setExpandedEmployeeId((current) => {
+      const next = current === employee.id ? null : employee.id;
+
+      if (next === employee.id) {
+        setEditingEmployees((currentDrafts) => ({
+          ...currentDrafts,
+          [employee.id]: normalizeEmployee(employee),
+        }));
+
+        setEmployeeSaveStatus((currentStatus) => ({
+          ...currentStatus,
+          [employee.id]: '',
+        }));
+      }
+
+      return next;
+    });
+  }
+
+  function cancelEmployeeEdits(employeeId: string) {
+    setEditingEmployees((current) => {
+      const next = { ...current };
+      delete next[employeeId];
+      return next;
+    });
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Changes canceled.',
+    }));
+
+    setExpandedEmployeeId(null);
+  }
+
   const handleEmployeeFieldChange = (employeeId: string, field: keyof EmployeeProfile, value: string) => {
-    let employeeToSave: EmployeeProfile | null = null;
+    setEditingEmployees((current) => {
+      const existing = current[employeeId] ?? employees.find((employee) => employee.id === employeeId);
+      if (!existing) return current;
 
-    setEmployees((current) =>
-      sortEmployees(
-        current.map((employee) => {
-          if (employee.id !== employeeId) {
-            return employee;
-          }
+      const updated = {
+        ...existing,
+        [field]: value,
+      };
 
-          const updated = {
-            ...employee,
-            [field]: value,
-          };
+      if (field === 'role' && existing.scope === defaultScopeForRole(existing.role)) {
+        updated.scope = defaultScopeForRole(value);
+      }
 
-          if (field === 'role' && employee.scope === defaultScopeForRole(employee.role)) {
-            updated.scope = defaultScopeForRole(value);
-          }
+      return {
+        ...current,
+        [employeeId]: normalizeEmployee(updated),
+      };
+    });
 
-          employeeToSave = normalizeEmployee(updated);
-          return employeeToSave;
-        }),
-      ),
-    );
-
-    if (employeeToSave) {
-      void saveEmployeeToSupabase(employeeToSave);
-    }
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Unsaved changes.',
+    }));
   };
 
   const handleEmployeeCertificationChange = (
@@ -1144,32 +1179,61 @@ export default function EmployeeProfilesPage() {
     field: keyof CertificationRecord,
     value: string,
   ) => {
-    let employeeToSave: EmployeeProfile | null = null;
+    setEditingEmployees((current) => {
+      const existing = current[employeeId] ?? employees.find((employee) => employee.id === employeeId);
+      if (!existing) return current;
+
+      return {
+        ...current,
+        [employeeId]: normalizeEmployee({
+          ...existing,
+          certifications: {
+            ...normalizeCertificationRecord(existing.certifications),
+            [field]: value,
+          },
+        }),
+      };
+    });
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Unsaved changes.',
+    }));
+  };
+
+  async function saveEmployeeChanges(employeeId: string) {
+    const draft = editingEmployees[employeeId];
+    if (!draft) {
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]: 'No changes to save.',
+      }));
+      return;
+    }
+
+    const normalized = normalizeEmployee(draft);
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Saving changes...',
+    }));
+
+    await saveEmployeeToSupabase(normalized);
 
     setEmployees((current) =>
-      sortEmployees(
-        current.map((employee) => {
-          if (employee.id !== employeeId) {
-            return employee;
-          }
-
-          employeeToSave = normalizeEmployee({
-            ...employee,
-            certifications: {
-              ...normalizeCertificationRecord(employee.certifications),
-              [field]: value,
-            },
-          });
-
-          return employeeToSave;
-        }),
-      ),
+      sortEmployees(current.map((employee) => (employee.id === employeeId ? normalized : employee))),
     );
 
-    if (employeeToSave) {
-      void saveEmployeeToSupabase(employeeToSave);
-    }
-  };
+    setEditingEmployees((current) => ({
+      ...current,
+      [employeeId]: normalized,
+    }));
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: `Saved at ${new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.`,
+    }));
+  }
 
   const handleNewEmployeeCertificationChange = (field: keyof CertificationRecord, value: string) => {
     setNewEmployee((current) => ({
@@ -1550,6 +1614,7 @@ export default function EmployeeProfilesPage() {
           <div className="divide-y divide-slate-200">
             {filteredEmployees.map((employee) => {
               const expanded = expandedEmployeeId === employee.id;
+              const editingEmployee = editingEmployees[employee.id] ?? employee;
 
               return (
                 <div key={employee.id}>
@@ -1577,7 +1642,7 @@ export default function EmployeeProfilesPage() {
                     <div className="flex justify-end">
                       <button
                         type="button"
-                        onClick={() => setExpandedEmployeeId((current) => (current === employee.id ? null : employee.id))}
+                        onClick={() => openEmployeeProfile(employee)}
                         className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
                       >
                         {expanded ? 'Close' : 'Edit Profile'}
@@ -1596,7 +1661,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">First Name</label>
                           <input
                             type="text"
-                            value={employee.firstName}
+                            value={editingEmployee.firstName}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'firstName', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           />
@@ -1606,7 +1671,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Last Name</label>
                           <input
                             type="text"
-                            value={employee.lastName}
+                            value={editingEmployee.lastName}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'lastName', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           />
@@ -1616,7 +1681,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label>
                           <input
                             type="email"
-                            value={employee.email}
+                            value={editingEmployee.email}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'email', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           />
@@ -1626,7 +1691,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Phone</label>
                           <input
                             type="text"
-                            value={employee.phone}
+                            value={editingEmployee.phone}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'phone', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           />
@@ -1635,7 +1700,7 @@ export default function EmployeeProfilesPage() {
                         <div>
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Role</label>
                           <select
-                            value={employee.role}
+                            value={editingEmployee.role}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'role', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           >
@@ -1648,7 +1713,7 @@ export default function EmployeeProfilesPage() {
                         <div>
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Scope</label>
                           <select
-                            value={employee.scope || 'BLS'}
+                            value={editingEmployee.scope || 'BLS'}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'scope', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           >
@@ -1661,7 +1726,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Job Title</label>
                           <input
                             type="text"
-                            value={employee.jobTitle}
+                            value={editingEmployee.jobTitle}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'jobTitle', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           />
@@ -1670,7 +1735,7 @@ export default function EmployeeProfilesPage() {
                         <div>
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
                           <select
-                            value={employee.status}
+                            value={editingEmployee.status}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'status', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           >
@@ -1683,7 +1748,7 @@ export default function EmployeeProfilesPage() {
                         <div>
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Employee Type</label>
                           <select
-                            value={employee.employeeType}
+                            value={editingEmployee.employeeType}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'employeeType', event.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                           >
@@ -1697,7 +1762,7 @@ export default function EmployeeProfilesPage() {
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Seniority</label>
                           <input
                             type="text"
-                            value={employee.seniorityLabel || 'Seniority Unassigned'}
+                            value={editingEmployee.seniorityLabel || 'Seniority Unassigned'}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'seniorityLabel', event.target.value)}
                             placeholder="Seniority Unassigned"
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
@@ -1705,15 +1770,15 @@ export default function EmployeeProfilesPage() {
                         </div>
 
                         {renderCertificationFields(
-                          normalizeCertificationRecord(employee.certifications),
+                          normalizeCertificationRecord(editingEmployee.certifications),
                           (field, value) => handleEmployeeCertificationChange(employee.id, field, value),
-                          employee.scope,
+                          editingEmployee.scope,
                         )}
 
                         <div className="md:col-span-2 xl:col-span-4">
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</label>
                           <textarea
-                            value={employee.notes}
+                            value={editingEmployee.notes}
                             onChange={(event) => handleEmployeeFieldChange(employee.id, 'notes', event.target.value)}
                             rows={3}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
@@ -1721,14 +1786,36 @@ export default function EmployeeProfilesPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveEmployee(employee.id, buildDisplayName(employee))}
-                          className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                        >
-                          Remove Employee
-                        </button>
+                      <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
+                        <div className="text-sm font-semibold text-slate-600">
+                          {employeeSaveStatus[employee.id] || 'Review changes, then click Save Changes.'}
+                        </div>
+
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => cancelEmployeeEdits(employee.id)}
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => saveEmployeeChanges(employee.id)}
+                            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                          >
+                            Save Changes
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEmployee(employee.id, buildDisplayName(employee))}
+                            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                          >
+                            Remove Employee
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
