@@ -1195,10 +1195,31 @@ export default function DashboardPage() {
         setReadAnnouncementIds(JSON.parse(readRaw));
       }
 
-      const punchRaw = window.localStorage.getItem(TIME_PUNCH_STORAGE_KEY);
-      if (punchRaw) {
-        setTimePunches(JSON.parse(punchRaw));
-      }
+      supabase
+        .from('time_punches')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load time punches:', error);
+          } else {
+            setTimePunches(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                type: row.type,
+                timestamp: row.timestamp,
+                shiftDateKey: row.shift_date_key,
+                shiftLabel: row.shift_label,
+                locationLabel: row.location_label,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                distanceFeet: row.distance_feet,
+                geofenceStatus: row.geofence_status,
+              })),
+            );
+          }
+        });
 
       const notesRaw = window.localStorage.getItem(TIMECARD_NOTES_STORAGE_KEY);
       if (notesRaw) {
@@ -1699,9 +1720,31 @@ export default function DashboardPage() {
   const lastPunch = currentEmployeePunches[0] ?? null;
   const isClockedIn = lastPunch?.type === 'CLOCK_IN';
 
-  function saveTimePunches(nextPunches: TimePunch[]) {
+  async function saveTimePunches(nextPunches: TimePunch[]) {
     setTimePunches(nextPunches);
-    window.localStorage.setItem(TIME_PUNCH_STORAGE_KEY, JSON.stringify(nextPunches));
+
+    const payload = nextPunches.map((punch) => ({
+      id: punch.id,
+      employee_id: punch.employeeId,
+      type: punch.type,
+      timestamp: punch.timestamp,
+      shift_date_key: punch.shiftDateKey,
+      shift_label: punch.shiftLabel,
+      location_label: punch.locationLabel,
+      latitude: punch.latitude,
+      longitude: punch.longitude,
+      distance_feet: punch.distanceFeet,
+      geofence_status: punch.geofenceStatus,
+    }));
+
+    const { error } = await supabase
+      .from('time_punches')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save time punches:', error);
+      window.alert(`Time punch save failed: ${error.message}`);
+    }
   }
 
   function getTimecardNoteKey(): string {
