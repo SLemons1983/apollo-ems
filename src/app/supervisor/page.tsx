@@ -1161,7 +1161,7 @@ export default function SupervisorPage() {
     };
   }
 
-  function launchBuilderSchedule() {
+  async function launchBuilderSchedule() {
     const templateDateKeys = Object.keys(builderSchedule).sort();
     const launchDateKeys = getBuilderDateRange(builderStartDate, builderEndDate);
 
@@ -1190,21 +1190,116 @@ export default function SupervisorPage() {
       return;
     }
 
-    const existingRaw = window.localStorage.getItem(SCHEDULE_STORAGE_KEY);
-    const existingSchedule = existingRaw ? JSON.parse(existingRaw) : {};
-    const nextSchedule = {
-      ...existingSchedule,
-    };
+    try {
+      for (const dateKey of launchDateKeys) {
+        const { error: scheduleError } = await supabase.from('schedules').upsert({
+          id: dateKey,
+          date_key: dateKey,
+          updated_at: new Date().toISOString(),
+        });
 
-    launchDateKeys.forEach((dateKey, index) => {
-      const templateDateKey = templateDateKeys[index % templateDateKeys.length];
-      const templateDay = builderSchedule[templateDateKey];
-      nextSchedule[dateKey] = getLaunchedScheduleDayFromBuilderDay(templateDay);
-    });
+        if (scheduleError) {
+          throw scheduleError;
+        }
 
-    window.localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(nextSchedule));
-    addAuditEntry('SCHEDULE_LAUNCHED', `Schedule launched for ${launchDateKeys[0]} through ${launchDateKeys[launchDateKeys.length - 1]}`);
-    window.alert('Schedule launched successfully.');
+        const { error: deleteError } = await supabase
+          .from('schedule_assignments')
+          .delete()
+          .eq('date_key', dateKey);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+      }
+
+      const rows: any[] = [];
+
+      launchDateKeys.forEach((dateKey, index) => {
+        const templateDateKey = templateDateKeys[index % templateDateKeys.length];
+        const templateDay = builderSchedule[templateDateKey];
+        const launchedDay = getLaunchedScheduleDayFromBuilderDay(templateDay);
+
+        Object.entries(launchedDay.standard).forEach(([shiftKey, shift]: any) => {
+          const shiftLabel =
+            shiftKey === 'R1'
+              ? 'Reedley 1'
+              : shiftKey === 'R2'
+                ? 'Reedley 2'
+                : shiftKey === 'P'
+                  ? 'Parlier'
+                  : shiftKey === 'OC'
+                    ? 'Orange Cove'
+                    : shiftKey === 'ADMIN_SUP'
+                      ? 'Administrative Supervisor'
+                      : shiftKey === 'FIELD_SUP'
+                        ? 'Field Supervisor'
+                        : 'GM';
+
+          rows.push({
+            id: `${dateKey}-${shiftKey}-0`,
+            schedule_id: dateKey,
+            date_key: dateKey,
+            shift_key: shiftKey,
+            shift_label: shiftLabel,
+            slot_number: 0,
+            employee_id: null,
+            start_time: shift.employee1?.startTime ?? '06:00',
+            end_time: shift.employee1?.endTime ?? '06:00',
+            note: '',
+            vehicle: shift.vehicle || '',
+            allow_extended_hours: Boolean(shift.allowExtendedHours),
+            is_open_slot: false,
+            open_slot_scope: null,
+            updated_at: new Date().toISOString(),
+          });
+
+          (['employee1', 'employee2', 'employee3'] as const).forEach((slotKey, slotIndex) => {
+            const slot = shift[slotKey];
+            const employeeId = slot?.employeeId ?? '';
+
+            if (!employeeId && !slot?.startTime && !slot?.endTime && !slot?.note) {
+              return;
+            }
+
+            const isOpenSlot = employeeId === OPEN_ALS_SLOT_ID || employeeId === OPEN_BLS_SLOT_ID;
+
+            rows.push({
+              id: `${dateKey}-${shiftKey}-${slotIndex + 1}`,
+              schedule_id: dateKey,
+              date_key: dateKey,
+              shift_key: shiftKey,
+              shift_label: shiftLabel,
+              slot_number: slotIndex + 1,
+              employee_id: isOpenSlot ? null : employeeId || null,
+              start_time: slot?.startTime ?? '06:00',
+              end_time: slot?.endTime ?? '06:00',
+              note: slot?.note ?? '',
+              vehicle: shift.vehicle || '',
+              allow_extended_hours: Boolean(shift.allowExtendedHours),
+              is_open_slot: isOpenSlot,
+              open_slot_scope: employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
+              updated_at: new Date().toISOString(),
+            });
+          });
+        });
+      });
+
+      if (rows.length > 0) {
+        const { error: assignmentError } = await supabase
+          .from('schedule_assignments')
+          .upsert(rows, { onConflict: 'id' });
+
+        if (assignmentError) {
+          throw assignmentError;
+        }
+      }
+
+      void addAuditEntry('SCHEDULE_LAUNCHED', `Schedule launched for ${launchDateKeys[0]} through ${launchDateKeys[launchDateKeys.length - 1]}`);
+      window.alert('Schedule launched successfully.');
+    } catch (error) {
+      console.error('Schedule launch failed:', error);
+      window.alert('Schedule launch failed. Check console for details.');
+    }
   }
 
   const builderDateKeys = Object.keys(builderSchedule).sort();
