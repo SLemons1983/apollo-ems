@@ -298,7 +298,7 @@ function normalizeScope(scopeValue: string | undefined, roleValue: string | unde
 
 function loadEmployeesFromProfiles(): EmployeeOption[] {
   try {
-    const raw = window.localStorage.getItem(EMPLOYEE_STORAGE_KEY);
+    const raw = null;
     if (!raw) {
       return [];
     }
@@ -600,7 +600,7 @@ export default function SupervisorPage() {
           setEmployees(loadedEmployees);
         })
         .catch((employeeError) => {
-          console.error('Failed to load employees from Supabase. Falling back to localStorage:', employeeError);
+          console.error('Failed to load employees from Supabase:', employeeError);
           setEmployees(loadEmployeesFromProfiles());
         });
 

@@ -338,7 +338,7 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
   }
 
   try {
-    const raw = window.localStorage.getItem(EMPLOYEE_STORAGE_KEY);
+    const raw = null;
     if (!raw) {
       return sortEmployeesByName(DEFAULT_EMPLOYEES);
     }
