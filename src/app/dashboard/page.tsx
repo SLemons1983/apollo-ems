@@ -2030,17 +2030,25 @@ export default function DashboardPage() {
 
     setEditableTimecardRows(updatedRows);
 
-    void supabase.from('editable_timecard_rows').upsert(
-      {
-        id: rowKey,
-        employee_id: currentEmployeeId,
-        pay_period_key: selectedPayPeriod.key,
-        date_key: dateKey,
-        row_data: updatedRows[rowKey],
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'id' },
-    );
+    void supabase
+      .from('editable_timecard_rows')
+      .upsert(
+        {
+          id: rowKey,
+          employee_id: currentEmployeeId,
+          pay_period_key: selectedPayPeriod.key,
+          date_key: dateKey,
+          row_data: updatedRows[rowKey],
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save editable timecard row:', error);
+          window.alert(`Editable timecard row save failed: ${error.message}`);
+        }
+      });
   }
 
   function clearEditableRow(date: Date) {
@@ -2067,17 +2075,25 @@ export default function DashboardPage() {
 
     setEditableTimecardRows(updatedRows);
 
-    void supabase.from('editable_timecard_rows').upsert(
-      {
-        id: rowKey,
-        employee_id: currentEmployeeId,
-        pay_period_key: selectedPayPeriod.key,
-        date_key: dateKey,
-        row_data: clearedRow,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'id' },
-    );
+    void supabase
+      .from('editable_timecard_rows')
+      .upsert(
+        {
+          id: rowKey,
+          employee_id: currentEmployeeId,
+          pay_period_key: selectedPayPeriod.key,
+          date_key: dateKey,
+          row_data: clearedRow,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to clear editable timecard row:', error);
+          window.alert(`Editable timecard row clear failed: ${error.message}`);
+        }
+      });
   }
 
   function getEditableRowHours(row: EditableTimecardRow): number {
