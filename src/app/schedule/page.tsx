@@ -62,6 +62,7 @@ type ShiftAssignment = {
   showEmployee3: boolean;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
+  hiddenFromEmployees: boolean;
 };
 
 type DayAssignments = Record<ShiftName, ShiftAssignment>;
@@ -76,6 +77,7 @@ type ExtraShiftAssignment = {
   showEmployee3: boolean;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
+  hiddenFromEmployees: boolean;
 };
 
 type DaySchedule = {
@@ -423,6 +425,7 @@ function createEmptyShift(showEmployee3 = false): ShiftAssignment {
     showEmployee3,
     vehicle: '',
     allowExtendedHours: false,
+    hiddenFromEmployees: false,
   };
 }
 
@@ -443,6 +446,7 @@ function createAdminSupervisorShift(): ShiftAssignment {
     showEmployee3: false,
     vehicle: '',
     allowExtendedHours: false,
+    hiddenFromEmployees: false,
   };
 }
 
@@ -605,6 +609,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybeShift.showEmployee3 || employee3.employeeId),
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
     allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
+    hiddenFromEmployees: Boolean((maybeShift as any).hiddenFromEmployees),
   };
 }
 
@@ -620,6 +625,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
       showEmployee3: false,
       vehicle: '',
       allowExtendedHours: false,
+      hiddenFromEmployees: false,
     };
   }
 
@@ -637,6 +643,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
     showEmployee3: normalized.showEmployee3,
     vehicle: normalized.vehicle,
     allowExtendedHours: normalized.allowExtendedHours,
+    hiddenFromEmployees: normalized.hiddenFromEmployees,
   };
 }
 
@@ -1376,6 +1383,7 @@ export default function SchedulePage() {
                 showEmployee3: false,
                 vehicle: (row.vehicle || '') as VehicleValue,
                 allowExtendedHours: Boolean(row.allow_extended_hours),
+                hiddenFromEmployees: Boolean(row.hidden_from_employees),
               };
               day.extras.push(extra);
             }
@@ -1384,6 +1392,7 @@ export default function SchedulePage() {
             extra.category = category;
             extra.vehicle = (row.vehicle || '') as VehicleValue;
             extra.allowExtendedHours = Boolean(row.allow_extended_hours);
+            extra.hiddenFromEmployees = Boolean(row.hidden_from_employees);
 
             if (row.slot_number === 1) extra.employee1 = slot;
             if (row.slot_number === 2) extra.employee2 = slot;
@@ -1400,6 +1409,7 @@ export default function SchedulePage() {
             const shift = day.standard[shiftName];
             shift.vehicle = (row.vehicle || '') as VehicleValue;
             shift.allowExtendedHours = Boolean(row.allow_extended_hours);
+            shift.hiddenFromEmployees = Boolean(row.hidden_from_employees);
 
             if (row.slot_number === 1) shift.employee1 = slot;
             if (row.slot_number === 2) shift.employee2 = slot;
@@ -1445,6 +1455,7 @@ export default function SchedulePage() {
     slot: EmployeeSlot;
     vehicle: VehicleValue;
     allowExtendedHours: boolean;
+    hiddenFromEmployees: boolean;
     defaultEndTime?: string;
   }) {
     const isOpenSlot = isOpenShiftSlot(params.slot.employeeId);
@@ -1462,6 +1473,7 @@ export default function SchedulePage() {
       note: params.slot.note || '',
       vehicle: params.vehicle || '',
       allow_extended_hours: Boolean(params.allowExtendedHours),
+      hidden_from_employees: Boolean(params.hiddenFromEmployees),
       is_open_slot: isOpenSlot,
       open_slot_scope: params.slot.employeeId === OPEN_ALS_SLOT_ID ? 'ALS' : params.slot.employeeId === OPEN_BLS_SLOT_ID ? 'BLS' : null,
       updated_at: new Date().toISOString(),
@@ -1512,6 +1524,7 @@ export default function SchedulePage() {
             note: '',
             vehicle: shift.vehicle || '',
             allow_extended_hours: Boolean(shift.allowExtendedHours),
+            hidden_from_employees: Boolean(shift.hiddenFromEmployees),
             is_open_slot: false,
             open_slot_scope: null,
             updated_at: new Date().toISOString(),
@@ -1535,6 +1548,7 @@ export default function SchedulePage() {
                 slot,
                 vehicle: shift.vehicle || '',
                 allowExtendedHours: Boolean(shift.allowExtendedHours),
+                hiddenFromEmployees: Boolean(shift.hiddenFromEmployees),
                 defaultEndTime: getDefaultEndTimeForShift(shiftName, slotKey),
               }),
             );
@@ -1562,6 +1576,7 @@ export default function SchedulePage() {
             note: '',
             vehicle: extra.vehicle || '',
             allow_extended_hours: Boolean(extra.allowExtendedHours),
+            hidden_from_employees: Boolean(extra.hiddenFromEmployees),
             is_open_slot: false,
             open_slot_scope: null,
             updated_at: new Date().toISOString(),
@@ -1585,6 +1600,7 @@ export default function SchedulePage() {
                 slot,
                 vehicle: extra.vehicle || '',
                 allowExtendedHours: Boolean(extra.allowExtendedHours),
+                hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
               }),
             );
           });
@@ -1857,7 +1873,7 @@ export default function SchedulePage() {
   const handleStandardShiftChange = (
     dateKey: string,
     shiftName: ShiftName,
-    field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours',
+    field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours' | 'hiddenFromEmployees',
     value: string | boolean,
   ) => {
     markUnsavedChanges();
@@ -2007,6 +2023,7 @@ export default function SchedulePage() {
         showEmployee3: false,
         vehicle: '',
         allowExtendedHours: false,
+        hiddenFromEmployees: false,
       });
 
       return next;
@@ -2564,6 +2581,12 @@ export default function SchedulePage() {
                             {staffingLevel}
                           </div>
 
+                          {shift.hiddenFromEmployees && (
+                            <div className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                              Hidden
+                            </div>
+                          )}
+
                           {warningMessages.length > 0 ? (
                             <div className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
                               Warning
@@ -2632,6 +2655,18 @@ export default function SchedulePage() {
                               className="h-4 w-4"
                             />
                             Allow extended hours
+                          </label>
+
+                          <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(shift.hiddenFromEmployees)}
+                              onChange={(event) =>
+                                handleStandardShiftChange(dateKey, shiftName, 'hiddenFromEmployees', event.target.checked)
+                              }
+                              className="h-4 w-4"
+                            />
+                            Hide shift from employees
                           </label>
 
                           <div>
@@ -2776,6 +2811,12 @@ export default function SchedulePage() {
                                     {staffingLevel}
                                   </div>
 
+                                  {extra.hiddenFromEmployees && (
+                                    <div className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                      Hidden
+                                    </div>
+                                  )}
+
                                   <select
                                     value={extra.category}
                                     onChange={(event) =>
@@ -2851,6 +2892,18 @@ export default function SchedulePage() {
                                   className="h-4 w-4"
                                 />
                                 Allow extended hours
+                              </label>
+
+                              <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(extra.hiddenFromEmployees)}
+                                  onChange={(event) =>
+                                    handleExtraShiftChange(dateKey, extra.id, 'hiddenFromEmployees', event.target.checked)
+                                  }
+                                  className="h-4 w-4"
+                                />
+                                Hide shift from employees
                               </label>
 
                               <div>

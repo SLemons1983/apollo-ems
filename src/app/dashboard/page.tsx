@@ -75,6 +75,7 @@ type ShiftAssignment = {
   showEmployee3: boolean;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
+  hiddenFromEmployees: boolean;
 };
 
 type DayAssignments = Record<ShiftName, ShiftAssignment>;
@@ -89,6 +90,7 @@ type ExtraShiftAssignment = {
   showEmployee3: boolean;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
+  hiddenFromEmployees: boolean;
 };
 
 type DaySchedule = {
@@ -110,6 +112,7 @@ type DisplayAssignment = {
   key: string;
   label: string;
   slots: EmployeeSlot[];
+  hiddenFromEmployees: boolean;
 };
 
 type OpenShiftRequest = {
@@ -521,6 +524,7 @@ function createEmptyShift(showEmployee3 = false): ShiftAssignment {
     showEmployee3,
     vehicle: '',
     allowExtendedHours: false,
+    hiddenFromEmployees: false,
   };
 }
 
@@ -630,6 +634,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybe.showEmployee3 || maybe.employee3?.employeeId),
     vehicle: maybe.vehicle ?? '',
     allowExtendedHours: Boolean(maybe.allowExtendedHours),
+    hiddenFromEmployees: Boolean((maybe as any).hiddenFromEmployees),
   };
 
   return shift;
@@ -647,6 +652,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
       showEmployee3: false,
       vehicle: '',
       allowExtendedHours: false,
+      hiddenFromEmployees: false,
     };
   }
 
@@ -663,6 +669,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
     showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybe.showEmployee3 || maybe.employee3?.employeeId),
     vehicle: maybe.vehicle ?? '',
     allowExtendedHours: Boolean(maybe.allowExtendedHours),
+    hiddenFromEmployees: Boolean((maybe as any).hiddenFromEmployees),
   };
 }
 
@@ -1011,6 +1018,7 @@ export default function DashboardPage() {
               showEmployee3: false,
               vehicle: row.vehicle || '',
               allowExtendedHours: Boolean(row.allow_extended_hours),
+              hiddenFromEmployees: Boolean(row.hidden_from_employees),
             };
             day.extras.push(extra);
           }
@@ -1582,15 +1590,21 @@ export default function DashboardPage() {
         key: `standard-${shiftName}`,
         label: SHIFT_DISPLAY[shiftName],
         slots: getAssignedSlots(day.standard[shiftName], shiftName === 'ADMIN_SUP' || shiftName === 'FIELD_SUP' ? 'SUPERVISOR' : 'UNIT'),
+        hiddenFromEmployees: Boolean(day.standard[shiftName].hiddenFromEmployees),
       }));
 
       const extraAssignments: DisplayAssignment[] = day.extras.map((extra) => ({
         key: `extra-${extra.id}`,
         label: extra.label,
         slots: getAssignedSlots(extra, extra.category),
+        hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
       }));
 
       byDate[dateKey] = [...standardAssignments, ...extraAssignments].filter((assignment) => {
+        if (assignment.hiddenFromEmployees) {
+          return false;
+        }
+
         if (showFullSchedule) {
           return assignment.slots.length > 0 || getOpenSlotCount(assignment) > 0;
         }
@@ -2521,6 +2535,7 @@ export default function DashboardPage() {
                             {showFullSchedule &&
                               isFutureOrToday(date) &&
                               getOpenSlotCount(assignment) > 0 &&
+                              !assignment.hiddenFromEmployees &&
                               !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId) && (
                                 <button
                                   type="button"
