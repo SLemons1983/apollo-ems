@@ -1259,10 +1259,30 @@ export default function DashboardPage() {
           }
         });
 
-      const correctionsRaw = window.localStorage.getItem(TIMECARD_CORRECTIONS_STORAGE_KEY);
-      if (correctionsRaw) {
-        setTimecardCorrections(JSON.parse(correctionsRaw));
-      }
+      supabase
+        .from('timecard_corrections')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load timecard corrections:', error);
+          } else {
+            setTimecardCorrections(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                payPeriodKey: row.pay_period_key,
+                dateKey: row.date_key,
+                shiftLabel: row.shift_label,
+                correctionType: row.correction_type,
+                requestedDate: row.requested_date,
+                requestedTime: row.requested_time,
+                reason: row.reason,
+                createdAt: row.created_at,
+              })),
+            );
+          }
+        });
 
       supabase
         .from('submitted_timecards')
@@ -1300,10 +1320,30 @@ export default function DashboardPage() {
           }
         });
 
-      const editableRowsRaw = window.localStorage.getItem(EDITABLE_TIMECARD_ROWS_STORAGE_KEY);
-      if (editableRowsRaw) {
-        setEditableTimecardRows(JSON.parse(editableRowsRaw));
-      }
+      supabase
+        .from('editable_timecard_rows')
+        .select('*')
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load editable timecard rows:', error);
+          } else {
+            setEditableTimecardRows(
+              Object.fromEntries(
+                (data ?? []).map((row: any) => [
+                  row.id,
+                  row.row_data ?? {
+                    shiftLabel: '',
+                    payType: 'DAILY_OT_DT',
+                    clockInDate: '',
+                    clockInTime: '',
+                    clockOutDate: '',
+                    clockOutTime: '',
+                  },
+                ]),
+              ),
+            );
+          }
+        });
 
       setSelectedPayPeriodKey(currentPayPeriod.key);
     } catch (error) {
@@ -1989,7 +2029,18 @@ export default function DashboardPage() {
     };
 
     setEditableTimecardRows(updatedRows);
-    window.localStorage.setItem(EDITABLE_TIMECARD_ROWS_STORAGE_KEY, JSON.stringify(updatedRows));
+
+    void supabase.from('editable_timecard_rows').upsert(
+      {
+        id: rowKey,
+        employee_id: currentEmployeeId,
+        pay_period_key: selectedPayPeriod.key,
+        date_key: dateKey,
+        row_data: updatedRows[rowKey],
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
   }
 
   function clearEditableRow(date: Date) {
@@ -2015,7 +2066,18 @@ export default function DashboardPage() {
     };
 
     setEditableTimecardRows(updatedRows);
-    window.localStorage.setItem(EDITABLE_TIMECARD_ROWS_STORAGE_KEY, JSON.stringify(updatedRows));
+
+    void supabase.from('editable_timecard_rows').upsert(
+      {
+        id: rowKey,
+        employee_id: currentEmployeeId,
+        pay_period_key: selectedPayPeriod.key,
+        date_key: dateKey,
+        row_data: clearedRow,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
   }
 
   function getEditableRowHours(row: EditableTimecardRow): number {
@@ -2182,9 +2244,30 @@ export default function DashboardPage() {
     }, 0);
   }
 
-  function saveTimecardCorrections(nextCorrections: TimecardCorrectionRequest[]) {
+  async function saveTimecardCorrections(nextCorrections: TimecardCorrectionRequest[]) {
     setTimecardCorrections(nextCorrections);
-    window.localStorage.setItem(TIMECARD_CORRECTIONS_STORAGE_KEY, JSON.stringify(nextCorrections));
+
+    const payload = nextCorrections.map((correction) => ({
+      id: correction.id,
+      employee_id: correction.employeeId,
+      pay_period_key: correction.payPeriodKey,
+      date_key: correction.dateKey,
+      shift_label: correction.shiftLabel,
+      correction_type: correction.correctionType,
+      requested_date: correction.requestedDate,
+      requested_time: correction.requestedTime,
+      reason: correction.reason,
+      created_at: correction.createdAt,
+    }));
+
+    const { error } = await supabase
+      .from('timecard_corrections')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save timecard corrections:', error);
+      window.alert(`Timecard correction save failed: ${error.message}`);
+    }
   }
 
   function addTimecardCorrection() {
