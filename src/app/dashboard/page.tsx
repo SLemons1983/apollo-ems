@@ -1221,10 +1221,23 @@ export default function DashboardPage() {
           }
         });
 
-      const notesRaw = window.localStorage.getItem(TIMECARD_NOTES_STORAGE_KEY);
-      if (notesRaw) {
-        setTimecardNotes(JSON.parse(notesRaw));
-      }
+      supabase
+        .from('timecard_notes')
+        .select('*')
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load timecard notes:', error);
+          } else {
+            setTimecardNotes(
+              Object.fromEntries(
+                (data ?? []).map((row: any) => [
+                  `${row.employee_id}-${row.pay_period_key}`,
+                  row.note ?? '',
+                ]),
+              ),
+            );
+          }
+        });
 
       const missedMealRaw = window.localStorage.getItem(MISSED_MEAL_BREAK_STORAGE_KEY);
       if (missedMealRaw) {
@@ -1751,13 +1764,32 @@ export default function DashboardPage() {
     return `${currentEmployeeId}-${selectedPayPeriod.key}`;
   }
 
-  function saveTimecardNote(value: string) {
+  async function saveTimecardNote(value: string) {
+    const noteKey = getTimecardNoteKey();
     const updated = {
       ...timecardNotes,
-      [getTimecardNoteKey()]: value,
+      [noteKey]: value,
     };
+
     setTimecardNotes(updated);
-    window.localStorage.setItem(TIMECARD_NOTES_STORAGE_KEY, JSON.stringify(updated));
+
+    const { error } = await supabase
+      .from('timecard_notes')
+      .upsert(
+        {
+          id: noteKey,
+          employee_id: currentEmployeeId,
+          pay_period_key: selectedPayPeriod.key,
+          note: value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      );
+
+    if (error) {
+      console.error('Failed to save timecard note:', error);
+      window.alert(`Timecard note save failed: ${error.message}`);
+    }
   }
 
   function saveMissedMealBreaks(nextBreaks: MissedMealBreak[]) {
