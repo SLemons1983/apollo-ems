@@ -1239,10 +1239,25 @@ export default function DashboardPage() {
           }
         });
 
-      const missedMealRaw = window.localStorage.getItem(MISSED_MEAL_BREAK_STORAGE_KEY);
-      if (missedMealRaw) {
-        setMissedMealBreaks(JSON.parse(missedMealRaw));
-      }
+      supabase
+        .from('missed_meal_breaks')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load missed meal breaks:', error);
+          } else {
+            setMissedMealBreaks(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                dateKey: row.date_key,
+                reason: row.reason,
+                createdAt: row.created_at,
+              })),
+            );
+          }
+        });
 
       const correctionsRaw = window.localStorage.getItem(TIMECARD_CORRECTIONS_STORAGE_KEY);
       if (correctionsRaw) {
@@ -1792,9 +1807,25 @@ export default function DashboardPage() {
     }
   }
 
-  function saveMissedMealBreaks(nextBreaks: MissedMealBreak[]) {
+  async function saveMissedMealBreaks(nextBreaks: MissedMealBreak[]) {
     setMissedMealBreaks(nextBreaks);
-    window.localStorage.setItem(MISSED_MEAL_BREAK_STORAGE_KEY, JSON.stringify(nextBreaks));
+
+    const payload = nextBreaks.map((mealBreak) => ({
+      id: mealBreak.id,
+      employee_id: mealBreak.employeeId,
+      date_key: mealBreak.dateKey,
+      reason: mealBreak.reason,
+      created_at: mealBreak.createdAt,
+    }));
+
+    const { error } = await supabase
+      .from('missed_meal_breaks')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save missed meal breaks:', error);
+      window.alert(`Missed meal break save failed: ${error.message}`);
+    }
   }
 
   function addMissedMealBreak() {
