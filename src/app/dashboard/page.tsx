@@ -2009,7 +2009,18 @@ export default function DashboardPage() {
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const saved = editableTimecardRows[rowKey];
-    if (saved) {
+
+    const hasManualData =
+      saved &&
+      (
+        saved.shiftLabel ||
+        saved.clockInDate ||
+        saved.clockInTime ||
+        saved.clockOutDate ||
+        saved.clockOutTime
+      );
+
+    if (hasManualData) {
       const legacySaved = saved as EditableTimecardRow & { isTwentyFourHourShift?: boolean };
 
       return {
