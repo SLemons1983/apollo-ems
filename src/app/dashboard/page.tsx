@@ -398,7 +398,7 @@ function getDefaultSystemConfig(): SystemConfig {
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
 const DEFAULT_EMPLOYEE_ID = 'emp-001';
 
-const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'];
+const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'FIELD_SUP'];
 
 const SHIFT_DISPLAY: Record<ShiftName, string> = {
   R1: 'Reedley 1',
