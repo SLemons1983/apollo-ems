@@ -2875,7 +2875,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
       {selectedVacationShift && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
