@@ -1321,17 +1321,32 @@ export default function EmployeeProfilesPage() {
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Required for All Employees</div>
             <div className="grid gap-3">
-              {commonFields.map(([field, label]) => (
-                <div key={field}>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
-                  <input
-                    type="date"
-                    value={certifications[field]}
-                    onChange={(event) => onChange(field, event.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </div>
-              ))}
+              {commonFields.map(([field, label]) => {
+                const status = getCertificationStatus(certifications[field]);
+
+                return (
+                  <div key={field}>
+                    <label className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${status === 'valid' ? 'text-slate-500' : 'text-red-700'}`}>
+                      {label}
+                    </label>
+                    <input
+                      type="date"
+                      value={certifications[field]}
+                      onChange={(event) => onChange(field, event.target.value)}
+                      className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                        status === 'valid'
+                          ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
+                          : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                      }`}
+                    />
+                    {status !== 'valid' && (
+                      <div className="mt-1 text-xs font-semibold text-red-700">
+                        {status === 'missing' ? 'Missing expiration date' : 'Expired certification'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1341,17 +1356,32 @@ export default function EmployeeProfilesPage() {
             </div>
 
             <div className="grid gap-3">
-              {(scope === 'ALS' ? alsFields : blsFields).map(([field, label]) => (
-                <div key={field}>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
-                  <input
-                    type="date"
-                    value={certifications[field]}
-                    onChange={(event) => onChange(field, event.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                  />
-                </div>
-              ))}
+              {(scope === 'ALS' ? alsFields : blsFields).map(([field, label]) => {
+                const status = getCertificationStatus(certifications[field]);
+
+                return (
+                  <div key={field}>
+                    <label className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${status === 'valid' ? 'text-slate-500' : 'text-red-700'}`}>
+                      {label}
+                    </label>
+                    <input
+                      type="date"
+                      value={certifications[field]}
+                      onChange={(event) => onChange(field, event.target.value)}
+                      className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                        status === 'valid'
+                          ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
+                          : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                      }`}
+                    />
+                    {status !== 'valid' && (
+                      <div className="mt-1 text-xs font-semibold text-red-700">
+                        {status === 'missing' ? 'Missing expiration date' : 'Expired certification'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
