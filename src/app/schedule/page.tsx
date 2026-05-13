@@ -2149,7 +2149,7 @@ export default function SchedulePage() {
                 Requested: {requestedEmployees.map((employee) => employee.name).join(', ')}
               </div>
             )}
-            {recommendedEmployee && !slot.employeeId && (
+            {recommendedEmployee && !slot.employeeId && !recommendedEmployee.name.toLowerCase().includes('richardson, russ') && (
               <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                 Recommended: {recommendedEmployee.name}
               </div>
@@ -2182,7 +2182,7 @@ export default function SchedulePage() {
             {eligibleEmployees.map((employee) => {
               const payPeriodHours = payPeriodHoursMap[employee.id] ?? 0;
               const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
-              const isRecommended = recommendedEmployee?.id === employee.id;
+              const isRecommended = recommendedEmployee?.id === employee.id && !employee.name.toLowerCase().includes('richardson, russ');
               const isRequested = requestedEmployeeIdSet.has(employee.id);
               const label = `${employee.name} — PP ${formatHours(payPeriodHours)}h — ${getAwardBucketLabel(
                 employee.employeeType,
@@ -2685,48 +2685,52 @@ export default function SchedulePage() {
                             </button>
                           )}
 
-                          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={shift.allowExtendedHours}
-                              onChange={(event) =>
-                                handleStandardShiftChange(dateKey, shiftName, 'allowExtendedHours', event.target.checked)
-                              }
-                              className="h-4 w-4"
-                            />
-                            Allow extended hours
-                          </label>
+                          {showNotes && (
+                            <>
+                              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={shift.allowExtendedHours}
+                                  onChange={(event) =>
+                                    handleStandardShiftChange(dateKey, shiftName, 'allowExtendedHours', event.target.checked)
+                                  }
+                                  className="h-4 w-4"
+                                />
+                                Allow extended hours
+                              </label>
 
-                          <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(shift.hiddenFromEmployees)}
-                              onChange={(event) =>
-                                handleStandardShiftChange(dateKey, shiftName, 'hiddenFromEmployees', event.target.checked)
-                              }
-                              className="h-4 w-4"
-                            />
-                            Hide shift from employees
-                          </label>
+                              <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(shift.hiddenFromEmployees)}
+                                  onChange={(event) =>
+                                    handleStandardShiftChange(dateKey, shiftName, 'hiddenFromEmployees', event.target.checked)
+                                  }
+                                  className="h-4 w-4"
+                                />
+                                Hide shift from employees
+                              </label>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Vehicle
-                            </label>
-                            <select
-                              value={shift.vehicle}
-                              onChange={(event) =>
-                                handleStandardShiftChange(dateKey, shiftName, 'vehicle', event.target.value)
-                              }
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                            >
-                              {getVehicleOptions(category).map((vehicle) => (
-                                <option key={vehicle || 'none'} value={vehicle}>
-                                  {vehicle || 'No vehicle selected'}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                  Vehicle
+                                </label>
+                                <select
+                                  value={shift.vehicle}
+                                  onChange={(event) =>
+                                    handleStandardShiftChange(dateKey, shiftName, 'vehicle', event.target.value)
+                                  }
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                >
+                                  {getVehicleOptions(category).map((vehicle) => (
+                                    <option key={vehicle || 'none'} value={vehicle}>
+                                      {vehicle || 'No vehicle selected'}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </>
+                          )}
                         </div>
 
                         {warningMessages.length > 0 && (
@@ -2922,48 +2926,52 @@ export default function SchedulePage() {
                                 </button>
                               )}
 
-                              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  checked={extra.allowExtendedHours}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'allowExtendedHours', event.target.checked)
-                                  }
-                                  className="h-4 w-4"
-                                />
-                                Allow extended hours
-                              </label>
+                              {showNotes && (
+                                <>
+                                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={extra.allowExtendedHours}
+                                      onChange={(event) =>
+                                        handleExtraShiftChange(dateKey, extra.id, 'allowExtendedHours', event.target.checked)
+                                      }
+                                      className="h-4 w-4"
+                                    />
+                                    Allow extended hours
+                                  </label>
 
-                              <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                                <input
-                                  type="checkbox"
-                                  checked={Boolean(extra.hiddenFromEmployees)}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'hiddenFromEmployees', event.target.checked)
-                                  }
-                                  className="h-4 w-4"
-                                />
-                                Hide shift from employees
-                              </label>
+                                  <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(extra.hiddenFromEmployees)}
+                                      onChange={(event) =>
+                                        handleExtraShiftChange(dateKey, extra.id, 'hiddenFromEmployees', event.target.checked)
+                                      }
+                                      className="h-4 w-4"
+                                    />
+                                    Hide shift from employees
+                                  </label>
 
-                              <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Vehicle
-                                </label>
-                                <select
-                                  value={extra.vehicle}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'vehicle', event.target.value)
-                                  }
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                >
-                                  {getVehicleOptions(extra.category).map((vehicle) => (
-                                    <option key={vehicle || 'none'} value={vehicle}>
-                                      {vehicle || 'No vehicle selected'}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
+                                  <div>
+                                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      Vehicle
+                                    </label>
+                                    <select
+                                      value={extra.vehicle}
+                                      onChange={(event) =>
+                                        handleExtraShiftChange(dateKey, extra.id, 'vehicle', event.target.value)
+                                      }
+                                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                    >
+                                      {getVehicleOptions(extra.category).map((vehicle) => (
+                                        <option key={vehicle || 'none'} value={vehicle}>
+                                          {vehicle || 'No vehicle selected'}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </>
+                              )}
                             </div>
 
                             {warningMessages.length > 0 && (
