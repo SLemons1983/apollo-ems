@@ -2253,7 +2253,7 @@ export default function SchedulePage() {
             </div>
           )}
 
-          {showShiftDetails && (
+          {showNotes && (
                 <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
