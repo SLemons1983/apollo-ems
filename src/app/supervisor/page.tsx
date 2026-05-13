@@ -2176,7 +2176,30 @@ export default function SupervisorPage() {
   }
 
   function deleteAnnouncement(announcementId: string) {
-    saveAnnouncements(announcements.filter((announcement) => announcement.id !== announcementId));
+    const existing = announcements.find((announcement) => announcement.id === announcementId);
+
+    if (!window.confirm(`Delete announcement "${existing?.title ?? 'selected announcement'}"?`)) {
+      return;
+    }
+
+    setAnnouncements((current) => current.filter((announcement) => announcement.id !== announcementId));
+
+    supabase
+      .from('company_announcements')
+      .delete()
+      .eq('id', announcementId)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to delete announcement:', error);
+          window.alert(`Announcement delete failed: ${error.message}`);
+          return;
+        }
+
+        void addAuditEntry(
+          'ANNOUNCEMENT_DELETED',
+          `Deleted announcement: ${existing?.title ?? announcementId}`,
+        );
+      });
   }
 
   function toggleTile(tileId: string) {
