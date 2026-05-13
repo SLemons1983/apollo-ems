@@ -1839,7 +1839,7 @@ export default function EmployeeProfilesPage() {
                         </div>
 
                         {renderCertificationFields(
-                          normalizeCertificationRecord(employee.certifications),
+                          normalizeCertificationRecord(editingEmployee.certifications),
                           (field, value) => handleEmployeeCertificationChange(employee.id, field, value),
                           editingEmployee.scope,
                         )}
