@@ -1,5 +1,9 @@
+# Replace `src/app/login/page.tsx`
+
+```tsx
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
@@ -23,28 +27,78 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">ApolloEMS Login</h1>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4">
+      <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl">
+        <div className="flex flex-col items-center text-center">
+          <Image
+            src="/apollo-logo.png"
+            alt="Apollo EMS Management"
+            width={320}
+            height={320}
+            priority
+            className="mb-6 h-auto w-full max-w-[320px]"
+          />
 
-        <p className="mt-2 text-sm text-slate-600">
-          Sign in with your company-issued Google Workspace email.
-        </p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            ApolloEMS
+          </h1>
 
-        <button
-          type="button"
-          onClick={handleLogin}
-          className="mt-6 w-full cursor-pointer rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 active:scale-[0.99]"
-        >
-          Sign in with Google
-        </button>
+          <p className="mt-4 max-w-lg text-sm leading-7 text-slate-600">
+            ApolloEMS is a modern EMS workforce and operations management platform
+            designed specifically for emergency medical services agencies. Apollo
+            streamlines scheduling, timecards, employee management, shift requests,
+            communication, and operational oversight into one secure cloud-based
+            system.
+          </p>
 
-        {statusMessage && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            {statusMessage}
+          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            Secure access is limited to authorized company personnel using approved
+            Google Workspace accounts.
           </div>
-        )}
+
+          <button
+            type="button"
+            onClick={handleLogin}
+            className="mt-8 w-full max-w-md cursor-pointer rounded-2xl bg-slate-900 px-4 py-4 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+          >
+            Sign in with Google
+          </button>
+
+          {statusMessage && (
+            <div className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              {statusMessage}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
 }
+```
+
+# Add the logo file
+
+Place your uploaded Apollo logo at:
+
+```text
+/public/apollo-logo.png
+```
+
+You can do this in VS Code by:
+
+1. Open the `public` folder
+2. Drag the logo image into the folder
+3. Rename it exactly:
+
+```text
+apollo-logo.png
+```
+
+# Then run
+
+```bash
+npm run build
+git add .
+git commit -m "Refresh Apollo login page"
+git push
+```
