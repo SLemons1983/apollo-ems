@@ -506,7 +506,7 @@ function formatHours(hours: number): string {
 }
 
 function requiresSupervisorNote(slot: EmployeeSlot): boolean {
-  if (!slot.employeeId) {
+  if (!slot.employeeId || isOpenShiftSlot(slot.employeeId)) {
     return false;
   }
 
