@@ -12,6 +12,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
+    document.title = 'ApolloEMS | Dashboard';
+
     let isMounted = true;
 
     async function checkSession() {

@@ -1,10 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
+  useEffect(() => {
+    document.title = 'ApolloEMS | Login';
+  }, []);
+
   const [statusMessage, setStatusMessage] = useState('');
 
   const handleLogin = async () => {

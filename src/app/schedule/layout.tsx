@@ -27,6 +27,8 @@ export default function SupervisorProtectedLayout({ children }: { children: Reac
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
+    document.title = 'ApolloEMS | Schedule';
+
     let isMounted = true;
 
     async function verifySupervisorAccess(activeUser: User | null | undefined) {
