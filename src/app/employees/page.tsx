@@ -1269,6 +1269,19 @@ export default function EmployeeProfilesPage() {
     }));
   };
 
+  function getCertificationStatus(value: string): 'missing' | 'expired' | 'valid' {
+    if (!value) {
+      return 'missing';
+    }
+
+    const expiration = new Date(`${value}T23:59:59`);
+    if (Number.isNaN(expiration.getTime())) {
+      return 'missing';
+    }
+
+    return expiration < new Date() ? 'expired' : 'valid';
+  }
+
   function renderCertificationFields(
     certifications: CertificationRecord,
     onChange: (field: keyof CertificationRecord, value: string) => void,
