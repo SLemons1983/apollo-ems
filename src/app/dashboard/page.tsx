@@ -2770,7 +2770,7 @@ export default function DashboardPage() {
                                   type="button"
                                   onClick={() => requestOpenShift(date, assignment)}
                                   disabled={hasCurrentEmployeeRequestedShift(dateKey, assignment.key)}
-                                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
                                 >
                                   {hasCurrentEmployeeRequestedShift(dateKey, assignment.key) ? 'Requested' : 'Request'}
                                 </button>
