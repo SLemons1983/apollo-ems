@@ -425,6 +425,10 @@ function makeDateInputValue(date: Date): string {
 
 export default function SupervisorPage() {
   const [activeTile, setActiveTile] = useState<string | null>(null);
+
+  const [showEmployeesNotSubmitted, setShowEmployeesNotSubmitted] = useState(false);
+  const [showPendingReview, setShowPendingReview] = useState(false);
+  const [showReviewedTimecards, setShowReviewedTimecards] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -2947,47 +2951,96 @@ export default function SupervisorPage() {
               </div>
 
               <div>
-                <div className="mb-2 text-sm font-semibold text-slate-900">Employees Not Submitted</div>
-                {employeesNotSubmitted.length === 0 ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                    All active employees have submitted a timecard for this pay period.
-                  </div>
-                ) : (
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {employeesNotSubmitted.map((employee) => (
-                      <div key={employee.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                        {employee.name}
+                <button
+                  type="button"
+                  onClick={() => setShowEmployeesNotSubmitted((current) => !current)}
+                  className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                >
+                  <span className="text-sm font-semibold text-slate-900">
+                    Employees Not Submitted
+                  </span>
+
+                  <span className="text-xs font-bold text-slate-500">
+                    {showEmployeesNotSubmitted ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {showEmployeesNotSubmitted && (
+                  <>
+                    {employeesNotSubmitted.length === 0 ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                        All active employees have submitted a timecard for this pay period.
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        {employeesNotSubmitted.map((employee) => (
+                          <div key={employee.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                            {employee.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div>
-                <div className="mb-2 text-sm font-semibold text-slate-900">Pending Review</div>
+                <button
+                  type="button"
+                  onClick={() => setShowPendingReview((current) => !current)}
+                  className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                >
+                  <span className="text-sm font-semibold text-slate-900">
+                    Pending Review
+                  </span>
 
-                {pendingTimecards.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No submitted timecards are pending review.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {pendingTimecards.map((timecard) => renderSubmittedTimecard(timecard))}
-                  </div>
+                  <span className="text-xs font-bold text-slate-500">
+                    {showPendingReview ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {showPendingReview && (
+                  <>
+                    {pendingTimecards.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                        No submitted timecards are pending review.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {pendingTimecards.map((timecard) => renderSubmittedTimecard(timecard))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div>
-                <div className="mb-2 text-sm font-semibold text-slate-900">Reviewed Timecards</div>
+                <button
+                  type="button"
+                  onClick={() => setShowReviewedTimecards((current) => !current)}
+                  className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+                >
+                  <span className="text-sm font-semibold text-slate-900">
+                    Reviewed Timecards
+                  </span>
 
-                {reviewedTimecards.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No reviewed timecards yet.
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {reviewedTimecards.slice(0, 10).map((timecard) => renderSubmittedTimecard(timecard))}
-                  </div>
+                  <span className="text-xs font-bold text-slate-500">
+                    {showReviewedTimecards ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {showReviewedTimecards && (
+                  <>
+                    {reviewedTimecards.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                        No reviewed timecards yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {reviewedTimecards.slice(0, 10).map((timecard) => renderSubmittedTimecard(timecard))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>,
