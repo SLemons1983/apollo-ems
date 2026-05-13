@@ -1247,6 +1247,7 @@ export default function SchedulePage() {
   const scheduleDataRef = useRef<ScheduleData>({});
   const [mounted, setMounted] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [expandedWarnings, setExpandedWarnings] = useState<Record<string, boolean>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
@@ -2197,14 +2198,52 @@ export default function SchedulePage() {
           </select>
 
           {slot.employeeId && selectedEligibility?.warning && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              {selectedEligibility.warning}
+            <div>
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedWarnings((current) => ({
+                    ...current,
+                    [`warning-${slotLabel}`]: !current[`warning-${slotLabel}`],
+                  }))
+                }
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-sm font-bold text-amber-800 transition hover:bg-amber-200"
+                title="Show warning"
+              >
+                ⚠
+              </button>
+
+              {expandedWarnings[`warning-${slotLabel}`] && (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+                  {selectedEligibility.warning}
+                </div>
+              )}
             </div>
           )}
 
-          {isLowerPrioritySelection && recommendedEmployee && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
-              Higher priority employee available: {recommendedEmployee.name}. Selection is still allowed, but should be treated as a supervisor override if used.
+          {isLowerPrioritySelection &&
+            recommendedEmployee &&
+            !recommendedEmployee.name.toLowerCase().includes('richardson, russ') && (
+            <div>
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedWarnings((current) => ({
+                    ...current,
+                    [`priority-${slotLabel}`]: !current[`priority-${slotLabel}`],
+                  }))
+                }
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 bg-amber-100 text-sm font-bold text-amber-800 transition hover:bg-amber-200"
+                title="Show staffing warning"
+              >
+                ⚠
+              </button>
+
+              {expandedWarnings[`priority-${slotLabel}`] && (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs font-semibold text-amber-800">
+                  Higher priority employee available: {recommendedEmployee.name}. Selection is still allowed, but should be treated as a supervisor override if used.
+                </div>
+              )}
             </div>
           )}
 
