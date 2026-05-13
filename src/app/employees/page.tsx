@@ -892,6 +892,7 @@ export default function EmployeeProfilesPage() {
   const [roleFilter, setRoleFilter] = useState('All');
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
+  const [showCertifications, setShowCertifications] = useState(true);
   const [editingEmployees, setEditingEmployees] = useState<Record<string, EmployeeProfile>>({});
   const [employeeSaveStatus, setEmployeeSaveStatus] = useState<Record<string, string>>({});
   const [activeSummaryCard, setActiveSummaryCard] = useState<string | null>(null);
@@ -1295,14 +1296,28 @@ export default function EmployeeProfilesPage() {
 
     return (
       <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-3">
-          <div className="text-sm font-semibold text-slate-900">Certifications & Expiration Dates</div>
-          <div className="text-xs text-slate-500">
-            Employees with ALS scope require paramedic credentials. Employees with BLS scope require EMT credentials.
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowCertifications((current) => !current)}
+          className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+        >
+          <div>
+            <div className="text-sm font-semibold text-slate-900">
+              Certifications & Expiration Dates
+            </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+            <div className="text-xs text-slate-500">
+              Employees with ALS scope require paramedic credentials. Employees with BLS scope require EMT credentials.
+            </div>
+          </div>
+
+          <div className="text-sm font-semibold text-slate-600">
+            {showCertifications ? 'Hide' : 'Show'}
+          </div>
+        </button>
+
+        {showCertifications && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Required for All Employees</div>
             <div className="grid gap-3">
@@ -1340,6 +1355,7 @@ export default function EmployeeProfilesPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
     );
   }
