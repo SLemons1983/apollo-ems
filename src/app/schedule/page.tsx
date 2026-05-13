@@ -164,7 +164,7 @@ const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
 const PAY_PERIOD_REFERENCE_NUMBER = 9;
 const PAY_PERIOD_REFERENCE_START = '2026-04-12';
 
-const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'];
+const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'FIELD_SUP'];
 const UNIT_SHIFTS = new Set<ShiftName>(['R1', 'R2', 'P', 'OC']);
 const SUPERVISOR_SHIFTS = new Set<ShiftName>(['ADMIN_SUP', 'FIELD_SUP']);
 
@@ -2311,7 +2311,7 @@ export default function SchedulePage() {
 
   if (!payPeriodReady) {
     return (
-      <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+      <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
         <div className="mx-auto max-w-[1900px] rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-sm">
           Loading current pay period...
         </div>
@@ -2320,7 +2320,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
