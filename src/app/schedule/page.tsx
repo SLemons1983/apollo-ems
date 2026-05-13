@@ -1254,6 +1254,7 @@ export default function SchedulePage() {
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
+  const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
 
   function markUnsavedChanges() {
     setHasUnsavedChanges(true);
@@ -2385,7 +2386,7 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 xl:grid-cols-2">
+        <div className="mb-6 grid gap-4 xl:grid-cols-3">
           <div className={`rounded-2xl border p-4 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
@@ -2503,6 +2504,58 @@ export default function SchedulePage() {
             )}
           </div>
         </div>
+
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowSupervisorNotes((value) => !value)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className="text-sm font-bold text-slate-900">Supervisor Shift Notes</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {supervisorNotes.length > 0
+                    ? `${supervisorNotes.length} note${supervisorNotes.length === 1 ? '' : 's'} available.`
+                    : 'No supervisor notes entered.'}
+                </div>
+              </div>
+
+              <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+                {showSupervisorNotes ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+
+            {showSupervisorNotes && (
+              <div className="mt-4 space-y-3">
+                {supervisorNotes.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No supervisor notes entered.
+                  </div>
+                ) : (
+                  supervisorNotes.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                    >
+                      <div className="text-sm font-bold text-slate-900">
+                        {entry.employeeName}
+                      </div>
+
+                      <div className="mt-1 text-xs text-slate-600">
+                        {entry.shiftLabel} • {entry.dateKey}
+                      </div>
+
+                      <div className="mt-2 text-sm text-slate-800">
+                        {entry.note}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
 
         <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
