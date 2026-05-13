@@ -2310,6 +2310,35 @@ export default function SchedulePage() {
     );
   }
 
+  const supervisorNotes = dates.flatMap((date) => {
+    const dateKey = toDateKey(date);
+    const day = getDaySchedule(scheduleData, dateKey);
+
+    return SHIFT_ORDER.flatMap((shiftName) => {
+      const shift = day.standard[shiftName];
+
+      return (['employee1', 'employee2', 'employee3'] as const)
+        .map((slotKey) => {
+          const slot = shift[slotKey];
+
+          if (!slot.employeeId || !slot.note.trim()) {
+            return null;
+          }
+
+          const employee = employees.find((item) => item.id === slot.employeeId);
+
+          return {
+            id: `${dateKey}-${shiftName}-${slotKey}`,
+            dateKey,
+            shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+            employeeName: employee?.name ?? 'Unknown Employee',
+            note: slot.note.trim(),
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+    });
+  });
+
   if (!payPeriodReady) {
     return (
       <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
@@ -2503,8 +2532,6 @@ export default function SchedulePage() {
               </div>
             )}
           </div>
-        </div>
-
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <button
@@ -2555,7 +2582,7 @@ export default function SchedulePage() {
               </div>
             )}
           </div>
-
+        </div>
 
         <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
