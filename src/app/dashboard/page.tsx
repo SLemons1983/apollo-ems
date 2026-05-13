@@ -1190,10 +1190,17 @@ export default function DashboardPage() {
           }
         });
 
-      const readRaw = window.localStorage.getItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`);
-      if (readRaw) {
-        setReadAnnouncementIds(JSON.parse(readRaw));
-      }
+      supabase
+        .from('announcement_reads')
+        .select('announcement_id')
+        .eq('employee_id', currentEmployeeId)
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load announcement read state:', error);
+          } else {
+            setReadAnnouncementIds((data ?? []).map((row: any) => row.announcement_id));
+          }
+        });
 
       supabase
         .from('time_punches')
@@ -1462,7 +1469,24 @@ export default function DashboardPage() {
     const activeIds = activeAnnouncements.map((announcement) => announcement.id);
     const updated = Array.from(new Set([...readAnnouncementIds, ...activeIds]));
     setReadAnnouncementIds(updated);
-    window.localStorage.setItem(`${ANNOUNCEMENT_READ_STORAGE_KEY}-${currentEmployeeId}`, JSON.stringify(updated));
+
+    const rows = activeIds.map((announcementId) => ({
+      id: `${currentEmployeeId}-${announcementId}`,
+      employee_id: currentEmployeeId,
+      announcement_id: announcementId,
+      read_at: new Date().toISOString(),
+    }));
+
+    if (rows.length > 0) {
+      void supabase
+        .from('announcement_reads')
+        .upsert(rows, { onConflict: 'id' })
+        .then(({ error }) => {
+          if (error) {
+            console.error('Failed to save announcement read state:', error);
+          }
+        });
+    }
   }
 
   const currentEmployeeMessages = useMemo(() => {
