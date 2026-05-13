@@ -1,6 +1,3 @@
-# Replace `src/app/login/page.tsx`
-
-```tsx
 'use client';
 
 import Image from 'next/image';
@@ -74,31 +71,3 @@ export default function LoginPage() {
     </main>
   );
 }
-```
-
-# Add the logo file
-
-Place your uploaded Apollo logo at:
-
-```text
-/public/apollo-logo.png
-```
-
-You can do this in VS Code by:
-
-1. Open the `public` folder
-2. Drag the logo image into the folder
-3. Rename it exactly:
-
-```text
-apollo-logo.png
-```
-
-# Then run
-
-```bash
-npm run build
-git add .
-git commit -m "Refresh Apollo login page"
-git push
-```
