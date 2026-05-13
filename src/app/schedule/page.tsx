@@ -2254,54 +2254,55 @@ export default function SchedulePage() {
           )}
 
           {showNotes && (
-                <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Start
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-2][0-9]:[0-5][0-9]"
-                placeholder="06:00"
-                value={slot.startTime}
-                onChange={(event) => onChange('startTime', event.target.value)}
-                onBlur={(event) => onChange('startTime', normalizeMilitaryTime(event.target.value, DEFAULT_START_TIME))}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-              />
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Start
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-2][0-9]:[0-5][0-9]"
+                    placeholder="06:00"
+                    value={slot.startTime}
+                    onChange={(event) => onChange('startTime', event.target.value)}
+                    onBlur={(event) => onChange('startTime', normalizeMilitaryTime(event.target.value, DEFAULT_START_TIME))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </div>
 
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                End
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-2][0-9]:[0-5][0-9]"
-                placeholder="06:00"
-                value={slot.endTime}
-                onChange={(event) => onChange('endTime', event.target.value)}
-                onBlur={(event) => onChange('endTime', normalizeMilitaryTime(event.target.value, DEFAULT_END_TIME))}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-              />
-            </div>
-          </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    End
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-2][0-9]:[0-5][0-9]"
+                    placeholder="06:00"
+                    value={slot.endTime}
+                    onChange={(event) => onChange('endTime', event.target.value)}
+                    onBlur={(event) => onChange('endTime', normalizeMilitaryTime(event.target.value, DEFAULT_END_TIME))}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </div>
+              </div>
 
-          {showNotes && (
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Supervisor Note {noteRequired ? '(required)' : '(optional)'}
-              </label>
-              <textarea
-                value={slot.note}
-                onChange={(event) => onChange('note', event.target.value)}
-                disabled={!slot.employeeId}
-                rows={2}
-                placeholder={noteRequired ? 'Explain why the end time is not 06:00' : 'Add note if needed'}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
-              />
-            </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Supervisor Note {noteRequired ? '(required)' : '(optional)'}
+                </label>
+                <textarea
+                  value={slot.note}
+                  onChange={(event) => onChange('note', event.target.value)}
+                  disabled={!slot.employeeId}
+                  rows={2}
+                  placeholder={noteRequired ? 'Explain why the end time is not 06:00' : 'Add note if needed'}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
