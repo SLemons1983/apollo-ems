@@ -2376,11 +2376,17 @@ export default function SchedulePage() {
     );
   }
 
-  const supervisorNotes = dates.flatMap((date) => {
+  const supervisorNotes = dates.flatMap<{
+    id: string;
+    dateKey: string;
+    shiftLabel: string;
+    employeeName: string;
+    note: string;
+  }>((date) => {
     const dateKey = toDateKey(date);
     const day = getDaySchedule(scheduleData, dateKey);
 
-    return SHIFT_ORDER.flatMap((shiftName) => {
+    const standardNotes = SHIFT_ORDER.flatMap((shiftName) => {
       const shift = day.standard[shiftName];
 
       return (['employee1', 'employee2', 'employee3'] as const)
@@ -2403,6 +2409,30 @@ export default function SchedulePage() {
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
     });
+
+    const extraNotes = day.extras.flatMap((extra) =>
+      (['employee1', 'employee2', 'employee3'] as const)
+        .map((slotKey) => {
+          const slot = extra[slotKey];
+
+          if (!slot.employeeId || !slot.note.trim()) {
+            return null;
+          }
+
+          const employee = employees.find((item) => item.id === slot.employeeId);
+
+          return {
+            id: `${dateKey}-${extra.id}-${slotKey}`,
+            dateKey,
+            shiftLabel: extra.label,
+            employeeName: employee?.name ?? 'Unknown Employee',
+            note: slot.note.trim(),
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
+    );
+
+    return [...standardNotes, ...extraNotes];
   });
 
   if (!payPeriodReady) {
