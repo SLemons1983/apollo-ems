@@ -2345,8 +2345,37 @@ export default function SchedulePage() {
                 </select>
               </div>
 
+
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Shift Type
+                </label>
+
+                <select
+                  value={slot.shiftType}
+                  onChange={(event) => onChange('shiftType', event.target.value)}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                >
+                  <option value="REGULAR">Regular Shift</option>
+                  <option value="SICK">Sick Time</option>
+                  <option value="VACATION">Vacation</option>
+                  <option value="LEAVE">Leave</option>
+                  <option value="TRAINING">Training</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${
+                  slot.shiftType === 'SICK'
+                    ? 'text-red-700'
+                    : slot.shiftType === 'VACATION'
+                      ? 'text-amber-700'
+                      : slot.shiftType === 'LEAVE'
+                        ? 'text-purple-700'
+                        : slot.shiftType === 'TRAINING'
+                          ? 'text-blue-700'
+                          : 'text-slate-500'
+                }`}>
                   Supervisor Note {noteRequired ? '(required)' : '(optional)'}
                 </label>
                 <textarea
