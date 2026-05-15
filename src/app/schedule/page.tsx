@@ -1498,6 +1498,7 @@ export default function SchedulePage() {
       start_time: normalizeMilitaryTime(params.slot.startTime, DEFAULT_START_TIME),
       end_time: normalizeMilitaryTime(params.slot.endTime, params.defaultEndTime ?? DEFAULT_END_TIME),
       note: params.slot.note || '',
+      shift_type: params.slot.shiftType,
       vehicle: params.vehicle || '',
       allow_extended_hours: Boolean(params.allowExtendedHours),
       hidden_from_employees: Boolean(params.hiddenFromEmployees),
