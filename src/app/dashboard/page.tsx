@@ -61,11 +61,14 @@ type SupabaseEmployeeRow = {
   status: string | null;
 };
 
+type ShiftType = 'REGULAR' | 'SICK' | 'VACATION' | 'LEAVE' | 'TRAINING';
+
 type EmployeeSlot = {
   employeeId: string;
   startTime: string;
   endTime: string;
   note: string;
+  shiftType: ShiftType;
 };
 
 type ShiftAssignment = {
@@ -513,6 +516,7 @@ function createEmptyEmployeeSlot(): EmployeeSlot {
     startTime: '06:00',
     endTime: '06:00',
     note: '',
+    shiftType: 'REGULAR',
   };
 }
 
@@ -999,6 +1003,7 @@ export default function DashboardPage() {
           startTime: row.start_time || '06:00',
           endTime: row.end_time || '06:00',
           note: row.note || '',
+          shiftType: row.shift_type || 'REGULAR',
         };
 
         const day = rebuilt[dateKey];
@@ -1981,16 +1986,29 @@ export default function DashboardPage() {
     return `${year}-${month}-${day}`;
   }
 
-  function getDefaultPayType(shiftLabel: string, hours: number): EditableTimecardRow['payType'] {
-    const normalized = shiftLabel.toLowerCase();
+  function getDefaultPayType(
+    shiftLabel: string,
+    hours: number,
+    shiftType?: string,
+  ): EditableTimecardRow['payType'] {
 
-    if (normalized.includes('sick')) {
+    if (shiftType === 'SICK') {
       return 'SICK_TIME';
     }
 
-    if (normalized.includes('vacation')) {
+    if (shiftType === 'VACATION') {
       return 'VACATION';
     }
+
+    if (shiftType === 'LEAVE') {
+      return 'VACATION';
+    }
+
+    if (shiftType === 'TRAINING') {
+      return 'DAILY_OT_DT';
+    }
+
+    const normalized = shiftLabel.toLowerCase();
 
     if (normalized.includes('jury') || normalized.includes('civic')) {
       return 'JURY_DUTY';
@@ -2042,7 +2060,11 @@ export default function DashboardPage() {
 
     return {
       shiftLabel: assignment?.label ?? '',
-      payType: getDefaultPayType(assignment?.label ?? '', inferredHours),
+      payType: getDefaultPayType(
+        assignment?.label ?? '',
+        inferredHours,
+        assignment?.slots?.[0]?.shiftType,
+      ),
       clockInDate: clockInDate ? getIsoDateInputValue(clockInDate) : '',
       clockInTime: clockInDate ? `${clockInDate.getHours()}`.padStart(2, '0') + ':' + `${clockInDate.getMinutes()}`.padStart(2, '0') : '',
       clockOutDate: clockOutDate ? getIsoDateInputValue(clockOutDate) : '',
