@@ -2379,8 +2379,8 @@ export default function SchedulePage() {
                   Supervisor Note {noteRequired ? '(required)' : '(optional)'}
                 </label>
                 <textarea
-                  value={slot.note}
-                  onChange={(event) => onChange('note', event.target.value)}
+                  defaultValue={slot.note}
+                  onBlur={(event) => onChange('note', event.target.value)}
                   disabled={!slot.employeeId}
                   rows={2}
                   placeholder={noteRequired ? 'Explain why the end time is not 06:00' : 'Add note if needed'}
