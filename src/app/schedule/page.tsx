@@ -48,11 +48,14 @@ type StoredEmployeeProfile = {
   status?: string;
 };
 
+type ShiftType = 'REGULAR' | 'SICK' | 'VACATION' | 'LEAVE' | 'TRAINING';
+
 type EmployeeSlot = {
   employeeId: string;
   startTime: string;
   endTime: string;
   note: string;
+  shiftType: ShiftType;
 };
 
 type ShiftAssignment = {
@@ -414,6 +417,7 @@ function createEmptyEmployeeSlot(): EmployeeSlot {
     startTime: DEFAULT_START_TIME,
     endTime: DEFAULT_END_TIME,
     note: '',
+    shiftType: 'REGULAR',
   };
 }
 
@@ -435,6 +439,7 @@ function createAdminSupervisorSlot(): EmployeeSlot {
     startTime: '06:00',
     endTime: '18:00',
     note: '',
+    shiftType: 'REGULAR',
   };
 }
 
@@ -523,6 +528,7 @@ function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
     startTime?: string;
     endTime?: string;
     note?: string;
+    shiftType?: ShiftType;
   };
 
   return {
@@ -530,6 +536,7 @@ function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
     startTime: maybeSlot.startTime ?? DEFAULT_START_TIME,
     endTime: maybeSlot.endTime ?? DEFAULT_END_TIME,
     note: maybeSlot.note ?? '',
+    shiftType: maybeSlot.shiftType ?? 'REGULAR',
   };
 }
 
@@ -544,6 +551,7 @@ function normalizeLegacyEmployeeSlot(
     startTime: startTime ?? DEFAULT_START_TIME,
     endTime: endTime ?? DEFAULT_END_TIME,
     note: note ?? '',
+    shiftType: 'REGULAR',
   };
 }
 
@@ -872,6 +880,22 @@ function sortEmployeesByAwardPriority(
 function getVehicleOptions(category: ShiftCategory): VehicleValue[] {
   return category === 'UNIT' ? UNIT_VEHICLES : SUPERVISOR_VEHICLES;
 }
+
+function getShiftTypeCardClasses(shiftType: ShiftType): string {
+  switch (shiftType) {
+    case 'SICK':
+      return 'border-red-300 bg-red-50';
+    case 'VACATION':
+      return 'border-amber-300 bg-amber-50';
+    case 'LEAVE':
+      return 'border-purple-300 bg-purple-50';
+    case 'TRAINING':
+      return 'border-blue-300 bg-blue-50';
+    default:
+      return 'border-slate-200 bg-white';
+  }
+}
+
 
 function getAssignedSlotsForAssignment(category: ShiftCategory, shift: AssignmentRef['shift']): EmployeeSlot[] {
   if (category === 'SUPERVISOR') {
@@ -1367,6 +1391,7 @@ export default function SchedulePage() {
             startTime: row.start_time || DEFAULT_START_TIME,
             endTime: row.end_time || DEFAULT_END_TIME,
             note: row.note || '',
+            shiftType: (row.shift_type as ShiftType) || 'REGULAR',
           };
 
           if (String(row.shift_key).startsWith('EXTRA::')) {
@@ -1913,7 +1938,12 @@ export default function SchedulePage() {
       }
 
       const shift = next[dateKey].standard[shiftName];
-      shift[slotKey][field] = value;
+
+      if (field === 'shiftType') {
+        shift[slotKey].shiftType = value as ShiftType;
+      } else {
+        shift[slotKey][field] = value;
+      }
 
       if (field === 'employeeId' && value && shiftName === 'ADMIN_SUP' && slotKey === 'employee1') {
         shift[slotKey].startTime = '06:00';
@@ -1924,6 +1954,7 @@ export default function SchedulePage() {
         shift[slotKey].startTime = DEFAULT_START_TIME;
         shift[slotKey].endTime = getDefaultEndTimeForShift(shiftName, slotKey);
         shift[slotKey].note = '';
+        shift[slotKey].shiftType = 'REGULAR';
       }
 
       return next;
@@ -1979,12 +2010,17 @@ export default function SchedulePage() {
         return current;
       }
 
-      extra[slotKey][field] = value;
+      if (field === 'shiftType') {
+        extra[slotKey].shiftType = value as ShiftType;
+      } else {
+        extra[slotKey][field] = value;
+      }
 
       if (field === 'employeeId' && !value) {
         extra[slotKey].startTime = DEFAULT_START_TIME;
         extra[slotKey].endTime = DEFAULT_END_TIME;
         extra[slotKey].note = '';
+        extra[slotKey].shiftType = 'REGULAR';
       }
 
       return next;
