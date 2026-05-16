@@ -655,6 +655,54 @@ export default function SupervisorPage() {
     return employees.filter((employee) => employee.status.toLowerCase() === 'active' && !submittedEmployeeIds.has(employee.id));
   }, [employees, selectedPayPeriodTimecards]);
 
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('supervisor-apollo-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'apollo_messages',
+        },
+        async () => {
+          const { data, error } = await supabase
+            .from('apollo_messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.error('Realtime supervisor Apollo message refresh failed:', error);
+            return;
+          }
+
+          setApolloMessages(
+            (data ?? []).map((row: any) => ({
+              id: row.id,
+              conversationId: row.conversation_id,
+              senderId: row.sender_id,
+              senderName: row.sender_name,
+              senderRole: row.sender_role,
+              recipients: row.recipients ?? [],
+              audienceLabel: row.audience_label,
+              title: row.title,
+              body: row.body,
+              createdAt: row.created_at,
+              relatedType: row.related_type ?? undefined,
+              relatedId: row.related_id ?? undefined,
+              priority: row.priority ?? 'NORMAL',
+            })),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
     setSubmittedTimecards(nextTimecards);
 

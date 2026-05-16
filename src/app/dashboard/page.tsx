@@ -1365,6 +1365,54 @@ export default function DashboardPage() {
     }
   }, [currentEmployeeId, currentPayPeriod.key]);
 
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-apollo-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'apollo_messages',
+        },
+        async () => {
+          const { data, error } = await supabase
+            .from('apollo_messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (error) {
+            console.error('Realtime Apollo message refresh failed:', error);
+            return;
+          }
+
+          setApolloMessages(
+            (data ?? []).map((row: any) => ({
+              id: row.id,
+              conversationId: row.conversation_id,
+              senderId: row.sender_id,
+              senderName: row.sender_name,
+              senderRole: row.sender_role,
+              recipients: row.recipients ?? [],
+              audienceLabel: row.audience_label,
+              title: row.title,
+              body: row.body,
+              createdAt: row.created_at,
+              relatedType: row.related_type ?? undefined,
+              relatedId: row.related_id ?? undefined,
+              priority: row.priority ?? 'NORMAL',
+            })),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SCHEDULE_STORAGE_KEY && event.newValue) {
