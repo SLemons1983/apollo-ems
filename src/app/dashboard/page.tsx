@@ -1675,7 +1675,7 @@ export default function DashboardPage() {
     return activeEmployees;
   }
 
-  function notifyApolloMessageRecipients(params: {
+  async function notifyApolloMessageRecipients(params: {
     recipients: EmployeeOption[];
     senderName: string;
     subject: string;
@@ -1689,7 +1689,7 @@ export default function DashboardPage() {
       ).values(),
     );
 
-    void Promise.allSettled(
+    await Promise.allSettled(
       uniqueRecipients.map((employee) =>
         fetch('/api/email/message', {
           method: 'POST',
@@ -1717,7 +1717,7 @@ export default function DashboardPage() {
     });
   }
 
-  function sendEmployeeMessage() {
+  async function sendEmployeeMessage() {
     if (!messageSubject.trim() || !messageBody.trim()) {
       window.alert('Enter a subject and message before sending.');
       return;
@@ -1772,7 +1772,7 @@ export default function DashboardPage() {
         .join(', ') || 'NONE'}`
     );
 
-    notifyApolloMessageRecipients({
+    await notifyApolloMessageRecipients({
       recipients: finalRecipients,
       senderName: currentEmployee?.name ?? 'Employee',
       subject: message.title,
@@ -1786,7 +1786,7 @@ export default function DashboardPage() {
     setSelectedConversationId(message.conversationId);
   }
 
-  function sendEmployeeReply() {
+  async function sendEmployeeReply() {
     if (!selectedConversation || !replyBody.trim()) {
       return;
     }
@@ -1834,7 +1834,7 @@ export default function DashboardPage() {
       return false;
     });
 
-    notifyApolloMessageRecipients({
+    await notifyApolloMessageRecipients({
       recipients: replyRecipientEmployees,
       senderName: currentEmployee?.name ?? 'Employee',
       subject: reply.title,
