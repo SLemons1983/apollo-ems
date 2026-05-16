@@ -909,6 +909,7 @@ export default function DashboardPage() {
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [showOpenShiftsOnly, setShowOpenShiftsOnly] = useState(false);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [timePunches, setTimePunches] = useState<TimePunch[]>([]);
   const [timecardNotes, setTimecardNotes] = useState<Record<string, string>>({});
@@ -1871,9 +1872,19 @@ export default function DashboardPage() {
           return false;
         }
 
+        if (showOpenShiftsOnly) {
+          return (
+            isFutureOrToday(date) &&
+            !assignment.hiddenFromEmployees &&
+            getEligibleOpenSlotCount(assignment) > 0 &&
+            !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId)
+          );
+        }
+
         if (showFullSchedule) {
           return assignment.slots.length > 0 || getOpenSlotCount(assignment) > 0;
         }
+
         return assignment.slots.some((slot) => slot.employeeId === currentEmployeeId);
       });
     }
@@ -2815,9 +2826,27 @@ export default function DashboardPage() {
   }
 
   function getOpenSlotCount(assignment: DisplayAssignment): number {
-    const explicitOpenSlots = assignment.slots.filter((slot) => isOpenShiftSlot(slot.employeeId)).length;
-    const emptyCapacity = Math.max(0, getMaxSlotsForAssignment(assignment) - assignment.slots.filter((slot) => !isOpenShiftSlot(slot.employeeId)).length - explicitOpenSlots);
-    return explicitOpenSlots + emptyCapacity;
+    return assignment.slots.filter((slot) => isOpenShiftSlot(slot.employeeId)).length;
+  }
+
+  function isEligibleOpenShiftSlot(employeeId: string): boolean {
+    if (!currentEmployee) {
+      return false;
+    }
+
+    if (employeeId === OPEN_ALS_SLOT_ID) {
+      return currentEmployee.scope === 'ALS';
+    }
+
+    if (employeeId === OPEN_BLS_SLOT_ID) {
+      return currentEmployee.scope === 'BLS';
+    }
+
+    return false;
+  }
+
+  function getEligibleOpenSlotCount(assignment: DisplayAssignment): number {
+    return assignment.slots.filter((slot) => isEligibleOpenShiftSlot(slot.employeeId)).length;
   }
 
   function hasCurrentEmployeeRequestedShift(dateKey: string, shiftKey: string): boolean {
@@ -2843,8 +2872,8 @@ export default function DashboardPage() {
       return;
     }
 
-    if (getOpenSlotCount(assignment) <= 0) {
-      window.alert('This shift does not currently have an open slot.');
+    if (getEligibleOpenSlotCount(assignment) <= 0) {
+      window.alert('This shift does not currently have an eligible open slot.');
       return;
     }
 
@@ -2948,7 +2977,7 @@ export default function DashboardPage() {
 
                             {showFullSchedule &&
                               isFutureOrToday(date) &&
-                              getOpenSlotCount(assignment) > 0 &&
+                              getEligibleOpenSlotCount(assignment) > 0 &&
                               !assignment.hiddenFromEmployees &&
                               !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId) && (
                                 <button
@@ -3638,9 +3667,11 @@ export default function DashboardPage() {
                     {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
-                    {showFullSchedule
-                      ? 'Showing the full schedule with your assignments highlighted.'
-                      : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
+                    {showOpenShiftsOnly
+                      ? `Showing eligible open ${currentEmployee?.scope ?? ''} shifts only.`
+                      : showFullSchedule
+                        ? 'Showing the full schedule with your assignments highlighted.'
+                        : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
                   </div>
                   {nextMyShift && (
                     <div className="mt-1 text-sm text-slate-600">
@@ -3693,7 +3724,25 @@ export default function DashboardPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowFullSchedule(true)}
+                      onClick={() => {
+                        setShowFullSchedule(false);
+                        setShowOpenShiftsOnly(true);
+                      }}
+                      className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                        showOpenShiftsOnly
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      Show Open Shifts
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFullSchedule(true);
+                        setShowOpenShiftsOnly(false);
+                      }}
                       className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
                         showFullSchedule ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                       }`}
