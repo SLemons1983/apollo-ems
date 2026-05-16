@@ -434,6 +434,7 @@ export default function SupervisorPage() {
   const [showPendingReview, setShowPendingReview] = useState(false);
   const [showReviewedTimecards, setShowReviewedTimecards] = useState(false);
   const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
+  const [showEula, setShowEula] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
