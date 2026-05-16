@@ -2986,7 +2986,7 @@ export default function DashboardPage() {
                               )}
                             </div>
 
-                            {showFullSchedule &&
+                            {(showFullSchedule || showOpenShiftsOnly) &&
                               isFutureOrToday(date) &&
                               getEligibleOpenSlotCount(assignment) > 0 &&
                               !assignment.hiddenFromEmployees &&
@@ -3012,6 +3012,13 @@ export default function DashboardPage() {
                             {assignment.slots.map((slot, index) => {
                               const isOpenSlot = isOpenShiftSlot(slot.employeeId);
                               const isCurrentEmployee = slot.employeeId === currentEmployeeId;
+
+                              if (
+                                isOpenSlot &&
+                                !isEligibleOpenShiftSlot(slot.employeeId)
+                              ) {
+                                return null;
+                              }
 
                               return (
                                 <div
