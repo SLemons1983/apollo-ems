@@ -1270,6 +1270,7 @@ export default function SchedulePage() {
   const [payPeriodReady, setPayPeriodReady] = useState(false);
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
   const scheduleDataRef = useRef<ScheduleData>({});
+  const scheduleScrollRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
   const [expandedShiftKey, setExpandedShiftKey] = useState<string | null>(null);
   const [pendingExpandedShiftKey, setPendingExpandedShiftKey] = useState<string | null>(null);
@@ -1877,6 +1878,34 @@ export default function SchedulePage() {
   const goToCurrentPayPeriod = () => {
     setAnchorDate(getGlobalPayPeriodStart(new Date()));
     setPayPeriodReady(true);
+  };
+
+  const jumpScheduleToColumn = (columnIndex: number) => {
+    const container = scheduleScrollRef.current;
+    if (!container) {
+      return;
+    }
+
+    const leftLabelWidth = 180;
+    const dayColumnWidth = 270;
+    const targetLeft = Math.max(0, leftLabelWidth + dayColumnWidth * columnIndex - leftLabelWidth);
+
+    container.scrollTo({
+      left: targetLeft,
+      behavior: 'smooth',
+    });
+  };
+
+  const jumpScheduleToToday = () => {
+    const todayKey = toDateKey(new Date());
+    const todayIndex = dates.findIndex((date) => toDateKey(date) === todayKey);
+
+    if (todayIndex >= 0) {
+      jumpScheduleToColumn(todayIndex);
+      return;
+    }
+
+    goToCurrentPayPeriod();
   };
 
   const handleExpandedShiftChange = (nextKey: string | null) => {
@@ -2706,7 +2735,33 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => jumpScheduleToColumn(0)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Week 1
+          </button>
+
+          <button
+            type="button"
+            onClick={jumpScheduleToToday}
+            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+          >
+            Today
+          </button>
+
+          <button
+            type="button"
+            onClick={() => jumpScheduleToColumn(7)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Week 2
+          </button>
+        </div>
+
+        <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</div>
@@ -2867,8 +2922,11 @@ export default function SchedulePage() {
                               ⚠
                             </div>
                           ) : approvalMessages.length > 0 ? (
-                            <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                              Approved
+                            <div
+                              title={approvalMessages.join(' | ')}
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                            >
+                              ✓
                             </div>
                           ) : (
                             <div className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
