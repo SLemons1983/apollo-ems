@@ -656,6 +656,37 @@ export default function SupervisorPage() {
   }, [employees, selectedPayPeriodTimecards]);
 
 
+
+  async function refreshApolloMessages() {
+    const { data, error } = await supabase
+      .from('apollo_messages')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Supervisor Apollo message refresh failed:', error);
+      return;
+    }
+
+    setApolloMessages(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        conversationId: row.conversation_id,
+        senderId: row.sender_id,
+        senderName: row.sender_name,
+        senderRole: row.sender_role,
+        recipients: row.recipients ?? [],
+        audienceLabel: row.audience_label,
+        title: row.title,
+        body: row.body,
+        createdAt: row.created_at,
+        relatedType: row.related_type ?? undefined,
+        relatedId: row.related_id ?? undefined,
+        priority: row.priority ?? 'NORMAL',
+      })),
+    );
+  }
+
   useEffect(() => {
     const channel = supabase
       .channel('supervisor-apollo-messages')
@@ -701,6 +732,15 @@ export default function SupervisorPage() {
     return () => {
       supabase.removeChannel(channel);
     };
+  }, []);
+
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void refreshApolloMessages();
+    }, 10000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
@@ -971,6 +1011,38 @@ export default function SupervisorPage() {
     };
 
     saveApolloMessages([reply, ...apolloMessages]);
+
+    const recipientEmployees = employees.filter((employee) =>
+      recipientIds.includes(employee.id) && employee.email,
+    );
+
+    void Promise.allSettled(
+      recipientEmployees.map((employee) =>
+        fetch('/api/email/message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: employee.email,
+            senderName: 'Supervisor',
+            subject: reply.title,
+            message: reply.body,
+          }),
+        }).then(async (response) => {
+          if (!response.ok) {
+            const details = await response.text();
+            throw new Error(`Reply email notification failed for ${employee.email}: ${details}`);
+          }
+        }),
+      ),
+    ).then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('Some Apollo reply email notifications failed:', failed);
+      }
+    });
+
     setReplyBody('');
     setSelectedConversationId(selectedSupervisorConversation.conversationId);
   }
