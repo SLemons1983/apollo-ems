@@ -2444,7 +2444,7 @@ export default function SupervisorPage() {
                   href="/schedule"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                  className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
                 >
                   Open Schedule
                 </a>
@@ -3223,7 +3223,7 @@ export default function SupervisorPage() {
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <a
                 href="/employees"
-                className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+                className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
               >
                 Open Employee Profiles
               </a>
