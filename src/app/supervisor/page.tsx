@@ -3325,6 +3325,11 @@ export default function SupervisorPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-bold text-slate-900">System Activity Log</div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">End User License Agreement (EULA)</div>
+                <div className="mt-2 text-sm text-slate-700">Apollo EMS is owned and operated by Steven John Lemons. Use of Apollo EMS does not transfer ownership, intellectual property rights, source code rights, licensing rights, or any claim of authorship to any employee, agency, organization, contractor, testing entity, or third party.</div>
+              </div>
+
                 <div className="mt-1 text-xs text-slate-600">
                   Tracks system configuration changes now. Later this will also include schedule changes, certification edits, timecard approvals/returns, and rule overrides.
                 </div>
