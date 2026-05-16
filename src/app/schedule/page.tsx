@@ -3096,6 +3096,23 @@ export default function SchedulePage() {
                                     <option value="UNIT">UNIT</option>
                                     <option value="SUPERVISOR">SUPERVISOR</option>
                                   </select>
+
+                                  {warningMessages.length > 0 ? (
+                                    <div
+                                      title={warningMessages.join(' | ')}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
+                                    >
+                                      ⚠
+                                    </div>
+                                  ) : approvalMessages.length > 0 ? (
+                                    <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                      Approved
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                                      Clear
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
