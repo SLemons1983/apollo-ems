@@ -149,6 +149,7 @@ type StoredEmployeeProfile = {
 
 type SupabaseEmployeeRow = {
   id: string;
+  email: string | null;
   first_name: string | null;
   last_name: string | null;
   role: string | null;
@@ -160,6 +161,7 @@ type SupabaseEmployeeRow = {
 type EmployeeOption = {
   id: string;
   name: string;
+  email: string;
   role: 'Paramedic' | 'EMT' | 'Supervisor';
   scope: 'ALS' | 'BLS';
   employeeType: string;
@@ -309,6 +311,7 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
       .map((profile) => ({
         id: profile.id,
         name: buildEmployeeName(profile),
+        email: '',
         role: normalizeRole(profile.role),
         scope: normalizeScope(profile.scope, profile.role),
         employeeType: (profile.employeeType ?? 'Full Time').trim() || 'Full Time',
@@ -334,6 +337,7 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
   return {
     id: employee.id,
     name: buildSupabaseEmployeeName(employee),
+    email: (employee.email ?? '').trim().toLowerCase(),
     role: normalizeRole(employee.role ?? undefined),
     scope: normalizeScope(employee.scope ?? undefined, employee.role ?? undefined),
     employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
@@ -344,7 +348,7 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
 async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
   const { data, error } = await supabase
     .from('employees')
-    .select('id,first_name,last_name,role,scope,employee_type,status')
+    .select('id,email,first_name,last_name,role,scope,employee_type,status')
     .order('last_name', { ascending: true })
     .order('first_name', { ascending: true });
 
@@ -847,24 +851,32 @@ export default function SupervisorPage() {
 
     saveApolloMessages([message, ...apolloMessages]);
 
-    recipients.forEach(async (employee) => {
-      if (!(employee as any).email) return;
-
-      try {
-        await fetch('/api/email/message', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: (employee as any).email,
-            senderName: 'Supervisor',
-            subject: message.title,
-            message: message.body,
+    void Promise.allSettled(
+      recipients
+        .filter((employee) => employee.email)
+        .map((employee) =>
+          fetch('/api/email/message', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: employee.email,
+              senderName: 'Supervisor',
+              subject: message.title,
+              message: message.body,
+            }),
+          }).then(async (response) => {
+            if (!response.ok) {
+              const details = await response.text();
+              throw new Error(`Email notification failed for ${employee.email}: ${details}`);
+            }
           }),
-        });
-      } catch (error) {
-        console.error('Failed to send Apollo email notification:', error);
+        ),
+    ).then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('Some Apollo email notifications failed:', failed);
       }
     });
 
