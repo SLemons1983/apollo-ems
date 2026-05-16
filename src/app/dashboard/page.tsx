@@ -2039,15 +2039,17 @@ export default function DashboardPage() {
       );
 
     if (hasManualData) {
-      const legacySaved = saved as EditableTimecardRow & { isTwentyFourHourShift?: boolean };
+      const assignment = getAssignedShiftForDate(date);
 
       return {
         ...saved,
-        payType:
-          saved.payType ??
-          (typeof legacySaved.isTwentyFourHourShift === 'boolean' && legacySaved.isTwentyFourHourShift
-            ? 'TWENTY_FOUR_HOUR'
-            : getDefaultPayType(saved.shiftLabel, getEditableRowHours(saved))),
+        payType: getDefaultPayType(
+          assignment?.label ?? saved.shiftLabel,
+          getEditableRowHours(saved),
+          assignment?.slots.find(
+            (slot) => slot.employeeId === currentEmployeeId,
+          )?.shiftType,
+        ),
       };
     }
 
