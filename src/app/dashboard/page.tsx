@@ -1873,12 +1873,16 @@ export default function DashboardPage() {
         }
 
         if (showOpenShiftsOnly) {
-          return (
+          const hasAssignedShift = assignment.slots.some(
+            (slot) => slot.employeeId === currentEmployeeId,
+          );
+
+          const hasEligibleOpenShift =
             isFutureOrToday(date) &&
             !assignment.hiddenFromEmployees &&
-            getEligibleOpenSlotCount(assignment) > 0 &&
-            !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId)
-          );
+            getEligibleOpenSlotCount(assignment) > 0;
+
+          return hasAssignedShift || hasEligibleOpenShift;
         }
 
         if (showFullSchedule) {
@@ -1890,7 +1894,14 @@ export default function DashboardPage() {
     }
 
     return byDate;
-  }, [dates, scheduleData, showFullSchedule]);
+  }, [
+    currentEmployee,
+    currentEmployeeId,
+    dates,
+    scheduleData,
+    showFullSchedule,
+    showOpenShiftsOnly,
+  ]);
 
   const myShiftCount = useMemo(() => {
     return Object.values(assignmentsByDate).reduce((total, dayAssignments) => total + dayAssignments.length, 0);
@@ -3715,9 +3726,14 @@ export default function DashboardPage() {
                   <div className="inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1">
                     <button
                       type="button"
-                      onClick={() => setShowFullSchedule(false)}
+                      onClick={() => {
+                        setShowFullSchedule(false);
+                        setShowOpenShiftsOnly(false);
+                      }}
                       className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                        !showFullSchedule ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        !showFullSchedule && !showOpenShiftsOnly
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
                       My Schedule
