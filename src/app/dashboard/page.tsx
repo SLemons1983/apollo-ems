@@ -1756,6 +1756,16 @@ export default function DashboardPage() {
 
     saveApolloMessages([message, ...apolloMessages]);
 
+    console.log(
+      'Apollo employee email recipients:',
+      finalRecipients.map((employee) => ({
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        role: employee.role,
+      })),
+    );
+
     notifyApolloMessageRecipients({
       recipients: finalRecipients,
       senderName: currentEmployee?.name ?? 'Employee',
