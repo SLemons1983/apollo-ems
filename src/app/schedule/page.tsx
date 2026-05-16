@@ -1274,6 +1274,7 @@ export default function SchedulePage() {
   const [mounted, setMounted] = useState(false);
   const [expandedShiftKey, setExpandedShiftKey] = useState<string | null>(null);
   const [pendingExpandedShiftKey, setPendingExpandedShiftKey] = useState<string | null>(null);
+  const [visibleScheduleWeek, setVisibleScheduleWeek] = useState<'ALL' | 'WEEK1' | 'WEEK2'>('WEEK1');
   const [expandedWarnings, setExpandedWarnings] = useState<Record<string, boolean>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1874,6 +1875,18 @@ export default function SchedulePage() {
     () => Array.from({ length: 14 }, (_, index) => addDays(visiblePayPeriod.start, index)),
     [visiblePayPeriodStartKey],
   );
+
+  const visibleDates = useMemo(() => {
+    if (visibleScheduleWeek === 'WEEK1') {
+      return dates.slice(0, 7);
+    }
+
+    if (visibleScheduleWeek === 'WEEK2') {
+      return dates.slice(7, 14);
+    }
+
+    return dates;
+  }, [dates, visibleScheduleWeek]);
 
   const goToCurrentPayPeriod = () => {
     setAnchorDate(getGlobalPayPeriodStart(new Date()));
@@ -2738,15 +2751,27 @@ export default function SchedulePage() {
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => jumpScheduleToColumn(0)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            onClick={() => setVisibleScheduleWeek('WEEK1')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              visibleScheduleWeek === 'WEEK1'
+                ? 'bg-blue-700 text-white'
+                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
           >
             Week 1
           </button>
 
           <button
             type="button"
-            onClick={jumpScheduleToToday}
+            onClick={() => {
+              const todayKey = toDateKey(new Date());
+              const todayIndex = dates.findIndex((date) => toDateKey(date) === todayKey);
+              if (todayIndex >= 7) {
+                setVisibleScheduleWeek('WEEK2');
+              } else {
+                setVisibleScheduleWeek('WEEK1');
+              }
+            }}
             className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
           >
             Today
@@ -2754,20 +2779,36 @@ export default function SchedulePage() {
 
           <button
             type="button"
-            onClick={() => jumpScheduleToColumn(7)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            onClick={() => setVisibleScheduleWeek('WEEK2')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              visibleScheduleWeek === 'WEEK2'
+                ? 'bg-blue-700 text-white'
+                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
           >
             Week 2
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVisibleScheduleWeek('ALL')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              visibleScheduleWeek === 'ALL'
+                ? 'bg-slate-900 text-white'
+                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Full Pay Period
           </button>
         </div>
 
         <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
+          <div key={visiblePayPeriodStartKey} className={`grid ${visibleScheduleWeek === 'ALL' ? 'min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]' : 'min-w-[2100px] grid-cols-[180px_repeat(7,minmax(270px,1fr))]'}`}>
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</div>
             </div>
 
-            {dates.map((date, index) => {
+            {visibleDates.map((date, index) => {
               const dateKey = toDateKey(date);
               const previousDateKey = index > 0 ? toDateKey(dates[index - 1]) : '';
 
@@ -2825,7 +2866,7 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
-                {dates.map((date) => {
+                {visibleDates.map((date) => {
                   const dateKey = toDateKey(date);
                   const day = getDaySchedule(scheduleData, dateKey);
                   const shift = day.standard[shiftName];
@@ -3087,7 +3128,7 @@ export default function SchedulePage() {
               </div>
             </div>
 
-            {dates.map((date) => {
+            {visibleDates.map((date) => {
               const dateKey = toDateKey(date);
               const day = getDaySchedule(scheduleData, dateKey);
 
