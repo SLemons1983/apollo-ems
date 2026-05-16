@@ -1766,6 +1766,12 @@ export default function DashboardPage() {
       })),
     );
 
+    window.alert(
+      `Apollo debug recipients: ${finalRecipients
+        .map((employee) => `${employee.name} <${employee.email || 'NO EMAIL'}> [${employee.role}]`)
+        .join(', ') || 'NONE'}`
+    );
+
     notifyApolloMessageRecipients({
       recipients: finalRecipients,
       senderName: currentEmployee?.name ?? 'Employee',
