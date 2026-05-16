@@ -832,14 +832,30 @@ export default function SupervisorPage() {
       });
   }
 
+  const supervisorEmployeeIds = useMemo(() => {
+    return employees
+      .filter((employee) => employee.role === 'Supervisor')
+      .map((employee) => employee.id);
+  }, [employees]);
+
+  const supervisorInboxIds = useMemo(() => {
+    return Array.from(new Set([CURRENT_SUPERVISOR_ID, ...supervisorEmployeeIds]));
+  }, [supervisorEmployeeIds]);
+
   const supervisorMessages = useMemo(() => {
     return apolloMessages
-      .filter((message) => message.senderId === CURRENT_SUPERVISOR_ID || message.recipients.some((recipient) => recipient.employeeId === CURRENT_SUPERVISOR_ID))
+      .filter(
+        (message) =>
+          supervisorInboxIds.includes(message.senderId) ||
+          message.recipients.some((recipient) => supervisorInboxIds.includes(recipient.employeeId)),
+      )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [apolloMessages]);
+  }, [apolloMessages, supervisorInboxIds]);
 
   const supervisorUnreadCount = supervisorMessages.filter(
-    (message) => message.senderId !== CURRENT_SUPERVISOR_ID && message.recipients.some((recipient) => recipient.employeeId === CURRENT_SUPERVISOR_ID && !recipient.readAt),
+    (message) =>
+      !supervisorInboxIds.includes(message.senderId) &&
+      message.recipients.some((recipient) => supervisorInboxIds.includes(recipient.employeeId) && !recipient.readAt),
   ).length;
 
   const supervisorConversations = useMemo(() => {
