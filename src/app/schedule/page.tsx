@@ -1272,6 +1272,7 @@ export default function SchedulePage() {
   const scheduleDataRef = useRef<ScheduleData>({});
   const [mounted, setMounted] = useState(false);
   const [expandedShiftKey, setExpandedShiftKey] = useState<string | null>(null);
+  const [pendingExpandedShiftKey, setPendingExpandedShiftKey] = useState<string | null>(null);
   const [expandedWarnings, setExpandedWarnings] = useState<Record<string, boolean>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1876,6 +1877,32 @@ export default function SchedulePage() {
   const goToCurrentPayPeriod = () => {
     setAnchorDate(getGlobalPayPeriodStart(new Date()));
     setPayPeriodReady(true);
+  };
+
+  const handleExpandedShiftChange = (nextKey: string | null) => {
+    if (
+      hasUnsavedChanges &&
+      expandedShiftKey &&
+      expandedShiftKey !== nextKey
+    ) {
+      setPendingExpandedShiftKey(nextKey);
+      return;
+    }
+
+    setExpandedShiftKey(nextKey);
+  };
+
+  const discardUnsavedChangesAndContinue = () => {
+    setHasUnsavedChanges(false);
+    setSaveStatus('Changes discarded.');
+    setExpandedShiftKey(pendingExpandedShiftKey);
+    setPendingExpandedShiftKey(null);
+  };
+
+  const saveChangesAndContinue = async () => {
+    await saveScheduleToSupabase();
+    setExpandedShiftKey(pendingExpandedShiftKey);
+    setPendingExpandedShiftKey(null);
   };
   const visibleYear = visiblePayPeriod.end.getFullYear();
   const payPeriodOptions = useMemo(() => {
@@ -2803,7 +2830,9 @@ export default function SchedulePage() {
                     >
                       <div
                         onClick={() =>
-                          setExpandedShiftKey(isExpanded ? null : expandedKey)
+                          handleExpandedShiftChange(
+                            isExpanded ? null : expandedKey
+                          )
                         }
                         className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
                           isExpanded
@@ -3066,7 +3095,11 @@ export default function SchedulePage() {
                         return (
                           <div
                             key={extra.id}
-                            onClick={() => setExpandedShiftKey(isExpanded ? null : expandedKey)}
+                            onClick={() =>
+                              handleExpandedShiftChange(
+                                isExpanded ? null : expandedKey
+                              )
+                            }
                             className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
                               isExpanded
                                 ? 'border-slate-500 bg-slate-200'
@@ -3290,6 +3323,45 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+      {pendingExpandedShiftKey !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">
+              Unsaved Changes
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-600">
+              You have unsaved schedule changes. Save before switching shifts?
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={saveChangesAndContinue}
+                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+              >
+                Save Changes
+              </button>
+
+              <button
+                type="button"
+                onClick={discardUnsavedChangesAndContinue}
+                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+              >
+                Discard Changes
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPendingExpandedShiftKey(null)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
