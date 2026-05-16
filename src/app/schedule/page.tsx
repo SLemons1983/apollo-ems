@@ -949,7 +949,8 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
   }
 
   const messages: string[] = [];
-  const targetSlots = getAssignedSlotsForAssignment(target.category, target.shift);
+  const targetSlots = getAssignedSlotsForAssignment(target.category, target.shift)
+    .filter((slot) => !isOpenShiftSlot(slot.employeeId));
 
   const seenInSameShift = new Set<string>();
   for (const slot of targetSlots) {
@@ -2203,7 +2204,10 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div
+          className="space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
           <select
             value={slot.employeeId}
             onChange={(event) => onChange('employeeId', event.target.value)}
@@ -2696,7 +2700,10 @@ export default function SchedulePage() {
                       : 'border-slate-200 bg-slate-50'
                   }`}
                 >
-                  <div className="space-y-3">
+                  <div
+          className="space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
                     <div>
                       <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
                       <div className="mt-1 text-xs text-slate-500">{dateKey}</div>
@@ -2824,8 +2831,11 @@ export default function SchedulePage() {
                           )}
 
                           {warningMessages.length > 0 ? (
-                            <div className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                              Warning
+                            <div
+                              title={warningMessages.join(' | ')}
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
+                            >
+                              ⚠
                             </div>
                           ) : approvalMessages.length > 0 ? (
                             <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -2838,7 +2848,10 @@ export default function SchedulePage() {
                           )}
                         </div>
 
-                        <div className="space-y-3">
+                        <div
+          className="space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
                           {renderEmployeeSlotEditor(
                             shift.employee1,
                             'Employee 1',
@@ -2932,7 +2945,7 @@ export default function SchedulePage() {
                           )}
                         </div>
 
-                        {warningMessages.length > 0 && (
+                        {isExpanded && warningMessages.length > 0 && (
                           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
                             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                               Conflict Warnings
@@ -2977,7 +2990,10 @@ export default function SchedulePage() {
 
               return (
                 <div key={`extras-${dateKey}`} className="border-r border-slate-200 bg-white p-3 align-top">
-                  <div className="space-y-3">
+                  <div
+          className="space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
                     {day.extras.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500">
                         No extra shifts
@@ -3092,7 +3108,10 @@ export default function SchedulePage() {
                               </button>
                             </div>
 
-                            <div className="space-y-3">
+                            <div
+          className="space-y-3"
+          onClick={(event) => event.stopPropagation()}
+        >
                               {renderEmployeeSlotEditor(
                                 extra.employee1,
                                 'Employee 1',
@@ -3186,7 +3205,7 @@ export default function SchedulePage() {
                               )}
                             </div>
 
-                            {warningMessages.length > 0 && (
+                            {isExpanded && warningMessages.length > 0 && (
                               <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
                                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                                   Conflict Warnings
