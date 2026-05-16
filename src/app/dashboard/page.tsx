@@ -1675,6 +1675,48 @@ export default function DashboardPage() {
     return activeEmployees;
   }
 
+  function notifyApolloMessageRecipients(params: {
+    recipients: EmployeeOption[];
+    senderName: string;
+    subject: string;
+    message: string;
+  }) {
+    const uniqueRecipients = Array.from(
+      new Map(
+        params.recipients
+          .filter((employee) => employee.email)
+          .map((employee) => [employee.email, employee]),
+      ).values(),
+    );
+
+    void Promise.allSettled(
+      uniqueRecipients.map((employee) =>
+        fetch('/api/email/message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: employee.email,
+            senderName: params.senderName,
+            subject: params.subject,
+            message: params.message,
+          }),
+        }).then(async (response) => {
+          if (!response.ok) {
+            const details = await response.text();
+            throw new Error(`Employee message email failed for ${employee.email}: ${details}`);
+          }
+        }),
+      ),
+    ).then((results) => {
+      const failed = results.filter((result) => result.status === 'rejected');
+      if (failed.length > 0) {
+        console.error('Some employee Apollo email notifications failed:', failed);
+      }
+    });
+  }
+
   function sendEmployeeMessage() {
     if (!messageSubject.trim() || !messageBody.trim()) {
       window.alert('Enter a subject and message before sending.');
@@ -1713,6 +1755,14 @@ export default function DashboardPage() {
     };
 
     saveApolloMessages([message, ...apolloMessages]);
+
+    notifyApolloMessageRecipients({
+      recipients: finalRecipients,
+      senderName: currentEmployee?.name ?? 'Employee',
+      subject: message.title,
+      message: message.body,
+    });
+
     setMessageSubject('');
     setMessageBody('');
     setMessageRecipientEmployeeId('');
@@ -1755,6 +1805,26 @@ export default function DashboardPage() {
     };
 
     saveApolloMessages([reply, ...apolloMessages]);
+
+    const replyRecipientEmployees = employees.filter((employee) => {
+      if (recipientIds.includes(employee.id)) {
+        return true;
+      }
+
+      if (recipientIds.includes(CURRENT_SUPERVISOR_ID) && employee.role === 'Supervisor') {
+        return true;
+      }
+
+      return false;
+    });
+
+    notifyApolloMessageRecipients({
+      recipients: replyRecipientEmployees,
+      senderName: currentEmployee?.name ?? 'Employee',
+      subject: reply.title,
+      message: reply.body,
+    });
+
     setReplyBody('');
     setSelectedConversationId(selectedConversation.conversationId);
   }
