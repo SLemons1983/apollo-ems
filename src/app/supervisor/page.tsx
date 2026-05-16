@@ -433,6 +433,7 @@ export default function SupervisorPage() {
   const [showEmployeesNotSubmitted, setShowEmployeesNotSubmitted] = useState(false);
   const [showPendingReview, setShowPendingReview] = useState(false);
   const [showReviewedTimecards, setShowReviewedTimecards] = useState(false);
+  const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -2451,24 +2452,28 @@ export default function SupervisorPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowScheduleBuilder((value) => !value)}
+                  className="flex w-full items-center justify-between gap-3 text-left"
+                >
                   <div>
-                    <div className="text-sm font-bold text-slate-900">Schedule Builder</div>
+                    <div className="text-sm font-bold text-slate-900">
+                      Schedule Builder
+                    </div>
+
                     <div className="mt-1 text-sm text-slate-600">
-                      Build a 2-week schedule template. All shifts launch as 24-hour shifts except Administrative Supervisor, which launches as 06:00-18:00. Apollo repeats the template until the selected end date and publishes it to supervisors and employees.
+                      Build and launch repeating 2-week schedule templates.
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={launchBuilderSchedule}
-                    disabled={builderDateKeys.length === 0}
-                    className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    Launch Schedule
-                  </button>
-                </div>
+                  <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+                    {showScheduleBuilder ? 'Hide Builder' : 'Open Builder'}
+                  </span>
+                </button>
 
+                {showScheduleBuilder && (
+                  <>
                 <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -2675,6 +2680,8 @@ export default function SupervisorPage() {
                   <div className="mt-3 text-xs text-slate-500">
                     Builder template loaded for {builderDateKeys[0]} through {builderDateKeys[builderDateKeys.length - 1]}. Launching repeats this 2-week template through the selected end date and overwrites the published schedule in that date range.
                   </div>
+                )}
+                  </>
                 )}
               </div>
 
