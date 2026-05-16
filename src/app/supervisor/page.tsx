@@ -846,6 +846,28 @@ export default function SupervisorPage() {
     };
 
     saveApolloMessages([message, ...apolloMessages]);
+
+    recipients.forEach(async (employee) => {
+      if (!(employee as any).email) return;
+
+      try {
+        await fetch('/api/email/message', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: (employee as any).email,
+            senderName: 'Supervisor',
+            subject: message.title,
+            message: message.body,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to send Apollo email notification:', error);
+      }
+    });
+
     setMessageSubject('');
     setMessageBody('');
     setMessageRecipientEmployeeId('');
