@@ -2609,21 +2609,21 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className={`rounded-2xl border p-4 shadow-sm ${reviewedOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowRecentOpenShiftDecisions((value) => !value)}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className="text-sm font-bold text-slate-900">Recent Open Shift Decisions</div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className={`text-sm font-bold ${reviewedOpenShiftRequests.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>Recent Open Shift Decisions</div>
+                <div className={`mt-1 text-xs ${reviewedOpenShiftRequests.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
                   {reviewedOpenShiftRequests.length > 0
                     ? `${reviewedOpenShiftRequests.length} reviewed request${reviewedOpenShiftRequests.length === 1 ? '' : 's'} available.`
                     : 'No reviewed open shift requests yet.'}
                 </div>
               </div>
-              <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${reviewedOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showRecentOpenShiftDecisions ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
@@ -2655,22 +2655,22 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className={`rounded-2xl border p-4 shadow-sm ${supervisorNotes.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowSupervisorNotes((value) => !value)}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className="text-sm font-bold text-slate-900">Supervisor Shift Notes</div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className={`text-sm font-bold ${supervisorNotes.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>Supervisor Shift Notes</div>
+                <div className={`mt-1 text-xs ${supervisorNotes.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
                   {supervisorNotes.length > 0
                     ? `${supervisorNotes.length} note${supervisorNotes.length === 1 ? '' : 's'} available.`
                     : 'No supervisor notes entered.'}
                 </div>
               </div>
 
-              <span className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
+              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${supervisorNotes.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showSupervisorNotes ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
