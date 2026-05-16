@@ -2063,7 +2063,9 @@ export default function DashboardPage() {
       payType: getDefaultPayType(
         assignment?.label ?? '',
         inferredHours,
-        assignment?.slots?.[0]?.shiftType,
+        assignment?.slots.find(
+          (slot) => slot.employeeId === currentEmployeeId,
+        )?.shiftType,
       ),
       clockInDate: clockInDate ? getIsoDateInputValue(clockInDate) : '',
       clockInTime: clockInDate ? `${clockInDate.getHours()}`.padStart(2, '0') + ':' + `${clockInDate.getMinutes()}`.padStart(2, '0') : '',
