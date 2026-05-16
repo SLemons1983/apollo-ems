@@ -2923,6 +2923,22 @@ export default function SchedulePage() {
                                 Hide shift from employees
                               </label>
 
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  saveScheduleToSupabase();
+                                }}
+                                disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')}
+                                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                                  hasUnsavedChanges
+                                    ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                                    : 'cursor-not-allowed bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                Confirm Changes
+                              </button>
+
                               <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                   Vehicle
