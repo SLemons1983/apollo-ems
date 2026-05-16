@@ -1730,10 +1730,7 @@ export default function DashboardPage() {
     }
 
     const createdAt = new Date().toISOString();
-    const finalRecipients =
-      recipients.length > 0
-        ? recipients
-        : [{ id: CURRENT_SUPERVISOR_ID, name: 'Supervisor', email: 'supervisor@sscems.org', role: 'Supervisor' as const, scope: 'ALS' as const, employeeType: 'Supervisor', seniorityLabel: '', certifications: EMPTY_CERTIFICATIONS, status: 'Active' }];
+    const finalRecipients = recipients;
 
     const message: ApolloMessage = {
       id: `message-${Date.now()}`,
