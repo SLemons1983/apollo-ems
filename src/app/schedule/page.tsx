@@ -1283,6 +1283,8 @@ export default function SchedulePage() {
   const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
+  const [reviewedDecisionCount, setReviewedDecisionCount] = useState(0);
+  const [reviewedSupervisorNoteCount, setReviewedSupervisorNoteCount] = useState(0);
 
   function markUnsavedChanges() {
     setHasUnsavedChanges(true);
@@ -1305,6 +1307,9 @@ export default function SchedulePage() {
     const currentPayPeriodStart = getGlobalPayPeriodStart(new Date());
     setAnchorDate(currentPayPeriodStart);
     setPayPeriodReady(true);
+
+    setReviewedDecisionCount(Number(localStorage.getItem('apollo-reviewed-decisions') ?? '0'));
+    setReviewedSupervisorNoteCount(Number(localStorage.getItem('apollo-reviewed-supervisor-notes') ?? '0'));
   }, []);
 
   useEffect(() => {
@@ -1677,6 +1682,8 @@ export default function SchedulePage() {
       .filter((request) => request.status !== 'PENDING')
       .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
   }, [openShiftRequests]);
+
+  const hasUnreadOpenShiftDecisions = reviewedOpenShiftRequests.length > reviewedDecisionCount;
 
   async function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
     setOpenShiftRequests(nextRequests);
@@ -2510,6 +2517,8 @@ export default function SchedulePage() {
     return [...standardNotes, ...extraNotes];
   });
 
+  const hasUnreadSupervisorNotes = supervisorNotes.length > reviewedSupervisorNoteCount;
+
   if (!payPeriodReady) {
     return (
       <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
@@ -2651,27 +2660,40 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-2xl border p-4 shadow-sm ${reviewedOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-2xl border p-4 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowRecentOpenShiftDecisions((value) => !value)}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className={`text-sm font-bold ${reviewedOpenShiftRequests.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>Recent Open Shift Decisions</div>
-                <div className={`mt-1 text-xs ${reviewedOpenShiftRequests.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
+                <div className={`text-sm font-bold ${hasUnreadOpenShiftDecisions ? 'text-red-800' : 'text-slate-900'}`}>Recent Open Shift Decisions</div>
+                <div className={`mt-1 text-xs ${hasUnreadOpenShiftDecisions ? 'text-red-700' : 'text-slate-500'}`}>
                   {reviewedOpenShiftRequests.length > 0
                     ? `${reviewedOpenShiftRequests.length} reviewed request${reviewedOpenShiftRequests.length === 1 ? '' : 's'} available.`
                     : 'No reviewed open shift requests yet.'}
                 </div>
               </div>
-              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${reviewedOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${hasUnreadOpenShiftDecisions ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showRecentOpenShiftDecisions ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showRecentOpenShiftDecisions && (
               <div className="mt-4 space-y-2">
+                {reviewedOpenShiftRequests.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem('apollo-reviewed-decisions', String(reviewedOpenShiftRequests.length));
+                      setReviewedDecisionCount(reviewedOpenShiftRequests.length);
+                    }}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Mark Reviewed
+                  </button>
+                )}
+
                 {reviewedOpenShiftRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No reviewed open shift requests yet.
@@ -2697,28 +2719,41 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-2xl border p-4 shadow-sm ${supervisorNotes.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-2xl border p-4 shadow-sm ${hasUnreadSupervisorNotes ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowSupervisorNotes((value) => !value)}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className={`text-sm font-bold ${supervisorNotes.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>Supervisor Shift Notes</div>
-                <div className={`mt-1 text-xs ${supervisorNotes.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
+                <div className={`text-sm font-bold ${hasUnreadSupervisorNotes ? 'text-red-800' : 'text-slate-900'}`}>Supervisor Shift Notes</div>
+                <div className={`mt-1 text-xs ${hasUnreadSupervisorNotes ? 'text-red-700' : 'text-slate-500'}`}>
                   {supervisorNotes.length > 0
                     ? `${supervisorNotes.length} note${supervisorNotes.length === 1 ? '' : 's'} available.`
                     : 'No supervisor notes entered.'}
                 </div>
               </div>
 
-              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${supervisorNotes.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${hasUnreadSupervisorNotes ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showSupervisorNotes ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showSupervisorNotes && (
               <div className="mt-4 space-y-3">
+                {supervisorNotes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.setItem('apollo-reviewed-supervisor-notes', String(supervisorNotes.length));
+                      setReviewedSupervisorNoteCount(supervisorNotes.length);
+                    }}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Mark Reviewed
+                  </button>
+                )}
+
                 {supervisorNotes.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No supervisor notes entered.
