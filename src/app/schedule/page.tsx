@@ -1270,7 +1270,7 @@ export default function SchedulePage() {
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
   const scheduleDataRef = useRef<ScheduleData>({});
   const [mounted, setMounted] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
+  const [expandedShiftKey, setExpandedShiftKey] = useState<string | null>(null);
   const [expandedWarnings, setExpandedWarnings] = useState<Record<string, boolean>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -2133,6 +2133,7 @@ export default function SchedulePage() {
     slotLabel: string,
     isVisible: boolean,
     onChange: (field: keyof EmployeeSlot, value: string) => void,
+    showDetails: boolean,
     eligibilityMap: Record<string, EligibilityResult>,
     payPeriodHoursMap: Record<string, number>,
     requestContext?: { dateKey: string; shiftKey: string; shiftLabel: string },
@@ -2291,7 +2292,7 @@ export default function SchedulePage() {
             </div>
           )}
 
-          {showNotes && (
+          {showDetails && (
             <>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -2501,13 +2502,6 @@ export default function SchedulePage() {
                 Current Pay Period
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowNotes((s) => !s)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                {showNotes ? 'Hide Shift Details' : 'Show Shift Details'}
-              </button>
             </div>
           </div>
         </div>
@@ -2691,8 +2685,17 @@ export default function SchedulePage() {
               const dateKey = toDateKey(date);
               const previousDateKey = index > 0 ? toDateKey(dates[index - 1]) : '';
 
+              const isToday = toDateKey(new Date()) === dateKey;
+
               return (
-                <div key={dateKey} className="sticky top-0 z-30 border-b border-r border-slate-200 bg-slate-50 p-4">
+                <div
+                  key={dateKey}
+                  className={`sticky top-0 z-30 border-b border-r p-4 ${
+                    isToday
+                      ? 'border-emerald-300 bg-emerald-50'
+                      : 'border-slate-200 bg-slate-50'
+                  }`}
+                >
                   <div className="space-y-3">
                     <div>
                       <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
@@ -2783,9 +2786,24 @@ export default function SchedulePage() {
                   const approvalMessages = continuousHours.approvals;
                   const isSupervisorShift = category === 'SUPERVISOR';
 
+                  const expandedKey = `${shiftName}-${dateKey}`;
+                  const isExpanded = expandedShiftKey === expandedKey;
+
                   return (
-                    <div key={`${shiftName}-${dateKey}`} className="border-b border-r border-slate-200 bg-white p-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+                    <div
+                      key={`${shiftName}-${dateKey}`}
+                      className="border-b border-r border-slate-200 bg-white p-3"
+                    >
+                      <div
+                        onClick={() =>
+                          setExpandedShiftKey(isExpanded ? null : expandedKey)
+                        }
+                        className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
+                          isExpanded
+                            ? 'border-slate-500 bg-slate-200'
+                            : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
+                        }`}
+                      >
                         <div className="mb-3 flex items-center justify-between gap-2">
                           <div
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
@@ -2826,6 +2844,7 @@ export default function SchedulePage() {
                             'Employee 1',
                             true,
                             (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee1', field, value),
+                            isExpanded,
                             slotEligibilityMaps.employee1,
                             payPeriodHoursMap,
                             { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
@@ -2837,6 +2856,7 @@ export default function SchedulePage() {
                               'Employee 2',
                               true,
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee2', field, value),
+                              isExpanded,
                               slotEligibilityMaps.employee2,
                               payPeriodHoursMap,
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
@@ -2848,6 +2868,7 @@ export default function SchedulePage() {
                               'Employee 3',
                               shift.showEmployee3 || Boolean(shift.employee3.employeeId),
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee3', field, value),
+                              isExpanded,
                               slotEligibilityMaps.employee3,
                               payPeriodHoursMap,
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
@@ -2863,7 +2884,7 @@ export default function SchedulePage() {
                             </button>
                           )}
 
-                          {showNotes && (
+                          {isExpanded && (
                             <>
                               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                                 <input
@@ -3007,9 +3028,19 @@ export default function SchedulePage() {
                         const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
                         const approvalMessages = continuousHours.approvals;
                         const isSupervisorShift = extra.category === 'SUPERVISOR';
+                        const expandedKey = `extra-${extra.id}-${dateKey}`;
+                        const isExpanded = expandedShiftKey === expandedKey;
 
                         return (
-                          <div key={extra.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
+                          <div
+                            key={extra.id}
+                            onClick={() => setExpandedShiftKey(isExpanded ? null : expandedKey)}
+                            className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
+                              isExpanded
+                                ? 'border-slate-500 bg-slate-200'
+                                : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
+                            }`}
+                          >
                             <div className="mb-3 flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <input
@@ -3067,6 +3098,7 @@ export default function SchedulePage() {
                                 'Employee 1',
                                 true,
                                 (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee1', field, value),
+                                isExpanded,
                                 slotEligibilityMaps.employee1,
                                 payPeriodHoursMap,
                                 { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
@@ -3078,6 +3110,7 @@ export default function SchedulePage() {
                                   'Employee 2',
                                   true,
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee2', field, value),
+                                  isExpanded,
                                   slotEligibilityMaps.employee2,
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
@@ -3089,6 +3122,7 @@ export default function SchedulePage() {
                                   'Employee 3',
                                   extra.showEmployee3 || Boolean(extra.employee3.employeeId),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee3', field, value),
+                                  isExpanded,
                                   slotEligibilityMaps.employee3,
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
@@ -3104,7 +3138,7 @@ export default function SchedulePage() {
                                 </button>
                               )}
 
-                              {showNotes && (
+                              {isExpanded && (
                                 <>
                                   <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                                     <input
