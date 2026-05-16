@@ -1723,7 +1723,10 @@ export default function DashboardPage() {
       return;
     }
 
-    const recipients = getRecipientEmployeesForMode(messageRecipientMode).filter((employee) => employee.id !== currentEmployeeId);
+    const recipients =
+      messageRecipientMode === 'SUPERVISORS'
+        ? getRecipientEmployeesForMode(messageRecipientMode)
+        : getRecipientEmployeesForMode(messageRecipientMode).filter((employee) => employee.id !== currentEmployeeId);
     if (recipients.length === 0 && messageRecipientMode !== 'SUPERVISORS') {
       window.alert('No recipients were found for that selection.');
       return;
