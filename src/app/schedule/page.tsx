@@ -1522,10 +1522,12 @@ export default function SchedulePage() {
       return;
     }
 
+    const saveStartedAt = Date.now();
     setSaveStatus('Saving schedule changes...');
 
     try {
       const normalizedSchedule = normalizeLoadedData(scheduleDataRef.current);
+      console.log(`Apollo schedule save started: ${Object.keys(normalizedSchedule).length} dates.`);
 
       for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
         const { error: scheduleError } = await supabase.from('schedules').upsert({
@@ -1662,7 +1664,9 @@ export default function SchedulePage() {
       }
 
       setHasUnsavedChanges(false);
-      setSaveStatus(`Schedule saved at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`);
+      const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
+      console.log(`Apollo schedule save completed in ${saveSeconds}s.`);
+      setSaveStatus(`Schedule saved at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (${saveSeconds}s).`);
     } catch (error) {
       console.error('Supabase schedule save failed:', error);
       setSaveStatus('Schedule save failed. Check console and try again.');
