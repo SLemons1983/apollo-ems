@@ -2707,7 +2707,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div key={visiblePayPeriodStartKey} className="grid min-w-[3250px] grid-cols-[150px_repeat(14,minmax(220px,1fr))]">
+          <div key={visiblePayPeriodStartKey} className="grid min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shift</div>
             </div>
