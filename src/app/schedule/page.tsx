@@ -3061,7 +3061,7 @@ export default function SchedulePage() {
                           </div>
                         )}
 
-                        {approvalMessages.length > 0 && (
+                        {isExpanded && approvalMessages.length > 0 && (
                           <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                               Extended Hours Approved
@@ -3358,7 +3358,7 @@ export default function SchedulePage() {
                               </div>
                             )}
 
-                            {approvalMessages.length > 0 && (
+                            {isExpanded && approvalMessages.length > 0 && (
                               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                                   Extended Hours Approved
