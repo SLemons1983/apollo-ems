@@ -1529,6 +1529,8 @@ export default function SchedulePage() {
       const normalizedSchedule = normalizeLoadedData(scheduleDataRef.current);
       console.log(`Apollo schedule save started: ${Object.keys(normalizedSchedule).length} dates.`);
 
+      const saveTasks: Promise<any>[] = [];
+
       for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
         const { error: scheduleError } = await supabase.from('schedules').upsert({
           id: dateKey,
@@ -1645,25 +1647,35 @@ export default function SchedulePage() {
           });
         }
 
-        const { error: deleteError } = await supabase
-          .from('schedule_assignments')
-          .delete()
-          .eq('date_key', dateKey);
+        saveTasks.push(
+          (async () => {
+            const { error: deleteError } = await supabase
+              .from('schedule_assignments')
+              .delete()
+              .eq('date_key', dateKey);
 
         if (deleteError) {
           throw deleteError;
         }
 
         if (rows.length > 0) {
-          const { error: assignmentError } = await supabase.from('schedule_assignments').upsert(rows, { onConflict: 'id' });
+          const { error: assignmentError } = await supabase
+            .from('schedule_assignments')
+            .upsert(rows, { onConflict: 'id' });
 
           if (assignmentError) {
             throw assignmentError;
           }
         }
+          })(),
+        );
       }
 
+      await Promise.all(saveTasks);
+
       setHasUnsavedChanges(false);
+      await Promise.all(saveTasks);
+
       const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
       console.log(`Apollo schedule save completed in ${saveSeconds}s.`);
       setSaveStatus(`Schedule saved at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (${saveSeconds}s).`);
