@@ -3411,7 +3411,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="overflow-auto rounded-2xl border border-slate-300 bg-white">
+              <div className="overflow-auto rounded-2xl border border-slate-300 bg-white text-slate-950 [color-scheme:light]">
                 <div className="min-w-[980px] p-5">
                   <div className="mb-5 text-center text-sm font-bold uppercase tracking-wide text-slate-900">
                     Time Card
