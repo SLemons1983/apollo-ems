@@ -3501,7 +3501,7 @@ export default function DashboardPage() {
                                       })
                                     }
                                     disabled={!row.shiftLabel}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
                                     title="Shift Type controls how this row calculates regular, overtime, and double time."
                                   >
                                                                         <option value="DAILY_OT_DT">Non 24-Shift</option>
@@ -3551,7 +3551,7 @@ export default function DashboardPage() {
                                     type="button"
                                     onClick={() => clearEditableRow(date)}
                                     disabled={!row.shiftLabel && !row.clockInDate && !row.clockInTime && !row.clockOutDate && !row.clockOutTime}
-                                    className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                                    className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
                                   >
                                     Clear
                                   </button>
