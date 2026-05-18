@@ -2537,7 +2537,17 @@ export default function SupervisorPage() {
                           </div>
                         ))}
                       </div>
-                    )}
+                    )}                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={launchBuilderSchedule}
+                      className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                    >
+                      Launch Schedule
+                    </button>
+                  </div>
+
+
                   </div>
                 )}
 
