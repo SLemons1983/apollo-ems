@@ -492,15 +492,14 @@ function parseTimeToMinutes(timeValue: string): number {
 
 function calculateSlotHours(startTime: string, endTime: string): number {
   const startMinutes = parseTimeToMinutes(startTime);
-  const endMinutes = parseTimeToMinutes(endTime);
+  let endMinutes = parseTimeToMinutes(endTime);
 
-  let duration = endMinutes - startMinutes;
-  if (duration <= 0) {
-    duration += 24 * 60;
+  if (endMinutes <= startMinutes || (startMinutes < parseTimeToMinutes(DEFAULT_START_TIME) && endMinutes === parseTimeToMinutes(DEFAULT_END_TIME))) {
+    endMinutes += 24 * 60;
   }
 
-  const hours = duration / 60;
-  return Math.min(Math.max(hours, 0), 24);
+  const hours = (endMinutes - startMinutes) / 60;
+  return Math.max(hours, 0);
 }
 
 function formatHours(hours: number): string {
