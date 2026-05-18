@@ -494,7 +494,7 @@ function calculateSlotHours(startTime: string, endTime: string): number {
   const startMinutes = parseTimeToMinutes(startTime);
   let endMinutes = parseTimeToMinutes(endTime);
 
-  if (endMinutes <= startMinutes || (startMinutes < parseTimeToMinutes(DEFAULT_START_TIME) && endMinutes === parseTimeToMinutes(DEFAULT_END_TIME))) {
+  if (endMinutes <= startMinutes || endMinutes === parseTimeToMinutes(DEFAULT_END_TIME)) {
     endMinutes += 24 * 60;
   }
 
