@@ -1673,7 +1673,6 @@ export default function SchedulePage() {
       await Promise.all(saveTasks);
 
       setHasUnsavedChanges(false);
-      await Promise.all(saveTasks);
 
       const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
       console.log(`Apollo schedule save completed in ${saveSeconds}s.`);
