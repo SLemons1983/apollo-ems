@@ -1488,6 +1488,15 @@ export default function SchedulePage() {
               extra.employee3 = slot;
               extra.showEmployee3 = Boolean(slot.employeeId);
             }
+            if (row.slot_number === 4) {
+            extra.employee4 = slot;
+            extra.visibleEmployeeSlots = Math.max(extra.visibleEmployeeSlots, 4);
+}
+
+           if (row.slot_number === 5) {
+           extra.employee5 = slot;
+           extra.visibleEmployeeSlots = Math.max(extra.visibleEmployeeSlots, 5);
+}
           } else {
             const shiftName = row.shift_key as ShiftName;
             if (!day.standard[shiftName]) {
@@ -1504,6 +1513,15 @@ export default function SchedulePage() {
             if (row.slot_number === 3) {
               shift.employee3 = slot;
               shift.showEmployee3 = Boolean(slot.employeeId);
+            }
+            if (row.slot_number === 4) {
+            shift.employee4 = slot;
+            shift.visibleEmployeeSlots = Math.max(shift.visibleEmployeeSlots, 4);
+            }
+
+            if (row.slot_number === 5) {
+            shift.employee5 = slot;
+            shift.visibleEmployeeSlots = Math.max(shift.visibleEmployeeSlots, 5);
             }
           }
         }
