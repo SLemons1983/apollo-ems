@@ -2977,59 +2977,23 @@ export default function SchedulePage() {
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setVisibleScheduleWeek('WEEK1')}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              visibleScheduleWeek === 'WEEK1'
-                ? 'bg-blue-700 text-white'
-                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Week 1
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const todayKey = toDateKey(new Date());
-              const todayIndex = dates.findIndex((date) => toDateKey(date) === todayKey);
-              if (todayIndex >= 7) {
-                setVisibleScheduleWeek('WEEK2');
-              } else {
-                setVisibleScheduleWeek('WEEK1');
-              }
-            }}
-            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
-          >
-            Today
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setVisibleScheduleWeek('WEEK2')}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              visibleScheduleWeek === 'WEEK2'
-                ? 'bg-blue-700 text-white'
-                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Week 2
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setVisibleScheduleWeek('ALL')}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              visibleScheduleWeek === 'ALL'
-                ? 'bg-slate-900 text-white'
-                : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            Full Pay Period
-          </button>
-
-          <button
+          <div className="min-w-[180px]">
+  <select
+    value={visibleScheduleWeek}
+    onChange={(event) =>
+      setVisibleScheduleWeek(
+        event.target.value as 'WEEK1' | 'WEEK2' | 'ALL'
+      )
+    }
+    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+  >
+    <option value="WEEK1">Week 1</option>
+    <option value="WEEK2">Week 2</option>
+    <option value="ALL">Full Pay Period</option>
+  </select>
+</div>
+          
+                      <button
             type="button"
             onClick={() => setShowOnDutyEmployees((value) => !value)}
             className={showOnDutyEmployees ? "rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800" : "rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"}
