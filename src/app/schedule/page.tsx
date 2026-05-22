@@ -624,14 +624,27 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
             maybeShift.employee3Note,
           );
 
-    const visibleEmployeeSlots =
+    const employee4 =
+    category === 'SUPERVISOR'
+      ? createEmptyEmployeeSlot()
+      : maybeShift.employee4 && typeof maybeShift.employee4 === 'object'
+        ? normalizeEmployeeSlot(maybeShift.employee4)
+        : createEmptyEmployeeSlot();
+
+  const employee5 =
+    category === 'SUPERVISOR'
+      ? createEmptyEmployeeSlot()
+      : maybeShift.employee5 && typeof maybeShift.employee5 === 'object'
+        ? normalizeEmployeeSlot(maybeShift.employee5)
+        : createEmptyEmployeeSlot();
+        const visibleEmployeeSlots =
     category === 'SUPERVISOR'
       ? 1
       : Math.max(
           2,
           Math.min(
             5,
-            Number(maybeShift.visibleEmployeeSlots ?? (maybeShift.showEmployee3 || employee3.employeeId ? 3 : 2)),
+            Number(maybeShift.visibleEmployeeSlots ?? (employee5.employeeId ? 5 : employee4.employeeId ? 4 : maybeShift.showEmployee3 || employee3.employeeId ? 3 : 2)),
           ),
         );
 
@@ -639,8 +652,8 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     employee1,
     employee2,
     employee3,
-    employee4: createEmptyEmployeeSlot(),
-    employee5: createEmptyEmployeeSlot(),
+    employee4,
+    employee5,
     showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybeShift.showEmployee3 || employee3.employeeId),
     visibleEmployeeSlots,
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
