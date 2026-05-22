@@ -3448,6 +3448,17 @@ export default function SchedulePage() {
                               employee.id,
                               getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
                             ]),
+                          ) as Record<string, EligibilityResult>,                          employee4: Object.fromEntries(
+                            employees.map((employee) => [
+                              employee.id,
+                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
+                            ]),
+                          ) as Record<string, EligibilityResult>,
+                          employee5: Object.fromEntries(
+                            employees.map((employee) => [
+                              employee.id,
+                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
+                            ]),
                           ) as Record<string, EligibilityResult>,
                         };
 
@@ -3590,8 +3601,30 @@ export default function SchedulePage() {
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
+                                                            {!isSupervisorShift &&
+                                renderEmployeeSlotEditor(
+                                  extra.employee4,
+                                  'Employee 4',
+                                  extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId),
+                                  (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee4', field, value),
+                                  isExpanded,
+                                  slotEligibilityMaps.employee4,
+                                  payPeriodHoursMap,
+                                  { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
+                                )}
 
-                              {!isSupervisorShift && !extra.showEmployee3 && !extra.employee3.employeeId && (
+                              {!isSupervisorShift &&
+                                renderEmployeeSlotEditor(
+                                  extra.employee5,
+                                  'Employee 5',
+                                  extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId),
+                                  (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee5', field, value),
+                                  isExpanded,
+                                  slotEligibilityMaps.employee5,
+                                  payPeriodHoursMap,
+                                  { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
+                                )}
+                              {!isSupervisorShift && extra.visibleEmployeeSlots < 5 && (
                                 <button
                                   type="button"
                                   onClick={() => handleAddEmployeeSlotToExtra(dateKey, extra.id)}
