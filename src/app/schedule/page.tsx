@@ -2303,7 +2303,7 @@ export default function SchedulePage() {
         </div>
 
         <div
-          className="space-y-3"
+          className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
           <select
@@ -2986,7 +2986,7 @@ export default function SchedulePage() {
                   }`}
                 >
                   <div
-          className="space-y-3"
+          className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
                     <div>
@@ -3092,13 +3092,13 @@ export default function SchedulePage() {
                             isExpanded ? null : expandedKey
                           )
                         }
-                        className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
+                        className={`cursor-pointer rounded-xl border p-2 shadow-sm transition ${
                           isExpanded
                             ? 'border-slate-500 bg-slate-200'
                             : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
                         }`}
                       >
-                        <div className="mb-3 flex items-center justify-between gap-2">
+                        <div className="mb-2 flex items-center justify-between gap-2">
                           <div
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                               staffingLevel === 'ALS'
@@ -3139,7 +3139,7 @@ export default function SchedulePage() {
                         </div>
 
                         <div
-          className="space-y-3"
+          className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
                           {renderEmployeeSlotEditor(
@@ -3252,7 +3252,7 @@ export default function SchedulePage() {
                         </div>
 
                         {isExpanded && warningMessages.length > 0 && (
-                          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                          <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2">
                             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                               Conflict Warnings
                             </div>
@@ -3265,7 +3265,7 @@ export default function SchedulePage() {
                         )}
 
                         {isExpanded && approvalMessages.length > 0 && (
-                          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                          <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2">
                             <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                               Extended Hours Approved
                             </div>
@@ -3297,7 +3297,7 @@ export default function SchedulePage() {
               return (
                 <div key={`extras-${dateKey}`} className="border-r border-slate-200 bg-white p-3 align-top">
                   <div
-          className="space-y-3"
+          className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
                     {day.extras.length === 0 ? (
@@ -3361,7 +3361,7 @@ export default function SchedulePage() {
                                 isExpanded ? null : expandedKey
                               )
                             }
-                            className={`cursor-pointer rounded-2xl border p-3 shadow-sm transition ${
+                            className={`cursor-pointer rounded-xl border p-2 shadow-sm transition ${
                               isExpanded
                                 ? 'border-slate-500 bg-slate-200'
                                 : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
@@ -3436,7 +3436,7 @@ export default function SchedulePage() {
                             </div>
 
                             <div
-          className="space-y-3"
+          className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
                               {renderEmployeeSlotEditor(
@@ -3549,7 +3549,7 @@ export default function SchedulePage() {
                             </div>
 
                             {isExpanded && warningMessages.length > 0 && (
-                              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                              <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-2">
                                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-red-700">
                                   Conflict Warnings
                                 </div>
@@ -3562,7 +3562,7 @@ export default function SchedulePage() {
                             )}
 
                             {isExpanded && approvalMessages.length > 0 && (
-                              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                              <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2">
                                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                                   Extended Hours Approved
                                 </div>
