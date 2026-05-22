@@ -57,12 +57,16 @@ type EmployeeSlot = {
   note: string;
   shiftType: ShiftType;
 };
+type ScheduleSlotKey = 'employee1' | 'employee2' | 'employee3' | 'employee4' | 'employee5';
 
 type ShiftAssignment = {
   employee1: EmployeeSlot;
   employee2: EmployeeSlot;
   employee3: EmployeeSlot;
+  employee4: EmployeeSlot;
+  employee5: EmployeeSlot;
   showEmployee3: boolean;
+  visibleEmployeeSlots: number;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
@@ -205,7 +209,7 @@ function normalizeMilitaryTime(value: string, fallback = DEFAULT_START_TIME): st
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function getDefaultEndTimeForShift(shiftName?: ShiftName, slotKey?: 'employee1' | 'employee2' | 'employee3'): string {
+function getDefaultEndTimeForShift(shiftName?: ShiftName, slotKey?: ScheduleSlotKey): string {
   return shiftName === 'ADMIN_SUP' && slotKey === 'employee1' ? '18:00' : DEFAULT_END_TIME;
 }
 
@@ -428,7 +432,10 @@ function createEmptyShift(showEmployee3 = false): ShiftAssignment {
     employee1: createEmptyEmployeeSlot(),
     employee2: createEmptyEmployeeSlot(),
     employee3: createEmptyEmployeeSlot(),
+    employee4: createEmptyEmployeeSlot(),
+    employee5: createEmptyEmployeeSlot(),
     showEmployee3,
+    visibleEmployeeSlots: showEmployee3 ? 3 : 2,
     vehicle: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
@@ -450,7 +457,10 @@ function createAdminSupervisorShift(): ShiftAssignment {
     employee1: createAdminSupervisorSlot(),
     employee2: createEmptyEmployeeSlot(),
     employee3: createEmptyEmployeeSlot(),
+    employee4: createEmptyEmployeeSlot(),
+    employee5: createEmptyEmployeeSlot(),
     showEmployee3: false,
+    visibleEmployeeSlots: 1,
     vehicle: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
@@ -611,11 +621,25 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
             maybeShift.employee3Note,
           );
 
+    const visibleEmployeeSlots =
+    category === 'SUPERVISOR'
+      ? 1
+      : Math.max(
+          2,
+          Math.min(
+            5,
+            Number(maybeShift.visibleEmployeeSlots ?? (maybeShift.showEmployee3 || employee3.employeeId ? 3 : 2)),
+          ),
+        );
+
   return {
     employee1,
     employee2,
     employee3,
+    employee4: createEmptyEmployeeSlot(),
+    employee5: createEmptyEmployeeSlot(),
     showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybeShift.showEmployee3 || employee3.employeeId),
+    visibleEmployeeSlots,
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
     allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
     hiddenFromEmployees: Boolean((maybeShift as any).hiddenFromEmployees),
