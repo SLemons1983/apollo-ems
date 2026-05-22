@@ -2789,7 +2789,7 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 xl:grid-cols-3">
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
@@ -2994,6 +2994,50 @@ export default function SchedulePage() {
               </div>
             )}
           </div>
+
+          <div className={`rounded-xl border p-3 shadow-sm ${showOnDutyEmployees ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                const nextValue = !showOnDutyEmployees;
+                closeSchedulePanels();
+                setShowOnDutyEmployees(nextValue);
+              }}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className={`text-sm font-bold ${showOnDutyEmployees ? 'text-emerald-800' : 'text-slate-900'}`}>On-Duty Now</div>
+                <div className={`mt-1 text-xs ${showOnDutyEmployees ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {onDutyEmployees.length} employee{onDutyEmployees.length === 1 ? '' : 's'} currently on duty.
+                </div>
+              </div>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${showOnDutyEmployees ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                {showOnDutyEmployees ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+          </div>
+
+          <div className={`rounded-xl border p-3 shadow-sm ${showOpenShiftsNeedingCoverage ? 'border-red-300 bg-red-50' : 'border-red-200 bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                const nextValue = !showOpenShiftsNeedingCoverage;
+                closeSchedulePanels();
+                setShowOpenShiftsNeedingCoverage(nextValue);
+              }}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className={`text-sm font-bold ${showOpenShiftsNeedingCoverage ? 'text-red-800' : 'text-slate-900'}`}>Open Shifts</div>
+                <div className={`mt-1 text-xs ${showOpenShiftsNeedingCoverage ? 'text-red-700' : 'text-slate-500'}`}>
+                  {openShiftsNeedingCoverage.length} shift{openShiftsNeedingCoverage.length === 1 ? '' : 's'} need coverage.
+                </div>
+              </div>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${showOpenShiftsNeedingCoverage ? 'bg-red-700 text-white' : 'bg-red-100 text-red-700'}`}>
+                {showOpenShiftsNeedingCoverage ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -3012,30 +3056,7 @@ export default function SchedulePage() {
     <option value="ALL">Full Pay Period</option>
   </select>
 </div>
-          
-                      <button
-            type="button"
-            onClick={() => {
-              const nextValue = !showOnDutyEmployees;
-              closeSchedulePanels();
-              setShowOnDutyEmployees(nextValue);
-            }}
-            className={showOnDutyEmployees ? "rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800" : "rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"}
-          >
-            On-Duty Now ({onDutyEmployees.length})
-          </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              const nextValue = !showOpenShiftsNeedingCoverage;
-              closeSchedulePanels();
-              setShowOpenShiftsNeedingCoverage(nextValue);
-            }}
-            className={showOpenShiftsNeedingCoverage ? "rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800" : "rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"}
-          >
-            Open Shifts ({openShiftsNeedingCoverage.length})
-          </button>
         </div>
 
         {showOpenShiftsNeedingCoverage && (
