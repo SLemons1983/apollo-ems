@@ -2947,7 +2947,7 @@ export default function SchedulePage() {
                 </div>
               </div>
 
-              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${hasUnreadSupervisorNotes ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${hasUnreadSupervisorNotes ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showSupervisorNotes ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
