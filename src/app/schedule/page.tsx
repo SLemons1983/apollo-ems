@@ -2167,12 +2167,52 @@ export default function SchedulePage() {
     });
   };
 
-  const handleAddEmployeeSlot = (dateKey: string, shiftName: ShiftName) => {
-    handleStandardShiftChange(dateKey, shiftName, 'showEmployee3', true);
+    const handleAddEmployeeSlot = (dateKey: string, shiftName: ShiftName) => {
+    markUnsavedChanges();
+    setScheduleDataSafely((current) => {
+      const next = cloneScheduleData(normalizeLoadedData(current));
+      if (!next[dateKey]) {
+        next[dateKey] = createEmptyDaySchedule();
+      }
+
+      const shift = next[dateKey].standard[shiftName];
+      if (SUPERVISOR_SHIFTS.has(shiftName)) {
+        shift.visibleEmployeeSlots = 1;
+        shift.showEmployee3 = false;
+        return next;
+      }
+
+      shift.visibleEmployeeSlots = Math.min(5, Math.max(3, shift.visibleEmployeeSlots + 1));
+      shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
+
+      return next;
+    });
   };
 
   const handleAddEmployeeSlotToExtra = (dateKey: string, extraId: string) => {
-    handleExtraShiftChange(dateKey, extraId, 'showEmployee3', true);
+    markUnsavedChanges();
+    setScheduleDataSafely((current) => {
+      const next = cloneScheduleData(normalizeLoadedData(current));
+      if (!next[dateKey]) {
+        next[dateKey] = createEmptyDaySchedule();
+      }
+
+      const extra = next[dateKey].extras.find((item) => item.id === extraId);
+      if (!extra) {
+        return current;
+      }
+
+      if (extra.category === 'SUPERVISOR') {
+        extra.visibleEmployeeSlots = 1;
+        extra.showEmployee3 = false;
+        return next;
+      }
+
+      extra.visibleEmployeeSlots = Math.min(5, Math.max(3, extra.visibleEmployeeSlots + 1));
+      extra.showEmployee3 = extra.visibleEmployeeSlots >= 3;
+
+      return next;
+    });
   };
 
   const handleAddShift = (dateKey: string) => {
