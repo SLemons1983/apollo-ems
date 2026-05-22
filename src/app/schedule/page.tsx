@@ -164,6 +164,8 @@ const STORAGE_KEY = 'apollo-schedule-page-v6';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 const APOLLO_MESSAGES_STORAGE_KEY = 'apollo-messages-v2';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
+const REVIEWED_DECISIONS_SIGNATURE_STORAGE_KEY = 'apollo-reviewed-decisions-signature-v1';
+const REVIEWED_SUPERVISOR_NOTES_SIGNATURE_STORAGE_KEY = 'apollo-reviewed-supervisor-notes-signature-v1';
 const PAY_PERIOD_REFERENCE_NUMBER = 9;
 const PAY_PERIOD_REFERENCE_START = '2026-04-12';
 
@@ -1283,8 +1285,9 @@ export default function SchedulePage() {
   const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
-  const [reviewedDecisionCount, setReviewedDecisionCount] = useState(0);
-  const [reviewedSupervisorNoteCount, setReviewedSupervisorNoteCount] = useState(0);
+  const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
+  const [reviewedDecisionSignature, setReviewedDecisionSignature] = useState('');
+  const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
 
   function markUnsavedChanges() {
     setHasUnsavedChanges(true);
@@ -1308,8 +1311,8 @@ export default function SchedulePage() {
     setAnchorDate(currentPayPeriodStart);
     setPayPeriodReady(true);
 
-    setReviewedDecisionCount(Number(localStorage.getItem('apollo-reviewed-decisions') ?? '0'));
-    setReviewedSupervisorNoteCount(Number(localStorage.getItem('apollo-reviewed-supervisor-notes') ?? '0'));
+    setReviewedDecisionSignature(localStorage.getItem(REVIEWED_DECISIONS_SIGNATURE_STORAGE_KEY) ?? '');
+    setReviewedSupervisorNoteSignature(localStorage.getItem(REVIEWED_SUPERVISOR_NOTES_SIGNATURE_STORAGE_KEY) ?? '');
   }, []);
 
   useEffect(() => {
@@ -1698,7 +1701,11 @@ export default function SchedulePage() {
       .sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
   }, [openShiftRequests]);
 
-  const hasUnreadOpenShiftDecisions = reviewedOpenShiftRequests.length > reviewedDecisionCount;
+  const openShiftDecisionSignature = reviewedOpenShiftRequests
+    .map((request) => `${request.id}:${request.status}:${request.supervisorNote ?? ''}`)
+    .join('|');
+
+  const hasUnreadOpenShiftDecisions = reviewedOpenShiftRequests.length > 0 && openShiftDecisionSignature !== reviewedDecisionSignature;
 
   async function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
     setOpenShiftRequests(nextRequests);
@@ -2477,6 +2484,24 @@ export default function SchedulePage() {
   const todayKey = toDateKey(now);
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
+  const openShiftsNeedingCoverage = dates.flatMap((date) => {
+    const dateKey = toDateKey(date);
+    const day = getDaySchedule(scheduleData, dateKey);
+
+    return getAssignmentRefsForDay(day).flatMap((assignment) =>
+      getAssignedSlotsForAssignment(assignment.category, assignment.shift)
+        .filter((slot) => isOpenShiftSlot(slot.employeeId))
+        .map((slot) => ({
+          dateKey,
+          shiftLabel: assignment.label,
+          slotLabel: getOpenShiftLabel(slot.employeeId),
+          vehicle: assignment.shift.vehicle || 'No vehicle assigned',
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        })),
+    );
+  });
+
     const onDutyEmployees = getAssignmentRefsForDay(getDaySchedule(scheduleData, todayKey))
     .flatMap((assignment) =>
       getAssignedSlotsForAssignment(assignment.category, assignment.shift)
@@ -2561,7 +2586,11 @@ export default function SchedulePage() {
     return [...standardNotes, ...extraNotes];
   });
 
-  const hasUnreadSupervisorNotes = supervisorNotes.length > reviewedSupervisorNoteCount;
+  const supervisorNotesSignature = supervisorNotes
+    .map((entry) => `${entry.id}:${entry.note}`)
+    .join('|');
+
+  const hasUnreadSupervisorNotes = supervisorNotes.length > 0 && supervisorNotesSignature !== reviewedSupervisorNoteSignature;
 
   if (!payPeriodReady) {
     return (
@@ -2729,8 +2758,8 @@ export default function SchedulePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      localStorage.setItem('apollo-reviewed-decisions', String(reviewedOpenShiftRequests.length));
-                      setReviewedDecisionCount(reviewedOpenShiftRequests.length);
+                      localStorage.setItem(REVIEWED_DECISIONS_SIGNATURE_STORAGE_KEY, openShiftDecisionSignature);
+                      setReviewedDecisionSignature(openShiftDecisionSignature);
                     }}
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
                   >
@@ -2789,8 +2818,8 @@ export default function SchedulePage() {
                   <button
                     type="button"
                     onClick={() => {
-                      localStorage.setItem('apollo-reviewed-supervisor-notes', String(supervisorNotes.length));
-                      setReviewedSupervisorNoteCount(supervisorNotes.length);
+                      localStorage.setItem(REVIEWED_SUPERVISOR_NOTES_SIGNATURE_STORAGE_KEY, supervisorNotesSignature);
+                      setReviewedSupervisorNoteSignature(supervisorNotesSignature);
                     }}
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
                   >
@@ -2887,7 +2916,34 @@ export default function SchedulePage() {
           >
             On-Duty Now ({onDutyEmployees.length})
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowOpenShiftsNeedingCoverage((value) => !value)}
+            className={showOpenShiftsNeedingCoverage ? "rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800" : "rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"}
+          >
+            Open Shifts ({openShiftsNeedingCoverage.length})
+          </button>
         </div>
+
+        {showOpenShiftsNeedingCoverage && (
+          <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+            <div className="text-sm font-bold text-red-900">Open Shifts Needing Coverage</div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {openShiftsNeedingCoverage.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-red-300 bg-white p-3 text-sm text-red-800">No open shifts in this pay period.</div>
+              ) : (
+                openShiftsNeedingCoverage.map((item) => (
+                  <div key={`${item.dateKey}-${item.shiftLabel}-${item.slotLabel}-${item.startTime}-${item.endTime}`} className="rounded-xl border border-red-200 bg-white p-3">
+                    <div className="text-sm font-bold text-slate-900">{item.slotLabel}</div>
+                    <div className="mt-1 text-xs text-slate-600">{item.shiftLabel} • {item.vehicle}</div>
+                    <div className="mt-1 text-xs font-semibold text-red-700">{item.dateKey} • {item.startTime} - {item.endTime}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         {showOnDutyEmployees && (
           <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
