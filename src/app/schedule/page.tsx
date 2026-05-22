@@ -2414,13 +2414,7 @@ export default function SchedulePage() {
                 Recommended: {recommendedEmployee.name}
               </div>
             )}
-            {slot.employeeId ? (
-              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {formatHours(slotHours)}h
-              </div>
-            ) : (
-              <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">0h</div>
-            )}
+
           </div>
         </div>
 
