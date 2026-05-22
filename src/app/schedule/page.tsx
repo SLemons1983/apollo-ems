@@ -1340,6 +1340,14 @@ export default function SchedulePage() {
     setSaveStatus('Unsaved changes. Click Confirm Changes to save.');
   }
 
+  function closeSchedulePanels() {
+    setShowPendingOpenShiftRequests(false);
+    setShowRecentOpenShiftDecisions(false);
+    setShowSupervisorNotes(false);
+    setShowOnDutyEmployees(false);
+    setShowOpenShiftsNeedingCoverage(false);
+  }
+
   function setScheduleDataSafely(updater: ScheduleData | ((current: ScheduleData) => ScheduleData)) {
     setScheduleData((current) => {
       const next = typeof updater === 'function' ? updater(current) : updater;
@@ -2785,7 +2793,11 @@ export default function SchedulePage() {
           <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
-              onClick={() => setShowPendingOpenShiftRequests((value) => !value)}
+              onClick={() => {
+                const nextValue = !showPendingOpenShiftRequests;
+                closeSchedulePanels();
+                setShowPendingOpenShiftRequests(nextValue);
+              }}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
@@ -2856,7 +2868,11 @@ export default function SchedulePage() {
           <div className={`rounded-xl border p-3 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
-              onClick={() => setShowRecentOpenShiftDecisions((value) => !value)}
+              onClick={() => {
+                const nextValue = !showRecentOpenShiftDecisions;
+                closeSchedulePanels();
+                setShowRecentOpenShiftDecisions(nextValue);
+              }}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
@@ -2915,7 +2931,11 @@ export default function SchedulePage() {
           <div className={`rounded-2xl border p-4 shadow-sm ${hasUnreadSupervisorNotes ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
-              onClick={() => setShowSupervisorNotes((value) => !value)}
+              onClick={() => {
+                const nextValue = !showSupervisorNotes;
+                closeSchedulePanels();
+                setShowSupervisorNotes(nextValue);
+              }}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
@@ -2995,7 +3015,11 @@ export default function SchedulePage() {
           
                       <button
             type="button"
-            onClick={() => setShowOnDutyEmployees((value) => !value)}
+            onClick={() => {
+              const nextValue = !showOnDutyEmployees;
+              closeSchedulePanels();
+              setShowOnDutyEmployees(nextValue);
+            }}
             className={showOnDutyEmployees ? "rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800" : "rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"}
           >
             On-Duty Now ({onDutyEmployees.length})
@@ -3003,7 +3027,11 @@ export default function SchedulePage() {
 
           <button
             type="button"
-            onClick={() => setShowOpenShiftsNeedingCoverage((value) => !value)}
+            onClick={() => {
+              const nextValue = !showOpenShiftsNeedingCoverage;
+              closeSchedulePanels();
+              setShowOpenShiftsNeedingCoverage(nextValue);
+            }}
             className={showOpenShiftsNeedingCoverage ? "rounded-xl bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-800" : "rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"}
           >
             Open Shifts ({openShiftsNeedingCoverage.length})
