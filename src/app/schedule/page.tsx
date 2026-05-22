@@ -2066,7 +2066,7 @@ export default function SchedulePage() {
   const handleStandardSlotChange = (
     dateKey: string,
     shiftName: ShiftName,
-    slotKey: 'employee1' | 'employee2' | 'employee3',
+    slotKey: ScheduleSlotKey,
     field: keyof EmployeeSlot,
     value: string,
   ) => {
@@ -2134,7 +2134,7 @@ export default function SchedulePage() {
   const handleExtraSlotChange = (
     dateKey: string,
     extraId: string,
-    slotKey: 'employee1' | 'employee2' | 'employee3',
+    slotKey: ScheduleSlotKey,
     field: keyof EmployeeSlot,
     value: string,
   ) => {
