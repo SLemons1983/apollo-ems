@@ -1282,6 +1282,7 @@ export default function SchedulePage() {
   const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
+  const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
   const [reviewedDecisionCount, setReviewedDecisionCount] = useState(0);
   const [reviewedSupervisorNoteCount, setReviewedSupervisorNoteCount] = useState(0);
 
@@ -2472,6 +2473,35 @@ export default function SchedulePage() {
     );
   }
 
+  const now = new Date();
+  const todayKey = toDateKey(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const onDutyEmployees = getAssignmentRefsForDay(getDaySchedule(scheduleData, todayKey))
+    .flatMap((assignment) =>
+      getAssignedSlotsForAssignment(assignment.category, assignment.shift)
+        .filter((slot) => slot.employeeId)
+        .map((slot) => ({
+          employeeName: getEmployeeById(slot.employeeId, employees)?.name ?? slot.employeeId,
+          shiftLabel: assignment.label,
+          vehicle: assignment.shift.vehicle || 'No vehicle assigned',
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+        })),
+    )
+    .filter((item) => {
+      const start = parseTimeToMinutes(item.startTime);
+      let end = parseTimeToMinutes(item.endTime);
+
+      if (end <= start || end === parseTimeToMinutes(DEFAULT_END_TIME)) {
+        end += 24 * 60;
+      }
+
+      const adjustedCurrentMinutes = currentMinutes < start ? currentMinutes + 24 * 60 : currentMinutes;
+
+      return adjustedCurrentMinutes >= start && adjustedCurrentMinutes <= end;
+    });
+
   const supervisorNotes = dates.flatMap<{
     id: string;
     dateKey: string;
@@ -2849,7 +2879,34 @@ export default function SchedulePage() {
           >
             Full Pay Period
           </button>
+
+          <button
+            type="button"
+            onClick={() => setShowOnDutyEmployees((value) => !value)}
+            className={showOnDutyEmployees ? "rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800" : "rounded-xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"}
+          >
+            On-Duty Now ({onDutyEmployees.length})
+          </button>
         </div>
+
+        {showOnDutyEmployees && (
+          <div className="mb-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="text-sm font-bold text-emerald-900">On-Duty Now</div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {onDutyEmployees.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-emerald-300 bg-white p-3 text-sm text-emerald-800">No employees currently on duty.</div>
+              ) : (
+                onDutyEmployees.map((item) => (
+                  <div key={`${item.employeeName}-${item.shiftLabel}-${item.startTime}-${item.endTime}`} className="rounded-xl border border-emerald-200 bg-white p-3">
+                    <div className="text-sm font-bold text-slate-900">{item.employeeName}</div>
+                    <div className="mt-1 text-xs text-slate-600">{item.shiftLabel} • {item.vehicle}</div>
+                    <div className="mt-1 text-xs font-semibold text-emerald-700">{item.startTime} - {item.endTime}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className={`grid ${visibleScheduleWeek === 'ALL' ? 'min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]' : 'min-w-[2100px] grid-cols-[180px_repeat(7,minmax(270px,1fr))]'}`}>
