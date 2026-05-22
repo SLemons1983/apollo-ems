@@ -2722,10 +2722,20 @@ export default function SchedulePage() {
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Schedule</h1>
+             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Sequoia Safety Council Schedule
+             </h1>
 
-            </div>
-
+              <div
+    className={`mt-2 inline-flex rounded-xl px-3 py-2 text-xs font-semibold ${
+      hasUnsavedChanges
+        ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+    }`}
+  >
+    {saveStatus}
+  </div>
+</div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="min-w-[340px]">
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -2757,11 +2767,7 @@ export default function SchedulePage() {
                 Confirm Changes
               </button>
 
-              <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
-                hasUnsavedChanges ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-              }`}>
-                {saveStatus}
-              </div>
+              
 
               <button
                 type="button"
