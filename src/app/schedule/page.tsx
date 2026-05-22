@@ -81,7 +81,10 @@ type ExtraShiftAssignment = {
   employee1: EmployeeSlot;
   employee2: EmployeeSlot;
   employee3: EmployeeSlot;
+  employee4: EmployeeSlot;
+  employee5: EmployeeSlot;
   showEmployee3: boolean;
+  visibleEmployeeSlots: number;
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
@@ -655,7 +658,10 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
       employee1: createEmptyEmployeeSlot(),
       employee2: createEmptyEmployeeSlot(),
       employee3: createEmptyEmployeeSlot(),
+      employee4: createEmptyEmployeeSlot(),
+      employee5: createEmptyEmployeeSlot(),
       showEmployee3: false,
+      visibleEmployeeSlots: 2,
       vehicle: '',
       allowExtendedHours: false,
       hiddenFromEmployees: false,
@@ -673,7 +679,10 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
     employee1: normalized.employee1,
     employee2: normalized.employee2,
     employee3: normalized.employee3,
+    employee4: normalized.employee4,
+    employee5: normalized.employee5,
     showEmployee3: normalized.showEmployee3,
+    visibleEmployeeSlots: normalized.visibleEmployeeSlots,
     vehicle: normalized.vehicle,
     allowExtendedHours: normalized.allowExtendedHours,
     hiddenFromEmployees: normalized.hiddenFromEmployees,
@@ -1443,7 +1452,10 @@ export default function SchedulePage() {
                 employee1: createEmptyEmployeeSlot(),
                 employee2: createEmptyEmployeeSlot(),
                 employee3: createEmptyEmployeeSlot(),
+                employee4: createEmptyEmployeeSlot(),
+                employee5: createEmptyEmployeeSlot(),
                 showEmployee3: false,
+                visibleEmployeeSlots: 2,
                 vehicle: (row.vehicle || '') as VehicleValue,
                 allowExtendedHours: Boolean(row.allow_extended_hours),
                 hiddenFromEmployees: Boolean(row.hidden_from_employees),
@@ -1500,7 +1512,7 @@ export default function SchedulePage() {
     };
   }, []);
 
-  function hasMeaningfulSlotData(slot: EmployeeSlot, shiftName?: ShiftName, slotKey?: 'employee1' | 'employee2' | 'employee3'): boolean {
+  function hasMeaningfulSlotData(slot: EmployeeSlot, shiftName?: ShiftName, slotKey?: ScheduleSlotKey): boolean {
     const defaultEndTime = getDefaultEndTimeForShift(shiftName, slotKey);
     return Boolean(
       slot.employeeId ||
@@ -1573,10 +1585,12 @@ export default function SchedulePage() {
 
         for (const shiftName of SHIFT_ORDER) {
           const shift = day.standard[shiftName];
-          const slots: Array<['employee1' | 'employee2' | 'employee3', EmployeeSlot]> = [
+          const slots: Array<[ScheduleSlotKey, EmployeeSlot]> = [
             ['employee1', shift.employee1],
             ['employee2', shift.employee2],
             ['employee3', shift.employee3],
+            ['employee4', shift.employee4],
+            ['employee5', shift.employee5],
           ];
 
           rows.push({
@@ -1625,10 +1639,12 @@ export default function SchedulePage() {
 
         for (const extra of day.extras) {
           const extraShiftKey = `EXTRA::${extra.category}::${extra.id}`;
-          const slots: Array<['employee1' | 'employee2' | 'employee3', EmployeeSlot]> = [
+          const slots: Array<[ScheduleSlotKey, EmployeeSlot]> = [
             ['employee1', extra.employee1],
             ['employee2', extra.employee2],
             ['employee3', extra.employee3],
+            ['employee4', extra.employee4],
+            ['employee5', extra.employee5],
           ];
 
           rows.push({
@@ -2182,7 +2198,10 @@ export default function SchedulePage() {
         employee1: createEmptyEmployeeSlot(),
         employee2: createEmptyEmployeeSlot(),
         employee3: createEmptyEmployeeSlot(),
+        employee4: createEmptyEmployeeSlot(),
+        employee5: createEmptyEmployeeSlot(),
         showEmployee3: false,
+        visibleEmployeeSlots: 2,
         vehicle: '',
         allowExtendedHours: false,
         hiddenFromEmployees: false,
