@@ -2782,7 +2782,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="mb-6 grid gap-4 xl:grid-cols-3">
-          <div className={`rounded-2xl border p-4 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowPendingOpenShiftRequests((value) => !value)}
@@ -2798,13 +2798,13 @@ export default function SchedulePage() {
                     : 'No pending open shift requests.'}
                 </div>
               </div>
-              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showPendingOpenShiftRequests ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showPendingOpenShiftRequests && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-2 space-y-2">
                 {pendingOpenShiftRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No pending open shift requests.
@@ -2853,7 +2853,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-2xl border p-4 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
             <button
               type="button"
               onClick={() => setShowRecentOpenShiftDecisions((value) => !value)}
@@ -2867,13 +2867,13 @@ export default function SchedulePage() {
                     : 'No reviewed open shift requests yet.'}
                 </div>
               </div>
-              <span className={`rounded-xl px-3 py-2 text-xs font-bold ${hasUnreadOpenShiftDecisions ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${hasUnreadOpenShiftDecisions ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showRecentOpenShiftDecisions ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showRecentOpenShiftDecisions && (
-              <div className="mt-4 space-y-2">
+              <div className="mt-2 space-y-2">
                 {reviewedOpenShiftRequests.length > 0 && (
                   <button
                     type="button"
