@@ -3116,9 +3116,8 @@ export default function SchedulePage() {
           className="space-y-2"
           onClick={(event) => event.stopPropagation()}
         >
-                    <div>
+                    <div className="text-center">
                       <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
-                      <div className="mt-1 text-xs text-slate-500">{dateKey}</div>
                     </div>
 
                     <div className="flex flex-col gap-2">
