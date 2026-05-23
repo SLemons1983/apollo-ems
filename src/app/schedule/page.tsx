@@ -2441,10 +2441,7 @@ export default function SchedulePage() {
               const eligibility = eligibilityMap[employee.id] ?? { eligible: true, reason: '' };
               const isRecommended = recommendedEmployee?.id === employee.id && !employee.name.toLowerCase().includes('richardson, russ');
               const isRequested = requestedEmployeeIdSet.has(employee.id);
-              const label = `${employee.name} — PP ${formatHours(payPeriodHours)}h — ${getAwardBucketLabel(
-                employee.employeeType,
-                payPeriodHours,
-              )}${isRequested ? ' — Requested Shift' : ''}${isRecommended ? ' — Recommended' : ''}${eligibility.warning ? ` — Warning: ${eligibility.warning}` : ''}`;
+              const label = `${employee.name}${isRequested ? ' — Requested' : ''}${isRecommended ? ' — Recommended' : ''}${eligibility.warning ? ` — Warning: ${eligibility.warning}` : ''}`;
 
               return (
                 <option key={employee.id} value={employee.id}>
