@@ -3211,7 +3211,7 @@ export default function SchedulePage() {
                       key={`${shiftName}-${dateKey}`}
                       className={`border-b border-r border-slate-200 p-3 ${
                         isTodayColumn
-                          ? 'bg-emerald-100'
+                          ? 'bg-emerald-200'
                           : isDarkScheduleRow
                             ? 'bg-slate-300'
                             : 'bg-white'
@@ -3446,7 +3446,7 @@ export default function SchedulePage() {
               return (
                 <div
                   key={`extras-${dateKey}`}
-                  className={`border-r border-slate-200 p-3 align-top ${isTodayColumn ? 'bg-emerald-100' : 'bg-white'}`}
+                  className={`border-r border-slate-200 p-3 align-top ${isTodayColumn ? 'bg-emerald-200' : 'bg-white'}`}
                 >
                   <div
           className="space-y-2"
