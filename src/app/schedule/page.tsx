@@ -2170,6 +2170,26 @@ export default function SchedulePage() {
     });
   };
 
+  function assignOpenShiftFromPanel(
+    dateKey: string,
+    assignmentKey: string,
+    slotKey: ScheduleSlotKey,
+    employeeId: string,
+  ) {
+    if (!employeeId) return;
+
+    if (assignmentKey.startsWith('standard-')) {
+      const shiftName = assignmentKey.replace('standard-', '') as ShiftName;
+      handleStandardSlotChange(dateKey, shiftName, slotKey, 'employeeId', employeeId);
+      return;
+    }
+
+    if (assignmentKey.startsWith('extra-')) {
+      const extraId = assignmentKey.replace('extra-', '');
+      handleExtraSlotChange(dateKey, extraId, slotKey, 'employeeId', employeeId);
+    }
+  }
+
   const handleExtraSlotChange = (
     dateKey: string,
     extraId: string,
@@ -2601,18 +2621,25 @@ export default function SchedulePage() {
     const dateKey = toDateKey(date);
     const day = getDaySchedule(scheduleData, dateKey);
 
-    return getAssignmentRefsForDay(day).flatMap((assignment) =>
-      getAssignedSlotsForAssignment(assignment.category, assignment.shift)
-        .filter((slot) => isOpenShiftSlot(slot.employeeId))
-        .map((slot) => ({
-          dateKey,
-          shiftLabel: assignment.label,
-          slotLabel: getOpenShiftLabel(slot.employeeId),
-          vehicle: assignment.shift.vehicle || 'No vehicle assigned',
-          startTime: slot.startTime,
-          endTime: slot.endTime,
-        })),
-    );
+    return getAssignmentRefsForDay(day).flatMap((assignment) => {
+      const shiftWithSlots = assignment.shift as ShiftAssignment | ExtraShiftAssignment;
+      const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+      return slotKeys
+        .filter((slotKey) => shiftWithSlots[slotKey] && isOpenShiftSlot(shiftWithSlots[slotKey].employeeId))
+        .map((slotKey) => {
+          const slot = shiftWithSlots[slotKey];
+          return {
+            dateKey,
+            assignmentKey: assignment.key,
+            slotKey,
+            shiftLabel: assignment.label,
+            slotLabel: getOpenShiftLabel(slot.employeeId),
+            vehicle: assignment.shift.vehicle || 'No vehicle assigned',
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+          };
+        });
+    });
   });
 
     const onDutyEmployees = getAssignmentRefsForDay(getDaySchedule(scheduleData, todayKey))
@@ -3062,6 +3089,27 @@ export default function SchedulePage() {
                     <div className="text-sm font-bold text-slate-900">{item.slotLabel}</div>
                     <div className="mt-1 text-xs text-slate-600">{item.shiftLabel} • {item.vehicle}</div>
                     <div className="mt-1 text-xs font-semibold text-red-700">{item.dateKey} • {item.startTime} - {item.endTime}</div>
+
+                    <select
+                      value=""
+                      onChange={(event) => assignOpenShiftFromPanel(item.dateKey, item.assignmentKey, item.slotKey, event.target.value)}
+                      className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                    >
+                      <option value="">Assign Employee</option>
+                      {employees
+                        .filter((employee) =>
+                          item.slotLabel === 'Open ALS'
+                            ? employee.scope === 'ALS'
+                            : item.slotLabel === 'Open BLS'
+                              ? employee.scope === 'BLS'
+                              : true
+                        )
+                        .map((employee) => (
+                          <option key={employee.id} value={employee.id}>
+                            {employee.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 ))
               )}
