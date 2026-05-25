@@ -3200,6 +3200,8 @@ export default function SchedulePage() {
                   const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
                   const approvalMessages = continuousHours.approvals;
                   const isSupervisorShift = category === 'SUPERVISOR';
+                  const isTodayColumn = toDateKey(new Date()) === dateKey;
+                  const isDarkScheduleRow = shiftName === 'R1' || shiftName === 'P' || shiftName === 'FIELD_SUP';
 
                   const expandedKey = `${shiftName}-${dateKey}`;
                   const isExpanded = expandedShiftKey === expandedKey;
@@ -3207,7 +3209,13 @@ export default function SchedulePage() {
                   return (
                     <div
                       key={`${shiftName}-${dateKey}`}
-                      className="border-b border-r border-slate-200 bg-white p-3"
+                      className={`border-b border-r border-slate-200 p-3 ${
+                        isTodayColumn
+                          ? 'bg-emerald-100'
+                          : isDarkScheduleRow
+                            ? 'bg-slate-300'
+                            : 'bg-white'
+                      }`}
                     >
                       <div
                         onClick={() =>
@@ -3433,9 +3441,13 @@ export default function SchedulePage() {
             {visibleDates.map((date) => {
               const dateKey = toDateKey(date);
               const day = getDaySchedule(scheduleData, dateKey);
+              const isTodayColumn = toDateKey(new Date()) === dateKey;
 
               return (
-                <div key={`extras-${dateKey}`} className="border-r border-slate-200 bg-white p-3 align-top">
+                <div
+                  key={`extras-${dateKey}`}
+                  className={`border-r border-slate-200 p-3 align-top ${isTodayColumn ? 'bg-emerald-100' : 'bg-white'}`}
+                >
                   <div
           className="space-y-2"
           onClick={(event) => event.stopPropagation()}
