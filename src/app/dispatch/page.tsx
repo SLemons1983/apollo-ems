@@ -17,6 +17,12 @@ export default function DispatchPage() {
     employees.find((e) => e.id === id)
       ? `${employees.find((e) => e.id === id)?.first_name} ${employees.find((e) => e.id === id)?.last_name}`
       : 'Open';
+
+  const weekDateKey = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - d.getDay() + offset);
+    return d.toISOString().slice(0, 10);
+  };
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
