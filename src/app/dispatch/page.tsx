@@ -23,6 +23,9 @@ export default function DispatchPage() {
     d.setDate(d.getDate() - d.getDay() + offset);
     return d.toISOString().slice(0, 10);
   };
+
+  const dayAssignments = (offset: number) =>
+    assignments.filter((item) => item.date_key === weekDateKey(offset));
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -44,7 +47,13 @@ export default function DispatchPage() {
             const date = new Date(today);
             date.setDate(today.getDate() - today.getDay() + index);
             const isToday = date.toDateString() === today.toDateString();
-            return <div key={index} className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}><div className="font-bold">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div><div className="mt-2 text-xs">{assignments.filter((item) => item.date_key === weekDateKey(index)).length} assignments</div></div>;
+            return <div key={index} className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}><div className="font-bold">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div><div className="mt-2 text-left text-xs">
+              {Array.from(new Set(dayAssignments(index).map((item) => item.shift_label)))
+                .slice(0, 6)
+                .map((label) => (
+                  <div key={label}>{label}</div>
+                ))}
+            </div></div>;
           })}
         </div>
       </div>
