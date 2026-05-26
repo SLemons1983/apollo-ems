@@ -787,7 +787,7 @@ function buildPayPeriodOptions(baseDate: Date, count = 12): PayPeriodOption[] {
     options.push({
       key: `${year}-pp-${index + 1}`,
       year,
-      number: index + 1,
+      number: index + 2,
       start,
       end,
     });
