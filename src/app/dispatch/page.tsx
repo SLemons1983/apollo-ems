@@ -44,7 +44,7 @@ export default function DispatchPage() {
             const date = new Date(today);
             date.setDate(today.getDate() - today.getDay() + index);
             const isToday = date.toDateString() === today.toDateString();
-            return <div key={index} className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}>{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div>;
+            return <div key={index} className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}><div className="font-bold">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div><div className="mt-2 text-xs">{assignments.filter((item) => item.date_key === weekDateKey(index)).length} assignments</div></div>;
           })}
         </div>
       </div>
