@@ -1975,6 +1975,7 @@ export default function SupervisorPage() {
           window.alert(`Payroll reopen failed: ${error.message}`);
         } else {
           setPayrollSubmission(null);
+          void addAuditEntry('PAYROLL_REOPENED', `Payroll reopened for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}.`);
           window.alert('Payroll reopened.');
         }
       });
