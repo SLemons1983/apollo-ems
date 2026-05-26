@@ -2014,6 +2014,7 @@ export default function SupervisorPage() {
     };
 
     setPayrollSubmission(submission);
+    void addAuditEntry('PAYROLL_SUBMITTED', `Payroll submitted for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)} (${approvedCount} approved timecards).`);
 
     supabase
       .from('payroll_submissions')
