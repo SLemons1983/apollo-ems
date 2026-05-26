@@ -1920,6 +1920,37 @@ export default function SupervisorPage() {
     printWindow.print();
   }
 
+  function submitPayroll() {
+    const approvedCount = reviewedTimecards.filter(
+      (timecard) => timecard.status === 'APPROVED'
+    ).length;
+
+    if (employeesNotSubmitted.length > 0) {
+      window.alert('Payroll cannot be submitted. Employees still have missing timecards.');
+      return;
+    }
+
+    if (pendingTimecards.length > 0) {
+      window.alert('Payroll cannot be submitted. Timecards are still pending review.');
+      return;
+    }
+
+    if (approvedCount === 0) {
+      window.alert('Payroll cannot be submitted. No approved timecards were found.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Submit payroll for ${approvedCount} approved timecard(s)?`
+    );
+
+    if (!confirmed) return;
+
+    window.alert(
+      'Payroll submission workflow validated. Email delivery and pay period locking will be added in the next phase.'
+    );
+  }
+
   function printAllTimecards() {
     const approvedCards = reviewedTimecards.filter((timecard) => timecard.status === 'APPROVED');
 
@@ -3369,6 +3400,14 @@ export default function SupervisorPage() {
                   className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700"
                 >
                   Save All PDF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={submitPayroll}
+                  className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800"
+                >
+                  Submit Payroll
                 </button>
               </div>
 
