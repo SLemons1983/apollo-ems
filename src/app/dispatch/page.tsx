@@ -1,0 +1,27 @@
+'use client';
+
+import Image from 'next/image';
+
+export default function DispatchPage() {
+  return (
+    <main className="min-h-screen bg-slate-100 px-4 py-6">
+      <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+        <div className="flex flex-col items-center justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Dispatch Schedule</h1>
+            <p className="mt-1 text-sm text-slate-600">Read-only weekly schedule view</p>
+          </div>
+
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <span>Powered by</span>
+            <Image src="/apollo-logo.png" alt="ApolloEMS" width={80} height={80} className="h-12 w-auto" />
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-600">
+          Weekly dispatch schedule view coming next.
+        </div>
+      </div>
+    </main>
+  );
+}
