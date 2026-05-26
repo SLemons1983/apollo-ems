@@ -438,6 +438,7 @@ export default function SupervisorPage() {
   const [showEula, setShowEula] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
+  const [scheduleAssignments, setScheduleAssignments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [authEmail, setAuthEmail] = useState('');
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
@@ -562,6 +563,17 @@ export default function SupervisorPage() {
                 reviewedBy: row.reviewed_by ?? undefined,
               })),
             );
+          }
+        });
+
+      supabase
+        .from('schedule_assignments')
+        .select('date_key,employee_id,is_open_slot')
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load schedule assignments:', error);
+          } else {
+            setScheduleAssignments(data ?? []);
           }
         });
 
@@ -695,10 +707,22 @@ export default function SupervisorPage() {
       .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
+  const scheduledEmployeeIds = useMemo(() => {
+    const startKey = makeDateInputValue(selectedPayPeriod.start);
+    const endKey = makeDateInputValue(selectedPayPeriod.end);
+
+    return new Set(
+      scheduleAssignments
+        .filter((row) => row.employee_id && row.date_key >= startKey && row.date_key <= endKey && !row.is_open_slot)
+        .map((row) => row.employee_id),
+    );
+  }, [scheduleAssignments, selectedPayPeriod.end, selectedPayPeriod.start]);
+
   const employeesNotSubmitted = useMemo(() => {
     const submittedEmployeeIds = new Set(selectedPayPeriodTimecards.map((timecard) => timecard.employeeId));
-    return employees.filter((employee) => employee.status.toLowerCase() === 'active' && !submittedEmployeeIds.has(employee.id));
-  }, [employees, selectedPayPeriodTimecards]);
+
+    return employees.filter((employee) => scheduledEmployeeIds.has(employee.id) && !submittedEmployeeIds.has(employee.id));
+  }, [employees, scheduledEmployeeIds, selectedPayPeriodTimecards]);
 
   function sendTimecardReminders() {
     if (employeesNotSubmitted.length === 0) {
@@ -1945,7 +1969,7 @@ export default function SupervisorPage() {
               }`}
             >
               {timecard.status === 'PENDING_SUPERVISOR_REVIEW'
-                ? 'Pending Review'
+                ? 'Pending Review ({pendingTimecards.length})'
                 : timecard.status === 'APPROVED'
                   ? 'Approved'
                   : 'Returned'}
@@ -3150,10 +3174,6 @@ export default function SupervisorPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                Supervisors submit their own timecards from their personal dashboard. Their own timecard must be approved by another supervisor or GM.
-              </div>
-
               <div>
                 <button
                   type="button"
@@ -3161,7 +3181,7 @@ export default function SupervisorPage() {
                   className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
                 >
                   <span className="text-sm font-semibold text-slate-900">
-                    Employees Not Submitted
+                    Employees Not Submitted ({employeesNotSubmitted.length})
                   </span>
 
                   <span className="text-xs font-bold text-slate-500">
@@ -3254,7 +3274,7 @@ export default function SupervisorPage() {
                   className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
                 >
                   <span className="text-sm font-semibold text-slate-900">
-                    Reviewed Timecards
+                    Reviewed Timecards ({reviewedTimecards.length})
                   </span>
 
                   <span className="text-xs font-bold text-slate-500">
