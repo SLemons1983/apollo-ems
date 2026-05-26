@@ -36,12 +36,12 @@ export default function DispatchPage() {
 
   const orderedShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor', 'Extra'].filter((label) => shiftLabels.includes(label));
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6">
+    <main className="min-h-screen bg-slate-300 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
         <div className="flex flex-col items-center justify-between gap-4 border-b border-slate-200 pb-5 md:flex-row">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Dispatch Schedule</h1>
-            <p className="mt-1 text-sm text-slate-600">Read-only weekly schedule view</p>
+            <h1 className="text-3xl font-bold text-slate-900">Sequoia Safety Council</h1>
+            <p className="mt-1 text-sm text-slate-600">Dispatch View of Schedule</p>
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
