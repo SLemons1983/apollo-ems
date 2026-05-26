@@ -29,6 +29,12 @@ export default function DispatchPage() {
 
   const dayShifts = (offset: number) =>
     Array.from(new Set(dayAssignments(offset).map((item) => item.shift_label)));
+
+  const shiftLabels = Array.from(
+    new Set(assignments.map((item) => item.shift_label)),
+  );
+
+  const orderedShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor', 'Extra'].filter((label) => shiftLabels.includes(label));
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -44,23 +50,23 @@ export default function DispatchPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-600 md:grid-cols-7">
-          {Array.from({ length: 7 }, (_, index) => {
-            const today = new Date();
-            const date = new Date(today);
-            date.setDate(today.getDate() - today.getDay() + index);
-            const isToday = date.toDateString() === today.toDateString();
-            return <div key={index} className={`rounded-xl border p-4 ${isToday ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-700'}`}><div className="font-bold">{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div><div className="mt-2 text-left text-xs">
-              {dayShifts(index).map((label) => (
-                  <div
-                    key={label}
-                    className="mb-2 rounded-xl border border-slate-200 bg-slate-100 p-2 text-left"
-                  >
-                    <div className="font-semibold">{label}</div>
-                  </div>
-                ))}
-            </div></div>;
-          })}
+        <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid min-w-[1100px] grid-cols-[160px_repeat(7,1fr)] gap-2 text-sm">
+            <div className="rounded-xl bg-slate-200 p-3 font-bold text-slate-700">Shift</div>
+            {Array.from({ length: 7 }, (_, index) => {
+              const today = new Date();
+              const date = new Date(today);
+              date.setDate(today.getDate() - today.getDay() + index);
+              const isToday = date.toDateString() === today.toDateString();
+              return <div key={index} className={`rounded-xl p-3 text-center font-bold ${isToday ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })}</div>;
+            })}
+            {orderedShiftLabels.map((label) => (
+              <div key={label} className="contents">
+                <div className="rounded-xl bg-slate-300 p-3 font-bold text-slate-800">{label}</div>
+                {Array.from({ length: 7 }, (_, index) => <div key={`${label}-${index}`} className="min-h-[80px] rounded-xl border border-slate-200 bg-white p-3" />)}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </main>
