@@ -1920,6 +1920,152 @@ export default function SupervisorPage() {
     printWindow.print();
   }
 
+  function printAllTimecards() {
+    const approvedCards = reviewedTimecards.filter((timecard) => timecard.status === 'APPROVED');
+
+    if (approvedCards.length === 0) {
+      window.alert('No approved timecards available for printing.');
+      return;
+    }
+
+    const html = approvedCards
+      .map((timecard) => {
+        const element = document.getElementById(`printable-${timecard.id}`);
+        if (!element) return '';
+
+        return `
+          <div class="payroll-packet-page">
+            ${element.innerHTML}
+          </div>
+        `;
+      })
+      .join('');
+
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Payroll Packet</title>
+          <style>
+            @page {
+              size: letter landscape;
+              margin: 0.25in;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 0;
+              color: #0f172a;
+              font-size: 12px;
+              line-height: 1.15;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 11px;
+              page-break-inside: avoid;
+            }
+
+            th,
+            td {
+              border: 1px solid #334155;
+              padding: 2px 3px;
+              text-align: center;
+              vertical-align: middle;
+            }
+
+            .no-print {
+              display: none !important;
+            }
+
+            .payroll-packet-page {
+              width: 100%;
+              max-height: 7.5in;
+              overflow: hidden;
+              page-break-after: always;
+              page-break-inside: avoid;
+            }
+
+            .payroll-packet-page:last-child {
+              page-break-after: avoid;
+            }
+
+            .rounded-2xl,
+            .rounded-xl {
+              border-radius: 4px !important;
+            }
+
+            .p-5,
+            .p-4,
+            .p-3 {
+              padding: 4px !important;
+            }
+
+            .mt-5,
+            .mt-4,
+            .mt-3,
+            .mt-2,
+            .mt-1,
+            .mb-5,
+            .mb-4,
+            .mb-3,
+            .mb-2,
+            .mb-1 {
+              margin-top: 3px !important;
+              margin-bottom: 3px !important;
+            }
+
+            .grid {
+              display: grid;
+            }
+
+            .md\\:grid-cols-2 {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .xl\\:grid-cols-5 {
+              grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+
+            .text-xl {
+              font-size: 16px !important;
+            }
+
+            .text-base,
+            .text-sm {
+              font-size: 12px !important;
+            }
+
+            .text-xs {
+              font-size: 11px !important;
+            }
+
+            .overflow-auto {
+              overflow: visible !important;
+            }
+          </style>
+        </head>
+        <body>${html}</body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
   function renderSubmittedTimecard(timecard: SubmittedTimecard) {
     const payPeriodStart = new Date(timecard.payPeriodStart);
     const allDates = Array.from({ length: 14 }, (_, index) => addDays(payPeriodStart, index));
@@ -3214,6 +3360,16 @@ export default function SupervisorPage() {
                     </div>
                   </>
                 )}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={printAllTimecards}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700"
+                >
+                  Save All PDF
+                </button>
               </div>
 
               <div>
