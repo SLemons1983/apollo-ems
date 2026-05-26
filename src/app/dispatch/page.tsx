@@ -35,6 +35,8 @@ export default function DispatchPage() {
   );
 
   const orderedShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor', 'Extra'].filter((label) => shiftLabels.includes(label));
+
+  const cellAssignments = (label: string, offset: number) => dayAssignments(offset).filter((item) => item.shift_label === label);
   return (
     <main className="min-h-screen bg-slate-300 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -63,7 +65,14 @@ export default function DispatchPage() {
             {orderedShiftLabels.map((label) => (
               <div key={label} className="contents">
                 <div className="rounded-xl bg-slate-300 p-3 font-bold text-slate-800">{label}</div>
-                {Array.from({ length: 7 }, (_, index) => <div key={`${label}-${index}`} className="min-h-[80px] rounded-xl border border-slate-200 bg-white p-3" />)}
+                {Array.from({ length: 7 }, (_, index) => (
+                  <div key={`${label}-${index}`} className="min-h-[80px] rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700">
+                    <div className="font-bold text-slate-900">{cellAssignments(label, index)[0]?.vehicle || ''}</div>
+                    {cellAssignments(label, index).filter((item) => item.slot_number > 0).map((item) => (
+                      <div key={item.id}>{item.is_open_slot ? `Open ${item.open_slot_scope ?? ''}` : getEmployeeName(item.employee_id)}</div>
+                    ))}
+                  </div>
+                ))}
               </div>
             ))}
           </div>
