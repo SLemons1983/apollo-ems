@@ -6,9 +6,11 @@ import { supabase } from '@/lib/supabase';
 
 export default function DispatchPage() {
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.from('schedule_assignments').select('*').then(({ data }) => setAssignments(data ?? []));
+    supabase.from('employees').select('id,first_name,last_name').then(({ data }) => setEmployees(data ?? []));
   }, []);
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
