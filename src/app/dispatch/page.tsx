@@ -12,6 +12,11 @@ export default function DispatchPage() {
     supabase.from('schedule_assignments').select('*').then(({ data }) => setAssignments(data ?? []));
     supabase.from('employees').select('id,first_name,last_name').then(({ data }) => setEmployees(data ?? []));
   }, []);
+
+  const getEmployeeName = (id: string) =>
+    employees.find((e) => e.id === id)
+      ? `${employees.find((e) => e.id === id)?.first_name} ${employees.find((e) => e.id === id)?.last_name}`
+      : 'Open';
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
@@ -19,7 +24,7 @@ export default function DispatchPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Dispatch Schedule</h1>
             <p className="mt-1 text-sm text-slate-600">Read-only weekly schedule view</p>
-            <div className="mt-2 text-xs text-slate-500">Loaded {assignments.length} assignments</div>
+            <div className="mt-2 text-xs text-slate-500">Loaded {assignments.length} assignments • Example: {assignments[0] ? getEmployeeName(assignments[0].employee_id) : 'Loading...'}</div>
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
