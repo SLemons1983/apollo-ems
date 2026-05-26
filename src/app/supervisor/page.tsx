@@ -476,6 +476,8 @@ export default function SupervisorPage() {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
   }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
 
+  const payrollLocked = payrollSubmission?.payPeriodKey === selectedPayPeriod.key;
+
   const currentEmployee = useMemo(() => {
     const normalizedAuthEmail = authEmail.trim().toLowerCase();
 
@@ -1948,6 +1950,34 @@ export default function SupervisorPage() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+  }
+
+  function reopenPayroll() {
+    if (!payrollLocked) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Reopen this pay period? This will remove the payroll submission record and allow timecard changes again.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    supabase
+      .from('payroll_submissions')
+      .delete()
+      .eq('pay_period_key', selectedPayPeriod.key)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to reopen payroll:', error);
+          window.alert(`Payroll reopen failed: ${error.message}`);
+        } else {
+          setPayrollSubmission(null);
+          window.alert('Payroll reopened.');
+        }
+      });
   }
 
   function submitPayroll() {
@@ -3452,7 +3482,7 @@ export default function SupervisorPage() {
               {payrollSubmission?.payPeriodKey === selectedPayPeriod.key && (
                 <div className="rounded-xl border border-blue-300 bg-blue-50 p-4">
                   <div className="text-lg font-bold text-blue-800">
-                    Payroll Submitted
+                    🔒 PAYROLL LOCKED
                   </div>
 
                   <div className="mt-2 text-sm text-blue-700">
@@ -3466,6 +3496,14 @@ export default function SupervisorPage() {
                   <div className="text-sm text-blue-700">
                     Approved Timecards: {payrollSubmission.approvedCount}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={reopenPayroll}
+                    className="mt-3 rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                  >
+                    Reopen Payroll
+                  </button>
                 </div>
               )}
 
