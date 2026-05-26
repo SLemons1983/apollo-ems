@@ -1952,14 +1952,35 @@ export default function SupervisorPage() {
 
     if (!confirmed) return;
 
-    setPayrollSubmission({
+    const submission = {
       submittedBy: currentEmployee?.name ?? 'Supervisor',
       submittedAt: new Date().toISOString(),
       payPeriodKey: selectedPayPeriod.key,
       approvedCount,
-    });
+    };
 
-    window.alert('Payroll submission recorded.');
+    setPayrollSubmission(submission);
+
+    supabase
+      .from('payroll_submissions')
+      .upsert(
+        {
+          pay_period_key: submission.payPeriodKey,
+          submitted_by: submission.submittedBy,
+          submitted_at: submission.submittedAt,
+          approved_timecards: submission.approvedCount,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'pay_period_key' },
+      )
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save payroll submission:', error);
+          window.alert(`Payroll submission save failed: ${error.message}`);
+        } else {
+          window.alert('Payroll submission recorded.');
+        }
+      });
   }
 
   function printAllTimecards() {
