@@ -17,6 +17,7 @@ export default function DispatchPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Dispatch Schedule</h1>
             <p className="mt-1 text-sm text-slate-600">Read-only weekly schedule view</p>
+            <div className="mt-2 text-xs text-slate-500">Loaded {assignments.length} assignments</div>
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
