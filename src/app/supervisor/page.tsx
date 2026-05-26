@@ -3174,6 +3174,48 @@ export default function SupervisorPage() {
                 </div>
               </div>
 
+              <div
+                className={`rounded-xl border p-4 ${
+                  employeesNotSubmitted.length === 0 && pendingTimecards.length === 0
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-amber-300 bg-amber-50'
+                }`}
+              >
+                {employeesNotSubmitted.length === 0 && pendingTimecards.length === 0 ? (
+                  <>
+                    <div className="text-lg font-bold text-emerald-800">
+                      ✅ PAYROLL READY
+                    </div>
+
+                    <div className="mt-2 text-sm text-emerald-700">
+                      Scheduled Employees: {scheduledEmployeeIds.size}
+                    </div>
+
+                    <div className="text-sm text-emerald-700">
+                      Submitted Timecards: {selectedPayPeriodTimecards.length}
+                    </div>
+
+                    <div className="text-sm text-emerald-700">
+                      Pending Reviews: 0
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-lg font-bold text-amber-800">
+                      ⚠ PAYROLL NOT READY
+                    </div>
+
+                    <div className="mt-2 text-sm text-amber-700">
+                      Missing Timecards: {employeesNotSubmitted.length}
+                    </div>
+
+                    <div className="text-sm text-amber-700">
+                      Pending Reviews: {pendingTimecards.length}
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div>
                 <button
                   type="button"
