@@ -584,6 +584,30 @@ export default function SupervisorPage() {
         });
 
       supabase
+        .from('payroll_submissions')
+        .select('*')
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load payroll submissions:', error);
+          } else {
+            const currentSubmission = (data ?? []).find(
+              (row: any) => row.pay_period_key === selectedPayPeriod.key,
+            );
+
+            setPayrollSubmission(
+              currentSubmission
+                ? {
+                    submittedBy: currentSubmission.submitted_by,
+                    submittedAt: currentSubmission.submitted_at,
+                    payPeriodKey: currentSubmission.pay_period_key,
+                    approvedCount: currentSubmission.approved_timecards,
+                  }
+                : null,
+            );
+          }
+        });
+
+      supabase
         .from('apollo_messages')
         .select('*')
         .order('created_at', { ascending: false })
