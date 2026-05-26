@@ -65,6 +65,10 @@ export default function LoginPage() {
             Sign in with Google
           </button>
 
+          <button type="button" onClick={() => { window.location.href = '/dispatch-login'; }} className="mt-3 w-full max-w-md cursor-pointer rounded-2xl border border-slate-300 bg-white px-4 py-4 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:scale-[0.99]">
+            Dispatch Login
+          </button>
+
           {statusMessage && (
             <div className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
               {statusMessage}
