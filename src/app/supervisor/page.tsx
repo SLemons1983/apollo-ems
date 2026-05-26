@@ -449,6 +449,12 @@ export default function SupervisorPage() {
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [returnComments, setReturnComments] = useState<Record<string, string>>({});
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
+  const [payrollSubmission, setPayrollSubmission] = useState<{
+    submittedBy: string;
+    submittedAt: string;
+    payPeriodKey: string;
+    approvedCount: number;
+  } | null>(null);
   const [builderStartDate, setBuilderStartDate] = useState('');
   const [builderEndDate, setBuilderEndDate] = useState('');
   const [builderSchedule, setBuilderSchedule] = useState<BuilderSchedule>({});
@@ -1946,9 +1952,14 @@ export default function SupervisorPage() {
 
     if (!confirmed) return;
 
-    window.alert(
-      'Payroll submission workflow validated. Email delivery and pay period locking will be added in the next phase.'
-    );
+    setPayrollSubmission({
+      submittedBy: currentEmployee?.name ?? 'Supervisor',
+      submittedAt: new Date().toISOString(),
+      payPeriodKey: selectedPayPeriod.key,
+      approvedCount,
+    });
+
+    window.alert('Payroll submission recorded.');
   }
 
   function printAllTimecards() {
@@ -3392,6 +3403,26 @@ export default function SupervisorPage() {
                   </>
                 )}
               </div>
+
+              {payrollSubmission?.payPeriodKey === selectedPayPeriod.key && (
+                <div className="rounded-xl border border-blue-300 bg-blue-50 p-4">
+                  <div className="text-lg font-bold text-blue-800">
+                    Payroll Submitted
+                  </div>
+
+                  <div className="mt-2 text-sm text-blue-700">
+                    Submitted By: {payrollSubmission.submittedBy}
+                  </div>
+
+                  <div className="text-sm text-blue-700">
+                    Submitted On: {new Date(payrollSubmission.submittedAt).toLocaleString()}
+                  </div>
+
+                  <div className="text-sm text-blue-700">
+                    Approved Timecards: {payrollSubmission.approvedCount}
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2">
                 <button
