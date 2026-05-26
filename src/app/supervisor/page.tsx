@@ -3372,6 +3372,12 @@ export default function SupervisorPage() {
                 </button>
               </div>
 
+              <div className="hidden">
+                {reviewedTimecards
+                  .filter((timecard) => timecard.status === 'APPROVED')
+                  .map((timecard) => renderSubmittedTimecard(timecard))}
+              </div>
+
               <div>
                 <button
                   type="button"
