@@ -1,8 +1,15 @@
 'use client';
 
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 export default function DispatchPage() {
+  const [assignments, setAssignments] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from('schedule_assignments').select('*').then(({ data }) => setAssignments(data ?? []));
+  }, []);
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
