@@ -34,7 +34,7 @@ export default function DispatchPage() {
     new Set(assignments.map((item) => item.shift_label)),
   );
 
-  const orderedShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor', 'Extra'].filter((label) => shiftLabels.includes(label));
+  const orderedShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor'];
 
   const cellAssignments = (label: string, offset: number) => dayAssignments(offset).filter((item) => item.shift_label === label);
   return (
