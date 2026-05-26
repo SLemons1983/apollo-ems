@@ -438,6 +438,7 @@ export default function SupervisorPage() {
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [authEmail, setAuthEmail] = useState('');
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
@@ -466,6 +467,47 @@ export default function SupervisorPage() {
   const selectedPayPeriod = useMemo(() => {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
   }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
+
+  const currentEmployee = useMemo(() => {
+    const normalizedAuthEmail = authEmail.trim().toLowerCase();
+
+    if (!normalizedAuthEmail) {
+      return null;
+    }
+
+    return employees.find((employee) => employee.email.trim().toLowerCase() === normalizedAuthEmail) ?? null;
+  }, [authEmail, employees]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAuthenticatedUser() {
+      const { data } = await supabase.auth.getSession();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setAuthEmail(data.session?.user?.email?.trim().toLowerCase() ?? '');
+    }
+
+    loadAuthenticatedUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setAuthEmail(session?.user?.email?.trim().toLowerCase() ?? '');
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -2422,13 +2464,28 @@ export default function SupervisorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Supervisor</h1>
-            <div className="mt-1 text-sm text-slate-600">
-              Supervisor tools using the same tile format as the employee dashboard.
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            {systemConfig.logoDataUrl && (
+              <img
+                src={systemConfig.logoDataUrl}
+                alt={`${systemConfig.companyName} logo`}
+                className="h-16 w-16 rounded-xl object-contain"
+              />
+            )}
+
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                {systemConfig.companyName} Supervisor
+              </h1>
+              <div className="mt-1 text-sm text-slate-600">
+                Supervisor tools, scheduling, timecards, announcements, and employee communication.
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-700">
+                Welcome, {currentEmployee?.name || 'Supervisor'}
+              </div>
             </div>
           </div>
         </div>
