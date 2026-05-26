@@ -433,6 +433,7 @@ export default function SupervisorPage() {
   const [showEmployeesNotSubmitted, setShowEmployeesNotSubmitted] = useState(false);
   const [showPendingReview, setShowPendingReview] = useState(false);
   const [showReviewedTimecards, setShowReviewedTimecards] = useState(false);
+  const [selectedTimecardId, setSelectedTimecardId] = useState<string | null>(null);
   const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
   const [showEula, setShowEula] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
@@ -698,6 +699,40 @@ export default function SupervisorPage() {
     const submittedEmployeeIds = new Set(selectedPayPeriodTimecards.map((timecard) => timecard.employeeId));
     return employees.filter((employee) => employee.status.toLowerCase() === 'active' && !submittedEmployeeIds.has(employee.id));
   }, [employees, selectedPayPeriodTimecards]);
+
+  function sendTimecardReminders() {
+    if (employeesNotSubmitted.length === 0) {
+      window.alert('All active employees have submitted timecards for this pay period.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Send timecard reminder to ${employeesNotSubmitted.length} employee${employeesNotSubmitted.length === 1 ? '' : 's'}?`);
+    if (!confirmed) return;
+
+    const createdAt = new Date().toISOString();
+    const reminderMessage: ApolloMessage = {
+      id: `timecard-reminder-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      conversationId: `conversation-timecard-reminder-${selectedPayPeriod.key}-${Date.now()}`,
+      senderId: CURRENT_SUPERVISOR_ID,
+      senderName: currentEmployee?.name || 'Supervisor',
+      senderRole: 'Supervisor',
+      recipients: employeesNotSubmitted.map((employee) => ({
+        employeeId: employee.id,
+        deliveredAt: createdAt,
+        readAt: null,
+      })),
+      audienceLabel: `Employees missing timecards (${employeesNotSubmitted.length})`,
+      title: 'Timecard Reminder',
+      body: `Your timecard for the pay period ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)} has not been submitted yet. Please log into ApolloEMS and submit your timecard as soon as possible.`,
+      createdAt,
+      relatedType: 'TIMECARD_REMINDER',
+      relatedId: selectedPayPeriod.key,
+      priority: 'IMPORTANT',
+    };
+
+    saveApolloMessages([reminderMessage, ...apolloMessages]);
+    window.alert('Timecard reminders sent.');
+  }
 
 
 
@@ -1767,14 +1802,14 @@ export default function SupervisorPage() {
               margin: 0;
               padding: 0;
               color: #0f172a;
-              font-size: 9px;
+              font-size: 12px;
               line-height: 1.15;
             }
 
             table {
               width: 100%;
               border-collapse: collapse;
-              font-size: 8px;
+              font-size: 11px;
               page-break-inside: avoid;
             }
 
@@ -1828,16 +1863,16 @@ export default function SupervisorPage() {
             }
 
             .text-xl {
-              font-size: 11px !important;
+              font-size: 16px !important;
             }
 
             .text-base,
             .text-sm {
-              font-size: 9px !important;
+              font-size: 12px !important;
             }
 
             .text-xs {
-              font-size: 8px !important;
+              font-size: 11px !important;
             }
 
             .overflow-auto {
@@ -2594,7 +2629,8 @@ export default function SupervisorPage() {
                           </div>
                         ))}
                       </div>
-                    )}                  <div className="mt-4 flex justify-end">
+                    )}
+                  <div className="mt-4 flex justify-end">
                     <button
                       type="button"
                       onClick={launchBuilderSchedule}
@@ -3140,12 +3176,22 @@ export default function SupervisorPage() {
                         All active employees have submitted a timecard for this pay period.
                       </div>
                     ) : (
-                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                        {employeesNotSubmitted.map((employee) => (
-                          <div key={employee.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                            {employee.name}
-                          </div>
-                        ))}
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={sendTimecardReminders}
+                          className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                        >
+                          Remind Employees
+                        </button>
+
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {employeesNotSubmitted.map((employee) => (
+                            <div key={employee.id} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                              {employee.name}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </>
@@ -3174,8 +3220,27 @@ export default function SupervisorPage() {
                         No submitted timecards are pending review.
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {pendingTimecards.map((timecard) => renderSubmittedTimecard(timecard))}
+                      <div className="space-y-3">
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {pendingTimecards.map((timecard) => (
+                            <button
+                              key={timecard.id}
+                              type="button"
+                              onClick={() => setSelectedTimecardId(selectedTimecardId === timecard.id ? null : timecard.id)}
+                              className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                                selectedTimecardId === timecard.id
+                                  ? 'border-blue-300 bg-blue-50 text-blue-800'
+                                  : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+                              }`}
+                            >
+                              {timecard.employeeName}
+                            </button>
+                          ))}
+                        </div>
+
+                        {pendingTimecards.map((timecard) =>
+                          selectedTimecardId === timecard.id ? renderSubmittedTimecard(timecard) : null
+                        )}
                       </div>
                     )}
                   </>
@@ -3204,8 +3269,27 @@ export default function SupervisorPage() {
                         No reviewed timecards yet.
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {reviewedTimecards.slice(0, 10).map((timecard) => renderSubmittedTimecard(timecard))}
+                      <div className="space-y-3">
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {reviewedTimecards.slice(0, 10).map((timecard) => (
+                            <button
+                              key={timecard.id}
+                              type="button"
+                              onClick={() => setSelectedTimecardId(selectedTimecardId === timecard.id ? null : timecard.id)}
+                              className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                                selectedTimecardId === timecard.id
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                  : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+                              }`}
+                            >
+                              {timecard.employeeName}
+                            </button>
+                          ))}
+                        </div>
+
+                        {reviewedTimecards.slice(0, 10).map((timecard) =>
+                          selectedTimecardId === timecard.id ? renderSubmittedTimecard(timecard) : null
+                        )}
                       </div>
                     )}
                   </>
