@@ -13,6 +13,11 @@ export default function DispatchPage() {
     supabase.from('employees').select('id,first_name,last_name').then(({ data }) => setEmployees(data ?? []));
   }, []);
 
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    window.location.href = '/dispatch-login';
+  }
+
   const getEmployeeName = (id: string) =>
     employees.find((e) => e.id === id)
       ? `${employees.find((e) => e.id === id)?.first_name} ${employees.find((e) => e.id === id)?.last_name}`
@@ -49,6 +54,7 @@ export default function DispatchPage() {
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
+            <button type="button" onClick={handleLogout} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100">Logout</button>
             <span>Powered by</span>
             <Image src="/apollo-logo.png" alt="ApolloEMS" width={80} height={80} className="h-12 w-auto" />
           </div>
