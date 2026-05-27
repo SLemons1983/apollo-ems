@@ -2558,9 +2558,13 @@ export default function SchedulePage() {
                     inputMode="numeric"
                     pattern="[0-2][0-9]:[0-5][0-9]"
                     placeholder="06:00"
-                    value={slot.startTime}
-                    onChange={(event) => onChange('startTime', event.target.value)}
+                    defaultValue={slot.startTime}
                     onBlur={(event) => onChange('startTime', normalizeMilitaryTime(event.target.value, DEFAULT_START_TIME))}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.currentTarget.blur();
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                   />
                 </div>
@@ -2574,9 +2578,13 @@ export default function SchedulePage() {
                     inputMode="numeric"
                     pattern="[0-2][0-9]:[0-5][0-9]"
                     placeholder="06:00"
-                    value={slot.endTime}
-                    onChange={(event) => onChange('endTime', event.target.value)}
+                    defaultValue={slot.endTime}
                     onBlur={(event) => onChange('endTime', normalizeMilitaryTime(event.target.value, DEFAULT_END_TIME))}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.currentTarget.blur();
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                   />
                 </div>
@@ -3967,7 +3975,11 @@ export default function SchedulePage() {
 
                       {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee2, 'Employee 2', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee3, 'Employee 3', extra.showEmployee3 || Boolean(extra.employee3.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee3, 'Employee 3', extra.visibleEmployeeSlots >= 3 || Boolean(extra.employee3.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+
+                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee4, 'Employee 4', extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+
+                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee5, 'Employee 5', extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
                       {!isSupervisorShift && extra.visibleEmployeeSlots < 5 && (
                         <button type="button" onClick={() => handleAddEmployeeSlotToExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
@@ -4053,7 +4065,11 @@ export default function SchedulePage() {
 
                           {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee2, 'Employee 2', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee3, 'Employee 3', selectedShift.shift.showEmployee3 || Boolean(selectedShift.shift.employee3.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee3, 'Employee 3', selectedShift.shift.visibleEmployeeSlots >= 3 || Boolean(selectedShift.shift.employee3.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+
+                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee4, 'Employee 4', selectedShift.shift.visibleEmployeeSlots >= 4 || Boolean(selectedShift.shift.employee4.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+
+                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee5, 'Employee 5', selectedShift.shift.visibleEmployeeSlots >= 5 || Boolean(selectedShift.shift.employee5.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
                           {!isSupervisorShift && selectedShift.shift.visibleEmployeeSlots < 5 && (
                             <button type="button" onClick={() => handleAddEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
