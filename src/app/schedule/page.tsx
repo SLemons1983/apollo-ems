@@ -2274,6 +2274,62 @@ export default function SchedulePage() {
     });
   };
 
+  const handleRemoveEmployeeSlot = (dateKey: string, shiftName: ShiftName) => {
+    setScheduleDataSafely((current) => {
+      const next = cloneScheduleData(normalizeLoadedData(current));
+      const shift = next[dateKey]?.standard[shiftName];
+      if (!shift || SUPERVISOR_SHIFTS.has(shiftName)) {
+        return current;
+      }
+
+      const visibleSlots = Math.min(5, Math.max(2, shift.visibleEmployeeSlots));
+      if (visibleSlots <= 2) {
+        return current;
+      }
+
+      const slotKey = `employee${visibleSlots}` as ScheduleSlotKey;
+      if (shift[slotKey].employeeId) {
+        window.alert(`Remove the employee from Employee ${visibleSlots} before removing that slot.`);
+        return current;
+      }
+
+      markUnsavedChanges();
+      shift[slotKey] = createEmptyEmployeeSlot();
+      shift.visibleEmployeeSlots = visibleSlots - 1;
+      shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
+
+      return next;
+    });
+  };
+
+  const handleRemoveEmployeeSlotFromExtra = (dateKey: string, extraId: string) => {
+    setScheduleDataSafely((current) => {
+      const next = cloneScheduleData(normalizeLoadedData(current));
+      const extra = next[dateKey]?.extras.find((item) => item.id === extraId);
+      if (!extra || extra.category === 'SUPERVISOR') {
+        return current;
+      }
+
+      const visibleSlots = Math.min(5, Math.max(2, extra.visibleEmployeeSlots));
+      if (visibleSlots <= 2) {
+        return current;
+      }
+
+      const slotKey = `employee${visibleSlots}` as ScheduleSlotKey;
+      if (extra[slotKey].employeeId) {
+        window.alert(`Remove the employee from Employee ${visibleSlots} before removing that slot.`);
+        return current;
+      }
+
+      markUnsavedChanges();
+      extra[slotKey] = createEmptyEmployeeSlot();
+      extra.visibleEmployeeSlots = visibleSlots - 1;
+      extra.showEmployee3 = extra.visibleEmployeeSlots >= 3;
+
+      return next;
+    });
+  };
+
   const handleAddShift = (dateKey: string) => {
     const label = window.prompt('Enter the extra shift name (example: Standby or LDT):', 'Standby');
     if (!label || !label.trim()) {
@@ -3981,10 +4037,20 @@ export default function SchedulePage() {
 
                       {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee5, 'Employee 5', extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && extra.visibleEmployeeSlots < 5 && (
-                        <button type="button" onClick={() => handleAddEmployeeSlotToExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
-                          Add Employee
-                        </button>
+                      {!isSupervisorShift && (
+                        <div className="flex flex-wrap gap-2">
+                          {extra.visibleEmployeeSlots < 5 && (
+                            <button type="button" onClick={() => handleAddEmployeeSlotToExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+                              Add Employee
+                            </button>
+                          )}
+
+                          {extra.visibleEmployeeSlots > 2 && (
+                            <button type="button" onClick={() => handleRemoveEmployeeSlotFromExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                              Remove Employee
+                            </button>
+                          )}
+                        </div>
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">
@@ -4071,10 +4137,20 @@ export default function SchedulePage() {
 
                           {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee5, 'Employee 5', selectedShift.shift.visibleEmployeeSlots >= 5 || Boolean(selectedShift.shift.employee5.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && selectedShift.shift.visibleEmployeeSlots < 5 && (
-                            <button type="button" onClick={() => handleAddEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
-                              Add Employee
-                            </button>
+                          {!isSupervisorShift && (
+                            <div className="flex flex-wrap gap-2">
+                              {selectedShift.shift.visibleEmployeeSlots < 5 && (
+                                <button type="button" onClick={() => handleAddEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+                                  Add Employee
+                                </button>
+                              )}
+
+                              {selectedShift.shift.visibleEmployeeSlots > 2 && (
+                                <button type="button" onClick={() => handleRemoveEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                                  Remove Employee
+                                </button>
+                              )}
+                            </div>
                           )}
 
                           <div className="grid gap-3 md:grid-cols-2">
