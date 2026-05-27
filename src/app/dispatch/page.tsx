@@ -21,7 +21,9 @@ export default function DispatchPage() {
   const weekDateKey = (offset: number) => {
     const d = new Date();
     d.setDate(d.getDate() - d.getDay() + offset);
-    return d.toISOString().slice(0, 10);
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
   };
 
   const dayAssignments = (offset: number) =>
