@@ -9,8 +9,8 @@ export default function DispatchPage() {
   const [employees, setEmployees] = useState<any[]>([]);
 
   useEffect(() => {
-    supabase.from('schedule_assignments').select('*').then(({ data }) => setAssignments(data ?? []));
-    supabase.from('employees').select('id,first_name,last_name').then(({ data }) => setEmployees(data ?? []));
+    supabase.from('schedule_assignments').select('*').then(({ data, error }) => { if (error) console.error('Dispatch assignments load failed:', error); setAssignments(data ?? []); });
+    supabase.from('employees').select('id,first_name,last_name').then(({ data, error }) => { if (error) console.error('Dispatch employees load failed:', error); setEmployees(data ?? []); });
   }, []);
 
   async function handleLogout() {
