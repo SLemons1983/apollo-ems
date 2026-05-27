@@ -46,7 +46,18 @@ export default function DispatchPage() {
   );
 
   const standardShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor'];
-  const extraShiftLabels = shiftLabels.filter((label) => !standardShiftLabels.includes(label));
+  const extraShiftLabels = shiftLabels.filter((label) => {
+    if (standardShiftLabels.includes(label)) return false;
+
+    return assignments.some((item) =>
+      item.shift_label === label &&
+      (
+        item.vehicle ||
+        item.employee_id ||
+        item.is_open_slot
+      )
+    );
+  });
   const orderedShiftLabels = [...standardShiftLabels, ...extraShiftLabels];
 
   const cellAssignments = (label: string, offset: number) => dayAssignments(offset).filter((item) => item.shift_label === label);
