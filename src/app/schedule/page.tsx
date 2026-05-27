@@ -2632,6 +2632,36 @@ export default function SchedulePage() {
     );
   }
 
+  function getExpandedExtraShift() {
+    if (!expandedShiftKey || !expandedShiftKey.startsWith('extra-')) {
+      return null;
+    }
+
+    const dateKey = expandedShiftKey.slice(-10);
+    const remainder = expandedShiftKey.slice(6, -11);
+
+    const separatorIndex = remainder.lastIndexOf('-');
+
+    if (separatorIndex === -1) {
+      return null;
+    }
+
+    const extraId = remainder.slice(0, separatorIndex);
+
+    const day = getDaySchedule(scheduleData, dateKey);
+
+    const extra = day.extras.find((item) => item.id === extraId);
+
+    if (!extra) {
+      return null;
+    }
+
+    return {
+      dateKey,
+      extra,
+    };
+  }
+
   function getExpandedStandardShift() {
     if (!expandedShiftKey) {
       return null;
@@ -3882,9 +3912,110 @@ export default function SchedulePage() {
                 const selectedShift = getExpandedStandardShift();
 
                 if (!selectedShift) {
+                  const selectedExtraShift = getExpandedExtraShift();
+
+                  if (!selectedExtraShift) {
+                    return (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                        Select a standard shift or extra shift to edit.
+                      </div>
+                    );
+                  }
+
+                  const day = getDaySchedule(scheduleData, selectedExtraShift.dateKey);
+                  const extra = selectedExtraShift.extra;
+                  const assignmentRef: AssignmentRef = {
+                    key: `extra-${extra.id}`,
+                    label: extra.label,
+                    category: extra.category,
+                    shift: extra,
+                  };
+                  const isSupervisorShift = extra.category === 'SUPERVISOR';
+                  const slotEligibilityMaps = {
+                    employee1: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                    employee2: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                    employee3: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                    employee4: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                    employee5: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                  };
+                  const payPeriodHoursMap = Object.fromEntries(employees.map((employee) => [employee.id, getEmployeePayPeriodHours(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef.key)])) as Record<string, number>;
+                  const warningMessages = [
+                    ...getEmployeeConflictMessages(day, assignmentRef, employees),
+                    ...getVehicleConflictMessages(day, assignmentRef),
+                    ...getContinuousHoursResult(scheduleData, selectedExtraShift.dateKey, assignmentRef, employees).warnings,
+                    ...getRequiredNoteMessages(assignmentRef, employees),
+                    ...getCertificationMessages(assignmentRef, employees),
+                  ];
+
                   return (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                      Extra shift editor will be added next.
+                    <div className="space-y-3">
+                      <div>
+                        <input
+                          type="text"
+                          value={extra.label}
+                          onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'label', event.target.value)}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-lg font-bold text-slate-900 outline-none transition focus:border-slate-500"
+                        />
+                        <div className="mt-1 text-sm text-slate-600">{selectedExtraShift.dateKey}</div>
+                      </div>
+
+                      <select
+                        value={extra.category}
+                        onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'category', event.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                      >
+                        <option value="UNIT">UNIT</option>
+                        <option value="SUPERVISOR">SUPERVISOR</option>
+                      </select>
+
+                      {renderEmployeeSlotEditor(extra.employee1, 'Employee 1', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee1', field, value), true, slotEligibilityMaps.employee1, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+
+                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee2, 'Employee 2', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+
+                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee3, 'Employee 3', extra.showEmployee3 || Boolean(extra.employee3.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+
+                      {!isSupervisorShift && extra.visibleEmployeeSlots < 5 && (
+                        <button type="button" onClick={() => handleAddEmployeeSlotToExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+                          Add Employee
+                        </button>
+                      )}
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                          <input type="checkbox" checked={extra.allowExtendedHours} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'allowExtendedHours', event.target.checked)} className="h-4 w-4" />
+                          Allow extended hours
+                        </label>
+
+                        <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                          <input type="checkbox" checked={Boolean(extra.hiddenFromEmployees)} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'hiddenFromEmployees', event.target.checked)} className="h-4 w-4" />
+                          Hide shift from employees
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Vehicle</label>
+                        <select value={extra.vehicle} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'vehicle', event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500">
+                          {getVehicleOptions(extra.category).map((vehicle) => (
+                            <option key={vehicle || 'none'} value={vehicle}>{vehicle || 'No vehicle selected'}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {warningMessages.length > 0 && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                          {warningMessages.map((message) => <div key={message}>• {message}</div>)}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
+                          Confirm Changes
+                        </button>
+
+                        <button type="button" onClick={() => handleRemoveExtraShift(selectedExtraShift.dateKey, extra.id, extra.label)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                          Remove Extra Shift
+                        </button>
+                      </div>
                     </div>
                   );
                 }
