@@ -60,6 +60,7 @@ export default function DispatchPage() {
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
+            <button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-700">Refresh Schedule</button>
             <button type="button" onClick={handleLogout} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100">Logout</button>
             <span>Powered by</span>
             <Image src="/apollo-logo.png" alt="ApolloEMS" width={80} height={80} className="h-12 w-auto" />
@@ -91,6 +92,10 @@ export default function DispatchPage() {
             ))}
           </div>
         </div>
+
+        <p className="mt-4 text-center text-sm font-medium text-slate-700">
+          If there are any questions, please contact Sequoia Safety Council's On-duty supervisor at (559) 406-8210.
+        </p>
       </div>
     </main>
   );
