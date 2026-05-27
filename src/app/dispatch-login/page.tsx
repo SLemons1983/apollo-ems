@@ -9,6 +9,7 @@ export default function DispatchLoginPage() {
 
   function loginDispatch() {
     if (username === 'Dispatch' && password === 'Sequoia') {
+      document.cookie = 'apollo_dispatch_session=active; path=/; max-age=43200; SameSite=Lax';
       window.location.href = '/dispatch';
       return;
     }
