@@ -1594,12 +1594,18 @@ export default function SupervisorPage() {
       });
 
       if (rows.length > 0) {
-        const { error: assignmentError } = await supabase
-          .from('schedule_assignments')
-          .upsert(rows, { onConflict: 'id' });
+        const chunkSize = 100;
 
-        if (assignmentError) {
-          throw assignmentError;
+        for (let index = 0; index < rows.length; index += chunkSize) {
+          const chunk = rows.slice(index, index + chunkSize);
+
+          const { error: assignmentError } = await supabase
+            .from('schedule_assignments')
+            .upsert(chunk, { onConflict: 'id' });
+
+          if (assignmentError) {
+            throw assignmentError;
+          }
         }
       }
 
