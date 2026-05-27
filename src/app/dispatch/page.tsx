@@ -46,6 +46,8 @@ export default function DispatchPage() {
   );
 
   const standardShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor'];
+  const visibleWeekKeys = Array.from({ length: 7 }, (_, index) => weekDateKey(index));
+
   const extraShiftLabels = shiftLabels.filter((label) => {
     if (standardShiftLabels.includes(label)) {
       return false;
@@ -53,6 +55,7 @@ export default function DispatchPage() {
 
     return assignments.some((item) =>
       item.shift_label === label &&
+      visibleWeekKeys.includes(item.date_key) &&
       item.slot_number > 0 &&
       (
         item.employee_id ||
