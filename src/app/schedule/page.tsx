@@ -2419,6 +2419,29 @@ export default function SchedulePage() {
       slot.employeeId && !isOpenSlotSelection && recommendedEmployee && slot.employeeId !== recommendedEmployee.id,
     );
 
+    if (!showDetails) {
+      const collapsedName =
+        slot.employeeId === OPEN_ALS_SLOT_ID
+          ? 'Open ALS'
+          : slot.employeeId === OPEN_BLS_SLOT_ID
+            ? 'Open BLS'
+            : selectedEmployee?.name || 'Open';
+
+      return (
+        <div className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <div className="text-sm font-semibold text-slate-800">
+            {collapsedName}
+          </div>
+
+          {slot.startTime && slot.endTime && (
+            <div className="mt-1 text-xs text-slate-500">
+              {slot.startTime} - {slot.endTime}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
