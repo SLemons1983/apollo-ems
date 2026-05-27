@@ -1518,13 +1518,14 @@ export default function SupervisorPage() {
       const rows: any[] = [];
 
       launchDateKeys.forEach((dateKey, index) => {
-        const templateDateKey = templateDateKeys[index % templateDateKeys.length];
-        const templateDay = builderSchedule[templateDateKey];
-        const launchedDay = getLaunchedScheduleDayFromBuilderDay(templateDay);
-
         const templateIndex = index % 14;
         const normalizedTemplateDateKey = templateDateKeys[templateIndex];
         const normalizedTemplateDay = builderSchedule[normalizedTemplateDateKey];
+
+        if (!normalizedTemplateDay) {
+          return;
+        }
+
         const normalizedLaunchedDay = getLaunchedScheduleDayFromBuilderDay(normalizedTemplateDay);
 
         Object.entries(normalizedLaunchedDay.standard).forEach(([shiftKey, shift]: any) => {
@@ -1537,11 +1538,9 @@ export default function SupervisorPage() {
                   ? 'Parlier'
                   : shiftKey === 'OC'
                     ? 'Orange Cove'
-                    : shiftKey === 'ADMIN_SUP'
-                      ? 'Administrative Supervisor'
-                      : shiftKey === 'FIELD_SUP'
-                        ? 'Field Supervisor'
-                        : 'GM';
+                    : shiftKey === 'FIELD_SUP'
+                      ? 'Field Supervisor'
+                      : 'GM';
 
           rows.push({
             id: `${dateKey}-${shiftKey}-0`,
