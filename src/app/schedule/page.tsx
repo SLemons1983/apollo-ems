@@ -2632,6 +2632,30 @@ export default function SchedulePage() {
     );
   }
 
+  function getExpandedStandardShift() {
+    if (!expandedShiftKey) {
+      return null;
+    }
+
+    const [shiftName, dateKey] = expandedShiftKey.split('-');
+
+    if (!SHIFT_ORDER.includes(shiftName as ShiftName) || !dateKey) {
+      return null;
+    }
+
+    const day = getDaySchedule(scheduleData, dateKey);
+    const typedShiftName = shiftName as ShiftName;
+    const shift = day.standard[typedShiftName];
+
+    return {
+      dateKey,
+      shiftName: typedShiftName,
+      shift,
+      category: UNIT_SHIFTS.has(typedShiftName) ? 'UNIT' as ShiftCategory : 'SUPERVISOR' as ShiftCategory,
+      label: SHIFT_DISPLAY_NAMES[typedShiftName],
+    };
+  }
+
   const now = new Date();
   const todayKey = toDateKey(now);
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -3852,8 +3876,31 @@ export default function SchedulePage() {
               </button>
             </div>
 
-            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-              Shift editor will render here next.
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              {(() => {
+                const selectedShift = getExpandedStandardShift();
+
+                if (!selectedShift) {
+                  return (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                      Extra shift editor will be added next.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-lg font-bold text-slate-900">{selectedShift.label}</div>
+                      <div className="mt-1 text-sm text-slate-600">{selectedShift.dateKey}</div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      Standard shift editor connection confirmed.
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
