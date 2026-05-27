@@ -3295,9 +3295,11 @@ export default function SchedulePage() {
                           )
                         }
                         className={`cursor-pointer rounded-xl border p-2 shadow-sm transition ${
-                          isExpanded
-                            ? 'border-slate-500 bg-slate-200'
-                            : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
+                          warningMessages.length > 0
+                            ? 'border-red-300 bg-red-100 hover:bg-red-200'
+                            : isExpanded
+                              ? 'border-slate-500 bg-slate-200'
+                              : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between gap-2">
@@ -3407,7 +3409,7 @@ export default function SchedulePage() {
                             </button>
                           )}
 
-                          {isExpanded && (
+                          {false && isExpanded && (
                             <>
                               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                                 <input
@@ -3736,7 +3738,7 @@ export default function SchedulePage() {
                                 </button>
                               )}
 
-                              {isExpanded && (
+                              {false && isExpanded && (
                                 <>
                                   <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                                     <input
@@ -3836,6 +3838,31 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+      {expandedShiftKey && pendingExpandedShiftKey === null && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Edit Shift</h2>
+                <p className="mt-1 text-sm text-slate-600">{expandedShiftKey}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setExpandedShiftKey(null)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
+              Shift editor will render here next.
+            </div>
+          </div>
+        </div>
+      )}
+
       {pendingExpandedShiftKey !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
