@@ -1604,6 +1604,9 @@ export default function SupervisorPage() {
       }
 
       void addAuditEntry('SCHEDULE_LAUNCHED', `Schedule launched for ${launchDateKeys[0]} through ${launchDateKeys[launchDateKeys.length - 1]}`);
+
+      localStorage.setItem('apollo-schedule-refresh', new Date().toISOString());
+
       window.alert('Schedule launched successfully.');
     } catch (error) {
       console.error('Schedule launch failed:', error);

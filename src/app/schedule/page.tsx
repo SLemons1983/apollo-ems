@@ -1546,8 +1546,17 @@ export default function SchedulePage() {
 
     loadData();
 
+    const handleScheduleRefresh = (event: StorageEvent) => {
+      if (event.key === 'apollo-schedule-refresh') {
+        void loadData();
+      }
+    };
+
+    window.addEventListener('storage', handleScheduleRefresh);
+
     return () => {
       isActive = false;
+      window.removeEventListener('storage', handleScheduleRefresh);
     };
   }, []);
 
