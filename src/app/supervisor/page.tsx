@@ -189,7 +189,7 @@ type OpenShiftRequest = {
   supervisorNote?: string;
 };
 
-type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'ADMIN_SUP' | 'FIELD_SUP';
+type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
   employee1: string;
@@ -1237,7 +1237,6 @@ export default function SupervisorPage() {
       R2: { employee1: '', employee2: '' },
       P: { employee1: '', employee2: '' },
       OC: { employee1: '', employee2: '' },
-      ADMIN_SUP: { employee1: '', employee2: '' },
       FIELD_SUP: { employee1: '', employee2: '' },
     };
   }
@@ -1322,7 +1321,6 @@ export default function SupervisorPage() {
     if (shiftKey === 'R2') return 'Reedley 2';
     if (shiftKey === 'P') return 'Parlier';
     if (shiftKey === 'OC') return 'Orange Cove';
-    if (shiftKey === 'ADMIN_SUP') return 'Administrative Supervisor';
     return 'Field Supervisor';
   }
 
@@ -1457,10 +1455,6 @@ export default function SupervisorPage() {
           employee2: buildScheduleSlot(day.OC.employee2),
         },
         GM: buildEmptyScheduleShift(),
-        ADMIN_SUP: {
-          ...buildEmptyScheduleShift(),
-          employee1: buildScheduleSlot(day.ADMIN_SUP.employee1, '06:00', '18:00'),
-        },
         FIELD_SUP: {
           ...buildEmptyScheduleShift(),
           employee1: buildScheduleSlot(day.FIELD_SUP.employee1),
@@ -1528,7 +1522,12 @@ export default function SupervisorPage() {
         const templateDay = builderSchedule[templateDateKey];
         const launchedDay = getLaunchedScheduleDayFromBuilderDay(templateDay);
 
-        Object.entries(launchedDay.standard).forEach(([shiftKey, shift]: any) => {
+        const templateIndex = index % 14;
+        const normalizedTemplateDateKey = templateDateKeys[templateIndex];
+        const normalizedTemplateDay = builderSchedule[normalizedTemplateDateKey];
+        const normalizedLaunchedDay = getLaunchedScheduleDayFromBuilderDay(normalizedTemplateDay);
+
+        Object.entries(normalizedLaunchedDay.standard).forEach(([shiftKey, shift]: any) => {
           const shiftLabel =
             shiftKey === 'R1'
               ? 'Reedley 1'
@@ -2965,7 +2964,7 @@ export default function SupervisorPage() {
                         <div className="grid grid-cols-7">
                           {builderDateKeys.slice(0, 7).map((dateKey) => (
                             <div key={`builder-week1-${dateKey}`} className="space-y-3 border-r border-slate-200 p-3 last:border-r-0">
-                              {(['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
+                              {(['R1', 'R2', 'P', 'OC', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
                                 <div key={`${dateKey}-${shiftKey}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                   <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                     {getBuilderShiftLabel(shiftKey)}
@@ -2986,7 +2985,7 @@ export default function SupervisorPage() {
                                     ))}
                                   </select>
 
-                                  {!['ADMIN_SUP', 'FIELD_SUP'].includes(shiftKey) && (
+                                  {shiftKey !== 'FIELD_SUP' && (
                                     <select
                                       value={builderSchedule[dateKey][shiftKey].employee2}
                                       onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee2', event.target.value)}
@@ -3031,7 +3030,7 @@ export default function SupervisorPage() {
                           <div className="grid grid-cols-7">
                             {builderDateKeys.slice(7, 14).map((dateKey) => (
                               <div key={`builder-week2-${dateKey}`} className="space-y-3 border-r border-slate-200 p-3 last:border-r-0">
-                                {(['R1', 'R2', 'P', 'OC', 'ADMIN_SUP', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
+                                {(['R1', 'R2', 'P', 'OC', 'FIELD_SUP'] as BuilderShiftKey[]).map((shiftKey) => (
                                   <div key={`${dateKey}-${shiftKey}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                     <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                       {getBuilderShiftLabel(shiftKey)}
@@ -3052,7 +3051,7 @@ export default function SupervisorPage() {
                                       ))}
                                     </select>
 
-                                    {!['ADMIN_SUP', 'FIELD_SUP'].includes(shiftKey) && (
+                                    {shiftKey !== 'FIELD_SUP' && (
                                       <select
                                         value={builderSchedule[dateKey][shiftKey].employee2}
                                         onChange={(event) => updateBuilderSlot(dateKey, shiftKey, 'employee2', event.target.value)}
