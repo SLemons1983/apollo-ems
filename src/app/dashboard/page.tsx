@@ -2945,6 +2945,18 @@ export default function DashboardPage() {
   }
 
   function renderScheduleWeek(weekLabel: string, weekDates: Date[]) {
+    const standardLabels = SHIFT_ORDER.map((shiftName) => SHIFT_DISPLAY[shiftName]);
+    const extraLabels = Array.from(
+      new Set(
+        weekDates.flatMap((date) =>
+          (assignmentsByDate[toDateKey(date)] ?? [])
+            .map((assignment) => assignment.label)
+            .filter((label) => !standardLabels.includes(label)),
+        ),
+      ),
+    );
+    const rowLabels = [...standardLabels, ...extraLabels];
+
     return (
       <div key={weekLabel} className="rounded-2xl border border-slate-200 bg-white">
         <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
@@ -2954,37 +2966,55 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="max-h-[40vh] overflow-auto rounded-b-2xl">
-          <div className="grid min-w-[1400px] grid-cols-7">
+        <div className="overflow-x-auto rounded-b-2xl bg-slate-100 p-3">
+          <div className="grid min-w-[1400px] grid-cols-[170px_repeat(7,1fr)] gap-2 text-sm">
+            <div className="rounded-xl bg-slate-200 p-3 font-bold text-slate-700">Shift</div>
+
             {weekDates.map((date) => {
-              const dateKey = toDateKey(date);
-              const dayAssignments = assignmentsByDate[dateKey] ?? [];
-
+              const isToday = toDateKey(date) === toDateKey(new Date());
               return (
-                <div key={`${weekLabel}-${dateKey}`} className="border-r border-slate-200 last:border-r-0">
-                  <div className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50 p-4 shadow-sm">
-                    <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
-                    <div className="mt-1 text-xs text-slate-500">{dateKey}</div>
-                  </div>
+                <div
+                  key={`${weekLabel}-header-${toDateKey(date)}`}
+                  className={`rounded-xl p-3 text-center font-bold ${
+                    isToday ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  <div>{formatDayLabel(date)}</div>
+                  <div className="mt-1 text-xs font-medium">{toDateKey(date)}</div>
+                </div>
+              );
+            })}
 
-                  <div className="space-y-3 p-3">
-                    {dayAssignments.length === 0 ? (
-                      <div className="min-h-[120px] rounded-xl border border-dashed border-slate-200 bg-slate-50" />
-                    ) : (
-                      dayAssignments.map((assignment) => (
-                        <div
-                          key={`${weekLabel}-${dateKey}-${assignment.key}`}
-                          className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                        >
+            {rowLabels.map((label) => (
+              <div key={`${weekLabel}-${label}`} className="contents">
+                <div className="rounded-xl bg-slate-500 p-3 font-bold text-white">{label}</div>
+
+                {weekDates.map((date) => {
+                  const dateKey = toDateKey(date);
+                  const assignment = (assignmentsByDate[dateKey] ?? []).find((item) => item.label === label);
+                  const isToday = dateKey === toDateKey(new Date());
+
+                  return (
+                    <div
+                      key={`${weekLabel}-${dateKey}-${label}`}
+                      className={`min-h-[120px] rounded-xl border p-3 ${
+                        isToday
+                          ? 'border-emerald-500 bg-emerald-100 text-emerald-950'
+                          : 'border-slate-300 bg-slate-200 text-slate-900'
+                      }`}
+                    >
+                      {!assignment ? (
+                        <div className="h-full rounded-lg border border-dashed border-slate-300 bg-slate-100/60" />
+                      ) : (
+                        <>
                           <div className="mb-2 flex items-start justify-between gap-2">
-                            <div>
-                              <div className="text-sm font-bold text-slate-900">{assignment.label}</div>
-                              {getOpenSlotCount(assignment) > 0 && (
-                                <div className="mt-1 text-xs font-semibold text-emerald-700">
-                                  {getOpenSlotCount(assignment)} open slot{getOpenSlotCount(assignment) === 1 ? '' : 's'}
-                                </div>
-                              )}
-                            </div>
+                            {getOpenSlotCount(assignment) > 0 ? (
+                              <div className="text-xs font-semibold text-emerald-700">
+                                {getOpenSlotCount(assignment)} open slot{getOpenSlotCount(assignment) === 1 ? '' : 's'}
+                              </div>
+                            ) : (
+                              <div />
+                            )}
 
                             {(showFullSchedule || showOpenShiftsOnly) &&
                               isFutureOrToday(date) &&
@@ -3013,10 +3043,7 @@ export default function DashboardPage() {
                               const isOpenSlot = isOpenShiftSlot(slot.employeeId);
                               const isCurrentEmployee = slot.employeeId === currentEmployeeId;
 
-                              if (
-                                isOpenSlot &&
-                                !isEligibleOpenShiftSlot(slot.employeeId)
-                              ) {
+                              if (isOpenSlot && !isEligibleOpenShiftSlot(slot.employeeId)) {
                                 return null;
                               }
 
@@ -3037,38 +3064,19 @@ export default function DashboardPage() {
                                       endTime: slot.endTime,
                                     });
                                   }}
-                                  onKeyDown={(event) => {
-                                    if (!isCurrentEmployee || (event.key !== 'Enter' && event.key !== ' ')) return;
-                                    event.preventDefault();
-                                    setVacationRequestStatus('');
-                                    setSelectedVacationShift({
-                                      dateKey,
-                                      dateLabel: formatShortDate(date),
-                                      shiftKey: assignment.key,
-                                      shiftLabel: assignment.label,
-                                      startTime: slot.startTime,
-                                      endTime: slot.endTime,
-                                    });
-                                  }}
-                                  className={`rounded-lg border px-2.5 py-2 ${isCurrentEmployee ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200' : ''} ${
+                                  className={`rounded-lg border px-2.5 py-2 ${
+                                    isCurrentEmployee ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200' : ''
+                                  } ${
                                     isCurrentEmployee
-                                      ? 'border-emerald-200 bg-emerald-50'
+                                      ? 'border-emerald-300 bg-emerald-50'
                                       : isOpenSlot
                                         ? getOpenSlotColorClasses(slot.employeeId)
-                                        : 'border-slate-200 bg-white'
+                                        : 'border-slate-300 bg-white'
                                   }`}
                                 >
-                                  <div className={`text-sm font-medium ${
-                                    isCurrentEmployee
-                                      ? 'text-emerald-800'
-                                      : isOpenSlot
-                                        ? ''
-                                        : 'text-slate-800'
-                                  }`}>
+                                  <div className={`text-sm font-medium ${isCurrentEmployee ? 'text-emerald-800' : isOpenSlot ? '' : 'text-slate-800'}`}>
                                     {getEmployeeName(slot.employeeId)}
                                   </div>
-
-                                  <div className="mt-1 text-xs font-medium text-slate-500">{assignment.label}</div>
 
                                   <div className="mt-1 text-xs text-slate-600">
                                     {slot.startTime} - {slot.endTime}
@@ -3093,13 +3101,13 @@ export default function DashboardPage() {
                               );
                             })}
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
