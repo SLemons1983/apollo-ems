@@ -3895,9 +3895,78 @@ export default function SchedulePage() {
                       <div className="mt-1 text-sm text-slate-600">{selectedShift.dateKey}</div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                      Standard shift editor connection confirmed.
-                    </div>
+                    {(() => {
+                      const day = getDaySchedule(scheduleData, selectedShift.dateKey);
+                      const assignmentRef: AssignmentRef = {
+                        key: `standard-${selectedShift.shiftName}`,
+                        label: selectedShift.label,
+                        category: selectedShift.category,
+                        shift: selectedShift.shift,
+                      };
+                      const isSupervisorShift = selectedShift.category === 'SUPERVISOR';
+                      const slotEligibilityMaps = {
+                        employee1: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                        employee2: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                        employee3: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                        employee4: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                        employee5: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                      };
+                      const payPeriodHoursMap = Object.fromEntries(employees.map((employee) => [employee.id, getEmployeePayPeriodHours(scheduleData, selectedShift.dateKey, employee.id, assignmentRef.key)])) as Record<string, number>;
+                      const warningMessages = [
+                        ...getEmployeeConflictMessages(day, assignmentRef, employees),
+                        ...getVehicleConflictMessages(day, assignmentRef),
+                        ...getContinuousHoursResult(scheduleData, selectedShift.dateKey, assignmentRef, employees).warnings,
+                        ...getRequiredNoteMessages(assignmentRef, employees),
+                        ...getCertificationMessages(assignmentRef, employees),
+                      ];
+
+                      return (
+                        <div className="space-y-3">
+                          {renderEmployeeSlotEditor(selectedShift.shift.employee1, 'Employee 1', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee1', field, value), true, slotEligibilityMaps.employee1, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+
+                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee2, 'Employee 2', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+
+                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee3, 'Employee 3', selectedShift.shift.showEmployee3 || Boolean(selectedShift.shift.employee3.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+
+                          {!isSupervisorShift && selectedShift.shift.visibleEmployeeSlots < 5 && (
+                            <button type="button" onClick={() => handleAddEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
+                              Add Employee
+                            </button>
+                          )}
+
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                              <input type="checkbox" checked={selectedShift.shift.allowExtendedHours} onChange={(event) => handleStandardShiftChange(selectedShift.dateKey, selectedShift.shiftName, 'allowExtendedHours', event.target.checked)} className="h-4 w-4" />
+                              Allow extended hours
+                            </label>
+
+                            <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                              <input type="checkbox" checked={Boolean(selectedShift.shift.hiddenFromEmployees)} onChange={(event) => handleStandardShiftChange(selectedShift.dateKey, selectedShift.shiftName, 'hiddenFromEmployees', event.target.checked)} className="h-4 w-4" />
+                              Hide shift from employees
+                            </label>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Vehicle</label>
+                            <select value={selectedShift.shift.vehicle} onChange={(event) => handleStandardShiftChange(selectedShift.dateKey, selectedShift.shiftName, 'vehicle', event.target.value)} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500">
+                              {getVehicleOptions(selectedShift.category).map((vehicle) => (
+                                <option key={vehicle || 'none'} value={vehicle}>{vehicle || 'No vehicle selected'}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {warningMessages.length > 0 && (
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                              {warningMessages.map((message) => <div key={message}>• {message}</div>)}
+                            </div>
+                          )}
+
+                          <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
+                            Confirm Changes
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
