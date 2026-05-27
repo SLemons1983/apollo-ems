@@ -2637,7 +2637,8 @@ export default function SchedulePage() {
       return null;
     }
 
-    const [shiftName, dateKey] = expandedShiftKey.split('-');
+    const dateKey = expandedShiftKey.slice(-10);
+    const shiftName = expandedShiftKey.slice(0, -11);
 
     if (!SHIFT_ORDER.includes(shiftName as ShiftName) || !dateKey) {
       return null;
