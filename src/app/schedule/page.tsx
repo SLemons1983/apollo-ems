@@ -2638,15 +2638,10 @@ export default function SchedulePage() {
     }
 
     const dateKey = expandedShiftKey.slice(-10);
-    const remainder = expandedShiftKey.slice(6, -11);
 
-    const separatorIndex = remainder.lastIndexOf('-');
-
-    if (separatorIndex === -1) {
-      return null;
-    }
-
-    const extraId = remainder.slice(0, separatorIndex);
+    const extraId = expandedShiftKey
+      .slice(0, -11)
+      .replace(/^extra-/, '');
 
     const day = getDaySchedule(scheduleData, dateKey);
 
