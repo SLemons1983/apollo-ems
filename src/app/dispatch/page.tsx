@@ -47,12 +47,14 @@ export default function DispatchPage() {
 
   const standardShiftLabels = ['Reedley 1', 'Reedley 2', 'Parlier', 'Orange Cove', 'Field Supervisor', 'Admin Supervisor'];
   const extraShiftLabels = shiftLabels.filter((label) => {
-    if (standardShiftLabels.includes(label)) return false;
+    if (standardShiftLabels.includes(label)) {
+      return false;
+    }
 
     return assignments.some((item) =>
       item.shift_label === label &&
+      item.slot_number > 0 &&
       (
-        item.vehicle ||
         item.employee_id ||
         item.is_open_slot
       )
