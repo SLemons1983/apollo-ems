@@ -2433,11 +2433,7 @@ export default function SchedulePage() {
             {collapsedName}
           </div>
 
-          {slot.startTime && slot.endTime && (
-            <div className="mt-1 text-xs text-slate-500">
-              {slot.startTime} - {slot.endTime}
-            </div>
-          )}
+
         </div>
       );
     }
