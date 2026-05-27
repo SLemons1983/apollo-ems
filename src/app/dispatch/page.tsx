@@ -68,7 +68,7 @@ export default function DispatchPage() {
               <div key={label} className="contents">
                 <div className="rounded-xl bg-slate-500 p-3 font-bold text-white">{label}</div>
                 {Array.from({ length: 7 }, (_, index) => (
-                  <div key={`${label}-${index}`} className={`min-h-[80px] rounded-xl border p-3 text-xs ${index === 2 ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-300 bg-slate-100 text-slate-800'}`}>
+                  <div key={`${label}-${index}`} className={`min-h-[80px] rounded-xl border p-3 text-xs ${index === 2 ? 'border-emerald-500 bg-emerald-100 text-emerald-950' : 'border-slate-400 bg-slate-200 text-slate-900'}`}>
                     <div className="mb-1 text-sm font-extrabold text-slate-950">Unit: {cellAssignments(label, index)[0]?.vehicle || '—'}</div>
                     {cellAssignments(label, index).filter((item) => item.slot_number > 0).map((item) => (
                       <div key={item.id}>{item.is_open_slot ? `Open ${item.open_slot_scope ?? ''}` : getEmployeeName(item.employee_id)}</div>
