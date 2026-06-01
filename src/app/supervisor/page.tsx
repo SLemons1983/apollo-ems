@@ -1045,6 +1045,18 @@ export default function SupervisorPage() {
     saveApolloMessages(updated);
   }
 
+  function markAllSupervisorMessagesRead() {
+    const now = new Date().toISOString();
+    const updated = apolloMessages.map((message) => ({
+      ...message,
+      recipients: message.recipients.map((recipient) =>
+        supervisorInboxIds.includes(recipient.employeeId) && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
+      ),
+    }));
+
+    saveApolloMessages(updated);
+  }
+
   function getRecipientsForMode(mode: string): EmployeeOption[] {
     const activeEmployees = employees.filter((employee) => employee.status.toLowerCase() === 'active');
     if (mode === 'INDIVIDUAL') return activeEmployees.filter((employee) => employee.id === messageRecipientEmployeeId);
@@ -3167,7 +3179,18 @@ export default function SupervisorPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-3 text-sm font-bold text-slate-900">Conversations</div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-bold text-slate-900">Conversations</div>
+                    {supervisorUnreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllSupervisorMessagesRead}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                      >
+                        Mark All Read
+                      </button>
+                    )}
+                  </div>
 
                   <div className="max-h-[520px] space-y-2 overflow-auto">
                     {supervisorConversations.length === 0 ? (
