@@ -2979,7 +2979,7 @@ export default function DashboardPage() {
     }
 
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="rounded-2xl border border-slate-300 bg-slate-100 p-4">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-base font-bold text-slate-900">My Upcoming Shifts</div>
@@ -3011,7 +3011,7 @@ export default function DashboardPage() {
                 className={`rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                   isToday
                     ? 'border-emerald-300 bg-emerald-50'
-                    : 'border-slate-200 bg-slate-50 hover:bg-white'
+                    : 'border-slate-300 bg-white shadow-md hover:shadow-lg'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
