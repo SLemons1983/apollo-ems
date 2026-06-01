@@ -2944,6 +2944,109 @@ export default function DashboardPage() {
     setSelectedVacationShift(null);
   }
 
+  function renderMyScheduleCards() {
+    const myAssignments = dates.flatMap((date) => {
+      const dateKey = toDateKey(date);
+      return (assignmentsByDate[dateKey] ?? [])
+        .map((assignment) => {
+          const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId);
+          if (!slot) {
+            return null;
+          }
+
+          return {
+            date,
+            dateKey,
+            assignment,
+            slot,
+          };
+        })
+        .filter(Boolean) as {
+          date: Date;
+          dateKey: string;
+          assignment: DisplayAssignment;
+          slot: DisplayAssignment['slots'][number];
+        }[];
+    });
+
+    if (myAssignments.length === 0) {
+      return (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+          <div className="text-base font-bold text-slate-800">No assigned shifts in this pay period</div>
+          <div className="mt-1 text-sm text-slate-500">Use Show Open Shifts to look for available shifts.</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-base font-bold text-slate-900">My Upcoming Shifts</div>
+            <div className="text-sm text-slate-500">
+              {myAssignments.length} assigned shift{myAssignments.length === 1 ? '' : 's'} in this pay period.
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {myAssignments.map(({ date, dateKey, assignment, slot }) => {
+            const isToday = dateKey === toDateKey(new Date());
+
+            return (
+              <button
+                type="button"
+                key={`${dateKey}-${assignment.key}-${slot.employeeId}`}
+                onClick={() => {
+                  setVacationRequestStatus('');
+                  setSelectedVacationShift({
+                    dateKey,
+                    dateLabel: formatShortDate(date),
+                    shiftKey: assignment.key,
+                    shiftLabel: assignment.label,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                  });
+                }}
+                className={`rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                  isToday
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-slate-200 bg-slate-50 hover:bg-white'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">{formatDayLabel(date)}</div>
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
+                  </div>
+
+                  {isToday && (
+                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                      Today
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
+                <div className="mt-1 text-sm font-semibold text-slate-700">
+                  {slot.startTime} - {slot.endTime}
+                </div>
+
+                {slot.note && (
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                    {slot.note}
+                  </div>
+                )}
+
+                <div className="mt-3 text-xs font-bold text-emerald-700">Click to request vacation</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   function renderScheduleWeek(weekLabel: string, weekDates: Date[]) {
     const standardLabels = SHIFT_ORDER.map((shiftName) => SHIFT_DISPLAY[shiftName]);
     const extraLabels = Array.from(
@@ -3785,8 +3888,14 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-4">
-                {renderScheduleWeek('Week 1', week1Dates)}
-                {renderScheduleWeek('Week 2', week2Dates)}
+                {!showFullSchedule && !showOpenShiftsOnly ? (
+                  renderMyScheduleCards()
+                ) : (
+                  <>
+                    {renderScheduleWeek('Week 1', week1Dates)}
+                    {renderScheduleWeek('Week 2', week2Dates)}
+                  </>
+                )}
               </div>
 
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
