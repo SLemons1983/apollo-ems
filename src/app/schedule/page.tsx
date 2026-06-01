@@ -1334,8 +1334,13 @@ export default function SchedulePage() {
   const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
   const [reviewedDecisionSignature, setReviewedDecisionSignature] = useState('');
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
+  const dirtyDatesRef = useRef<Set<string>>(new Set());
 
-  function markUnsavedChanges() {
+  function markUnsavedChanges(dateKey?: string) {
+    if (dateKey) {
+      dirtyDatesRef.current.add(dateKey);
+    }
+
     setHasUnsavedChanges(true);
     setSaveStatus('Unsaved changes. Click Confirm Changes to save.');
   }
@@ -1629,11 +1634,18 @@ export default function SchedulePage() {
 
     try {
       const normalizedSchedule = normalizeLoadedData(scheduleDataRef.current);
-      console.log(`Apollo schedule save started: ${Object.keys(normalizedSchedule).length} dates.`);
+      const dirtyDates = Array.from(dirtyDatesRef.current);
+      const datesToSave =
+        dirtyDates.length > 0
+          ? dirtyDates.filter((dateKey) => normalizedSchedule[dateKey])
+          : Object.keys(normalizedSchedule);
+
+      console.log(`Apollo schedule save started: ${datesToSave.length} of ${Object.keys(normalizedSchedule).length} dates.`);
 
       const saveTasks: Promise<any>[] = [];
 
-      for (const [dateKey, day] of Object.entries(normalizedSchedule)) {
+      for (const dateKey of datesToSave) {
+        const day = normalizedSchedule[dateKey];
         const { error: scheduleError } = await supabase.from('schedules').upsert({
           id: dateKey,
           date_key: dateKey,
@@ -1779,6 +1791,7 @@ export default function SchedulePage() {
 
       await Promise.all(saveTasks);
 
+      dirtyDatesRef.current.clear();
       setHasUnsavedChanges(false);
 
       const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
@@ -2067,6 +2080,7 @@ export default function SchedulePage() {
   };
 
   const discardUnsavedChangesAndContinue = () => {
+    dirtyDatesRef.current.clear();
     setHasUnsavedChanges(false);
     setSaveStatus('Changes discarded.');
     setExpandedShiftKey(pendingExpandedShiftKey);
@@ -2106,7 +2120,7 @@ export default function SchedulePage() {
     field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours' | 'hiddenFromEmployees',
     value: string | boolean,
   ) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2133,7 +2147,7 @@ export default function SchedulePage() {
     field: keyof EmployeeSlot,
     value: string,
   ) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2170,7 +2184,7 @@ export default function SchedulePage() {
     field: keyof ExtraShiftAssignment,
     value: string | boolean,
   ) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2221,7 +2235,7 @@ export default function SchedulePage() {
     field: keyof EmployeeSlot,
     value: string,
   ) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2251,7 +2265,7 @@ export default function SchedulePage() {
   };
 
     const handleAddEmployeeSlot = (dateKey: string, shiftName: ShiftName) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2273,7 +2287,7 @@ export default function SchedulePage() {
   };
 
   const handleAddEmployeeSlotToExtra = (dateKey: string, extraId: string) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2317,7 +2331,7 @@ export default function SchedulePage() {
         return current;
       }
 
-      markUnsavedChanges();
+      markUnsavedChanges(dateKey);
       shift[slotKey] = createEmptyEmployeeSlot();
       shift.visibleEmployeeSlots = visibleSlots - 1;
       shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
@@ -2345,7 +2359,7 @@ export default function SchedulePage() {
         return current;
       }
 
-      markUnsavedChanges();
+      markUnsavedChanges(dateKey);
       extra[slotKey] = createEmptyEmployeeSlot();
       extra.visibleEmployeeSlots = visibleSlots - 1;
       extra.showEmployee3 = extra.visibleEmployeeSlots >= 3;
@@ -2363,7 +2377,7 @@ export default function SchedulePage() {
     const typeInput = window.prompt('Enter shift type: UNIT or SUPERVISOR', 'UNIT');
     const category: ShiftCategory = typeInput?.trim().toUpperCase() === 'SUPERVISOR' ? 'SUPERVISOR' : 'UNIT';
 
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2396,7 +2410,7 @@ export default function SchedulePage() {
       return;
     }
 
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       if (!next[dateKey]) {
@@ -2409,7 +2423,7 @@ export default function SchedulePage() {
   };
 
   const handleCopyPreviousDay = (dateKey: string, previousDateKey: string) => {
-    markUnsavedChanges();
+    markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       const previousDay = getDaySchedule(next, previousDateKey);
