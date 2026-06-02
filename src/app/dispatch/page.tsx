@@ -22,10 +22,21 @@ export default function DispatchPage() {
     window.location.href = '/dispatch-login';
   }
 
-  const getEmployeeName = (id: string) =>
-    employees.find((e) => e.id === id)
-      ? `${employees.find((e) => e.id === id)?.first_name} ${employees.find((e) => e.id === id)?.last_name}`
-      : 'Open';
+  const getEmployeeName = (id: string) => {
+    const employee = employees.find((e) => e.id === id);
+
+    if (!employee) {
+      return 'Open';
+    }
+
+    const status = (employee.status ?? '').toLowerCase();
+
+    if (status.includes('vacation') || status.includes('leave') || status.includes('sick')) {
+      return null;
+    }
+
+    return `${employee.first_name} ${employee.last_name}`;
+  };
 
   const weekDateKey = (offset: number) => {
     const d = new Date();
@@ -101,9 +112,17 @@ export default function DispatchPage() {
                 {Array.from({ length: 7 }, (_, index) => (
                   <div key={`${label}-${index}`} className={`min-h-[80px] rounded-xl border p-3 text-xs ${weekDateKey(index) === todayKey ? 'border-emerald-500 bg-emerald-100 text-emerald-950' : 'border-slate-400 bg-slate-200 text-slate-900'}`}>
                     <div className="mb-1 text-sm font-extrabold text-slate-950">Unit: {cellAssignments(label, index)[0]?.vehicle || '—'}</div>
-                    {cellAssignments(label, index).filter((item) => item.slot_number > 0).map((item) => (
-                      <div key={item.id}>{item.is_open_slot ? `Open ${item.open_slot_scope ?? ''}` : getEmployeeName(item.employee_id)}</div>
-                    ))}
+                    {cellAssignments(label, index).filter((item) => item.slot_number > 0).map((item) => {
+                      const employeeName = getEmployeeName(item.employee_id);
+
+                      if (!item.is_open_slot && !employeeName) {
+                        return null;
+                      }
+
+                      return (
+                        <div key={item.id}>{item.is_open_slot ? `Open ${item.open_slot_scope ?? ''}` : employeeName}</div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>

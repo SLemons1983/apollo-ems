@@ -44,7 +44,7 @@ export async function GET() {
     assignmentPageStart += assignmentPageSize;
   }
 
-  const employeesResult = await supabase.from('employees').select('id,first_name,last_name');
+  const employeesResult = await supabase.from('employees').select('id,first_name,last_name,status');
 
   if (employeesResult.error) {
     return NextResponse.json({ error: employeesResult.error.message }, { status: 500 });
