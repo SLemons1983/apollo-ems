@@ -3547,16 +3547,6 @@ export default function SchedulePage() {
                               payPeriodHoursMap,
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
-                          {!isSupervisorShift && shift.visibleEmployeeSlots < 5 && (
-                            <button
-                              type="button"
-                              onClick={() => handleAddEmployeeSlot(dateKey, shiftName)}
-                              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                            >
-                              Add Employee
-                            </button>
-                          )}
-
                           {false && isExpanded && (
                             <>
                               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
@@ -3876,16 +3866,6 @@ export default function SchedulePage() {
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
-                              {!isSupervisorShift && extra.visibleEmployeeSlots < 5 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddEmployeeSlotToExtra(dateKey, extra.id)}
-                                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                                >
-                                  Add Employee
-                                </button>
-                              )}
-
                               {false && isExpanded && (
                                 <>
                                   <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
