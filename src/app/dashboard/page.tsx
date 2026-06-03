@@ -2527,6 +2527,7 @@ export default function DashboardPage() {
     let week2 = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 };
 
     const weeklyOtTrackedHours = [0, 0];
+    let holidayPremiumHours = 0;
 
     dates.forEach((date, index) => {
       const row = getEditableRowForDate(date);
@@ -2566,6 +2567,14 @@ export default function DashboardPage() {
         nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours });
       }
 
+      if (isCompanyHoliday(date)) {
+        if (row.payType === 'TWENTY_FOUR_HOUR') {
+          holidayPremiumHours += 12;
+        } else if (row.payType === 'DAILY_OT_DT') {
+          holidayPremiumHours += 6;
+        }
+      }
+
       if (weekIndex === 0) {
         week1 = nextWeek;
       } else {
@@ -2579,7 +2588,7 @@ export default function DashboardPage() {
       regularHours: week1.regularHours + week2.regularHours,
       overtimeHours: week1.overtimeHours + week2.overtimeHours,
       doubleTimeHours: week1.doubleTimeHours + week2.doubleTimeHours,
-      holidayPremiumHours: 0,
+      holidayPremiumHours,
       missedMealPenaltyHours,
       week1,
       week2,
