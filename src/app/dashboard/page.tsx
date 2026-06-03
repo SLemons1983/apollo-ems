@@ -3583,7 +3583,7 @@ export default function DashboardPage() {
                       <table className="w-full border-collapse text-xs">
                         <thead>
                           <tr>
-                            <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift #</th>
+                            <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Day</th>
                             <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift</th>
                             <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift Type</th>
                             <th colSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Date &amp; Time In</th>
@@ -3606,7 +3606,7 @@ export default function DashboardPage() {
 
                             return (
                               <tr key={`${week.label}-${dateKey}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
-                                <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{index + 1}</td>
+                                <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</td>
                                 <td className="border border-slate-400 px-2 py-1 text-center">
                                   <select
                                     value={row.shiftLabel}
@@ -3661,6 +3661,7 @@ export default function DashboardPage() {
                                 <td className="border border-slate-400 px-2 py-1 text-center">
                                   <input
                                     type="time"
+                                    step={60}
                                     value={row.clockInTime}
                                     onChange={(event) => updateEditableRow(date, { clockInTime: event.target.value })}
                                     className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
@@ -3677,6 +3678,7 @@ export default function DashboardPage() {
                                 <td className="border border-slate-400 px-2 py-1 text-center">
                                   <input
                                     type="time"
+                                    step={60}
                                     value={row.clockOutTime}
                                     onChange={(event) => updateEditableRow(date, { clockOutTime: event.target.value })}
                                     className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
