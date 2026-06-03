@@ -4028,7 +4028,7 @@ export default function SchedulePage() {
 
                           {extra.visibleEmployeeSlots > 2 && (
                             <button type="button" onClick={() => handleRemoveEmployeeSlotFromExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
-                              Remove Employee
+                              Remove Empty Slot
                             </button>
                           )}
                         </div>
@@ -4135,7 +4135,7 @@ export default function SchedulePage() {
 
                               {selectedShift.shift.visibleEmployeeSlots > 2 && (
                                 <button type="button" onClick={() => handleRemoveEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
-                                  Remove Employee
+                                  Remove Empty Slot
                                 </button>
                               )}
                             </div>
