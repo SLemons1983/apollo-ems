@@ -3660,8 +3660,11 @@ export default function DashboardPage() {
                                 </td>
                                 <td className="border border-slate-400 px-2 py-1 text-center">
                                   <input
-                                    type="time"
-                                    step={60}
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="HH:MM"
+                                    pattern="[0-9]{2}:[0-9]{2}"
+                                    maxLength={5}
                                     value={row.clockInTime}
                                     onChange={(event) => updateEditableRow(date, { clockInTime: event.target.value })}
                                     className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
@@ -3677,8 +3680,11 @@ export default function DashboardPage() {
                                 </td>
                                 <td className="border border-slate-400 px-2 py-1 text-center">
                                   <input
-                                    type="time"
-                                    step={60}
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="HH:MM"
+                                    pattern="[0-9]{2}:[0-9]{2}"
+                                    maxLength={5}
                                     value={row.clockOutTime}
                                     onChange={(event) => updateEditableRow(date, { clockOutTime: event.target.value })}
                                     className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
