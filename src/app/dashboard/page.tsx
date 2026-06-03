@@ -3680,6 +3680,11 @@ export default function DashboardPage() {
                   <div className="mt-1 text-2xl font-bold text-slate-900">{calculateTimecardPayBreakdown().doubleTimeHours.toFixed(2)}</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Holiday Premium</div>
+                  <div className="mt-1 text-2xl font-bold text-slate-900">{calculateTimecardPayBreakdown().holidayPremiumHours.toFixed(2)}</div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Missed Meal</div>
                   <div className="mt-1 text-2xl font-bold text-slate-900">{calculateTimecardPayBreakdown().missedMealPenaltyHours.toFixed(2)}</div>
                 </div>
