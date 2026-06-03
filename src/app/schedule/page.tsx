@@ -3123,73 +3123,6 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-2xl border p-4 shadow-sm ${hasUnreadSupervisorNotes ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
-            <button
-              type="button"
-              onClick={() => {
-                const nextValue = !showSupervisorNotes;
-                closeSchedulePanels();
-                setShowSupervisorNotes(nextValue);
-              }}
-              className="flex w-full items-center justify-between gap-3 text-left"
-            >
-              <div>
-                <div className={`text-sm font-bold ${hasUnreadSupervisorNotes ? 'text-red-800' : 'text-slate-900'}`}>Supervisor Shift Notes</div>
-                <div className={`mt-1 text-xs ${hasUnreadSupervisorNotes ? 'text-red-700' : 'text-slate-500'}`}>
-                  {supervisorNotes.length > 0
-                    ? `${supervisorNotes.length} note${supervisorNotes.length === 1 ? '' : 's'} available.`
-                    : 'No supervisor notes entered.'}
-                </div>
-              </div>
-
-              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${hasUnreadSupervisorNotes ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                {showSupervisorNotes ? 'Hide Details' : 'Show Details'}
-              </span>
-            </button>
-
-            {showSupervisorNotes && (
-              <div className="mt-4 space-y-3">
-                {supervisorNotes.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.setItem(REVIEWED_SUPERVISOR_NOTES_SIGNATURE_STORAGE_KEY, supervisorNotesSignature);
-                      setReviewedSupervisorNoteSignature(supervisorNotesSignature);
-                    }}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
-                  >
-                    Mark Reviewed
-                  </button>
-                )}
-
-                {supervisorNotes.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No supervisor notes entered.
-                  </div>
-                ) : (
-                  supervisorNotes.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="rounded-xl border border-amber-200 bg-amber-50 p-3"
-                    >
-                      <div className="text-sm font-bold text-slate-900">
-                        {entry.employeeName}
-                      </div>
-
-                      <div className="mt-1 text-xs text-slate-600">
-                        {entry.shiftLabel} • {entry.dateKey}
-                      </div>
-
-                      <div className="mt-2 text-sm text-slate-800">
-                        {entry.note}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
           <div className={`rounded-xl border p-3 shadow-sm ${showOnDutyEmployees ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
             <button
               type="button"
@@ -3553,6 +3486,18 @@ export default function SchedulePage() {
                               payPeriodHoursMap,
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
+
+                          {[
+                            shift.employee1,
+                            shift.employee2,
+                            shift.employee3,
+                            shift.employee4,
+                            shift.employee5,
+                          ].some((slot) => slot.note?.trim()) && (
+                            <div className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                              📝 Note
+                            </div>
+                          )}
                           {false && isExpanded && (
                             <>
                               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
@@ -3872,6 +3817,18 @@ export default function SchedulePage() {
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
+
+                              {[
+                                extra.employee1,
+                                extra.employee2,
+                                extra.employee3,
+                                extra.employee4,
+                                extra.employee5,
+                              ].some((slot) => slot.note?.trim()) && (
+                                <div className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                                  📝 Note
+                                </div>
+                              )}
                               {false && isExpanded && (
                                 <>
                                   <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
