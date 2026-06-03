@@ -234,6 +234,7 @@ type PayBreakdown = {
   regularHours: number;
   overtimeHours: number;
   doubleTimeHours: number;
+  holidayPremiumHours: number;
   missedMealPenaltyHours: number;
   week1: {
     regularHours: number;
@@ -1360,6 +1361,7 @@ export default function DashboardPage() {
                   regularHours: row.total_hours ?? 0,
                   overtimeHours: 0,
                   doubleTimeHours: 0,
+                  holidayPremiumHours: 0,
                   missedMealPenaltyHours: 0,
                   week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
                   week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
@@ -2541,6 +2543,7 @@ export default function DashboardPage() {
       regularHours: week1.regularHours + week2.regularHours,
       overtimeHours: week1.overtimeHours + week2.overtimeHours,
       doubleTimeHours: week1.doubleTimeHours + week2.doubleTimeHours,
+      holidayPremiumHours: 0,
       missedMealPenaltyHours,
       week1,
       week2,
