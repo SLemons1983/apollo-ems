@@ -2567,7 +2567,9 @@ export default function DashboardPage() {
         nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours });
       }
 
-      if (isCompanyHoliday(date)) {
+      const clockInDate = row.clockInDate ? parseDateKey(row.clockInDate) : date;
+
+      if (isCompanyHoliday(clockInDate)) {
         if (row.payType === 'TWENTY_FOUR_HOUR') {
           holidayPremiumHours += 12;
         } else if (row.payType === 'DAILY_OT_DT') {
