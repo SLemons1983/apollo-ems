@@ -2087,8 +2087,21 @@ export default function DashboardPage() {
     setTimecardStatus('Missed meal break declaration added to this timecard.');
   }
 
-  function removeMissedMealBreak(id: string) {
-    saveMissedMealBreaks(missedMealBreaks.filter((item) => item.id !== id));
+  async function removeMissedMealBreak(id: string) {
+    setMissedMealBreaks(missedMealBreaks.filter((item) => item.id !== id));
+
+    const { error } = await supabase
+      .from('missed_meal_breaks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to remove missed meal break:', error);
+      window.alert(`Missed meal break remove failed: ${error.message}`);
+      return;
+    }
+
+    setTimecardStatus('Missed meal break removed.');
   }
 
   function getPunchPairForShift(dateKey: string, shiftLabel: string) {
@@ -2213,13 +2226,15 @@ export default function DashboardPage() {
 
       return {
         ...saved,
-        payType: getDefaultPayType(
-          assignment?.label ?? saved.shiftLabel,
-          getEditableRowHours(saved),
-          assignment?.slots.find(
-            (slot) => slot.employeeId === currentEmployeeId,
-          )?.shiftType,
-        ),
+        payType:
+          saved.payType ||
+          getDefaultPayType(
+            assignment?.label ?? saved.shiftLabel,
+            getEditableRowHours(saved),
+            assignment?.slots.find(
+              (slot) => slot.employeeId === currentEmployeeId,
+            )?.shiftType,
+          ),
       };
     }
 
@@ -2546,8 +2561,21 @@ export default function DashboardPage() {
     setTimecardStatus('Timecard correction request added.');
   }
 
-  function removeTimecardCorrection(id: string) {
-    saveTimecardCorrections(timecardCorrections.filter((item) => item.id !== id));
+  async function removeTimecardCorrection(id: string) {
+    setTimecardCorrections(timecardCorrections.filter((item) => item.id !== id));
+
+    const { error } = await supabase
+      .from('timecard_corrections')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to remove timecard correction:', error);
+      window.alert(`Timecard correction remove failed: ${error.message}`);
+      return;
+    }
+
+    setTimecardStatus('Timecard correction request removed.');
   }
 
   function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
