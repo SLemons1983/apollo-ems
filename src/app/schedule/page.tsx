@@ -4039,11 +4039,6 @@ export default function SchedulePage() {
                           <input type="checkbox" checked={extra.allowExtendedHours} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'allowExtendedHours', event.target.checked)} className="h-4 w-4" />
                           Allow extended hours
                         </label>
-
-                        <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                          <input type="checkbox" checked={Boolean(extra.hiddenFromEmployees)} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'hiddenFromEmployees', event.target.checked)} className="h-4 w-4" />
-                          Hide shift from employees
-                        </label>
                       </div>
 
                       <div>
@@ -4150,11 +4145,6 @@ export default function SchedulePage() {
                             <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                               <input type="checkbox" checked={selectedShift.shift.allowExtendedHours} onChange={(event) => handleStandardShiftChange(selectedShift.dateKey, selectedShift.shiftName, 'allowExtendedHours', event.target.checked)} className="h-4 w-4" />
                               Allow extended hours
-                            </label>
-
-                            <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
-                              <input type="checkbox" checked={Boolean(selectedShift.shift.hiddenFromEmployees)} onChange={(event) => handleStandardShiftChange(selectedShift.dateKey, selectedShift.shiftName, 'hiddenFromEmployees', event.target.checked)} className="h-4 w-4" />
-                              Hide shift from employees
                             </label>
                           </div>
 
