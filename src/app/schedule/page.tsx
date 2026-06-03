@@ -4104,7 +4104,19 @@ export default function SchedulePage() {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                          saveStatus.startsWith('Saving')
+                            ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                            : saveStatus.toLowerCase().includes('failed')
+                              ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                              : hasUnsavedChanges
+                                ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                                : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                        }`}>
+                          {saveStatus}
+                        </div>
+
                         <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
                           Confirm Changes
                         </button>
@@ -4204,9 +4216,23 @@ export default function SchedulePage() {
                             </div>
                           )}
 
-                          <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
-                            Confirm Changes
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+                              saveStatus.startsWith('Saving')
+                                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                                : saveStatus.toLowerCase().includes('failed')
+                                  ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                                  : hasUnsavedChanges
+                                    ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                                    : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                            }`}>
+                              {saveStatus}
+                            </div>
+
+                            <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
+                              Confirm Changes
+                            </button>
+                          </div>
                         </div>
                       );
                     })()}
