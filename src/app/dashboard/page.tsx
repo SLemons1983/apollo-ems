@@ -790,6 +790,42 @@ function formatShortDate(date: Date): string {
   });
 }
 
+function getNthWeekdayOfMonth(year: number, monthIndex: number, weekday: number, nth: number): Date {
+  const date = new Date(year, monthIndex, 1);
+
+  while (date.getDay() !== weekday) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  date.setDate(date.getDate() + (nth - 1) * 7);
+  return date;
+}
+
+function getLastWeekdayOfMonth(year: number, monthIndex: number, weekday: number): Date {
+  const date = new Date(year, monthIndex + 1, 0);
+
+  while (date.getDay() !== weekday) {
+    date.setDate(date.getDate() - 1);
+  }
+
+  return date;
+}
+
+function getCompanyHolidayDateKeys(year: number): string[] {
+  return [
+    toDateKey(new Date(year, 0, 1)),
+    toDateKey(getLastWeekdayOfMonth(year, 4, 1)),
+    toDateKey(new Date(year, 6, 4)),
+    toDateKey(getNthWeekdayOfMonth(year, 8, 1, 1)),
+    toDateKey(getNthWeekdayOfMonth(year, 10, 4, 4)),
+    toDateKey(new Date(year, 11, 25)),
+  ];
+}
+
+function isCompanyHoliday(date: Date): boolean {
+  return getCompanyHolidayDateKeys(date.getFullYear()).includes(toDateKey(date));
+}
+
 function buildPayPeriodOptions(baseDate: Date, count = 12): PayPeriodOption[] {
   const year = baseDate.getFullYear();
   const januaryFirst = new Date(year, 0, 1);
