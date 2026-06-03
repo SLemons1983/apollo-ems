@@ -221,6 +221,15 @@ type TimecardCorrectionRequest = {
   createdAt: string;
 };
 
+type AdditionalCompensation = {
+  id: string;
+  employeeId: string;
+  dateKey: string;
+  compensationType: 'LDT_STIPEND' | 'MEAL_PAY';
+  amount: number;
+  createdAt: string;
+};
+
 type PayBreakdown = {
   regularHours: number;
   overtimeHours: number;
@@ -921,6 +930,7 @@ export default function DashboardPage() {
   const [timecardNotes, setTimecardNotes] = useState<Record<string, string>>({});
   const [missedMealBreaks, setMissedMealBreaks] = useState<MissedMealBreak[]>([]);
   const [timecardCorrections, setTimecardCorrections] = useState<TimecardCorrectionRequest[]>([]);
+  const [additionalCompensation, setAdditionalCompensation] = useState<AdditionalCompensation[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [editableTimecardRows, setEditableTimecardRows] = useState<Record<string, EditableTimecardRow>>({});
   const [missedMealDateKey, setMissedMealDateKey] = useState('');
@@ -931,6 +941,10 @@ export default function DashboardPage() {
   const [correctionRequestedDate, setCorrectionRequestedDate] = useState('');
   const [correctionRequestedTime, setCorrectionRequestedTime] = useState('');
   const [correctionReason, setCorrectionReason] = useState('');
+
+  const [compensationDateKey, setCompensationDateKey] = useState('');
+  const [compensationType, setCompensationType] =
+    useState<'LDT_STIPEND' | 'MEAL_PAY'>('LDT_STIPEND');
   const [messageRecipientMode, setMessageRecipientMode] = useState('SUPERVISORS');
   const [messageRecipientEmployeeId, setMessageRecipientEmployeeId] = useState('');
   const [messageSubject, setMessageSubject] = useState('');
@@ -2050,6 +2064,73 @@ export default function DashboardPage() {
       console.error('Failed to save timecard note:', error);
       window.alert(`Timecard note save failed: ${error.message}`);
     }
+  }
+
+  function getDefaultCompensationAmount(type: AdditionalCompensation['compensationType']): number {
+    if (type === 'LDT_STIPEND') {
+      return 75;
+    }
+
+    return 25;
+  }
+
+  async function saveAdditionalCompensation(nextItems: AdditionalCompensation[]) {
+    setAdditionalCompensation(nextItems);
+
+    const payload = nextItems.map((item) => ({
+      id: item.id,
+      employee_id: item.employeeId,
+      date_key: item.dateKey,
+      compensation_type: item.compensationType,
+      amount: item.amount,
+      created_at: item.createdAt,
+    }));
+
+    const { error } = await supabase
+      .from('additional_compensation')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save additional compensation:', error);
+      window.alert(`Additional compensation save failed: ${error.message}`);
+    }
+  }
+
+  function addAdditionalCompensation() {
+    if (!compensationDateKey) {
+      setTimecardStatus('Select a date before adding compensation.');
+      return;
+    }
+
+    const item: AdditionalCompensation = {
+      id: `comp-${Date.now()}`,
+      employeeId: currentEmployeeId,
+      dateKey: compensationDateKey,
+      compensationType,
+      amount: getDefaultCompensationAmount(compensationType),
+      createdAt: new Date().toISOString(),
+    };
+
+    saveAdditionalCompensation([item, ...additionalCompensation]);
+    setCompensationDateKey('');
+    setTimecardStatus('Additional compensation added.');
+  }
+
+  async function removeAdditionalCompensation(id: string) {
+    setAdditionalCompensation(additionalCompensation.filter((item) => item.id !== id));
+
+    const { error } = await supabase
+      .from('additional_compensation')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Failed to remove additional compensation:', error);
+      window.alert(`Additional compensation remove failed: ${error.message}`);
+      return;
+    }
+
+    setTimecardStatus('Additional compensation removed.');
   }
 
   async function saveMissedMealBreaks(nextBreaks: MissedMealBreak[]) {
@@ -3774,6 +3855,49 @@ export default function DashboardPage() {
                               </button>
                             </div>
                           ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 rounded-xl border border-slate-300 bg-slate-50 p-4">
+                    <div className="text-sm font-bold text-slate-900">Additional Compensation</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      Record LDT stipends and meal pay for payroll processing.
+                    </div>
+
+                    <div className="mt-3 grid gap-3 md:grid-cols-[220px_220px_auto]">
+                      <select value={compensationDateKey} onChange={(event) => setCompensationDateKey(event.target.value)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500">
+                        <option value="">Select date</option>
+                        {dates.map((date) => (
+                          <option key={toDateKey(date)} value={toDateKey(date)}>{formatDayLabel(date)}</option>
+                        ))}
+                      </select>
+
+                      <select value={compensationType} onChange={(event) => setCompensationType(event.target.value as AdditionalCompensation['compensationType'])} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500">
+                        <option value="LDT_STIPEND">LDT Stipend ($75)</option>
+                        <option value="MEAL_PAY">Meal Pay ($25)</option>
+                      </select>
+
+                      <button type="button" onClick={addAdditionalCompensation} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700">
+                        Add
+                      </button>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {additionalCompensation.length === 0 ? (
+                        <div className="text-xs text-slate-500">No additional compensation added for this pay period.</div>
+                      ) : (
+                        additionalCompensation.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                            <div>
+                              <div className="font-semibold text-slate-900">{item.dateKey}</div>
+                              <div className="text-slate-600">{item.compensationType === 'LDT_STIPEND' ? 'LDT Stipend' : 'Meal Pay'} • ${item.amount.toFixed(2)}</div>
+                            </div>
+                            <button type="button" onClick={() => removeAdditionalCompensation(item.id)} className="text-xs font-semibold text-red-600 hover:text-red-700">
+                              Remove
+                            </button>
+                          </div>
+                        ))
                       )}
                     </div>
                   </div>
