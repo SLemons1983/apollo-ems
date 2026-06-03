@@ -1318,6 +1318,27 @@ export default function DashboardPage() {
         });
 
       supabase
+        .from('additional_compensation')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to load additional compensation:', error);
+          } else {
+            setAdditionalCompensation(
+              (data ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                dateKey: row.date_key,
+                compensationType: row.compensation_type,
+                amount: row.amount,
+                createdAt: row.created_at,
+              })),
+            );
+          }
+        });
+
+      supabase
         .from('submitted_timecards')
         .select('*')
         .order('submitted_at', { ascending: false })
