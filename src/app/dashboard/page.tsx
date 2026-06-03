@@ -257,7 +257,13 @@ type SubmittedTimecard = {
 
 type EditableTimecardRow = {
   shiftLabel: string;
-  payType: 'DAILY_OT_DT' | 'TWENTY_FOUR_HOUR' | 'SICK_TIME' | 'VACATION' | 'JURY_DUTY';
+  payType:
+    | 'DAILY_OT_DT'
+    | 'TWENTY_FOUR_HOUR'
+    | 'CALL_IN'
+    | 'SICK_TIME'
+    | 'VACATION'
+    | 'JURY_DUTY';
   clockInDate: string;
   clockInTime: string;
   clockOutDate: string;
@@ -2362,7 +2368,7 @@ export default function DashboardPage() {
   }
 
   function usesDailyOtDoubleTimeRule(row: EditableTimecardRow): boolean {
-    return row.payType === 'DAILY_OT_DT';
+    return row.payType === 'DAILY_OT_DT' || row.payType === 'CALL_IN';
   }
 
   function addToWeekBreakdown(
@@ -3645,6 +3651,7 @@ export default function DashboardPage() {
                                   >
                                                                         <option value="DAILY_OT_DT">Non 24-Shift</option>
                                     <option value="TWENTY_FOUR_HOUR">24-Hour Shift</option>
+                                    <option value="CALL_IN">Call In</option>
                                     <option value="SICK_TIME">Sick Time</option>
                                     <option value="VACATION">Vacation</option>
                                     <option value="JURY_DUTY">Jury Duty</option>
