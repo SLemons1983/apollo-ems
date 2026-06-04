@@ -1134,6 +1134,10 @@ function getContinuousHoursResult(
   const slots = getAssignedSlotsForAssignment(target.category, target.shift);
 
   for (const slot of slots) {
+    if (isOpenShiftSlot(slot.employeeId)) {
+      continue;
+    }
+
     const employee = getEmployeeById(slot.employeeId, employees);
     const summary = buildEmployeeDailyUnitSummary(scheduleData, slot.employeeId);
     const { totalHours, hasApproval } = getChainHours(summary, dateKey);
