@@ -2858,6 +2858,17 @@ export default function DashboardPage() {
     setIsPunching(true);
     setTimecardStatus('Checking location...');
 
+    const punchShift =
+      type === 'CLOCK_OUT' && lastPunch?.type === 'CLOCK_IN'
+        ? {
+            dateKey: lastPunch.shiftDateKey,
+            label: lastPunch.shiftLabel,
+          }
+        : {
+            dateKey: activeShift.dateKey,
+            label: activeShift.label,
+          };
+
     try {
       const position = await getCurrentPosition();
       const latitude = position.coords.latitude;
@@ -2870,8 +2881,8 @@ export default function DashboardPage() {
         employeeId: currentEmployeeId,
         type,
         timestamp: new Date().toISOString(),
-        shiftDateKey: activeShift.dateKey,
-        shiftLabel: activeShift.label,
+        shiftDateKey: punchShift.dateKey,
+        shiftLabel: punchShift.label,
         locationLabel: activeShift.locationLabel,
         latitude,
         longitude,
@@ -2894,8 +2905,8 @@ export default function DashboardPage() {
         employeeId: currentEmployeeId,
         type,
         timestamp: new Date().toISOString(),
-        shiftDateKey: activeShift.dateKey,
-        shiftLabel: activeShift.label,
+        shiftDateKey: punchShift.dateKey,
+        shiftLabel: punchShift.label,
         locationLabel: activeShift.locationLabel,
         latitude: null,
         longitude: null,
