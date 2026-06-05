@@ -2878,7 +2878,26 @@ export default function DashboardPage() {
   }
 
   async function handlePunch(type: 'CLOCK_IN' | 'CLOCK_OUT') {
-    if (!activeShift) {
+    const punchShiftContext =
+      activeShift ??
+      (type === 'CLOCK_OUT' && lastPunch?.type === 'CLOCK_IN'
+        ? (() => {
+            const fallbackGeofence = SHIFT_GEOFENCES[lastPunch.shiftLabel] ?? SHIFT_GEOFENCES['Reedley 1'];
+
+            return {
+              date: parseDateKey(lastPunch.shiftDateKey),
+              dateKey: lastPunch.shiftDateKey,
+              label: lastPunch.shiftLabel,
+              slot: createEmptyEmployeeSlot(),
+              locationLabel: fallbackGeofence.label,
+              latitude: fallbackGeofence.latitude,
+              longitude: fallbackGeofence.longitude,
+              radiusFeet: fallbackGeofence.radiusFeet,
+            };
+          })()
+        : null);
+
+    if (!punchShiftContext) {
       setTimecardStatus('No active assigned shift was found for the current time window.');
       return;
     }
@@ -2893,16 +2912,16 @@ export default function DashboardPage() {
             label: lastPunch.shiftLabel,
           }
         : {
-            dateKey: activeShift.dateKey,
-            label: activeShift.label,
+            dateKey: punchShiftContext.dateKey,
+            label: punchShiftContext.label,
           };
 
     try {
       const position = await getCurrentPosition();
       const latitude = position.coords.latitude;
       const longitude = position.coords.longitude;
-      const distanceFeet = getDistanceFeet(latitude, longitude, activeShift.latitude, activeShift.longitude);
-      const approved = distanceFeet <= activeShift.radiusFeet;
+      const distanceFeet = getDistanceFeet(latitude, longitude, punchShiftContext.latitude, punchShiftContext.longitude);
+      const approved = distanceFeet <= punchShiftContext.radiusFeet;
 
       const punch: TimePunch = {
         id: `punch-${Date.now()}`,
@@ -2911,7 +2930,7 @@ export default function DashboardPage() {
         timestamp: new Date().toISOString(),
         shiftDateKey: punchShift.dateKey,
         shiftLabel: punchShift.label,
-        locationLabel: activeShift.locationLabel,
+        locationLabel: punchShiftContext.locationLabel,
         latitude,
         longitude,
         distanceFeet,
@@ -2920,7 +2939,7 @@ export default function DashboardPage() {
 
       if (!approved) {
         setTimecardStatus(
-          `Punch recorded as outside geofence. Distance: ${Math.round(distanceFeet)} ft from ${activeShift.locationLabel}.`,
+          `Punch recorded as outside geofence. Distance: ${Math.round(distanceFeet)} ft from ${punchShiftContext.locationLabel}.`,
         );
       } else {
         setTimecardStatus(`${type === 'CLOCK_IN' ? 'Clock in' : 'Clock out'} recorded successfully.`);
@@ -2935,7 +2954,7 @@ export default function DashboardPage() {
         timestamp: new Date().toISOString(),
         shiftDateKey: punchShift.dateKey,
         shiftLabel: punchShift.label,
-        locationLabel: activeShift.locationLabel,
+        locationLabel: punchShiftContext.locationLabel,
         latitude: null,
         longitude: null,
         distanceFeet: null,
@@ -3687,7 +3706,7 @@ export default function DashboardPage() {
 
                     <button
                       type="button"
-                      disabled={!activeShift || !isClockedIn || isPunching}
+                      disabled={!isClockedIn || isPunching}
                       onClick={() => handlePunch('CLOCK_OUT')}
                       className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
