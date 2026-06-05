@@ -2005,10 +2005,59 @@ export default function DashboardPage() {
     return null;
   }, [assignmentsByDate, dates, systemConfig.geofences]);
 
+  const currentEmployeePunches = useMemo(() => {
+    return timePunches
+      .filter((punch) => punch.employeeId === currentEmployeeId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [timePunches, currentEmployeeId]);
+
+  const lastPunch = currentEmployeePunches[0] ?? null;
+  const isClockedIn = lastPunch?.type === 'CLOCK_IN';
+
   const activeShift = useMemo((): ActiveShiftInfo | null => {
     const now = new Date();
     const earlyWindowMinutes = 60;
     const lateWindowMinutes = 60;
+    const continuousShiftClockOutWindowHours = 72;
+
+    const buildActiveShift = (
+      date: Date,
+      dateKey: string,
+      label: string,
+      slot: EmployeeSlot,
+    ): ActiveShiftInfo => {
+      const configuredGeofence = systemConfig.geofences.find((item) => item.shiftLabel === label);
+      const fallbackGeofence = SHIFT_GEOFENCES[label] ?? SHIFT_GEOFENCES['Reedley 1'];
+
+      return {
+        date,
+        dateKey,
+        label,
+        slot,
+        locationLabel: configuredGeofence?.locationLabel ?? fallbackGeofence.label,
+        latitude: configuredGeofence?.latitude ?? fallbackGeofence.latitude,
+        longitude: configuredGeofence?.longitude ?? fallbackGeofence.longitude,
+        radiusFeet: configuredGeofence?.radiusFeet ?? fallbackGeofence.radiusFeet,
+      };
+    };
+
+    if (lastPunch?.type === 'CLOCK_IN') {
+      const clockInTime = new Date(lastPunch.timestamp);
+      const clockOutWindowEnd = new Date(
+        clockInTime.getTime() + continuousShiftClockOutWindowHours * 60 * 60 * 1000,
+      );
+
+      if (now <= clockOutWindowEnd) {
+        const clockInDate = parseDateKey(lastPunch.shiftDateKey);
+        const dayAssignments = assignmentsByDate[lastPunch.shiftDateKey] ?? [];
+        const assignment = dayAssignments.find((item) => item.label === lastPunch.shiftLabel);
+        const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId);
+
+        if (assignment && slot) {
+          return buildActiveShift(clockInDate, lastPunch.shiftDateKey, assignment.label, slot);
+        }
+      }
+    }
 
     for (const date of dates) {
       const dateKey = toDateKey(date);
@@ -2025,31 +2074,13 @@ export default function DashboardPage() {
         const latestClockOut = new Date(end.getTime() + lateWindowMinutes * 60 * 1000);
 
         if (now >= earliestClockIn && now <= latestClockOut) {
-          const configuredGeofence = systemConfig.geofences.find((item) => item.shiftLabel === assignment.label);
-          const fallbackGeofence = SHIFT_GEOFENCES[assignment.label] ?? SHIFT_GEOFENCES['Reedley 1'];
-
-          return {
-            date,
-            dateKey,
-            label: assignment.label,
-            slot,
-            locationLabel: configuredGeofence?.locationLabel ?? fallbackGeofence.label,
-            latitude: configuredGeofence?.latitude ?? fallbackGeofence.latitude,
-            longitude: configuredGeofence?.longitude ?? fallbackGeofence.longitude,
-            radiusFeet: configuredGeofence?.radiusFeet ?? fallbackGeofence.radiusFeet,
-          };
+          return buildActiveShift(date, dateKey, assignment.label, slot);
         }
       }
     }
 
     return null;
-  }, [assignmentsByDate, dates]);
-
-  const currentEmployeePunches = useMemo(() => {
-    return timePunches
-      .filter((punch) => punch.employeeId === currentEmployeeId)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [timePunches]);
+  }, [assignmentsByDate, dates, lastPunch, systemConfig.geofences]);
 
   const payPeriodPunches = useMemo(() => {
     const start = new Date(selectedPayPeriod.start);
@@ -2062,9 +2093,6 @@ export default function DashboardPage() {
       return timestamp >= start && timestamp <= end;
     });
   }, [currentEmployeePunches, selectedPayPeriod]);
-
-  const lastPunch = currentEmployeePunches[0] ?? null;
-  const isClockedIn = lastPunch?.type === 'CLOCK_IN';
 
   async function saveTimePunches(nextPunches: TimePunch[]) {
     setTimePunches(nextPunches);
