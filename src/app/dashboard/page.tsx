@@ -2397,9 +2397,19 @@ export default function DashboardPage() {
 
     if (hasManualData) {
       const assignment = getAssignedShiftForDate(date);
+      const punchPair = saved.shiftLabel
+        ? getPunchPairForShift(dateKey, saved.shiftLabel)
+        : { clockIn: null, clockOut: null };
+      const clockOutDate = !saved.clockOutDate && punchPair.clockOut
+        ? new Date(punchPair.clockOut.timestamp)
+        : null;
 
       return {
         ...saved,
+        clockOutDate: clockOutDate ? getIsoDateInputValue(clockOutDate) : saved.clockOutDate,
+        clockOutTime: clockOutDate
+          ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0')
+          : saved.clockOutTime,
         payType:
           saved.payType ||
           getDefaultPayType(
