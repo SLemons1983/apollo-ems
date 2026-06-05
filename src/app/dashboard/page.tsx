@@ -2946,6 +2946,20 @@ export default function DashboardPage() {
       }
 
       saveTimePunches([punch, ...timePunches]);
+
+      const punchTime = new Date(punch.timestamp);
+      updateEditableRow(parseDateKey(punch.shiftDateKey), {
+        shiftLabel: punch.shiftLabel,
+        ...(type === 'CLOCK_IN'
+          ? {
+              clockInDate: getIsoDateInputValue(punchTime),
+              clockInTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
+            }
+          : {
+              clockOutDate: getIsoDateInputValue(punchTime),
+              clockOutTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
+            }),
+      });
     } catch (error) {
       const punch: TimePunch = {
         id: `punch-${Date.now()}`,
@@ -2962,6 +2976,20 @@ export default function DashboardPage() {
       };
 
       saveTimePunches([punch, ...timePunches]);
+
+      const punchTime = new Date(punch.timestamp);
+      updateEditableRow(parseDateKey(punch.shiftDateKey), {
+        shiftLabel: punch.shiftLabel,
+        ...(type === 'CLOCK_IN'
+          ? {
+              clockInDate: getIsoDateInputValue(punchTime),
+              clockInTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
+            }
+          : {
+              clockOutDate: getIsoDateInputValue(punchTime),
+              clockOutTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
+            }),
+      });
       setTimecardStatus('Location was unavailable. Punch was recorded for supervisor review.');
     } finally {
       setIsPunching(false);
