@@ -2284,7 +2284,18 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     const clockIn = punches.find((punch) => punch.type === 'CLOCK_IN') ?? null;
-    const clockOut = [...punches].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+    let clockOut = [...punches].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+
+    if (clockIn && !clockOut) {
+      clockOut =
+        payPeriodPunches
+          .filter(
+            (punch) =>
+              punch.type === 'CLOCK_OUT' &&
+              new Date(punch.timestamp).getTime() > new Date(clockIn.timestamp).getTime(),
+          )
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0] ?? null;
+    }
 
     return { clockIn, clockOut };
   }
