@@ -2457,12 +2457,18 @@ export default function DashboardPage() {
 
     if (hasManualData) {
       const assignment = getAssignedShiftForDate(date);
+      const isBlankDateValue = (value: string | undefined) =>
+        !value || value === 'mm/dd/yyyy';
+
+      const isBlankTimeValue = (value: string | undefined) =>
+        !value || value === 'HH:MM';
+
       const savedIsOffRow =
         (!saved.shiftLabel || saved.shiftLabel === 'Off') &&
-        !saved.clockInDate &&
-        !saved.clockInTime &&
-        !saved.clockOutDate &&
-        !saved.clockOutTime;
+        isBlankDateValue(saved.clockInDate) &&
+        isBlankTimeValue(saved.clockInTime) &&
+        isBlankDateValue(saved.clockOutDate) &&
+        isBlankTimeValue(saved.clockOutTime);
 
       if (assignment && savedIsOffRow) {
         const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
