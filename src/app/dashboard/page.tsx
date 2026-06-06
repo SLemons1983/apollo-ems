@@ -2505,12 +2505,31 @@ export default function DashboardPage() {
         ? new Date(punchPair.clockOut.timestamp)
         : null;
 
+      const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
+      const scheduledRange = assignment && slot ? getShiftDateTimeRange(date, slot) : null;
+
       return {
         ...saved,
-        clockOutDate: clockOutDate ? getIsoDateInputValue(clockOutDate) : saved.clockOutDate,
-        clockOutTime: clockOutDate
-          ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0')
-          : saved.clockOutTime,
+        clockInDate:
+          isBlankDateValue(saved.clockInDate) && scheduledRange
+            ? getIsoDateInputValue(scheduledRange.start)
+            : saved.clockInDate,
+        clockInTime:
+          isBlankTimeValue(saved.clockInTime) && scheduledRange
+            ? `${scheduledRange.start.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.start.getMinutes()}`.padStart(2, '0')
+            : saved.clockInTime,
+        clockOutDate:
+          clockOutDate
+            ? getIsoDateInputValue(clockOutDate)
+            : isBlankDateValue(saved.clockOutDate) && scheduledRange
+              ? getIsoDateInputValue(scheduledRange.end)
+              : saved.clockOutDate,
+        clockOutTime:
+          clockOutDate
+            ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0')
+            : isBlankTimeValue(saved.clockOutTime) && scheduledRange
+              ? `${scheduledRange.end.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.end.getMinutes()}`.padStart(2, '0')
+              : saved.clockOutTime,
         payType:
           saved.payType ||
           getDefaultPayType(
