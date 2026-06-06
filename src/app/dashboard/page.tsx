@@ -2457,6 +2457,30 @@ export default function DashboardPage() {
 
     if (hasManualData) {
       const assignment = getAssignedShiftForDate(date);
+      const savedIsOffRow =
+        (!saved.shiftLabel || saved.shiftLabel === 'Off') &&
+        !saved.clockInDate &&
+        !saved.clockInTime &&
+        !saved.clockOutDate &&
+        !saved.clockOutTime;
+
+      if (assignment && savedIsOffRow) {
+        const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
+        const scheduledRange = slot ? getShiftDateTimeRange(date, slot) : null;
+        const scheduledHours = scheduledRange
+          ? Math.max(0, (scheduledRange.end.getTime() - scheduledRange.start.getTime()) / (1000 * 60 * 60))
+          : 0;
+
+        return {
+          shiftLabel: assignment.label,
+          payType: getDefaultPayType(assignment.label, scheduledHours, slot?.shiftType),
+          clockInDate: scheduledRange ? getIsoDateInputValue(scheduledRange.start) : '',
+          clockInTime: scheduledRange ? `${scheduledRange.start.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.start.getMinutes()}`.padStart(2, '0') : '',
+          clockOutDate: scheduledRange ? getIsoDateInputValue(scheduledRange.end) : '',
+          clockOutTime: scheduledRange ? `${scheduledRange.end.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.end.getMinutes()}`.padStart(2, '0') : '',
+        };
+      }
+
       const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
       const punchPair = scheduledPair.clockIn && scheduledPair.clockOut
         ? scheduledPair
