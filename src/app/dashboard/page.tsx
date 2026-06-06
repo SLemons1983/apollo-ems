@@ -2580,9 +2580,9 @@ export default function DashboardPage() {
         )?.shiftType,
       ),
       clockInDate: clockInDate ? getIsoDateInputValue(clockInDate) : '',
-      clockInTime: clockInDate ? `${clockInDate.getHours()}`.padStart(2, '0') + ':' + `${clockInDate.getMinutes()}`.padStart(2, '0') : '',
+      clockInTime: punchPair.clockIn && clockInDate ? `${clockInDate.getHours()}`.padStart(2, '0') + ':' + `${clockInDate.getMinutes()}`.padStart(2, '0') : '',
       clockOutDate: clockOutDate ? getIsoDateInputValue(clockOutDate) : '',
-      clockOutTime: clockOutDate ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0') : '',
+      clockOutTime: punchPair.clockOut && clockOutDate ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0') : '',
     };
   }
 
