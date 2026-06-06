@@ -2391,6 +2391,55 @@ export default function DashboardPage() {
     return hours >= 23 ? 'TWENTY_FOUR_HOUR' : 'DAILY_OT_DT';
   }
 
+  function getContinuousPunchPairForScheduledShift(
+    date: Date,
+    assignment: DisplayAssignment | null,
+  ): { clockIn: TimePunch | null; clockOut: TimePunch | null } {
+    const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId);
+    if (!assignment || !slot) {
+      return { clockIn: null, clockOut: null };
+    }
+
+    const { start, end } = getShiftDateTimeRange(date, slot);
+
+    const realClockIn =
+      payPeriodPunches
+        .filter(
+          (punch) =>
+            punch.type === 'CLOCK_IN' &&
+            new Date(punch.timestamp).getTime() <= start.getTime(),
+        )
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null;
+
+    const realClockOut =
+      payPeriodPunches
+        .filter(
+          (punch) =>
+            punch.type === 'CLOCK_OUT' &&
+            new Date(punch.timestamp).getTime() >= end.getTime(),
+        )
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0] ?? null;
+
+    if (!realClockIn || !realClockOut) {
+      return { clockIn: null, clockOut: null };
+    }
+
+    return {
+      clockIn: {
+        ...realClockIn,
+        timestamp: start.toISOString(),
+        shiftDateKey: toDateKey(date),
+        shiftLabel: assignment.label,
+      },
+      clockOut: {
+        ...realClockOut,
+        timestamp: end.toISOString(),
+        shiftDateKey: toDateKey(date),
+        shiftLabel: assignment.label,
+      },
+    };
+  }
+
   function getEditableRowForDate(date: Date): EditableTimecardRow {
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
@@ -2408,9 +2457,12 @@ export default function DashboardPage() {
 
     if (hasManualData) {
       const assignment = getAssignedShiftForDate(date);
-      const punchPair = saved.shiftLabel
-        ? getPunchPairForShift(dateKey, saved.shiftLabel)
-        : { clockIn: null, clockOut: null };
+      const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
+      const punchPair = scheduledPair.clockIn && scheduledPair.clockOut
+        ? scheduledPair
+        : saved.shiftLabel
+          ? getPunchPairForShift(dateKey, saved.shiftLabel)
+          : { clockIn: null, clockOut: null };
       const clockOutDate = !saved.clockOutDate && punchPair.clockOut
         ? new Date(punchPair.clockOut.timestamp)
         : null;
@@ -2434,7 +2486,13 @@ export default function DashboardPage() {
     }
 
     const assignment = getAssignedShiftForDate(date);
-    const punchPair = assignment ? getPunchPairForShift(dateKey, assignment.label) : { clockIn: null, clockOut: null };
+    const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
+    const punchPair =
+      scheduledPair.clockIn && scheduledPair.clockOut
+        ? scheduledPair
+        : assignment
+          ? getPunchPairForShift(dateKey, assignment.label)
+          : { clockIn: null, clockOut: null };
     const clockInDate = punchPair.clockIn ? new Date(punchPair.clockIn.timestamp) : null;
     const clockOutDate = punchPair.clockOut ? new Date(punchPair.clockOut.timestamp) : null;
 
