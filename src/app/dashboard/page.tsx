@@ -2958,9 +2958,26 @@ export default function DashboardPage() {
 
   function getAssignedShiftForDate(date: Date) {
     const dateKey = toDateKey(date);
-    const dayAssignments = assignmentsByDate[dateKey] ?? [];
+    const day = getDaySchedule(scheduleData, dateKey);
 
-    return dayAssignments.find((assignment) =>
+    const standardAssignments: DisplayAssignment[] = SHIFT_ORDER.map((shiftName) => ({
+      key: `standard-${shiftName}`,
+      label: SHIFT_DISPLAY[shiftName],
+      slots: getAssignedSlots(
+        day.standard[shiftName],
+        shiftName === 'ADMIN_SUP' || shiftName === 'FIELD_SUP' ? 'SUPERVISOR' : 'UNIT',
+      ),
+      hiddenFromEmployees: Boolean(day.standard[shiftName].hiddenFromEmployees),
+    }));
+
+    const extraAssignments: DisplayAssignment[] = day.extras.map((extra) => ({
+      key: `extra-${extra.id}`,
+      label: extra.label,
+      slots: getAssignedSlots(extra, extra.category),
+      hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
+    }));
+
+    return [...standardAssignments, ...extraAssignments].find((assignment) =>
       assignment.slots.some((slot) => slot.employeeId === currentEmployeeId),
     ) ?? null;
   }
