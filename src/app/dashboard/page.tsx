@@ -2521,7 +2521,8 @@ export default function DashboardPage() {
       console.log('Apollo timecard debug 2026-06-05', {
         dateKey,
         currentEmployeeId,
-        assignment,
+        assignmentLabel: assignment?.label,
+        assignmentSlots: assignment?.slots,
         saved,
         scheduleDay: getDaySchedule(scheduleData, dateKey),
       });
