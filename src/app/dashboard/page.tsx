@@ -2516,6 +2516,17 @@ export default function DashboardPage() {
     }
 
     const assignment = getAssignedShiftForDate(date);
+
+    if (dateKey === '2026-06-05') {
+      console.log('Apollo timecard debug 2026-06-05', {
+        dateKey,
+        currentEmployeeId,
+        assignment,
+        saved,
+        scheduleDay: getDaySchedule(scheduleData, dateKey),
+      });
+    }
+
     const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
     const punchPair =
       scheduledPair.clockIn && scheduledPair.clockOut
