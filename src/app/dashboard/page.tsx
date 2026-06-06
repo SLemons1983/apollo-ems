@@ -2457,11 +2457,15 @@ export default function DashboardPage() {
 
     if (hasManualData) {
       const assignment = getAssignedShiftForDate(date);
-      const isBlankDateValue = (value: string | undefined) =>
-        !value || value === 'mm/dd/yyyy';
+      const isBlankDateValue = (value: string | undefined) => {
+        const trimmed = (value ?? '').trim();
+        return !trimmed || trimmed === 'mm/dd/yyyy' || !/^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+      };
 
-      const isBlankTimeValue = (value: string | undefined) =>
-        !value || value === 'HH:MM';
+      const isBlankTimeValue = (value: string | undefined) => {
+        const trimmed = (value ?? '').trim();
+        return !trimmed || trimmed === 'HH:MM' || !/^\d{2}:\d{2}$/.test(trimmed);
+      };
 
       const savedHasBlankTimes =
         isBlankDateValue(saved.clockInDate) &&
