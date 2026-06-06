@@ -2066,7 +2066,28 @@ export default function SupervisorPage() {
           console.error('Failed to save payroll submission:', error);
           window.alert(`Payroll submission save failed: ${error.message}`);
         } else {
-          window.alert('Payroll submission recorded.');
+          void fetch('/api/email/message', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              to: 'kira.holley@sscems.org',
+              senderName: submission.submittedBy,
+              subject: `ApolloEMS Payroll Submitted - ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}`,
+              message:
+                `Payroll has been submitted in ApolloEMS.\n\n` +
+                `Pay Period: ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}\n` +
+                `Submitted By: ${submission.submittedBy}\n` +
+                `Submitted At: ${new Date(submission.submittedAt).toLocaleString()}\n` +
+                `Approved Timecards: ${submission.approvedCount}\n\n` +
+                `Please log into ApolloEMS to review the payroll packet.`,
+            }),
+          }).catch((emailError) => {
+            console.error('Payroll submission email failed:', emailError);
+          });
+
+          window.alert('Payroll submission recorded. Kira has been notified by email.');
         }
       });
   }
