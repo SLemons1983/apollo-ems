@@ -2554,10 +2554,21 @@ export default function DashboardPage() {
         : assignment
           ? getPunchPairForShift(dateKey, assignment.label)
           : { clockIn: null, clockOut: null };
-    const clockInDate = punchPair.clockIn ? new Date(punchPair.clockIn.timestamp) : null;
-    const clockOutDate = punchPair.clockOut ? new Date(punchPair.clockOut.timestamp) : null;
+    const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
+    const scheduledRange = assignment && slot ? getShiftDateTimeRange(date, slot) : null;
+    const clockInDate = punchPair.clockIn
+      ? new Date(punchPair.clockIn.timestamp)
+      : scheduledRange?.start ?? null;
+    const clockOutDate = punchPair.clockOut
+      ? new Date(punchPair.clockOut.timestamp)
+      : scheduledRange?.end ?? null;
 
-    const inferredHours = getHoursNumberBetween(punchPair.clockIn, punchPair.clockOut);
+    const inferredHours =
+      punchPair.clockIn && punchPair.clockOut
+        ? getHoursNumberBetween(punchPair.clockIn, punchPair.clockOut)
+        : scheduledRange
+          ? Math.max(0, (scheduledRange.end.getTime() - scheduledRange.start.getTime()) / (1000 * 60 * 60))
+          : 0;
 
     return {
       shiftLabel: assignment?.label ?? '',
