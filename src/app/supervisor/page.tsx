@@ -1480,6 +1480,19 @@ export default function SupervisorPage() {
     const templateDateKeys = Object.keys(builderSchedule).sort();
     const launchDateKeys = getBuilderDateRange(builderStartDate, builderEndDate);
 
+    console.log('Apollo schedule launch range', {
+      builderStartDate,
+      builderEndDate,
+      launchDateCount: launchDateKeys.length,
+      firstLaunchDate: launchDateKeys[0] ?? null,
+      lastLaunchDate: launchDateKeys[launchDateKeys.length - 1] ?? null,
+    });
+
+    if (launchDateKeys.length < 14) {
+      window.alert(`Schedule launch cancelled. The selected launch range only has ${launchDateKeys.length} day(s). Select the full pay period before launching.`);
+      return;
+    }
+
     if (templateDateKeys.length === 0) {
       window.alert('Build a schedule layout before launching.');
       return;
