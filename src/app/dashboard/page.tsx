@@ -2463,14 +2463,22 @@ export default function DashboardPage() {
       const isBlankTimeValue = (value: string | undefined) =>
         !value || value === 'HH:MM';
 
-      const savedIsOffRow =
-        (!saved.shiftLabel || saved.shiftLabel === 'Off') &&
+      const savedHasBlankTimes =
         isBlankDateValue(saved.clockInDate) &&
         isBlankTimeValue(saved.clockInTime) &&
         isBlankDateValue(saved.clockOutDate) &&
         isBlankTimeValue(saved.clockOutTime);
 
-      if (assignment && savedIsOffRow) {
+      const savedIsOffRow =
+        (!saved.shiftLabel || saved.shiftLabel === 'Off') &&
+        savedHasBlankTimes;
+
+      const savedMatchesAssignedShift =
+        assignment &&
+        saved.shiftLabel === assignment.label &&
+        savedHasBlankTimes;
+
+      if (assignment && (savedIsOffRow || savedMatchesAssignedShift)) {
         const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
         const scheduledRange = slot ? getShiftDateTimeRange(date, slot) : null;
         const scheduledHours = scheduledRange
