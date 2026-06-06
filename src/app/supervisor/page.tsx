@@ -2072,7 +2072,7 @@ export default function SupervisorPage() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              to: 'kira.holley@sscems.org',
+              to: 'steve@sscems.org',
               senderName: submission.submittedBy,
               subject: `ApolloEMS Payroll Submitted - ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}`,
               message:
