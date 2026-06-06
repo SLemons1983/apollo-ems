@@ -1026,15 +1026,30 @@ export default function DashboardPage() {
         throw scheduleError;
       }
 
-      const { data: assignments, error: assignmentError } = await supabase
-        .from('schedule_assignments')
-        .select('*')
-        .order('date_key', { ascending: true })
-        .order('shift_key', { ascending: true })
-        .order('slot_number', { ascending: true });
+      const assignments: any[] = [];
+      let assignmentPageStart = 0;
+      const assignmentPageSize = 1000;
 
-      if (assignmentError) {
-        throw assignmentError;
+      while (true) {
+        const { data: assignmentPage, error: assignmentError } = await supabase
+          .from('schedule_assignments')
+          .select('*')
+          .order('date_key', { ascending: true })
+          .order('shift_key', { ascending: true })
+          .order('slot_number', { ascending: true })
+          .range(assignmentPageStart, assignmentPageStart + assignmentPageSize - 1);
+
+        if (assignmentError) {
+          throw assignmentError;
+        }
+
+        assignments.push(...(assignmentPage ?? []));
+
+        if (!assignmentPage || assignmentPage.length < assignmentPageSize) {
+          break;
+        }
+
+        assignmentPageStart += assignmentPageSize;
       }
 
       const rebuilt: ScheduleData = {};
