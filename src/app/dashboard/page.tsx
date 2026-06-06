@@ -2516,18 +2516,6 @@ export default function DashboardPage() {
     }
 
     const assignment = getAssignedShiftForDate(date);
-
-    if (dateKey === '2026-06-05') {
-      console.log('Apollo timecard debug 2026-06-05', {
-        dateKey,
-        currentEmployeeId,
-        assignmentLabel: assignment?.label,
-        assignmentSlots: assignment?.slots,
-        saved,
-        scheduleDay: getDaySchedule(scheduleData, dateKey),
-      });
-    }
-
     const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
     const punchPair =
       scheduledPair.clockIn && scheduledPair.clockOut
@@ -4007,6 +3995,20 @@ export default function DashboardPage() {
                                     className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
                                   >
                                     <option value="">Off</option>
+                                    {row.shiftLabel &&
+                                      ![
+                                        'Reedley 1',
+                                        'Reedley 2',
+                                        'Parlier',
+                                        'Orange Cove',
+                                        'Field Supervisor',
+                                        'Administrative Supervisor',
+                                        'Standby',
+                                        'Transfer',
+                                        'Other',
+                                      ].includes(row.shiftLabel) && (
+                                        <option value={row.shiftLabel}>{row.shiftLabel}</option>
+                                      )}
                                     <option value="Reedley 1">Reedley 1</option>
                                     <option value="Reedley 2">Reedley 2</option>
                                     <option value="Parlier">Parlier</option>
