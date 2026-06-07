@@ -4003,26 +4003,39 @@ export default function SupervisorPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-bold text-slate-900">Legal</div>
-                <div className="mt-1 text-xs text-slate-600">
-                  ApolloEMS End User Agreement, ownership notice, and intellectual property protections.
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowEula((current) => !current)}
+                  className="flex w-full items-center justify-between text-left"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">Legal</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      ApolloEMS End User Agreement, ownership notice, and intellectual property protections.
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {showEula ? 'Hide' : 'Show'}
+                  </span>
+                </button>
 
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="text-sm font-bold text-slate-900">ApolloEMS End User Agreement</div>
-                  <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Version 1.0 • Last Updated June 7, 2026
+                {showEula && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">ApolloEMS End User Agreement</div>
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Version 1.0 • Last Updated June 7, 2026
+                    </div>
+                    <div className="mt-3 text-sm leading-6 text-slate-700">
+                      ApolloEMS, including its software, source code, databases, designs, user interfaces, workflows, branding,
+                      documentation, intellectual property, and related materials, is the sole and exclusive property of Steven Lemons.
+                      Steven Lemons is the sole creator, designer, developer, engineer, and owner of ApolloEMS. Use of ApolloEMS does
+                      not transfer ownership, equity, partnership rights, revenue-sharing rights, licensing rights, source code rights,
+                      intellectual property rights, or any claim of authorship to any employee, agency, organization, beta tester,
+                      contractor, or third party. The owner reserves the right to modify, license, transfer, suspend, terminate, or sell
+                      ApolloEMS in whole or in part at any time.
+                    </div>
                   </div>
-                  <div className="mt-3 text-sm leading-6 text-slate-700">
-                    ApolloEMS, including its software, source code, databases, designs, user interfaces, workflows, branding,
-                    documentation, intellectual property, and related materials, is the sole and exclusive property of Steven Lemons.
-                    Steven Lemons is the sole creator, designer, developer, engineer, and owner of ApolloEMS. Use of ApolloEMS does
-                    not transfer ownership, equity, partnership rights, revenue-sharing rights, licensing rights, source code rights,
-                    intellectual property rights, or any claim of authorship to any employee, agency, organization, beta tester,
-                    contractor, or third party. The owner reserves the right to modify, license, transfer, suspend, terminate, or sell
-                    ApolloEMS in whole or in part at any time.
-                  </div>
-                </div>
+                )}
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
