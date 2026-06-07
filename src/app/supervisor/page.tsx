@@ -1799,6 +1799,34 @@ export default function SupervisorPage() {
     );
   }
 
+  function getScheduleMatchStatus(timecard: SubmittedTimecard): 'MATCH' | 'REVIEW' {
+    const startKey = makeDateInputValue(new Date(timecard.payPeriodStart));
+    const endKey = makeDateInputValue(new Date(timecard.payPeriodEnd));
+
+    const scheduledDateKeys = new Set(
+      scheduleAssignments
+        .filter(
+          (row) =>
+            row.employee_id === timecard.employeeId &&
+            row.date_key >= startKey &&
+            row.date_key <= endKey &&
+            !row.is_open_slot,
+        )
+        .map((row) => row.date_key),
+    );
+
+    const punchedDateKeys = new Set(timecard.punches.map((punch) => punch.shiftDateKey).filter(Boolean));
+
+    if (scheduledDateKeys.size === 0) {
+      return punchedDateKeys.size === 0 ? 'MATCH' : 'REVIEW';
+    }
+
+    const missingScheduledPunch = [...scheduledDateKeys].some((dateKey) => !punchedDateKeys.has(dateKey));
+    const unscheduledPunch = [...punchedDateKeys].some((dateKey) => !scheduledDateKeys.has(dateKey));
+
+    return missingScheduledPunch || unscheduledPunch ? 'REVIEW' : 'MATCH';
+  }
+
   function getDateKeyFromDate(date: Date): string {
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -2201,12 +2229,24 @@ export default function SupervisorPage() {
     const hasMissedMeals = timecard.missedMealBreaks.length > 0;
     const hasFlags = hasManualEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
     const isOwnSupervisorTimecard = timecard.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID;
+    const scheduleMatchStatus = getScheduleMatchStatus(timecard);
 
     return (
       <div id={`printable-${timecard.id}`} className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-base font-bold text-slate-900">{timecard.employeeName}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-base font-bold text-slate-900">{timecard.employeeName}</div>
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                  scheduleMatchStatus === 'MATCH'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}
+              >
+                {scheduleMatchStatus === 'MATCH' ? 'Schedule Match' : 'Schedule Review Needed'}
+              </span>
+            </div>
             <div className="mt-1 text-sm text-slate-600">
               Pay Period: {formatShortDate(new Date(timecard.payPeriodStart))} to {formatShortDate(new Date(timecard.payPeriodEnd))}
             </div>
