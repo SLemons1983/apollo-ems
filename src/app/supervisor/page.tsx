@@ -163,7 +163,10 @@ type SupabaseEmployeeRow = {
   scope: string | null;
   employee_type: string | null;
   status: string | null;
+  certifications?: EmployeeCertificationRecord | null;
 };
+
+type EmployeeCertificationRecord = Record<string, string>;
 
 type EmployeeOption = {
   id: string;
@@ -173,6 +176,7 @@ type EmployeeOption = {
   scope: 'ALS' | 'BLS';
   employeeType: string;
   status: string;
+  certifications?: EmployeeCertificationRecord | null;
 };
 
 type OpenShiftRequest = {
@@ -291,13 +295,14 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
     scope: normalizeScope(employee.scope ?? undefined, employee.role ?? undefined),
     employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
     status: (employee.status ?? 'Active').trim() || 'Active',
+    certifications: employee.certifications ?? null,
   };
 }
 
 async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
   const { data, error } = await supabase
     .from('employees')
-    .select('id,email,first_name,last_name,role,scope,employee_type,status')
+    .select('id,email,first_name,last_name,role,scope,employee_type,status,certifications')
     .order('last_name', { ascending: true })
     .order('first_name', { ascending: true });
 
@@ -953,6 +958,40 @@ export default function SupervisorPage() {
       !supervisorInboxIds.includes(message.senderId) &&
       message.recipients.some((recipient) => supervisorInboxIds.includes(recipient.employeeId) && !recipient.readAt),
   ).length;
+
+  const employeeCertificationAlertCount = useMemo(() => {
+    const expirationKeys = [
+      'driversLicense',
+      'ambulanceDriversLicense',
+      'ahaBlsCpr',
+      'medicalExaminerCertificate',
+      'annualTbScreen',
+      'californiaParamedicLicense',
+      'ccemsaParamedicLicense',
+      'acls',
+      'pals',
+      'californiaEmtLicense',
+      'ccemsaEmtLicense',
+    ];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return employees.filter((employee) => {
+      const certs = employee.certifications ?? {};
+
+      return expirationKeys.some((key) => {
+        const value = certs[key];
+        if (!value) return false;
+
+        const expiration = new Date(`${value}T23:59:59`);
+        if (Number.isNaN(expiration.getTime())) return false;
+
+        const days = Math.ceil((expiration.getTime() - today.getTime()) / 86400000);
+        return days <= 90;
+      });
+    }).length;
+  }, [employees]);
 
   const supervisorConversations = useMemo(() => {
     const grouped = new Map<string, ApolloMessage[]>();
@@ -3777,8 +3816,20 @@ export default function SupervisorPage() {
           {renderTile(
             'employee-management',
             'Employee Profiles',
-            'Manage employees, seniority, certifications, and employment status.',
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            employeeCertificationAlertCount > 0
+              ? `${employeeCertificationAlertCount} employee${employeeCertificationAlertCount === 1 ? '' : 's'} with expired or soon-expiring certifications.`
+              : 'Manage employees, seniority, certifications, and employment status.',
+            <div className={`rounded-xl border p-4 ${
+              employeeCertificationAlertCount > 0
+                ? 'border-red-300 bg-red-50'
+                : 'border-slate-200 bg-slate-50'
+            }`}>
+              {employeeCertificationAlertCount > 0 && (
+                <div className="mb-3 rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white">
+                  Certification review needed
+                </div>
+              )}
+
               <a
                 href="/employees"
                 className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
@@ -3786,6 +3837,7 @@ export default function SupervisorPage() {
                 Open Employee Profiles
               </a>
             </div>,
+            employeeCertificationAlertCount > 0,
           )}
 
           {renderTile(
