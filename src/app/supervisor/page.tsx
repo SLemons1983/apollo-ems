@@ -524,7 +524,7 @@ export default function SupervisorPage() {
 
       supabase
         .from('schedule_assignments')
-        .select('date_key,employee_id,is_open_slot')
+        .select('date_key,employee_id,is_open_slot,shift_label')
         .then(({ data, error }) => {
           if (error) {
             console.error('Failed to load schedule assignments:', error);
@@ -1799,32 +1799,56 @@ export default function SupervisorPage() {
     );
   }
 
+  function normalizeShiftLabelForReview(value: string | undefined): string {
+    return (value ?? '').trim().toLowerCase();
+  }
+
   function getScheduleMatchStatus(timecard: SubmittedTimecard): 'MATCH' | 'REVIEW' {
+    if (
+      hasManualEditFlag(timecard) ||
+      hasGeofenceReviewFlag(timecard) ||
+      timecard.missedMealBreaks.length > 0
+    ) {
+      return 'REVIEW';
+    }
+
     const startKey = makeDateInputValue(new Date(timecard.payPeriodStart));
     const endKey = makeDateInputValue(new Date(timecard.payPeriodEnd));
 
-    const scheduledDateKeys = new Set(
-      scheduleAssignments
-        .filter(
-          (row) =>
-            row.employee_id === timecard.employeeId &&
-            row.date_key >= startKey &&
-            row.date_key <= endKey &&
-            !row.is_open_slot,
-        )
-        .map((row) => row.date_key),
+    const scheduledRows = scheduleAssignments.filter(
+      (row) =>
+        row.employee_id === timecard.employeeId &&
+        row.date_key >= startKey &&
+        row.date_key <= endKey &&
+        !row.is_open_slot,
     );
 
-    const punchedDateKeys = new Set(timecard.punches.map((punch) => punch.shiftDateKey).filter(Boolean));
-
-    if (scheduledDateKeys.size === 0) {
-      return punchedDateKeys.size === 0 ? 'MATCH' : 'REVIEW';
+    if (scheduledRows.length === 0) {
+      return timecard.punches.length === 0 ? 'MATCH' : 'REVIEW';
     }
 
-    const missingScheduledPunch = [...scheduledDateKeys].some((dateKey) => !punchedDateKeys.has(dateKey));
-    const unscheduledPunch = [...punchedDateKeys].some((dateKey) => !scheduledDateKeys.has(dateKey));
+    const scheduledKeys = new Set(
+      scheduledRows.map((row) => `${row.date_key}|${normalizeShiftLabelForReview(row.shift_label)}`),
+    );
 
-    return missingScheduledPunch || unscheduledPunch ? 'REVIEW' : 'MATCH';
+    const punchKeys = new Set(
+      timecard.punches
+        .filter((punch) => punch.shiftDateKey && punch.shiftLabel)
+        .map((punch) => `${punch.shiftDateKey}|${normalizeShiftLabelForReview(punch.shiftLabel)}`),
+    );
+
+    const missingScheduledPunch = [...scheduledKeys].some((key) => !punchKeys.has(key));
+    const unscheduledPunch = [...punchKeys].some((key) => !scheduledKeys.has(key));
+
+    const missingClockPair = scheduledRows.some((row) => {
+      const pair = getPunchPairForDate(timecard, row.date_key);
+      return (
+        normalizeShiftLabelForReview(pair.shiftLabel) === normalizeShiftLabelForReview(row.shift_label) &&
+        (!pair.clockIn || !pair.clockOut)
+      );
+    });
+
+    return missingScheduledPunch || unscheduledPunch || missingClockPair ? 'REVIEW' : 'MATCH';
   }
 
   function getDateKeyFromDate(date: Date): string {
