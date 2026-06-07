@@ -1294,38 +1294,63 @@ export default function EmployeeProfilesPage() {
     return expiration < new Date() ? 'expired' : 'valid';
   }
 
-  function getEmployeeNameAlertClass(employee: EmployeeProfile): string {
-    const certifications = normalizeCertificationRecord(employee.certifications);
-    const expirationFields: Array<keyof CertificationRecord> = [
-      'driversLicense',
-      'ambulanceDriversLicense',
-      'ahaBlsCpr',
-      'medicalExaminerCertificate',
-      'annualTbScreen',
-      employee.scope === 'ALS' ? 'californiaParamedicLicense' : 'californiaEmtLicense',
-      employee.scope === 'ALS' ? 'ccemsaParamedicLicense' : 'ccemsaEmtLicense',
-      ...(employee.scope === 'ALS' ? (['acls', 'pals'] as Array<keyof CertificationRecord>) : []),
-    ];
+  function getCertificationDateAlert(value: string): { className: string; days: number | null } {
+    if (!value) return { className: '', days: null };
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const daysUntilExpiration = expirationFields
-      .map((field) => certifications[field])
-      .filter(Boolean)
-      .map((value) => {
-        const expiration = new Date(`${value}T23:59:59`);
-        if (Number.isNaN(expiration.getTime())) return null;
-        return Math.ceil((expiration.getTime() - today.getTime()) / 86400000);
-      })
-      .filter((days): days is number => days !== null)
-      .sort((a, b) => a - b)[0];
+    const expiration = new Date(`${value}T23:59:59`);
+    if (Number.isNaN(expiration.getTime())) return { className: '', days: null };
 
-    if (daysUntilExpiration === undefined || daysUntilExpiration > 90) return 'text-slate-900';
-    if (daysUntilExpiration >= 61) return 'rounded-md bg-yellow-200 px-2 py-1 text-slate-900';
-    if (daysUntilExpiration >= 31) return 'rounded-md bg-orange-300 px-2 py-1 text-slate-900';
-    if (daysUntilExpiration >= 8) return 'rounded-md bg-red-700 px-2 py-1 text-white';
-    return 'rounded-md bg-black px-2 py-1 text-red-500';
+    const days = Math.ceil((expiration.getTime() - today.getTime()) / 86400000);
+
+    if (days > 90) return { className: '', days };
+    if (days >= 61) return { className: 'border-yellow-300 bg-yellow-100 text-slate-900 focus:border-yellow-500', days };
+    if (days >= 31) return { className: 'border-orange-400 bg-orange-100 text-slate-900 focus:border-orange-500', days };
+    if (days >= 8) return { className: 'border-red-700 bg-red-700 text-white focus:border-red-900', days };
+    return { className: 'border-black bg-black text-red-500 focus:border-red-700', days };
+  }
+
+  function getEmployeeCertificationAlert(employee: EmployeeProfile): { className: string; title: string } {
+    const certifications = normalizeCertificationRecord(employee.certifications);
+    const expirationFields: Array<[keyof CertificationRecord, string]> = [
+      ['driversLicense', "Driver's License"],
+      ['ambulanceDriversLicense', "Ambulance Driver's License"],
+      ['ahaBlsCpr', 'AHA BLS CPR'],
+      ['medicalExaminerCertificate', 'Medical Examiner Certificate'],
+      ['annualTbScreen', 'Annual TB Screen'],
+      employee.scope === 'ALS'
+        ? ['californiaParamedicLicense', 'California Paramedic License']
+        : ['californiaEmtLicense', 'California EMT License'],
+      employee.scope === 'ALS'
+        ? ['ccemsaParamedicLicense', 'CCEMSA Paramedic License']
+        : ['ccemsaEmtLicense', 'CCEMSA EMT License'],
+      ...(employee.scope === 'ALS'
+        ? ([['acls', 'ACLS'], ['pals', 'PALS']] as Array<[keyof CertificationRecord, string]>)
+        : []),
+    ];
+
+    const nearest = expirationFields
+      .map(([field, label]) => ({ label, ...getCertificationDateAlert(certifications[field]) }))
+      .filter((item): item is { label: string; className: string; days: number } => item.days !== null)
+      .sort((a, b) => a.days - b.days)[0];
+
+    if (!nearest || nearest.days > 90) return { className: 'text-slate-900', title: '' };
+
+    const nameClass = nearest.days >= 61
+      ? 'rounded-md bg-yellow-200 px-2 py-1 text-slate-900'
+      : nearest.days >= 31
+        ? 'rounded-md bg-orange-300 px-2 py-1 text-slate-900'
+        : nearest.days >= 8
+          ? 'rounded-md bg-red-700 px-2 py-1 text-white'
+          : 'rounded-md bg-black px-2 py-1 text-red-500';
+
+    const title = nearest.days >= 0
+      ? `${nearest.days} day${nearest.days === 1 ? '' : 's'} until ${nearest.label} expires`
+      : `${nearest.label} expired ${Math.abs(nearest.days)} day${nearest.days === -1 ? '' : 's'} ago`;
+
+    return { className: nameClass, title };
   }
 
   function renderCertificationFields(
@@ -1394,6 +1419,7 @@ export default function EmployeeProfilesPage() {
               {commonFields.map(([field, label]) => {
                 const isLicenseNumber = licenseNumberFields.has(field);
                 const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
+                const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
 
                 return (
                   <div key={field}>
@@ -1405,9 +1431,11 @@ export default function EmployeeProfilesPage() {
                       value={certifications[field]}
                       onChange={(event) => onChange(field, event.target.value)}
                       className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
-                        status === 'valid'
-                          ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
-                          : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                        dateAlert.className || (
+                          status === 'valid'
+                            ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
+                            : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                        )
                       }`}
                     />
                     {status !== 'valid' && (
@@ -1430,6 +1458,7 @@ export default function EmployeeProfilesPage() {
               {(scope === 'ALS' ? alsFields : blsFields).map(([field, label]) => {
                 const isLicenseNumber = licenseNumberFields.has(field);
                 const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
+                const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
 
                 return (
                   <div key={field}>
@@ -1441,9 +1470,11 @@ export default function EmployeeProfilesPage() {
                       value={certifications[field]}
                       onChange={(event) => onChange(field, event.target.value)}
                       className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
-                        status === 'valid'
-                          ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
-                          : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                        dateAlert.className || (
+                          status === 'valid'
+                            ? 'border-slate-300 bg-white text-slate-900 focus:border-slate-500'
+                            : 'border-red-300 bg-red-50 text-red-900 focus:border-red-500'
+                        )
                       }`}
                     />
                     {status !== 'valid' && (
@@ -1756,12 +1787,16 @@ export default function EmployeeProfilesPage() {
             {filteredEmployees.map((employee) => {
               const expanded = expandedEmployeeId === employee.id;
               const editingEmployee = editingEmployees[employee.id] ?? employee;
+              const certAlert = getEmployeeCertificationAlert(employee);
 
               return (
                 <div key={employee.id}>
                   <div className="grid grid-cols-[minmax(300px,1.3fr)_minmax(180px,1fr)_minmax(180px,0.9fr)_minmax(150px,0.8fr)_140px] items-center px-4 py-3 hover:bg-slate-50">
                     <div>
-                      <div className={`inline-block font-semibold ${getEmployeeNameAlertClass(employee)}`}>
+                      <div
+                        title={certAlert.title}
+                        className={`inline-block font-semibold ${certAlert.className}`}
+                      >
                         {buildDisplayName(employee)}
                       </div>
                       <div className="text-xs text-slate-500">{employee.seniorityLabel || 'Seniority Unassigned'}</div>
