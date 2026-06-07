@@ -10,11 +10,15 @@ type CertificationRecord = {
   medicalExaminerCertificate: string;
   annualTbScreen: string;
   californiaParamedicLicense: string;
+  californiaParamedicLicenseNumber: string;
   ccemsaParamedicLicense: string;
+  ccemsaParamedicLicenseNumber: string;
   acls: string;
   pals: string;
   californiaEmtLicense: string;
+  californiaEmtLicenseNumber: string;
   ccemsaEmtLicense: string;
+  ccemsaEmtLicenseNumber: string;
 };
 
 type EmployeeProfile = {
@@ -78,11 +82,15 @@ const EMPTY_CERTIFICATIONS: CertificationRecord = {
   medicalExaminerCertificate: '',
   annualTbScreen: '',
   californiaParamedicLicense: '',
+  californiaParamedicLicenseNumber: '',
   ccemsaParamedicLicense: '',
+  ccemsaParamedicLicenseNumber: '',
   acls: '',
   pals: '',
   californiaEmtLicense: '',
+  californiaEmtLicenseNumber: '',
   ccemsaEmtLicense: '',
+  ccemsaEmtLicenseNumber: '',
 };
 
 const INITIAL_EMPLOYEES: EmployeeProfile[] = [
@@ -792,11 +800,15 @@ function normalizeCertificationRecord(value: CertificationRecord | undefined): C
     medicalExaminerCertificate: value?.medicalExaminerCertificate || '',
     annualTbScreen: value?.annualTbScreen || '',
     californiaParamedicLicense: value?.californiaParamedicLicense || '',
+    californiaParamedicLicenseNumber: value?.californiaParamedicLicenseNumber || '',
     ccemsaParamedicLicense: value?.ccemsaParamedicLicense || '',
+    ccemsaParamedicLicenseNumber: value?.ccemsaParamedicLicenseNumber || '',
     acls: value?.acls || '',
     pals: value?.pals || '',
     californiaEmtLicense: value?.californiaEmtLicense || '',
+    californiaEmtLicenseNumber: value?.californiaEmtLicenseNumber || '',
     ccemsaEmtLicense: value?.ccemsaEmtLicense || '',
+    ccemsaEmtLicenseNumber: value?.ccemsaEmtLicenseNumber || '',
   };
 }
 
@@ -1282,30 +1294,75 @@ export default function EmployeeProfilesPage() {
     return expiration < new Date() ? 'expired' : 'valid';
   }
 
+  function getEmployeeNameAlertClass(employee: EmployeeProfile): string {
+    const certifications = normalizeCertificationRecord(employee.certifications);
+    const expirationFields: Array<keyof CertificationRecord> = [
+      'driversLicense',
+      'ambulanceDriversLicense',
+      'ahaBlsCpr',
+      'medicalExaminerCertificate',
+      'annualTbScreen',
+      employee.scope === 'ALS' ? 'californiaParamedicLicense' : 'californiaEmtLicense',
+      employee.scope === 'ALS' ? 'ccemsaParamedicLicense' : 'ccemsaEmtLicense',
+      ...(employee.scope === 'ALS' ? (['acls', 'pals'] as Array<keyof CertificationRecord>) : []),
+    ];
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const daysUntilExpiration = expirationFields
+      .map((field) => certifications[field])
+      .filter(Boolean)
+      .map((value) => {
+        const expiration = new Date(`${value}T23:59:59`);
+        if (Number.isNaN(expiration.getTime())) return null;
+        return Math.ceil((expiration.getTime() - today.getTime()) / 86400000);
+      })
+      .filter((days): days is number => days !== null)
+      .sort((a, b) => a - b)[0];
+
+    if (daysUntilExpiration === undefined || daysUntilExpiration > 90) return 'text-slate-900';
+    if (daysUntilExpiration >= 61) return 'rounded-md bg-yellow-200 px-2 py-1 text-slate-900';
+    if (daysUntilExpiration >= 31) return 'rounded-md bg-orange-300 px-2 py-1 text-slate-900';
+    if (daysUntilExpiration >= 8) return 'rounded-md bg-red-700 px-2 py-1 text-white';
+    return 'rounded-md bg-black px-2 py-1 text-red-500';
+  }
+
   function renderCertificationFields(
     certifications: CertificationRecord,
     onChange: (field: keyof CertificationRecord, value: string) => void,
     scope: string,
   ) {
     const commonFields: Array<[keyof CertificationRecord, string]> = [
-      ['driversLicense', 'Drivers License'],
-      ['ambulanceDriversLicense', 'Ambulance Drivers License'],
-      ['ahaBlsCpr', 'AHA BLS CPR Card'],
-      ['medicalExaminerCertificate', 'Medical Examiners Certificate'],
-      ['annualTbScreen', 'Annual TB Screen'],
+      ['driversLicense', "Driver's License Expiration Date"],
+      ['ambulanceDriversLicense', "Ambulance Driver's License Expiration Date"],
+      ['ahaBlsCpr', 'AHA BLS CPR Expiration Date'],
+      ['medicalExaminerCertificate', 'Medical Examiner Certificate Expiration Date'],
+      ['annualTbScreen', 'Annual TB Screen Expiration Date'],
     ];
 
     const alsFields: Array<[keyof CertificationRecord, string]> = [
-      ['californiaParamedicLicense', 'California Paramedic License'],
-      ['ccemsaParamedicLicense', 'CCEMSA Paramedic License'],
-      ['acls', 'ACLS'],
-      ['pals', 'PALS'],
+      ['californiaParamedicLicenseNumber', 'California Paramedic License Number'],
+      ['californiaParamedicLicense', 'California Paramedic License Expiration Date'],
+      ['ccemsaParamedicLicenseNumber', 'CCEMSA Paramedic License Number'],
+      ['ccemsaParamedicLicense', 'CCEMSA Paramedic License Expiration Date'],
+      ['acls', 'ACLS Expiration Date'],
+      ['pals', 'PALS Expiration Date'],
     ];
 
     const blsFields: Array<[keyof CertificationRecord, string]> = [
-      ['californiaEmtLicense', 'California EMT License'],
-      ['ccemsaEmtLicense', 'CCEMSA EMT License'],
+      ['californiaEmtLicenseNumber', 'California EMT License Number'],
+      ['californiaEmtLicense', 'California EMT License Expiration Date'],
+      ['ccemsaEmtLicenseNumber', 'CCEMSA EMT License Number'],
+      ['ccemsaEmtLicense', 'CCEMSA EMT License Expiration Date'],
     ];
+
+    const licenseNumberFields = new Set<keyof CertificationRecord>([
+      'californiaParamedicLicenseNumber',
+      'ccemsaParamedicLicenseNumber',
+      'californiaEmtLicenseNumber',
+      'ccemsaEmtLicenseNumber',
+    ]);
 
     return (
       <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-white p-4">
@@ -1335,7 +1392,8 @@ export default function EmployeeProfilesPage() {
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Required for All Employees</div>
             <div className="grid gap-3">
               {commonFields.map(([field, label]) => {
-                const status = getCertificationStatus(certifications[field]);
+                const isLicenseNumber = licenseNumberFields.has(field);
+                const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
 
                 return (
                   <div key={field}>
@@ -1343,7 +1401,7 @@ export default function EmployeeProfilesPage() {
                       {label}
                     </label>
                     <input
-                      type="date"
+                      type={isLicenseNumber ? 'text' : 'date'}
                       value={certifications[field]}
                       onChange={(event) => onChange(field, event.target.value)}
                       className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
@@ -1370,7 +1428,8 @@ export default function EmployeeProfilesPage() {
 
             <div className="grid gap-3">
               {(scope === 'ALS' ? alsFields : blsFields).map(([field, label]) => {
-                const status = getCertificationStatus(certifications[field]);
+                const isLicenseNumber = licenseNumberFields.has(field);
+                const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
 
                 return (
                   <div key={field}>
@@ -1378,7 +1437,7 @@ export default function EmployeeProfilesPage() {
                       {label}
                     </label>
                     <input
-                      type="date"
+                      type={isLicenseNumber ? 'text' : 'date'}
                       value={certifications[field]}
                       onChange={(event) => onChange(field, event.target.value)}
                       className={`w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
@@ -1702,7 +1761,9 @@ export default function EmployeeProfilesPage() {
                 <div key={employee.id}>
                   <div className="grid grid-cols-[minmax(300px,1.3fr)_minmax(180px,1fr)_minmax(180px,0.9fr)_minmax(150px,0.8fr)_140px] items-center px-4 py-3 hover:bg-slate-50">
                     <div>
-                      <div className="font-semibold text-slate-900">{buildDisplayName(employee)}</div>
+                      <div className={`inline-block font-semibold ${getEmployeeNameAlertClass(employee)}`}>
+                        {buildDisplayName(employee)}
+                      </div>
                       <div className="text-xs text-slate-500">{employee.seniorityLabel || 'Seniority Unassigned'}</div>
                     </div>
 
