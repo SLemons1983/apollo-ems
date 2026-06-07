@@ -4025,14 +4025,75 @@ export default function SupervisorPage() {
                     <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       Version 1.0 • Last Updated June 7, 2026
                     </div>
-                    <div className="mt-3 text-sm leading-6 text-slate-700">
-                      ApolloEMS, including its software, source code, databases, designs, user interfaces, workflows, branding,
-                      documentation, intellectual property, and related materials, is the sole and exclusive property of Steven Lemons.
-                      Steven Lemons is the sole creator, designer, developer, engineer, and owner of ApolloEMS. Use of ApolloEMS does
-                      not transfer ownership, equity, partnership rights, revenue-sharing rights, licensing rights, source code rights,
-                      intellectual property rights, or any claim of authorship to any employee, agency, organization, beta tester,
-                      contractor, or third party. The owner reserves the right to modify, license, transfer, suspend, terminate, or sell
-                      ApolloEMS in whole or in part at any time.
+                    <div className="mt-3 max-h-[420px] space-y-4 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                      <div>
+                        <div className="font-bold text-slate-900">1. Acceptance of Agreement</div>
+                        <p className="mt-1">By accessing or using ApolloEMS, you acknowledge that you have read, understood, and agree to be bound by this End User Agreement. If you do not agree, you must discontinue use immediately.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">2. Ownership of ApolloEMS</div>
+                        <p className="mt-1">ApolloEMS, including its software, source code, databases, designs, user interfaces, workflows, branding, documentation, intellectual property, and related materials, is the sole and exclusive property of Steven Lemons. Steven Lemons is the sole creator, designer, developer, engineer, and owner of ApolloEMS.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">3. Beta Software Status</div>
+                        <p className="mt-1">ApolloEMS may contain features that are under active development and testing. Users acknowledge that functionality may change, be modified, be discontinued, or contain errors while the platform remains under active development. Use during beta testing is voluntary and at the user's own risk.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">4. No Ownership or Financial Interest</div>
+                        <p className="mt-1">Use of ApolloEMS, participation in testing, feedback, operational use, implementation assistance, feature requests, recommendations, bug reports, or other contributions does not create ownership rights, equity rights, partnership rights, joint venture rights, revenue sharing rights, royalty rights, licensing rights, rights to future sale proceeds, or rights to future compensation.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">5. Feedback and Suggestions</div>
+                        <p className="mt-1">Any suggestions, recommendations, comments, feature requests, bug reports, or other feedback regarding ApolloEMS may be used by the owner without restriction or compensation.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">6. Right to Modify, License, or Sell ApolloEMS</div>
+                        <p className="mt-1">The owner reserves the unrestricted right to modify ApolloEMS, add or remove features, change pricing, change licensing models, rebrand the platform, transfer ownership, assign ownership, license the software, merge ApolloEMS with another product, or sell ApolloEMS in whole or in part at any time.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">7. Right to Suspend or Terminate Access</div>
+                        <p className="mt-1">The owner reserves the right to suspend, restrict, or terminate access to ApolloEMS at any time, with or without notice, and for any reason. Upon termination, users must immediately discontinue use.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">8. Data Ownership</div>
+                        <p className="mt-1">Users and organizations retain ownership of the operational data they enter into ApolloEMS. By using ApolloEMS, users grant the owner the right to store, process, transmit, back up, and manage such data as necessary to provide the software and related services.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">9. No Warranty</div>
+                        <p className="mt-1">ApolloEMS is provided &quot;AS IS&quot; and &quot;AS AVAILABLE.&quot; The owner makes no warranties, express or implied, regarding availability, reliability, accuracy, performance, fitness for a particular purpose, merchantability, or uninterrupted operation.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">10. Limitation of Liability</div>
+                        <p className="mt-1">To the maximum extent permitted by law, the owner shall not be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages arising from the use of ApolloEMS. Users are responsible for verifying platform information and maintaining appropriate operational procedures.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">11. Governing Law</div>
+                        <p className="mt-1">This Agreement shall be governed by and interpreted under the laws of the State of California, without regard to conflict-of-law principles.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">12. Changes to This Agreement</div>
+                        <p className="mt-1">The owner may modify this Agreement at any time. Updated versions may be published within ApolloEMS or through other reasonable means of notice. Continued use after publication of updated terms constitutes acceptance of those changes.</p>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-slate-900">13. Entire Agreement</div>
+                        <p className="mt-1">This End User Agreement constitutes the entire agreement regarding use of ApolloEMS and supersedes any prior verbal or written understandings concerning platform use.</p>
+                      </div>
+
+                      <div className="border-t border-slate-200 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        ApolloEMS • Copyright © 2026 Steven Lemons • All Rights Reserved
+                      </div>
                     </div>
                   </div>
                 )}
