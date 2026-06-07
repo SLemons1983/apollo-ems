@@ -672,8 +672,20 @@ export default function SupervisorPage() {
   }, [announcements]);
 
   const selectedPayPeriodTimecards = useMemo(() => {
-    return submittedTimecards.filter((timecard) => timecard.payPeriodKey === selectedPayPeriod.key);
-  }, [selectedPayPeriod.key, submittedTimecards]);
+    const selectedStartKey = makeDateInputValue(selectedPayPeriod.start);
+    const selectedEndKey = makeDateInputValue(selectedPayPeriod.end);
+
+    return submittedTimecards.filter((timecard) => {
+      const timecardStartKey = makeDateInputValue(new Date(timecard.payPeriodStart));
+      const timecardEndKey = makeDateInputValue(new Date(timecard.payPeriodEnd));
+
+      return (
+        timecard.payPeriodKey === selectedPayPeriod.key &&
+        timecardStartKey === selectedStartKey &&
+        timecardEndKey === selectedEndKey
+      );
+    });
+  }, [selectedPayPeriod.end, selectedPayPeriod.key, selectedPayPeriod.start, submittedTimecards]);
 
   const pendingTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
