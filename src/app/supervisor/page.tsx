@@ -2814,7 +2814,7 @@ export default function SupervisorPage() {
     return (
       <div
         className={`rounded-2xl border bg-white shadow-sm ${
-          hasAlert ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'
+          hasAlert ? 'border-red-400 ring-2 ring-red-200' : 'border-slate-200'
         }`}
       >
         <button
@@ -2823,8 +2823,8 @@ export default function SupervisorPage() {
           className="flex w-full items-center justify-between gap-4 rounded-2xl bg-white px-5 py-4 text-left transition hover:bg-slate-50"
         >
           <div>
-            <div className="text-base font-bold text-slate-900">{titleText}</div>
-            <div className="mt-1 text-sm text-slate-600">{description}</div>
+            <div className={`text-base font-bold ${hasAlert ? 'text-red-700' : 'text-slate-900'}`}>{titleText}</div>
+            <div className={`mt-1 text-sm ${hasAlert ? 'font-semibold text-red-700' : 'text-slate-600'}`}>{description}</div>
           </div>
 
           <div
@@ -3741,6 +3741,7 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
+            pendingTimecards.length > 0,
           )}
 
           {renderTile(

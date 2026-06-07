@@ -3003,7 +3003,42 @@ export default function DashboardPage() {
         item.status === 'RETURNED',
     );
 
+    const createdAt = new Date().toISOString();
+    const supervisorRecipients = employees
+      .filter((employee) => employee.role === 'Supervisor' && employee.status !== 'Removed')
+      .map((employee) => ({
+        employeeId: employee.id,
+        deliveredAt: createdAt,
+        readAt: null,
+      }));
+
+    const supervisorMessage: ApolloMessage | null =
+      supervisorRecipients.length > 0
+        ? {
+            id: `timecard-submitted-${timecard.id}`,
+            conversationId: `timecard-submitted-${timecard.id}`,
+            senderId: currentEmployeeId,
+            senderName: timecard.employeeName,
+            senderRole: 'EMPLOYEE',
+            recipients: supervisorRecipients,
+            audienceLabel: 'Supervisors',
+            title: 'Timecard Submitted for Review',
+            body: `${timecard.employeeName} submitted a timecard for the pay period ${formatShortDate(
+              new Date(timecard.payPeriodStart),
+            )} to ${formatShortDate(new Date(timecard.payPeriodEnd))}.`,
+            createdAt,
+            relatedType: 'GENERAL',
+            relatedId: timecard.id,
+            priority: 'IMPORTANT',
+          }
+        : null;
+
     saveSubmittedTimecards([timecard, ...submittedTimecards.filter((item) => item.id !== returnedForThisPeriod?.id)]);
+
+    if (supervisorMessage) {
+      saveApolloMessages([supervisorMessage, ...apolloMessages]);
+    }
+
     setTimecardStatus('Timecard submitted for supervisor review.');
   }
 
