@@ -2292,17 +2292,28 @@ export default function DashboardPage() {
     (item) => item.employeeId === currentEmployeeId && item.payPeriodKey === selectedPayPeriod.key,
   );
 
+  const selectedPayPeriodStartKey = getIsoDateInputValue(selectedPayPeriod.start);
+  const selectedPayPeriodEndKey = getIsoDateInputValue(selectedPayPeriod.end);
+
+  function timecardMatchesSelectedPayPeriod(item: SubmittedTimecard): boolean {
+    return (
+      item.payPeriodKey === selectedPayPeriod.key &&
+      getIsoDateInputValue(new Date(item.payPeriodStart)) === selectedPayPeriodStartKey &&
+      getIsoDateInputValue(new Date(item.payPeriodEnd)) === selectedPayPeriodEndKey
+    );
+  }
+
   const submittedTimecard = submittedTimecards.find(
     (item) =>
       item.employeeId === currentEmployeeId &&
-      item.payPeriodKey === selectedPayPeriod.key &&
+      timecardMatchesSelectedPayPeriod(item) &&
       item.status !== 'RETURNED',
   ) ?? null;
 
   const returnedTimecard = submittedTimecards.find(
     (item) =>
       item.employeeId === currentEmployeeId &&
-      item.payPeriodKey === selectedPayPeriod.key &&
+      timecardMatchesSelectedPayPeriod(item) &&
       item.status === 'RETURNED',
   ) ?? null;
 
@@ -2947,7 +2958,7 @@ export default function DashboardPage() {
     const returnedForThisPeriod = submittedTimecards.find(
       (item) =>
         item.employeeId === currentEmployeeId &&
-        item.payPeriodKey === selectedPayPeriod.key &&
+        timecardMatchesSelectedPayPeriod(item) &&
         item.status === 'RETURNED',
     );
 
