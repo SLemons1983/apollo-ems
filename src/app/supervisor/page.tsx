@@ -110,6 +110,7 @@ type PayBreakdown = {
   regularHours: number;
   overtimeHours: number;
   doubleTimeHours: number;
+  holidayPremiumHours: number;
   missedMealPenaltyHours: number;
   week1: {
     regularHours: number;
@@ -1780,6 +1781,7 @@ export default function SupervisorPage() {
       regularHours: timecard.totalHours,
       overtimeHours: 0,
       doubleTimeHours: 0,
+      holidayPremiumHours: 0,
       missedMealPenaltyHours: timecard.missedMealBreaks.length,
       week1: {
         regularHours: timecard.totalHours,
@@ -2338,7 +2340,7 @@ export default function SupervisorPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total Hours</div>
             <div className="mt-1 text-xl font-bold text-slate-900">{timecard.totalHours.toFixed(2)}</div>
@@ -2354,6 +2356,10 @@ export default function SupervisorPage() {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Double Time</div>
             <div className="mt-1 text-xl font-bold text-slate-900">{breakdown.doubleTimeHours.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Holiday Premium</div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{(breakdown.holidayPremiumHours ?? 0).toFixed(2)}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Missed Meal</div>
