@@ -2,6 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  addDays,
+  buildPayPeriodOptions,
+  getCurrentPayPeriodOption,
+  type PayPeriodOption,
+} from '@/lib/payPeriods';
 
 type ImportantLink = {
   id: string;
@@ -168,14 +174,6 @@ type EmployeeOption = {
   status: string;
 };
 
-type PayPeriodOption = {
-  key: string;
-  year: number;
-  number: number;
-  start: Date;
-  end: Date;
-};
-
 type OpenShiftRequest = {
   id: string;
   employeeId: string;
@@ -225,56 +223,6 @@ function formatShortDate(date: Date): string {
     day: 'numeric',
     year: 'numeric',
   });
-}
-
-function addDays(date: Date, days: number): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function getSundayStart(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  copy.setDate(copy.getDate() - copy.getDay());
-  return copy;
-}
-
-function buildPayPeriodOptions(baseDate: Date, count = 28): PayPeriodOption[] {
-  const year = baseDate.getFullYear();
-  const januaryFirst = new Date(year, 0, 1);
-  const firstSunday = getSundayStart(addDays(januaryFirst, (7 - januaryFirst.getDay()) % 7));
-  const options: PayPeriodOption[] = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const start = addDays(firstSunday, index * 14);
-    const end = addDays(start, 13);
-
-    options.push({
-      key: `${year}-pp-${index + 1}`,
-      year,
-      number: index + 2,
-      start,
-      end,
-    });
-  }
-
-  return options;
-}
-
-function getCurrentPayPeriodOption(options: PayPeriodOption[], currentDate: Date): PayPeriodOption {
-  const today = new Date(currentDate);
-  today.setHours(0, 0, 0, 0);
-
-  return (
-    options.find((option) => {
-      const start = new Date(option.start);
-      const end = new Date(option.end);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      return today >= start && today <= end;
-    }) ?? options[0]
-  );
 }
 
 function buildEmployeeName(profile: StoredEmployeeProfile): string {

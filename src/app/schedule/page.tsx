@@ -2,6 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import {
+  addDays,
+  getGlobalPayPeriodStart,
+  getPayPeriodInfo,
+  getPayPeriodsForYear,
+  type PayPeriodOption,
+} from '@/lib/payPeriods';
 type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type UnitVehicle = '305' | '310' | '315' | '320' | '325' | '330' | '335' | '';
 type SupervisorVehicle = '300' | '301' | '302' | '303' | '';
@@ -128,11 +135,7 @@ type EligibilityResult = {
   warning?: string;
 };
 
-type PayPeriodInfo = {
-  number: number;
-  start: Date;
-  end: Date;
-};
+type PayPeriodInfo = PayPeriodOption;
 
 type OpenShiftRequest = {
   id: string;
@@ -173,8 +176,6 @@ const APOLLO_MESSAGES_STORAGE_KEY = 'apollo-messages-v2';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
 const REVIEWED_DECISIONS_SIGNATURE_STORAGE_KEY = 'apollo-reviewed-decisions-signature-v1';
 const REVIEWED_SUPERVISOR_NOTES_SIGNATURE_STORAGE_KEY = 'apollo-reviewed-supervisor-notes-signature-v1';
-const PAY_PERIOD_REFERENCE_NUMBER = 9;
-const PAY_PERIOD_REFERENCE_START = '2026-04-12';
 
 const SHIFT_ORDER: ShiftName[] = ['R1', 'R2', 'P', 'OC', 'FIELD_SUP'];
 const UNIT_SHIFTS = new Set<ShiftName>(['R1', 'R2', 'P', 'OC']);
@@ -770,20 +771,6 @@ function getDaySchedule(data: ScheduleData, dateKey: string): DaySchedule {
   return normalizeDaySchedule(data[dateKey]);
 }
 
-function getSundayStart(date: Date): Date {
-  const copy = new Date(date);
-  const day = copy.getDay();
-  copy.setHours(0, 0, 0, 0);
-  copy.setDate(copy.getDate() - day);
-  return copy;
-}
-
-function addDays(date: Date, days: number): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
 function toDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -804,53 +791,8 @@ function formatDayLabel(date: Date): string {
   });
 }
 
-function getBiWeeklyDates(anchorDate: Date): Date[] {
-  const start = getGlobalPayPeriodStart(anchorDate);
-  return Array.from({ length: 14 }, (_, index) => addDays(start, index));
-}
-
 function getEmployeeById(id: string, employees: EmployeeOption[]): EmployeeOption | undefined {
   return employees.find((employee) => employee.id === id);
-}
-
-function getGlobalPayPeriodStart(date: Date): Date {
-  const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
-  const sunday = getSundayStart(date);
-  const diffDays = Math.round((sunday.getTime() - referenceStart.getTime()) / (1000 * 60 * 60 * 24));
-  const offsetWithinCycle = ((diffDays % 14) + 14) % 14;
-  return addDays(sunday, -offsetWithinCycle);
-}
-
-function getPayPeriodInfo(date: Date): PayPeriodInfo {
-  const periodStart = getGlobalPayPeriodStart(date);
-  const periodEnd = addDays(periodStart, 13);
-
-  const janFirst = new Date(date.getFullYear(), 0, 1);
-  const firstPayPeriodStartOfYear = getGlobalPayPeriodStart(janFirst);
-  const diffDays = Math.round(
-    (periodStart.getTime() - firstPayPeriodStartOfYear.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  const number = Math.floor(diffDays / 14) + 1;
-
-  return {
-    number,
-    start: periodStart,
-    end: periodEnd,
-  };
-}
-
-function getPayPeriodsForYear(year: number): PayPeriodInfo[] {
-  const janFirst = new Date(year, 0, 1);
-  const nextJanFirst = new Date(year + 1, 0, 1);
-  const firstStart = getGlobalPayPeriodStart(janFirst);
-  const firstStartNextYear = getGlobalPayPeriodStart(nextJanFirst);
-
-  const periods: PayPeriodInfo[] = [];
-  for (let currentStart = new Date(firstStart); currentStart < firstStartNextYear; currentStart = addDays(currentStart, 14)) {
-    periods.push(getPayPeriodInfo(currentStart));
-  }
-
-  return periods;
 }
 
 function formatShortDate(date: Date): string {
@@ -2101,7 +2043,6 @@ export default function SchedulePage() {
     const years = [visibleYear - 1, visibleYear, visibleYear + 1];
     return years.flatMap((year) =>
       getPayPeriodsForYear(year).map((payPeriod) => ({
-        year,
         ...payPeriod,
       })),
     );
