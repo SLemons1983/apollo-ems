@@ -1733,7 +1733,26 @@ export default function EmployeeProfilesPage() {
                   {expanded && (
                     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
                       <div className="my-6 w-full max-w-6xl rounded-2xl bg-slate-50 px-4 py-4 shadow-2xl">
-                      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                        <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-4">
+                          <div>
+                            <div className="text-xl font-bold text-slate-900">
+                              {buildDisplayName(employee)}
+                            </div>
+                            <div className="text-sm text-slate-500">
+                              Employee Profile Editor
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => cancelEmployeeEdits(employee.id)}
+                            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-lg font-bold text-slate-600 transition hover:bg-slate-100"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         Removing this employee will also remove them from all future schedules starting today forward. Past schedules will remain unchanged.
                       </div>
 
