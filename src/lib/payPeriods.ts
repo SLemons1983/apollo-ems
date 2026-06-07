@@ -38,7 +38,7 @@ export function getPayPeriodInfo(date: Date): PayPeriodOption {
   const diffDays = Math.round((periodStart.getTime() - referenceStart.getTime()) / DAY_MS);
 
   return {
-    key: `${periodStart.getFullYear()}-pp-${Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER}`,
+    key: `${periodStart.getFullYear()}-pp-${Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER - 1}`,
     year: periodStart.getFullYear(),
     number: Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER,
     start: periodStart,
