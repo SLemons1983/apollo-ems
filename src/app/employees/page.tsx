@@ -1731,7 +1731,8 @@ export default function EmployeeProfilesPage() {
                   </div>
 
                   {expanded && (
-                    <div className="max-h-[75vh] overflow-y-auto border-t border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+                      <div className="my-6 w-full max-w-6xl rounded-2xl bg-slate-50 px-4 py-4 shadow-2xl">
                       <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         Removing this employee will also remove them from all future schedules starting today forward. Past schedules will remain unchanged.
                       </div>
@@ -1896,6 +1897,7 @@ export default function EmployeeProfilesPage() {
                             Remove Employee
                           </button>
                         </div>
+                      </div>
                       </div>
                     </div>
                   )}
