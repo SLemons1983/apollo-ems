@@ -907,7 +907,6 @@ export default function EmployeeProfilesPage() {
   const [showCertifications, setShowCertifications] = useState(true);
   const [editingEmployees, setEditingEmployees] = useState<Record<string, EmployeeProfile>>({});
   const [employeeSaveStatus, setEmployeeSaveStatus] = useState<Record<string, string>>({});
-  const [activeSummaryCard, setActiveSummaryCard] = useState<string | null>(null);
   const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(EMPTY_EMPLOYEE);
 
   useEffect(() => {
@@ -989,93 +988,6 @@ export default function EmployeeProfilesPage() {
       return matchesSearch && matchesStatus && matchesType && matchesRole;
     });
   }, [employees, roleFilter, search, statusFilter, typeFilter]);
-
-  const totals = useMemo(() => {
-    const total = employees.length;
-    const active = employees.filter((employee) => (employee.status || '').trim() === 'Active').length;
-    const inactive = employees.filter((employee) => (employee.status || '').trim() === 'Inactive').length;
-    const leave = employees.filter((employee) => (employee.status || '').trim() === 'Leave').length;
-    const paramedics = employees.filter((employee) => employee.role === 'Paramedic').length;
-    const emts = employees.filter((employee) => employee.role === 'EMT').length;
-    const supervisors = employees.filter((employee) => employee.role === 'Supervisor').length;
-
-    return {
-      total,
-      active,
-      inactive,
-      leave,
-      paramedics,
-      emts,
-      supervisors,
-    };
-  }, [employees]);
-
-  const employeesByCategory = useMemo(() => {
-    return {
-      total: sortEmployees([...employees]),
-      active: sortEmployees(employees.filter((employee) => (employee.status || '').trim() === 'Active')),
-      leave: sortEmployees(employees.filter((employee) => (employee.status || '').trim() === 'Leave')),
-      inactive: sortEmployees(employees.filter((employee) => (employee.status || '').trim() === 'Inactive')),
-      paramedics: sortEmployees(employees.filter((employee) => employee.role === 'Paramedic')),
-      emts: sortEmployees(employees.filter((employee) => employee.role === 'EMT')),
-      supervisors: sortEmployees(employees.filter((employee) => employee.role === 'Supervisor')),
-    };
-  }, [employees]);
-
-  function renderSummaryCard(
-    label: string,
-    value: number,
-    categoryEmployees: EmployeeProfile[],
-  ) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    return (
-      <div className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <button
-          type="button"
-          onClick={() => setIsOpen((current) => !current)}
-          className="w-full text-left"
-        >
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
-          <div className="mt-2 text-2xl font-bold text-slate-900">{value}</div>
-          <div className="mt-1 text-xs font-semibold text-slate-500">
-            {isOpen ? 'Hide list' : 'View list'}
-          </div>
-        </button>
-
-        {isOpen && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-2xl">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {label} Employees
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Close
-              </button>
-            </div>
-
-            {categoryEmployees.length === 0 ? (
-              <div className="text-slate-500">No employees in this category.</div>
-            ) : (
-              <div className="max-h-80 overflow-y-auto pr-1">
-                <div className="space-y-1">
-                  {categoryEmployees.map((employee) => (
-                    <div key={employee.id} className="rounded-lg bg-slate-50 px-2 py-2 text-slate-700">
-                      {buildDisplayName(employee)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
 
   const roleOptions = useMemo(() => {
     return ['All', ...Array.from(new Set(employees.map((employee) => employee.role).filter(Boolean))).sort()];
@@ -1562,16 +1474,6 @@ export default function EmployeeProfilesPage() {
               </button>
             </div>
           </div>
-        </div>
-
-        <div className="mb-6 grid gap-3 md:grid-cols-3 xl:grid-cols-7">
-          {renderSummaryCard('Total Employees', totals.total, employeesByCategory.total)}
-          {renderSummaryCard('Active', totals.active, employeesByCategory.active)}
-          {renderSummaryCard('Leave', totals.leave, employeesByCategory.leave)}
-          {renderSummaryCard('Inactive', totals.inactive, employeesByCategory.inactive)}
-          {renderSummaryCard('Paramedics', totals.paramedics, employeesByCategory.paramedics)}
-          {renderSummaryCard('EMTs', totals.emts, employeesByCategory.emts)}
-          {renderSummaryCard('Supervisors', totals.supervisors, employeesByCategory.supervisors)}
         </div>
 
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
