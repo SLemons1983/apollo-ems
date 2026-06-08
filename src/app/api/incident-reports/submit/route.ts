@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     const companyEmail = String(formData.get('companyEmail') ?? '').trim();
     const category = String(formData.get('category') ?? '').trim();
     const supervisorNotified = String(formData.get('supervisorNotified') ?? '').trim();
+    const supervisorName = String(formData.get('supervisorName') ?? '').trim();
     const narrative = String(formData.get('narrative') ?? '').trim();
     const file = formData.get('attachment');
 
@@ -65,6 +66,12 @@ Phone Number: ${phoneNumber}
 Company Email: ${companyEmail}
 Category: ${category}
 Supervisor Notified: ${supervisorNotified}
+Supervisor Listed: ${supervisorName || 'Not listed'}
+Assigned Supervisor: ${
+  category === 'General Incident Report'
+    ? supervisorName || 'On-duty supervisor'
+    : 'Assigned by report category'
+}
 
 Narrative:
 ${narrative}

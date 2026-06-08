@@ -951,6 +951,7 @@ export default function DashboardPage() {
   const [isSubmittingCertificationUpload, setIsSubmittingCertificationUpload] = useState(false);
   const [incidentReportCategory, setIncidentReportCategory] = useState('General Incident Report');
   const [incidentReportSupervisorNotified, setIncidentReportSupervisorNotified] = useState('No');
+  const [incidentReportSupervisorName, setIncidentReportSupervisorName] = useState('');
   const [incidentReportNarrative, setIncidentReportNarrative] = useState('');
   const [incidentReportStatus, setIncidentReportStatus] = useState('');
   const [isSubmittingIncidentReport, setIsSubmittingIncidentReport] = useState(false);
@@ -997,6 +998,7 @@ export default function DashboardPage() {
       formData.append('companyEmail', currentEmployee.email || authEmail);
       formData.append('category', incidentReportCategory);
       formData.append('supervisorNotified', incidentReportSupervisorNotified);
+      formData.append('supervisorName', incidentReportSupervisorName);
       formData.append('narrative', incidentReportNarrative.trim());
 
       if (file) {
@@ -4872,6 +4874,27 @@ export default function DashboardPage() {
                   <option>Yes</option>
                 </select>
               </label>
+
+              {incidentReportSupervisorNotified === 'Yes' && (
+                <label className="block text-xs font-semibold text-slate-600">
+                  Who was the supervisor?
+                  <select
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    value={incidentReportSupervisorName}
+                    onChange={(event) => setIncidentReportSupervisorName(event.target.value)}
+                    required
+                  >
+                    <option value="">Please Select</option>
+                    {employees
+                      .filter((employee) => employee.status?.toLowerCase() !== 'removed' && employee.role === 'Supervisor')
+                      .map((employee) => (
+                        <option key={employee.id} value={employee.name}>
+                          {employee.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
 
               <label className="block text-xs font-semibold text-slate-600">
                 Narrative
