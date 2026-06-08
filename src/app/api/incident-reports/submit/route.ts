@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
+
+const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
 
 const CATEGORY_RECIPIENTS: Record<string, string[]> = {
   'Check Request': ['kira.holley@sscems.org'],
   'Report Workplace Harassment and/or Violence': ['russ@sscems.org'],
   'Vehicle/Equipment/Station Issue': ['armando.gutierrez@sscems.org'],
+};
+
+const CATEGORY_ASSIGNEES: Record<string, string> = {
+  'Check Request': 'Kira Holley',
+  'Report Workplace Harassment and/or Violence': 'Russ Richardson',
+  'Vehicle/Equipment/Station Issue': 'Armando Gutierrez',
 };
 
 const ALLOWED_TYPES = new Set([
@@ -14,6 +23,17 @@ const ALLOWED_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
+function createIncidentNumber(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  const second = String(date.getSeconds()).padStart(2, '0');
+
+  return `IR-${year}${month}${day}-${hour}${minute}${second}`;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,6 +74,43 @@ export async function POST(request: NextRequest) {
       ...(CATEGORY_RECIPIENTS[category] ?? []),
     ]));
 
+    const assignedSupervisor =
+      category === 'General Incident Report'
+        ? supervisorName || 'On-duty supervisor'
+        : CATEGORY_ASSIGNEES[category] || 'Supervisor team';
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!serviceRoleKey) {
+      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable.');
+    }
+
+    const supabase = createClient(SUPABASE_URL, serviceRoleKey);
+    const incidentNumber = createIncidentNumber(new Date());
+
+    const { data: insertedReport, error: insertError } = await supabase
+      .from('incident_reports')
+      .insert({
+        incident_number: incidentNumber,
+        employee_name: employeeName,
+        employee_phone: phoneNumber,
+        employee_email: companyEmail,
+        category,
+        supervisor_notified: supervisorNotified,
+        supervisor_name: supervisorName || null,
+        assigned_supervisor: assignedSupervisor,
+        narrative,
+        status: 'NEW',
+        attachment_name: file instanceof File && file.size > 0 ? file.name : null,
+        attachment_type: file instanceof File && file.size > 0 ? file.type : null,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      throw insertError;
+    }
+
     await Promise.all(recipients.map((to) =>
       sendApolloEmail({
         to,
@@ -61,17 +118,15 @@ export async function POST(request: NextRequest) {
         text:
 `An incident report has been submitted through ApolloEMS.
 
+Incident Number: ${incidentNumber}
+
 Employee Name: ${employeeName}
 Phone Number: ${phoneNumber}
 Company Email: ${companyEmail}
 Category: ${category}
 Supervisor Notified: ${supervisorNotified}
 Supervisor Listed: ${supervisorName || 'Not listed'}
-Assigned Supervisor: ${
-  category === 'General Incident Report'
-    ? supervisorName || 'On-duty supervisor'
-    : 'Assigned by report category'
-}
+Assigned Supervisor: ${assignedSupervisor}
 
 Narrative:
 ${narrative}
@@ -84,7 +139,12 @@ Supervisor Instructions:
       })
     ));
 
-    return NextResponse.json({ ok: true });
+    await supabase
+      .from('incident_reports')
+      .update({ email_sent_at: new Date().toISOString() })
+      .eq('id', insertedReport.id);
+
+    return NextResponse.json({ ok: true, incidentNumber });
   } catch (error) {
     console.error('Incident report submission error:', error);
     return NextResponse.json({ error: 'Failed to submit incident report.' }, { status: 500 });
