@@ -949,6 +949,11 @@ export default function DashboardPage() {
   const [certificationUploadName, setCertificationUploadName] = useState('');
   const [certificationUploadStatus, setCertificationUploadStatus] = useState('');
   const [isSubmittingCertificationUpload, setIsSubmittingCertificationUpload] = useState(false);
+  const [incidentReportCategory, setIncidentReportCategory] = useState('General Incident Report');
+  const [incidentReportSupervisorNotified, setIncidentReportSupervisorNotified] = useState('No');
+  const [incidentReportNarrative, setIncidentReportNarrative] = useState('');
+  const [incidentReportStatus, setIncidentReportStatus] = useState('');
+  const [isSubmittingIncidentReport, setIsSubmittingIncidentReport] = useState(false);
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -970,6 +975,55 @@ export default function DashboardPage() {
   }, [authEmail, employees]);
 
   const currentEmployeeId = currentEmployee?.id ?? '';
+
+  async function handleIncidentReportSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentEmployee) {
+      setIncidentReportStatus('Unable to identify the logged-in employee.');
+      return;
+    }
+
+    const fileInput = event.currentTarget.elements.namedItem('attachment') as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+
+    setIsSubmittingIncidentReport(true);
+    setIncidentReportStatus('Submitting incident report...');
+
+    try {
+      const formData = new FormData();
+      formData.append('employeeName', currentEmployee.name);
+      formData.append('phoneNumber', currentEmployee.phone);
+      formData.append('companyEmail', currentEmployee.email || authEmail);
+      formData.append('category', incidentReportCategory);
+      formData.append('supervisorNotified', incidentReportSupervisorNotified);
+      formData.append('narrative', incidentReportNarrative.trim());
+
+      if (file) {
+        formData.append('attachment', file);
+      }
+
+      const response = await fetch('/api/incident-reports/submit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Incident report submission failed.');
+      }
+
+      setIncidentReportNarrative('');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      setIncidentReportStatus('Incident report submitted successfully.');
+    } catch (error) {
+      console.error('Incident report submission failed:', error);
+      setIncidentReportStatus('Unable to submit incident report. Please try again.');
+    } finally {
+      setIsSubmittingIncidentReport(false);
+    }
+  }
 
   async function handleCertificationUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1578,27 +1632,6 @@ export default function DashboardPage() {
     script.onload = initializeWeatherWidget;
     document.body.appendChild(script);
   }, []);
-
-  useEffect(() => {
-    const loadJotFormScript = (containerId: string, scriptSrc: string) => {
-      const container = document.getElementById(containerId);
-      if (!container) {
-        return;
-      }
-
-      container.innerHTML = '';
-
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.src = scriptSrc;
-      script.async = true;
-      container.appendChild(script);
-    };
-
-    if (activeTile === 'incident-report') {
-      loadJotFormScript('apollo-incident-report-container', 'https://form.jotform.com/jsform/240977206656061');
-    }
-  }, [activeTile]);
 
   const selectedPayPeriod = useMemo(() => {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
@@ -4795,8 +4828,77 @@ export default function DashboardPage() {
           {renderTile(
             'incident-report',
             'Incident Report',
-            'Submit an incident report using the embedded company JotForm.',
-            <div id="apollo-incident-report-container" className="min-h-[720px] rounded-xl border border-slate-200 bg-white" />,
+            'Submit an incident report through ApolloEMS.',
+            <form className="space-y-4" onSubmit={handleIncidentReportSubmit}>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="text-xs font-semibold text-slate-600">
+                  Employee Name
+                  <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Phone Number
+                  <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.phone ?? ''} readOnly />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Company Email
+                  <input className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.email ?? authEmail} readOnly />
+                </label>
+              </div>
+
+              <label className="block text-xs font-semibold text-slate-600">
+                Incident Category
+                <select
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={incidentReportCategory}
+                onChange={(event) => setIncidentReportCategory(event.target.value)}
+                  required
+                >
+                  <option>General Incident Report</option>
+                <option>Check Request</option>
+                <option>Report Workplace Harassment and/or Violence</option>
+                  <option>Vehicle/Equipment/Station Issue</option>
+                </select>
+              </label>
+
+              <label className="block text-xs font-semibold text-slate-600">
+                Supervisor Notified?
+                <select
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={incidentReportSupervisorNotified}
+                onChange={(event) => setIncidentReportSupervisorNotified(event.target.value)}
+                  required
+                >
+                  <option>No</option>
+                  <option>Yes</option>
+                </select>
+              </label>
+
+              <label className="block text-xs font-semibold text-slate-600">
+                Narrative
+                <textarea
+                className="min-h-[180px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={incidentReportNarrative}
+                onChange={(event) => setIncidentReportNarrative(event.target.value)}
+                placeholder="Describe the incident, request, concern, or issue."
+                  required
+                />
+              </label>
+
+              <label className="block text-xs font-semibold text-slate-600">
+                Attachment
+                <input className="mt-1 w-full text-sm" type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" />
+              </label>
+
+              {incidentReportStatus && <p className="text-sm font-semibold text-slate-700">{incidentReportStatus}</p>}
+
+              <button
+                type="submit"
+                disabled={isSubmittingIncidentReport}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
+              >
+                {isSubmittingIncidentReport ? 'Submitting...' : 'Submit Incident Report'}
+              </button>
+            </form>,
           )}
 
           {renderTile(
