@@ -48,7 +48,7 @@ Uploaded File: ${file.name}
 Supervisor Instructions:
 1. Verify certification validity.
 2. Retain a hard copy for the employee file.
-3. Update the employee certification records in /employees.`,
+3. Update the employee certification records in the Employee Profile section of ApolloEMS.`,
       attachments: [
         {
           filename: file.name,
