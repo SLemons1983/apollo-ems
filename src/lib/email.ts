@@ -8,6 +8,10 @@ export async function sendApolloEmail(params: {
   to: string;
   subject: string;
   text: string;
+  attachments?: {
+    filename: string;
+    content: Buffer;
+  }[];
 }) {
   const apiKey = process.env.RESEND_API_KEY;
 
@@ -22,5 +26,6 @@ export async function sendApolloEmail(params: {
     to: [params.to],
     subject: params.subject,
     text: params.text,
+    attachments: params.attachments,
   });
 }

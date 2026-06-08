@@ -33,6 +33,7 @@ type EmployeeOption = {
   id: string;
   name: string;
   email: string;
+  phone: string;
   role: EmployeeRole;
   scope: 'ALS' | 'BLS';
   employeeType: string;
@@ -46,6 +47,7 @@ type StoredEmployeeProfile = {
   firstName?: string;
   lastName?: string;
   email?: string;
+  phone?: string;
   role?: string;
   scope?: string;
   employeeType?: string;
@@ -57,6 +59,7 @@ type StoredEmployeeProfile = {
 type SupabaseEmployeeRow = {
   id: string;
   email: string | null;
+  phone: string | null;
   first_name: string | null;
   last_name: string | null;
   role: string | null;
@@ -614,6 +617,7 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
     id: employee.id,
     name: buildSupabaseEmployeeName(employee),
     email: (employee.email ?? '').trim().toLowerCase(),
+    phone: employee.phone ?? '',
     role: normalizeEmployeeRole(employee.role ?? undefined),
     scope: normalizeEmployeeScope(employee.scope ?? undefined, employee.role ?? undefined),
     employeeType: (employee.employee_type ?? 'Full Time').trim() || 'Full Time',
@@ -626,7 +630,7 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
 async function loadEmployeesFromSupabase(): Promise<EmployeeOption[]> {
   const { data, error } = await supabase
     .from('employees')
-    .select('id,email,first_name,last_name,role,scope,employee_type,seniority_label,certifications,status')
+    .select('id,email,phone,first_name,last_name,role,scope,employee_type,seniority_label,certifications,status')
     .order('last_name', { ascending: true })
     .order('first_name', { ascending: true });
 
@@ -888,6 +892,7 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
         id: profile.id,
         name: buildEmployeeName(profile),
         email: (profile.email ?? '').trim().toLowerCase(),
+        phone: profile.phone ?? '',
         role: normalizeEmployeeRole(profile.role),
         scope: normalizeEmployeeScope(profile.scope, profile.role),
         employeeType: (profile.employeeType ?? 'Full Time').trim() || 'Full Time',
@@ -941,6 +946,9 @@ export default function DashboardPage() {
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [showCertificationUpload, setShowCertificationUpload] = useState(false);
+  const [certificationUploadName, setCertificationUploadName] = useState('');
+  const [certificationUploadStatus, setCertificationUploadStatus] = useState('');
+  const [isSubmittingCertificationUpload, setIsSubmittingCertificationUpload] = useState(false);
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -962,6 +970,55 @@ export default function DashboardPage() {
   }, [authEmail, employees]);
 
   const currentEmployeeId = currentEmployee?.id ?? '';
+
+  async function handleCertificationUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentEmployee) {
+      setCertificationUploadStatus('Unable to identify the logged-in employee.');
+      return;
+    }
+
+    const fileInput = event.currentTarget.elements.namedItem('certificationFile') as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+
+    if (!file) {
+      setCertificationUploadStatus('Please select a certification file.');
+      return;
+    }
+
+    setIsSubmittingCertificationUpload(true);
+    setCertificationUploadStatus('Submitting certification...');
+
+    try {
+      const formData = new FormData();
+      formData.append('employeeName', currentEmployee.name);
+      formData.append('phoneNumber', currentEmployee.phone);
+      formData.append('companyEmail', currentEmployee.email || authEmail);
+      formData.append('certificationName', certificationUploadName.trim());
+      formData.append('certificationFile', file);
+
+      const response = await fetch('/api/certifications/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Certification upload failed.');
+      }
+
+      setCertificationUploadName('');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      setCertificationUploadStatus('Certification submitted successfully. Your certification has been forwarded to the supervisor for verification.');
+    } catch (error) {
+      console.error('Certification upload failed:', error);
+      setCertificationUploadStatus('Unable to submit certification. Please try again.');
+    } finally {
+      setIsSubmittingCertificationUpload(false);
+    }
+  }
 
   async function reloadPublishedSchedule() {
     try {
@@ -1538,14 +1595,10 @@ export default function DashboardPage() {
       container.appendChild(script);
     };
 
-    if (showCertificationUpload) {
-      loadJotFormScript('apollo-certification-upload-container', 'https://form.jotform.com/jsform/250562086321047');
-    }
-
     if (activeTile === 'incident-report') {
       loadJotFormScript('apollo-incident-report-container', 'https://form.jotform.com/jsform/240977206656061');
     }
-  }, [activeTile, showCertificationUpload]);
+  }, [activeTile]);
 
   const selectedPayPeriod = useMemo(() => {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
@@ -3815,9 +3868,36 @@ export default function DashboardPage() {
           </div>
 
           {showCertificationUpload && (
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-              <div id="apollo-certification-upload-container" className="min-h-[720px] rounded-xl border border-slate-200 bg-white" />
-            </div>
+            <form
+              className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              onSubmit={handleCertificationUploadSubmit}
+            >
+              <div className="grid gap-3 md:grid-cols-3">
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.phone ?? ''} readOnly />
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.email ?? authEmail} readOnly />
+              </div>
+
+              <input
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={certificationUploadName}
+                onChange={(event) => setCertificationUploadName(event.target.value)}
+                placeholder="Certification name"
+                required
+              />
+
+              <input type="file" name="certificationFile" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required />
+
+              {certificationUploadStatus && <p className="text-sm font-semibold text-slate-700">{certificationUploadStatus}</p>}
+
+              <button
+                type="submit"
+                disabled={isSubmittingCertificationUpload}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
+              >
+                {isSubmittingCertificationUpload ? 'Submitting...' : 'Submit Certification'}
+              </button>
+            </form>
           )}
         </div>
 
