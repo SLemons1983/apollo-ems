@@ -24,15 +24,16 @@ const ALLOWED_TYPES = new Set([
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
-function createIncidentNumber(date: Date) {
+function getIncidentDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  const second = String(date.getSeconds()).padStart(2, '0');
 
-  return `IR-${year}${month}${day}-${hour}${minute}${second}`;
+  return `${year}${month}${day}`;
+}
+
+function createIncidentNumber(dateKey: string, sequence: number) {
+  return `IR-${dateKey}-${String(sequence).padStart(2, '0')}`;
 }
 
 export async function POST(request: NextRequest) {
@@ -86,7 +87,17 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createClient(SUPABASE_URL, serviceRoleKey);
-    const incidentNumber = createIncidentNumber(new Date());
+    const incidentDateKey = getIncidentDateKey(new Date());
+    const { count: todaysIncidentCount, error: countError } = await supabase
+      .from('incident_reports')
+      .select('id', { count: 'exact', head: true })
+      .like('incident_number', `IR-${incidentDateKey}-%`);
+
+    if (countError) {
+      throw countError;
+    }
+
+    const incidentNumber = createIncidentNumber(incidentDateKey, (todaysIncidentCount ?? 0) + 1);
 
     const { data: insertedReport, error: insertError } = await supabase
       .from('incident_reports')
