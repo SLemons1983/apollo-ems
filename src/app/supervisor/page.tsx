@@ -2018,6 +2018,16 @@ export default function SupervisorPage() {
         );
       }
 
+      if (
+        report.status !== 'PENDING_EMPLOYEE_RESPONSE' &&
+        updatedReport.status === 'PENDING_EMPLOYEE_RESPONSE'
+      ) {
+        await addAuditEntry(
+          'INCIDENT_EMPLOYEE_RESPONSE_REQUESTED',
+          `${updatedReport.incident_number}: Employee response requested by ${actorName}`,
+        );
+      }
+
       setIncidentReports((current) =>
         current.map((item) => (item.id === updatedReport.id ? updatedReport : item)),
       );

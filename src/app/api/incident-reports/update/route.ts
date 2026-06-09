@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendApolloEmail } from '@/lib/email';
 
 const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
 
@@ -33,6 +34,16 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(SUPABASE_URL, serviceRoleKey);
     const now = new Date().toISOString();
 
+    const { data: existingReport, error: existingError } = await supabase
+      .from('incident_reports')
+      .select('id,incident_number,employee_name,employee_email,status,assigned_supervisor')
+      .eq('id', id)
+      .single();
+
+    if (existingError) {
+      throw existingError;
+    }
+
     const updatePayload = {
       status,
       assigned_supervisor: assignedSupervisor || null,
@@ -51,6 +62,32 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    if (
+      existingReport.status !== 'PENDING_EMPLOYEE_RESPONSE' &&
+      status === 'PENDING_EMPLOYEE_RESPONSE' &&
+      existingReport.employee_email
+    ) {
+      await sendApolloEmail({
+        to: existingReport.employee_email,
+        subject: `Additional information needed for Incident Report ${existingReport.incident_number}`,
+        text:
+`ApolloEMS Incident Report Follow-Up
+
+Incident Number: ${existingReport.incident_number}
+
+Hello ${existingReport.employee_name},
+
+Your supervisor has requested additional information regarding this incident report.
+
+Please log into ApolloEMS and review your messages or contact your supervisor for follow-up.
+
+Assigned Supervisor: ${assignedSupervisor || existingReport.assigned_supervisor || 'Supervisor team'}
+
+Thank you,
+ApolloEMS`,
+      });
     }
 
     return NextResponse.json({ incidentReport: data });
