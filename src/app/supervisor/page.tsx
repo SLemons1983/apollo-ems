@@ -159,6 +159,10 @@ type IncidentReport = {
   status: string;
   attachment_name: string | null;
   attachment_type: string | null;
+  supervisor_notes: string | null;
+  updated_at: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
 };
 
 type StoredEmployeeProfile = {
@@ -417,6 +421,9 @@ export default function SupervisorPage() {
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
+  const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
+  const [incidentReportNotesDraft, setIncidentReportNotesDraft] = useState('');
+  const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -1951,6 +1958,38 @@ export default function SupervisorPage() {
     const month = `${date.getMonth() + 1}`.padStart(2, '0');
     const day = `${date.getDate()}`.padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  async function saveIncidentReportWorkflow(report: IncidentReport) {
+    setIncidentReportSaveStatus('Saving incident report...');
+
+    try {
+      const response = await fetch('/api/incident-reports/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: report.id,
+          status: incidentReportStatusDraft,
+          supervisorNotes: incidentReportNotesDraft,
+          closedBy: currentEmployee?.name ?? 'Supervisor',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Incident report update failed.');
+      }
+
+      const data = await response.json();
+      const updatedReport = data.incidentReport as IncidentReport;
+
+      setIncidentReports((current) =>
+        current.map((item) => (item.id === updatedReport.id ? updatedReport : item)),
+      );
+      setIncidentReportSaveStatus('Incident report saved.');
+    } catch (error) {
+      console.error('Failed to save incident report:', error);
+      setIncidentReportSaveStatus('Unable to save incident report.');
+    }
   }
 
   function printIncidentReport(report: IncidentReport) {
@@ -3672,7 +3711,12 @@ export default function SupervisorPage() {
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                onClick={() => setSelectedIncidentReportId(report.id)}
+                                onClick={() => {
+                                  setSelectedIncidentReportId(report.id);
+                                  setIncidentReportStatusDraft(report.status);
+                                  setIncidentReportNotesDraft(report.supervisor_notes ?? '');
+                                  setIncidentReportSaveStatus('');
+                                }}
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               >
                                 View
@@ -4341,6 +4385,50 @@ export default function SupervisorPage() {
                 <div className="text-sm font-semibold text-slate-900">Narrative</div>
                 <div className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   {incidentReports.find((report) => report.id === selectedIncidentReportId)!.narrative}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">Supervisor Workflow</div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr]">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Status
+                    <select
+                      value={incidentReportStatusDraft}
+                      onChange={(event) => setIncidentReportStatusDraft(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="NEW">New</option>
+                      <option value="IN_REVIEW">In Review</option>
+                      <option value="PENDING_EMPLOYEE_RESPONSE">Pending Employee Response</option>
+                      <option value="CLOSED">Closed</option>
+                    </select>
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Supervisor Notes
+                    <textarea
+                      value={incidentReportNotesDraft}
+                      onChange={(event) => setIncidentReportNotesDraft(event.target.value)}
+                      className="mt-1 min-h-[110px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      placeholder="Add supervisor notes, follow-up, or disposition details."
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => saveIncidentReportWorkflow(incidentReports.find((report) => report.id === selectedIncidentReportId)!)}
+                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  >
+                    Save Changes
+                  </button>
+
+                  {incidentReportSaveStatus && (
+                    <span className="text-sm font-semibold text-slate-700">{incidentReportSaveStatus}</span>
+                  )}
                 </div>
               </div>
             </div>
