@@ -3615,33 +3615,13 @@ export default function SupervisorPage() {
                             <td className="px-3 py-2">
                               <button
                                 type="button"
-                                onClick={() => setSelectedIncidentReportId(selectedIncidentReportId === report.id ? null : report.id)}
+                                onClick={() => setSelectedIncidentReportId(report.id)}
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               >
-                                {selectedIncidentReportId === report.id ? 'Hide' : 'View'}
+                                View
                               </button>
                             </td>
                           </tr>
-                          {selectedIncidentReportId === report.id && (
-                            <tr className="border-t border-slate-200 bg-slate-50">
-                              <td colSpan={7} className="px-4 py-4">
-                                <div className="grid gap-3 text-sm md:grid-cols-2">
-                                  <div><span className="font-semibold">Phone:</span> {report.employee_phone || '—'}</div>
-                                  <div><span className="font-semibold">Email:</span> {report.employee_email || '—'}</div>
-                                  <div><span className="font-semibold">Supervisor Notified:</span> {report.supervisor_notified || '—'}</div>
-                                  <div><span className="font-semibold">Supervisor Listed:</span> {report.supervisor_name || '—'}</div>
-                                  <div><span className="font-semibold">Attachment:</span> {report.attachment_name || 'None'}</div>
-                                  <div><span className="font-semibold">Attachment Type:</span> {report.attachment_type || '—'}</div>
-                                </div>
-                                <div className="mt-4">
-                                  <div className="text-sm font-semibold text-slate-900">Narrative</div>
-                                  <div className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                                    {report.narrative}
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
                         </React.Fragment>
                       ))}
                     </tbody>
@@ -4256,6 +4236,51 @@ export default function SupervisorPage() {
 
         </div>
       </div>
+
+      {incidentReports.find((report) => report.id === selectedIncidentReportId) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 p-5">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Incident Report</div>
+                <div className="mt-1 text-xl font-bold text-slate-900">{incidentReports.find((report) => report.id === selectedIncidentReportId)!.incident_number}</div>
+                <div className="mt-1 text-sm text-slate-500">
+                  Submitted {new Date(incidentReports.find((report) => report.id === selectedIncidentReportId)!.created_at).toLocaleString('en-US')}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIncidentReportId(null)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <div className="grid gap-3 text-sm md:grid-cols-2">
+                <div><span className="font-semibold">Employee:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.employee_name}</div>
+                <div><span className="font-semibold">Status:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.status}</div>
+                <div><span className="font-semibold">Phone:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.employee_phone || '—'}</div>
+                <div><span className="font-semibold">Email:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.employee_email || '—'}</div>
+                <div><span className="font-semibold">Category:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.category}</div>
+                <div><span className="font-semibold">Assigned To:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.assigned_supervisor || 'Unassigned'}</div>
+                <div><span className="font-semibold">Supervisor Notified:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.supervisor_notified || '—'}</div>
+                <div><span className="font-semibold">Supervisor Listed:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.supervisor_name || '—'}</div>
+                <div><span className="font-semibold">Attachment:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.attachment_name || 'None'}</div>
+                <div><span className="font-semibold">Attachment Type:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.attachment_type || '—'}</div>
+              </div>
+
+              <div>
+                <div className="text-sm font-semibold text-slate-900">Narrative</div>
+                <div className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  {incidentReports.find((report) => report.id === selectedIncidentReportId)!.narrative}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
