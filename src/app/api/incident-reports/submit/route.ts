@@ -23,6 +23,7 @@ const ALLOWED_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_BUCKET = 'incident-report-attachments';
 
 function getIncidentDateKey(date: Date) {
   const year = date.getFullYear();
@@ -99,6 +100,24 @@ export async function POST(request: NextRequest) {
 
     const incidentNumber = createIncidentNumber(incidentDateKey, (todaysIncidentCount ?? 0) + 1);
 
+    let attachmentPath: string | null = null;
+
+    if (file instanceof File && file.size > 0) {
+      const extension = file.name.includes('.') ? file.name.split('.').pop() : 'file';
+      attachmentPath = `${incidentNumber}/${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .upload(attachmentPath, Buffer.from(await file.arrayBuffer()), {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+    }
+
     const { data: insertedReport, error: insertError } = await supabase
       .from('incident_reports')
       .insert({
@@ -114,6 +133,7 @@ export async function POST(request: NextRequest) {
         status: 'NEW',
         attachment_name: file instanceof File && file.size > 0 ? file.name : null,
         attachment_type: file instanceof File && file.size > 0 ? file.type : null,
+        attachment_path: attachmentPath,
       })
       .select('id')
       .single();

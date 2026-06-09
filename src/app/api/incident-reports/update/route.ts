@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       .from('incident_reports')
       .update(updatePayload)
       .eq('id', id)
-      .select('id,incident_number,created_at,employee_name,employee_phone,employee_email,category,supervisor_notified,supervisor_name,assigned_supervisor,narrative,status,attachment_name,attachment_type,supervisor_notes,updated_at,closed_at,closed_by')
+      .select('id,incident_number,created_at,employee_name,employee_phone,employee_email,category,supervisor_notified,supervisor_name,assigned_supervisor,narrative,status,attachment_name,attachment_type,attachment_path,supervisor_notes,updated_at,closed_at,closed_by')
       .single();
 
     if (error) {

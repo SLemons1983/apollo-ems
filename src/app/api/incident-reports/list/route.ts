@@ -15,7 +15,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('incident_reports')
-      .select('id,incident_number,created_at,employee_name,employee_phone,employee_email,category,supervisor_notified,supervisor_name,assigned_supervisor,narrative,status,attachment_name,attachment_type,supervisor_notes,updated_at,closed_at,closed_by')
+      .select('id,incident_number,created_at,employee_name,employee_phone,employee_email,category,supervisor_notified,supervisor_name,assigned_supervisor,narrative,status,attachment_name,attachment_type,attachment_path,supervisor_notes,updated_at,closed_at,closed_by')
       .order('created_at', { ascending: false });
 
     if (error) {
