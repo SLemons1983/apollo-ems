@@ -424,6 +424,7 @@ export default function SupervisorPage() {
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
   const [incidentReportNotesDraft, setIncidentReportNotesDraft] = useState('');
   const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
+  const [showClosedIncidentReports, setShowClosedIncidentReports] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -3680,6 +3681,17 @@ export default function SupervisorPage() {
               ? `${openIncidentReports.length} open incident report${openIncidentReports.length === 1 ? '' : 's'}.`
               : 'No open incident reports.',
             <div className="space-y-3">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowClosedIncidentReports((current) => !current)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  {showClosedIncidentReports
+                    ? 'Hide Closed Reports'
+                    : `Show Closed Reports (${closedIncidentReports.length})`}
+                </button>
+              </div>
               {openIncidentReports.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                   No open incident reports.
@@ -3727,6 +3739,56 @@ export default function SupervisorPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {showClosedIncidentReports && (
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <div className="bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">
+                    Closed Incident Reports
+                  </div>
+
+                  {closedIncidentReports.length === 0 ? (
+                    <div className="p-4 text-sm text-slate-600">No closed incident reports.</div>
+                  ) : (
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2">Incident #</th>
+                          <th className="px-3 py-2">Date</th>
+                          <th className="px-3 py-2">Employee</th>
+                          <th className="px-3 py-2">Category</th>
+                          <th className="px-3 py-2">Assigned To</th>
+                          <th className="px-3 py-2">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {closedIncidentReports.map((report) => (
+                          <tr key={report.id} className="border-t border-slate-200">
+                            <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
+                            <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.category}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedIncidentReportId(report.id);
+                                  setIncidentReportStatusDraft(report.status);
+                                  setIncidentReportNotesDraft(report.supervisor_notes ?? '');
+                                  setIncidentReportSaveStatus('');
+                                }}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
             </div>,
