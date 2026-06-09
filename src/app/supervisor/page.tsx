@@ -1984,6 +1984,23 @@ export default function SupervisorPage() {
 
       const data = await response.json();
       const updatedReport = data.incidentReport as IncidentReport;
+      const actorName = currentEmployee?.name ?? 'Supervisor';
+      const previousAssignedSupervisor = report.assigned_supervisor || 'Unassigned';
+      const nextAssignedSupervisor = updatedReport.assigned_supervisor || 'Unassigned';
+
+      if (report.status !== updatedReport.status) {
+        await addAuditEntry(
+          'INCIDENT_STATUS_CHANGED',
+          `${updatedReport.incident_number}: ${report.status} → ${updatedReport.status} by ${actorName}`,
+        );
+      }
+
+      if (previousAssignedSupervisor !== nextAssignedSupervisor) {
+        await addAuditEntry(
+          'INCIDENT_REASSIGNED',
+          `${updatedReport.incident_number}: ${previousAssignedSupervisor} → ${nextAssignedSupervisor} by ${actorName}`,
+        );
+      }
 
       setIncidentReports((current) =>
         current.map((item) => (item.id === updatedReport.id ? updatedReport : item)),
