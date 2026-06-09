@@ -1998,7 +1998,12 @@ export default function SupervisorPage() {
       const previousAssignedSupervisor = report.assigned_supervisor || 'Unassigned';
       const nextAssignedSupervisor = updatedReport.assigned_supervisor || 'Unassigned';
 
-      if (report.status !== updatedReport.status) {
+      if (report.status === 'CLOSED' && updatedReport.status === 'IN_REVIEW') {
+        await addAuditEntry(
+          'INCIDENT_REOPENED',
+          `${updatedReport.incident_number}: Closed report reopened by ${actorName}`,
+        );
+      } else if (report.status !== updatedReport.status) {
         await addAuditEntry(
           'INCIDENT_STATUS_CHANGED',
           `${updatedReport.incident_number}: ${report.status} → ${updatedReport.status} by ${actorName}`,
