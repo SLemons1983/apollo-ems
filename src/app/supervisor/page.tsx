@@ -149,9 +149,16 @@ type IncidentReport = {
   incident_number: string;
   created_at: string;
   employee_name: string;
+  employee_phone: string | null;
+  employee_email: string | null;
   category: string;
+  supervisor_notified: string | null;
+  supervisor_name: string | null;
   assigned_supervisor: string | null;
+  narrative: string;
   status: string;
+  attachment_name: string | null;
+  attachment_type: string | null;
 };
 
 type StoredEmployeeProfile = {
@@ -409,6 +416,7 @@ export default function SupervisorPage() {
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
+  const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -3591,18 +3599,50 @@ export default function SupervisorPage() {
                         <th className="px-3 py-2">Category</th>
                         <th className="px-3 py-2">Assigned To</th>
                         <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {openIncidentReports.map((report) => (
-                        <tr key={report.id} className="border-t border-slate-200">
-                          <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
-                          <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
-                          <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
-                          <td className="px-3 py-2 text-slate-700">{report.category}</td>
-                          <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
-                          <td className="px-3 py-2 font-semibold text-blue-700">{report.status}</td>
-                        </tr>
+                        <React.Fragment key={report.id}>
+                          <tr className="border-t border-slate-200">
+                            <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
+                            <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.category}</td>
+                            <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
+                            <td className="px-3 py-2 font-semibold text-blue-700">{report.status}</td>
+                            <td className="px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedIncidentReportId(selectedIncidentReportId === report.id ? null : report.id)}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              >
+                                {selectedIncidentReportId === report.id ? 'Hide' : 'View'}
+                              </button>
+                            </td>
+                          </tr>
+                          {selectedIncidentReportId === report.id && (
+                            <tr className="border-t border-slate-200 bg-slate-50">
+                              <td colSpan={7} className="px-4 py-4">
+                                <div className="grid gap-3 text-sm md:grid-cols-2">
+                                  <div><span className="font-semibold">Phone:</span> {report.employee_phone || '—'}</div>
+                                  <div><span className="font-semibold">Email:</span> {report.employee_email || '—'}</div>
+                                  <div><span className="font-semibold">Supervisor Notified:</span> {report.supervisor_notified || '—'}</div>
+                                  <div><span className="font-semibold">Supervisor Listed:</span> {report.supervisor_name || '—'}</div>
+                                  <div><span className="font-semibold">Attachment:</span> {report.attachment_name || 'None'}</div>
+                                  <div><span className="font-semibold">Attachment Type:</span> {report.attachment_type || '—'}</div>
+                                </div>
+                                <div className="mt-4">
+                                  <div className="text-sm font-semibold text-slate-900">Narrative</div>
+                                  <div className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                                    {report.narrative}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
