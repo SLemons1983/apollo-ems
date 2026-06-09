@@ -144,6 +144,16 @@ type SubmittedTimecard = {
   reviewedBy?: string;
 };
 
+type IncidentReport = {
+  id: string;
+  incident_number: string;
+  created_at: string;
+  employee_name: string;
+  category: string;
+  assigned_supervisor: string | null;
+  status: string;
+};
+
 type StoredEmployeeProfile = {
   id: string;
   firstName?: string;
@@ -398,6 +408,7 @@ export default function SupervisorPage() {
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -631,6 +642,18 @@ export default function SupervisorPage() {
                 supervisorNote: row.supervisor_note ?? undefined,
               })),
             );
+          }
+        });
+
+      supabase
+        .from('incident_reports')
+        .select('id,incident_number,created_at,employee_name,category,assigned_supervisor,status')
+        .order('created_at', { ascending: false })
+        .then(({ data: incidentData, error: incidentError }) => {
+          if (incidentError) {
+            console.error('Failed to load incident reports:', incidentError);
+          } else {
+            setIncidentReports((incidentData ?? []) as IncidentReport[]);
           }
         });
 
@@ -1645,6 +1668,14 @@ export default function SupervisorPage() {
 
   const builderDateKeys = Object.keys(builderSchedule).sort();
   const builderWarnings = getBuilderWarnings();
+
+  const openIncidentReports = useMemo(() => {
+    return incidentReports.filter((report) => report.status !== 'CLOSED');
+  }, [incidentReports]);
+
+  const closedIncidentReports = useMemo(() => {
+    return incidentReports.filter((report) => report.status === 'CLOSED');
+  }, [incidentReports]);
 
   const pendingOpenShiftRequests = useMemo(() => {
     return openShiftRequests
@@ -3533,6 +3564,49 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
+          )}
+
+          {renderTile(
+            'incident-reports',
+            'Incident Reports',
+            openIncidentReports.length > 0
+              ? `${openIncidentReports.length} open incident report${openIncidentReports.length === 1 ? '' : 's'}.`
+              : 'No open incident reports.',
+            <div className="space-y-3">
+              {openIncidentReports.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  No open incident reports.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2">Incident #</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Employee</th>
+                        <th className="px-3 py-2">Category</th>
+                        <th className="px-3 py-2">Assigned To</th>
+                        <th className="px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {openIncidentReports.map((report) => (
+                        <tr key={report.id} className="border-t border-slate-200">
+                          <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
+                          <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
+                          <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
+                          <td className="px-3 py-2 text-slate-700">{report.category}</td>
+                          <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
+                          <td className="px-3 py-2 font-semibold text-blue-700">{report.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>,
+            openIncidentReports.length > 0,
           )}
 
           {renderTile(
