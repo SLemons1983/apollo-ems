@@ -645,16 +645,19 @@ export default function SupervisorPage() {
           }
         });
 
-      supabase
-        .from('incident_reports')
-        .select('id,incident_number,created_at,employee_name,category,assigned_supervisor,status')
-        .order('created_at', { ascending: false })
-        .then(({ data: incidentData, error: incidentError }) => {
-          if (incidentError) {
-            console.error('Failed to load incident reports:', incidentError);
-          } else {
-            setIncidentReports((incidentData ?? []) as IncidentReport[]);
+      fetch('/api/incident-reports/list')
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to load incident reports.');
           }
+
+          return response.json();
+        })
+        .then((data) => {
+          setIncidentReports((data.incidentReports ?? []) as IncidentReport[]);
+        })
+        .catch((error) => {
+          console.error('Failed to load incident reports:', error);
         });
 
       supabase
