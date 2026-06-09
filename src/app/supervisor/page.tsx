@@ -1953,6 +1953,63 @@ export default function SupervisorPage() {
     return `${year}-${month}-${day}`;
   }
 
+  function printIncidentReport(report: IncidentReport) {
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      window.alert('Unable to open print window. Please allow pop-ups for ApolloEMS.');
+      return;
+    }
+
+    const submittedAt = new Date(report.created_at).toLocaleString('en-US');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${report.incident_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #0f172a; }
+            h1 { margin: 0 0 4px; font-size: 24px; }
+            .sub { color: #475569; margin-bottom: 24px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-bottom: 24px; }
+            .label { font-weight: 700; }
+            .box { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px; white-space: pre-wrap; }
+            .footer { margin-top: 32px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>ApolloEMS Incident Report</h1>
+          <div class="sub">${report.incident_number} • Submitted ${submittedAt}</div>
+
+          <div class="grid">
+            <div><span class="label">Employee:</span> ${report.employee_name}</div>
+            <div><span class="label">Status:</span> ${report.status}</div>
+            <div><span class="label">Phone:</span> ${report.employee_phone || '—'}</div>
+            <div><span class="label">Email:</span> ${report.employee_email || '—'}</div>
+            <div><span class="label">Category:</span> ${report.category}</div>
+            <div><span class="label">Assigned To:</span> ${report.assigned_supervisor || 'Unassigned'}</div>
+            <div><span class="label">Supervisor Notified:</span> ${report.supervisor_notified || '—'}</div>
+            <div><span class="label">Supervisor Listed:</span> ${report.supervisor_name || '—'}</div>
+            <div><span class="label">Attachment:</span> ${report.attachment_name || 'None'}</div>
+            <div><span class="label">Attachment Type:</span> ${report.attachment_type || '—'}</div>
+          </div>
+
+          <h2>Narrative</h2>
+          <div class="box">${report.narrative}</div>
+
+          <div class="footer">ApolloEMS Incident Report • Generated ${new Date().toLocaleString('en-US')}</div>
+          <script>
+            window.onload = () => {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  }
+
   function printTimecard(timecardId: string) {
     const printable = document.getElementById(`printable-${timecardId}`);
     if (!printable) {
@@ -4248,13 +4305,22 @@ export default function SupervisorPage() {
                   Submitted {new Date(incidentReports.find((report) => report.id === selectedIncidentReportId)!.created_at).toLocaleString('en-US')}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedIncidentReportId(null)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Close
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => printIncidentReport(incidentReports.find((report) => report.id === selectedIncidentReportId)!)}
+                  className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                >
+                  Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIncidentReportId(null)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
             <div className="space-y-5 p-5">
