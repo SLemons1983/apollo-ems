@@ -1697,6 +1697,16 @@ export default function SupervisorPage() {
     return incidentReports.filter((report) => report.status === 'CLOSED');
   }, [incidentReports]);
 
+  const selectedIncidentAuditEntries = useMemo(() => {
+    const selectedReport = incidentReports.find((report) => report.id === selectedIncidentReportId);
+
+    if (!selectedReport) {
+      return [];
+    }
+
+    return auditLog.filter((entry) => entry.details.includes(selectedReport.incident_number));
+  }, [auditLog, incidentReports, selectedIncidentReportId]);
+
   const pendingOpenShiftRequests = useMemo(() => {
     return openShiftRequests
       .filter((request) => request.status === 'PENDING')
@@ -4468,6 +4478,27 @@ export default function SupervisorPage() {
                 <div className="text-sm font-semibold text-slate-900">Narrative</div>
                 <div className="mt-2 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
                   {incidentReports.find((report) => report.id === selectedIncidentReportId)!.narrative}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-bold text-slate-900">Incident History</div>
+
+                <div className="mt-3 max-h-64 space-y-2 overflow-auto">
+                  {selectedIncidentAuditEntries.length === 0 ? (
+                    <div className="text-sm text-slate-500">No incident history recorded yet.</div>
+                  ) : (
+                    selectedIncidentAuditEntries.map((entry) => (
+                      <div key={entry.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <div className="text-xs text-slate-500">
+                          {new Date(entry.timestamp).toLocaleString('en-US')}
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">{entry.actor}</div>
+                        <div className="text-sm text-slate-700">{entry.action}</div>
+                        <div className="mt-1 text-sm text-slate-600">{entry.details}</div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
