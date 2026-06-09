@@ -159,6 +159,7 @@ type IncidentReport = {
   status: string;
   attachment_name: string | null;
   attachment_type: string | null;
+  attachment_path: string | null;
   supervisor_notes: string | null;
   updated_at: string | null;
   closed_at: string | null;
@@ -2024,6 +2025,42 @@ export default function SupervisorPage() {
     } catch (error) {
       console.error('Failed to save incident report:', error);
       setIncidentReportSaveStatus('Unable to save incident report.');
+    }
+  }
+
+  async function openIncidentAttachment(report: IncidentReport, download = false) {
+    if (!report.attachment_path) {
+      window.alert('No attachment is available for this incident report.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/incident-reports/attachment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachmentPath: report.attachment_path }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to open attachment.');
+      }
+
+      const data = await response.json();
+      const signedUrl = data.signedUrl as string;
+
+      if (download) {
+        const link = document.createElement('a');
+        link.href = signedUrl;
+        link.download = report.attachment_name || 'incident-report-attachment';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (error) {
+      console.error('Failed to open incident attachment:', error);
+      window.alert('Unable to open attachment.');
     }
   }
 
@@ -4478,6 +4515,25 @@ export default function SupervisorPage() {
                 <div><span className="font-semibold">Attachment:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.attachment_name || 'None'}</div>
                 <div><span className="font-semibold">Attachment Type:</span> {incidentReports.find((report) => report.id === selectedIncidentReportId)!.attachment_type || '—'}</div>
               </div>
+
+              {incidentReports.find((report) => report.id === selectedIncidentReportId)!.attachment_path && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openIncidentAttachment(incidentReports.find((report) => report.id === selectedIncidentReportId)!)}
+                    className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  >
+                    View Attachment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openIncidentAttachment(incidentReports.find((report) => report.id === selectedIncidentReportId)!, true)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Download Attachment
+                  </button>
+                </div>
+              )}
 
               <div>
                 <div className="text-sm font-semibold text-slate-900">Narrative</div>
