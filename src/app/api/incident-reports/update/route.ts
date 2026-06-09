@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
 
     const id = String(body.id ?? '').trim();
     const status = String(body.status ?? '').trim();
+    const assignedSupervisor = String(body.assignedSupervisor ?? '').trim();
     const supervisorNotes = String(body.supervisorNotes ?? '').trim();
     const closedBy = String(body.closedBy ?? '').trim();
 
@@ -34,6 +35,7 @@ export async function POST(request: NextRequest) {
 
     const updatePayload = {
       status,
+      assigned_supervisor: assignedSupervisor || null,
       supervisor_notes: supervisorNotes || null,
       updated_at: now,
       closed_at: status === 'CLOSED' ? now : null,

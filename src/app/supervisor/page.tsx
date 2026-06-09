@@ -422,6 +422,7 @@ export default function SupervisorPage() {
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
+  const [incidentReportAssignedSupervisorDraft, setIncidentReportAssignedSupervisorDraft] = useState('');
   const [incidentReportNotesDraft, setIncidentReportNotesDraft] = useState('');
   const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
   const [showClosedIncidentReports, setShowClosedIncidentReports] = useState(false);
@@ -1971,6 +1972,7 @@ export default function SupervisorPage() {
         body: JSON.stringify({
           id: report.id,
           status: incidentReportStatusDraft,
+          assignedSupervisor: incidentReportAssignedSupervisorDraft,
           supervisorNotes: incidentReportNotesDraft,
           closedBy: currentEmployee?.name ?? 'Supervisor',
         }),
@@ -3726,6 +3728,7 @@ export default function SupervisorPage() {
                                 onClick={() => {
                                   setSelectedIncidentReportId(report.id);
                                   setIncidentReportStatusDraft(report.status);
+                                  setIncidentReportAssignedSupervisorDraft(report.assigned_supervisor ?? '');
                                   setIncidentReportNotesDraft(report.supervisor_notes ?? '');
                                   setIncidentReportSaveStatus('');
                                 }}
@@ -3776,6 +3779,7 @@ export default function SupervisorPage() {
                                 onClick={() => {
                                   setSelectedIncidentReportId(report.id);
                                   setIncidentReportStatusDraft(report.status);
+                                  setIncidentReportAssignedSupervisorDraft(report.assigned_supervisor ?? '');
                                   setIncidentReportNotesDraft(report.supervisor_notes ?? '');
                                   setIncidentReportSaveStatus('');
                                 }}
@@ -4453,7 +4457,7 @@ export default function SupervisorPage() {
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-bold text-slate-900">Supervisor Workflow</div>
 
-                <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr]">
+                <div className="mt-3 grid gap-3 md:grid-cols-[220px_220px_1fr]">
                   <label className="text-xs font-semibold text-slate-600">
                     Status
                     <select
@@ -4465,6 +4469,24 @@ export default function SupervisorPage() {
                       <option value="IN_REVIEW">In Review</option>
                       <option value="PENDING_EMPLOYEE_RESPONSE">Pending Employee Response</option>
                       <option value="CLOSED">Closed</option>
+                    </select>
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Reassign Incident Report
+                    <select
+                      value={incidentReportAssignedSupervisorDraft}
+                      onChange={(event) => setIncidentReportAssignedSupervisorDraft(event.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Unassigned</option>
+                      {employees
+                        .filter((employee) => employee.status?.toLowerCase() !== 'removed' && employee.role === 'Supervisor')
+                        .map((employee) => (
+                          <option key={employee.id} value={employee.name}>
+                            {employee.name}
+                          </option>
+                        ))}
                     </select>
                   </label>
 
