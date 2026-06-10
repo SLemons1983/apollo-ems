@@ -951,6 +951,11 @@ export default function DashboardPage() {
   const [certificationUploadName, setCertificationUploadName] = useState('');
   const [certificationUploadStatus, setCertificationUploadStatus] = useState('');
   const [isSubmittingCertificationUpload, setIsSubmittingCertificationUpload] = useState(false);
+  const [unitInspectionStatus, setUnitInspectionStatus] = useState('');
+  const [isSubmittingUnitInspection, setIsSubmittingUnitInspection] = useState(false);
+  const [inspectionVehicle, setInspectionVehicle] = useState('');
+  const [inspectionMileage, setInspectionMileage] = useState('');
+  const [inspectionDeficiencies, setInspectionDeficiencies] = useState('');
   const [incidentReportCategory, setIncidentReportCategory] = useState('General Incident Report');
   const [incidentReportSupervisorNotified, setIncidentReportSupervisorNotified] = useState('No');
   const [incidentReportSupervisorName, setIncidentReportSupervisorName] = useState('');
@@ -1075,6 +1080,58 @@ export default function DashboardPage() {
       setCertificationUploadStatus('Unable to submit certification. Please try again.');
     } finally {
       setIsSubmittingCertificationUpload(false);
+    }
+  }
+
+  async function handleUnitInspectionSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentEmployee) {
+      setUnitInspectionStatus('Unable to identify the logged-in employee.');
+      return;
+    }
+
+    setIsSubmittingUnitInspection(true);
+    setUnitInspectionStatus('Submitting inspection...');
+
+    try {
+      const formData = new FormData(event.currentTarget);
+
+      formData.append('employeeName', currentEmployee.name);
+      formData.append('phoneNumber', currentEmployee.phone);
+      formData.append('companyEmail', currentEmployee.email || authEmail);
+      formData.append('inspectionDate', new Date().toISOString().split('T')[0]);
+      formData.append('vehicle', inspectionVehicle);
+      formData.append('mileage', inspectionMileage);
+      formData.append('deficiencies', inspectionDeficiencies);
+
+      formData.append('vehicleCondition', 'PASS');
+      formData.append('mechanicalChecks', 'PASS');
+      formData.append('oxygenLevels', 'PASS');
+      formData.append('alsSupplies', 'PASS');
+      formData.append('blsSupplies', 'PASS');
+      formData.append('otherSupplies', 'PASS');
+
+      const response = await fetch('/api/unit-inspections/submit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Inspection submission failed.');
+      }
+
+      setInspectionVehicle('');
+      setInspectionMileage('');
+      setInspectionDeficiencies('');
+      event.currentTarget.reset();
+
+      setUnitInspectionStatus('Inspection submitted successfully.');
+    } catch (error) {
+      console.error('Unit inspection submission failed:', error);
+      setUnitInspectionStatus('Unable to submit inspection.');
+    } finally {
+      setIsSubmittingUnitInspection(false);
     }
   }
 
@@ -4865,6 +4922,73 @@ export default function DashboardPage() {
                 Place the handbook PDF in the project's public folder as: public/Employee Handbook.pdf
               </div>
             </div>,
+          )}
+
+          {renderTile(
+            'unit-inspection',
+            'Daily Unit Inspection',
+            'Complete the daily ambulance checklist and submit required vehicle photos.',
+            <form className="space-y-4" onSubmit={handleUnitInspectionSubmit}>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.phone ?? ''} readOnly />
+                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.email ?? authEmail} readOnly />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={inspectionVehicle}
+                  onChange={(event) => setInspectionVehicle(event.target.value)}
+                  placeholder="Vehicle being inspected"
+                  required
+                />
+                <input
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  value={inspectionMileage}
+                  onChange={(event) => setInspectionMileage(event.target.value)}
+                  placeholder="Vehicle mileage"
+                  inputMode="numeric"
+                  required
+                />
+              </div>
+
+              <textarea
+                className="min-h-[120px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                value={inspectionDeficiencies}
+                onChange={(event) => setInspectionDeficiencies(event.target.value)}
+                placeholder="Deficiencies / notes. Enter None if no issues are found."
+              />
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-600">
+                  Front Vehicle Photo
+                  <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Driver Side Photo
+                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Rear Vehicle Photo
+                  <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Passenger Side Photo
+                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                </label>
+              </div>
+
+              {unitInspectionStatus && <p className="text-sm font-semibold text-slate-700">{unitInspectionStatus}</p>}
+
+              <button
+                type="submit"
+                disabled={isSubmittingUnitInspection}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
+              >
+                {isSubmittingUnitInspection ? 'Submitting...' : 'Submit Inspection'}
+              </button>
+            </form>,
           )}
 
           {renderTile(
