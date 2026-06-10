@@ -2022,6 +2022,35 @@ export default function SupervisorPage() {
         report.status !== 'PENDING_EMPLOYEE_RESPONSE' &&
         updatedReport.status === 'PENDING_EMPLOYEE_RESPONSE'
       ) {
+        const employee = employees.find(
+          (item) => item.email.trim().toLowerCase() === (updatedReport.employee_email ?? '').trim().toLowerCase(),
+        );
+
+        if (employee) {
+          const createdAt = new Date().toISOString();
+          const followUpMessage: ApolloMessage = {
+            id: `incident-follow-up-${updatedReport.id}-${Date.now()}`,
+            conversationId: `incident-report-${updatedReport.id}`,
+            senderId: CURRENT_SUPERVISOR_ID,
+            senderName: actorName,
+            senderRole: 'SUPERVISOR',
+            recipients: [{
+              employeeId: employee.id,
+              deliveredAt: createdAt,
+              readAt: null,
+            }],
+            audienceLabel: updatedReport.employee_name,
+            title: `Incident Report Follow-Up: ${updatedReport.incident_number}`,
+            body: `Additional information is needed for Incident Report ${updatedReport.incident_number}. Please reply to this ApolloEMS message with the requested clarification or follow-up documentation.`,
+            createdAt,
+            relatedType: 'INCIDENT_REPORT',
+            relatedId: updatedReport.id,
+            priority: 'IMPORTANT',
+          };
+
+          saveApolloMessages([followUpMessage, ...apolloMessages]);
+        }
+
         await addAuditEntry(
           'INCIDENT_EMPLOYEE_RESPONSE_REQUESTED',
           `${updatedReport.incident_number}: Employee response requested by ${actorName}`,
