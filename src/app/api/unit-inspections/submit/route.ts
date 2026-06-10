@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     await sendApolloEmail({
-      to: 'steve@sscems.org',
+      to: 'supervisor@sscems.org, armando.gutierrez@sscems.org',
       subject: `Daily Unit Inspection: ${vehicle} - ${inspectionDate}`,
       text:
 `A daily unit inspection has been submitted through ApolloEMS.
