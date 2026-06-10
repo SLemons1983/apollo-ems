@@ -426,6 +426,11 @@ export default function SupervisorPage() {
   const [incidentReportAssignedSupervisorDraft, setIncidentReportAssignedSupervisorDraft] = useState('');
   const [incidentReportNotesDraft, setIncidentReportNotesDraft] = useState('');
   const [incidentReportFollowUpDraft, setIncidentReportFollowUpDraft] = useState('');
+
+  const [incidentReportSearch, setIncidentReportSearch] = useState('');
+  const [incidentReportStatusFilter, setIncidentReportStatusFilter] = useState('ALL');
+  const [incidentReportCategoryFilter, setIncidentReportCategoryFilter] = useState('ALL');
+  const [incidentReportSupervisorFilter, setIncidentReportSupervisorFilter] = useState('ALL');
   const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
   const [showClosedIncidentReports, setShowClosedIncidentReports] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
@@ -1691,13 +1696,49 @@ export default function SupervisorPage() {
   const builderDateKeys = Object.keys(builderSchedule).sort();
   const builderWarnings = getBuilderWarnings();
 
-  const openIncidentReports = useMemo(() => {
-    return incidentReports.filter((report) => report.status !== 'CLOSED');
+  const incidentReportCategories = useMemo(() => {
+    return Array.from(new Set(incidentReports.map((report) => report.category).filter(Boolean))).sort();
   }, [incidentReports]);
 
-  const closedIncidentReports = useMemo(() => {
-    return incidentReports.filter((report) => report.status === 'CLOSED');
+  const incidentReportSupervisors = useMemo(() => {
+    return Array.from(new Set(incidentReports.map((report) => report.assigned_supervisor || 'Unassigned'))).sort();
   }, [incidentReports]);
+
+  const filteredIncidentReports = useMemo(() => {
+    const search = incidentReportSearch.trim().toLowerCase();
+
+    return incidentReports.filter((report) => {
+      const assignedSupervisor = report.assigned_supervisor || 'Unassigned';
+      const searchText = [
+        report.incident_number,
+        report.employee_name,
+        report.category,
+        assignedSupervisor,
+        report.status,
+      ].join(' ').toLowerCase();
+
+      return (
+        (!search || searchText.includes(search)) &&
+        (incidentReportStatusFilter === 'ALL' || report.status === incidentReportStatusFilter) &&
+        (incidentReportCategoryFilter === 'ALL' || report.category === incidentReportCategoryFilter) &&
+        (incidentReportSupervisorFilter === 'ALL' || assignedSupervisor === incidentReportSupervisorFilter)
+      );
+    });
+  }, [
+    incidentReportCategoryFilter,
+    incidentReportSearch,
+    incidentReportStatusFilter,
+    incidentReportSupervisorFilter,
+    incidentReports,
+  ]);
+
+  const openIncidentReports = useMemo(() => {
+    return filteredIncidentReports.filter((report) => report.status !== 'CLOSED');
+  }, [filteredIncidentReports]);
+
+  const closedIncidentReports = useMemo(() => {
+    return filteredIncidentReports.filter((report) => report.status === 'CLOSED');
+  }, [filteredIncidentReports]);
 
   const selectedIncidentAuditEntries = useMemo(() => {
     const selectedReport = incidentReports.find((report) => report.id === selectedIncidentReportId);
@@ -3803,6 +3844,62 @@ export default function SupervisorPage() {
                     : `Show Closed Reports (${closedIncidentReports.length})`}
                 </button>
               </div>
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-4">
+                <label className="text-xs font-semibold text-slate-600">
+                  Search
+                  <input
+                    type="text"
+                    value={incidentReportSearch}
+                    onChange={(event) => setIncidentReportSearch(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    placeholder="Incident #, employee, category..."
+                  />
+                </label>
+
+                <label className="text-xs font-semibold text-slate-600">
+                  Status
+                  <select
+                    value={incidentReportStatusFilter}
+                    onChange={(event) => setIncidentReportStatusFilter(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="NEW">New</option>
+                    <option value="IN_REVIEW">In Review</option>
+                    <option value="PENDING_EMPLOYEE_RESPONSE">Pending Employee Response</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                </label>
+
+                <label className="text-xs font-semibold text-slate-600">
+                  Category
+                  <select
+                    value={incidentReportCategoryFilter}
+                    onChange={(event) => setIncidentReportCategoryFilter(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="ALL">All Categories</option>
+                    {incidentReportCategories.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-xs font-semibold text-slate-600">
+                  Assigned To
+                  <select
+                    value={incidentReportSupervisorFilter}
+                    onChange={(event) => setIncidentReportSupervisorFilter(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <option value="ALL">All Supervisors</option>
+                    {incidentReportSupervisors.map((supervisor) => (
+                      <option key={supervisor} value={supervisor}>{supervisor}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
               {openIncidentReports.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                   No open incident reports.
