@@ -1105,13 +1105,6 @@ export default function DashboardPage() {
       formData.append('mileage', inspectionMileage);
       formData.append('deficiencies', inspectionDeficiencies);
 
-      formData.append('vehicleCondition', 'PASS');
-      formData.append('mechanicalChecks', 'PASS');
-      formData.append('oxygenLevels', 'PASS');
-      formData.append('alsSupplies', 'PASS');
-      formData.append('blsSupplies', 'PASS');
-      formData.append('otherSupplies', 'PASS');
-
       const response = await fetch('/api/unit-inspections/submit', {
         method: 'POST',
         body: formData,
@@ -4936,13 +4929,21 @@ export default function DashboardPage() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-2">
-                <input
+                <select
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   value={inspectionVehicle}
                   onChange={(event) => setInspectionVehicle(event.target.value)}
-                  placeholder="Vehicle being inspected"
                   required
-                />
+                >
+                  <option value="">Select Vehicle</option>
+                  <option value="305">305</option>
+                  <option value="310">310</option>
+                  <option value="315">315</option>
+                  <option value="320">320</option>
+                  <option value="325">325</option>
+                  <option value="330">330</option>
+                  <option value="335">335</option>
+                </select>
                 <input
                   className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   value={inspectionMileage}
@@ -4951,6 +4952,26 @@ export default function DashboardPage() {
                   inputMode="numeric"
                   required
                 />
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  ['vehicleCondition', 'Vehicle Clean / Operating Condition'],
+                  ['mechanicalChecks', 'Mechanical Checks'],
+                  ['oxygenLevels', 'Oxygen Levels'],
+                  ['alsSupplies', 'ALS Supplies'],
+                  ['blsSupplies', 'BLS Supplies'],
+                  ['otherSupplies', 'Other Supplies'],
+                ].map(([name, label]) => (
+                  <label key={name} className="text-xs font-semibold text-slate-600">
+                    {label}
+                    <select name={name} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                      <option value="PASS">PASS</option>
+                      <option value="FAIL">FAIL</option>
+                      <option value="N/A">N/A</option>
+                    </select>
+                  </label>
+                ))}
               </div>
 
               <textarea
@@ -4963,19 +4984,19 @@ export default function DashboardPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-600">
                   Front Vehicle Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                  <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Driver Side Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Rear Vehicle Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                  <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Passenger Side Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required />
+                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept="image/*" capture="environment" required />
                 </label>
               </div>
 
