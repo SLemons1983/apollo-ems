@@ -4975,16 +4975,19 @@ export default function DashboardPage() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 {[
-                  ['vehicleCondition', 'Vehicle Clean / Operating Condition'],
-                  ['mechanicalChecks', 'Mechanical Checks'],
-                  ['oxygenLevels', 'Oxygen Levels'],
-                  ['alsSupplies', 'ALS Supplies'],
-                  ['blsSupplies', 'BLS Supplies'],
-                  ['otherSupplies', 'Other Supplies'],
-                ].map(([name, label]) => (
+                  ['vehicleCondition','Vehicle Clean / Operating Condition','The vehicle was inspected for cleanliness, appearance, and overall readiness for service.'],
+                  ['mechanicalChecks','Mechanical Checks','All mechanical components of the unit were inspected, including but not limited to the transmission, engine belts and hoses, brakes, steering, suspension, fluid levels, tires, mirrors, windshield and wipers, headlights, taillights, turn signals, interior and exterior lighting, and all emergency warning devices including Code 3 lights and siren.'],
+                  ['oxygenLevels','Oxygen Levels','All onboard oxygen systems were inspected, including main and portable oxygen cylinders, regulators, and related equipment. Oxygen levels were verified to be adequate for service.'],
+                  ['alsSupplies','ALS Supplies','All required ALS equipment and supplies were checked, including medications, airway equipment, cardiac monitor/defibrillator, IV/IO supplies, suction equipment, and other ALS-specific items assigned to the unit.'],
+                  ['blsSupplies','BLS Supplies','All required BLS equipment and supplies were inspected, including bandaging materials, splints, trauma supplies, infection control supplies, airway equipment, and immobilization devices.'],
+                  ['otherSupplies','Other Supplies','All additional assigned equipment and supplies were checked, including radios, mobile data/iPad, chargers, fuel card, documentation supplies, and other unit-specific accessories.'],
+                ].map(([name, label, description]) => (
                   <label key={name} className="text-xs font-semibold text-slate-600">
-                    {label}
-                    <select name={name} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
+                    <div>{label}</div>
+                    <div className="mt-1 text-xs font-normal text-slate-500">
+                      {description}
+                    </div>
+                    <select name={name} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
                       <option value="PASS">PASS</option>
                       <option value="FAIL">FAIL</option>
                       <option value="N/A">N/A</option>
@@ -5018,6 +5021,16 @@ export default function DashboardPage() {
                   <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept="image/*" capture="environment" required />
                 </label>
               </div>
+
+              <label className="block rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="inspectionAcknowledgement"
+                  className="mr-2"
+                  required
+                />
+                I acknowledge that I have personally completed this inspection in its entirety for the assigned unit on the date indicated. I affirm that all listed items were checked and found to be present, operational, and within normal operating parameters unless otherwise noted. I understand that this inspection is mandatory, must be completed daily, and that submitting inaccurate or incomplete information may result in corrective action. I further acknowledge my responsibility to promptly report any deficiencies, safety concerns, or equipment issues identified during this inspection to a supervisor in accordance with company policy.
+              </label>
 
               {unitInspectionStatus && <p className="text-sm font-semibold text-slate-700">{unitInspectionStatus}</p>}
 
