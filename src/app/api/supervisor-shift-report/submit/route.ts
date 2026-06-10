@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     await sendApolloEmail({
-      to: 'steve@sscems.org',
+      to: 'supervisor@sscems.org',
       subject: `Daily Supervisor Shift Report - ${shiftDate}`,
       text:
 `A Daily Supervisor Shift Report has been submitted through ApolloEMS.
