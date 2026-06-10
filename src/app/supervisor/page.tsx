@@ -454,6 +454,8 @@ export default function SupervisorPage() {
   const [messagePriority, setMessagePriority] = useState<'NORMAL' | 'IMPORTANT' | 'URGENT'>('NORMAL');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
+  const [hideReadMessages, setHideReadMessages] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [expiresAt, setExpiresAt] = useState(makeDateInputValue(addDays(new Date(), 7)));
@@ -1064,8 +1066,27 @@ export default function SupervisorPage() {
       .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
   }, [supervisorMessages]);
 
+  const filteredSupervisorConversations = useMemo(() => {
+    const search = messageSearch.trim().toLowerCase();
+
+    return supervisorConversations.filter((conversation) => {
+      if (hideReadMessages && conversation.unreadCount === 0) return false;
+      if (!search) return true;
+
+      return [
+        conversation.conversationId,
+        conversation.latest.title,
+        conversation.latest.body,
+        conversation.latest.senderName,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(search);
+    });
+  }, [supervisorConversations, hideReadMessages, messageSearch]);
+
   const selectedSupervisorConversation =
-    supervisorConversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? supervisorConversations[0] ?? null;
+    filteredSupervisorConversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? filteredSupervisorConversations[0] ?? null;
 
   function getMessageStatus(message: ApolloMessage, viewerId: string): string {
     if (message.senderId !== viewerId) {
@@ -3573,18 +3594,40 @@ export default function SupervisorPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="text-sm font-bold text-slate-900">Conversations</div>
-                    {supervisorUnreadCount > 0 && (
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">Conversations</div>
+                      <div className="text-xs text-slate-500">
+                        {filteredSupervisorConversations.length} shown · {supervisorUnreadCount} unread
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={markAllSupervisorMessagesRead}
-                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                        onClick={() => setHideReadMessages((value) => !value)}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                       >
-                        Mark All Read
+                        {hideReadMessages ? 'Show All Messages' : 'Hide Read Messages'}
                       </button>
-                    )}
+                      {supervisorUnreadCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={markAllSupervisorMessagesRead}
+                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                        >
+                          Mark All Read
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  <input
+                    type="text"
+                    value={messageSearch}
+                    onChange={(event) => setMessageSearch(event.target.value)}
+                    placeholder="Search messages..."
+                    className="mb-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
 
                   <div className="max-h-[520px] space-y-2 overflow-auto">
                     {supervisorConversations.length === 0 ? (
@@ -3592,7 +3635,7 @@ export default function SupervisorPage() {
                         No Apollo messages yet.
                       </div>
                     ) : (
-                      supervisorConversations.map((conversation) => (
+                      filteredSupervisorConversations.map((conversation) => (
                         <button
                           type="button"
                           key={conversation.conversationId}

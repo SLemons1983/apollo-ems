@@ -941,6 +941,8 @@ export default function DashboardPage() {
   const [messageBody, setMessageBody] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState('');
+  const [hideReadMessages, setHideReadMessages] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
   const [timecardStatus, setTimecardStatus] = useState('');
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
@@ -1718,7 +1720,26 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
   }, [currentEmployeeMessages]);
 
-  const selectedConversation = conversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? conversations[0] ?? null;
+  const filteredConversations = useMemo(() => {
+    const search = messageSearch.trim().toLowerCase();
+
+    return conversations.filter((conversation) => {
+      if (hideReadMessages && conversation.unreadCount === 0) return false;
+      if (!search) return true;
+
+      return [
+        conversation.conversationId,
+        conversation.latest.title,
+        conversation.latest.body,
+        conversation.latest.senderName,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(search);
+    });
+  }, [conversations, hideReadMessages, messageSearch]);
+
+  const selectedConversation = filteredConversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? filteredConversations[0] ?? null;
 
   function saveApolloMessages(nextMessages: ApolloMessage[]) {
     setApolloMessages(nextMessages);
@@ -4670,19 +4691,38 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-bold text-slate-900">Conversations</div>
-                      <div className="text-xs text-slate-500">{unreadMessageCount} unread</div>
+                      <div className="text-xs text-slate-500">
+                        {filteredConversations.length} shown · {unreadMessageCount} unread
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={markMessagesRead}
-                      className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                    >
-                      Mark All Read
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHideReadMessages((value) => !value)}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        {hideReadMessages ? 'Show All Messages' : 'Hide Read Messages'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={markMessagesRead}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Mark All Read
+                      </button>
+                    </div>
                   </div>
+
+                  <input
+                    type="text"
+                    value={messageSearch}
+                    onChange={(event) => setMessageSearch(event.target.value)}
+                    placeholder="Search messages..."
+                    className="mb-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
 
                   <div className="max-h-[520px] space-y-2 overflow-auto">
                     {conversations.length === 0 ? (
@@ -4690,7 +4730,7 @@ export default function DashboardPage() {
                         No Apollo messages yet.
                       </div>
                     ) : (
-                      conversations.map((conversation) => (
+                      filteredConversations.map((conversation) => (
                         <button
                           type="button"
                           key={conversation.conversationId}
