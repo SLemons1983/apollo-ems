@@ -425,6 +425,7 @@ export default function SupervisorPage() {
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
   const [incidentReportAssignedSupervisorDraft, setIncidentReportAssignedSupervisorDraft] = useState('');
   const [incidentReportNotesDraft, setIncidentReportNotesDraft] = useState('');
+  const [incidentReportFollowUpDraft, setIncidentReportFollowUpDraft] = useState('');
   const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
   const [showClosedIncidentReports, setShowClosedIncidentReports] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
@@ -2041,7 +2042,7 @@ export default function SupervisorPage() {
             }],
             audienceLabel: updatedReport.employee_name,
             title: `Incident Report Follow-Up: ${updatedReport.incident_number}`,
-            body: `Additional information is needed for Incident Report ${updatedReport.incident_number}. Please reply to this ApolloEMS message with the requested clarification or follow-up documentation.`,
+            body: incidentReportFollowUpDraft.trim() || `Additional information is needed for Incident Report ${updatedReport.incident_number}. Please reply to this ApolloEMS message with the requested clarification or follow-up documentation.`,
             createdAt,
             relatedType: 'INCIDENT_REPORT',
             relatedId: updatedReport.id,
@@ -3838,6 +3839,7 @@ export default function SupervisorPage() {
                                   setIncidentReportStatusDraft(report.status);
                                   setIncidentReportAssignedSupervisorDraft(report.assigned_supervisor ?? '');
                                   setIncidentReportNotesDraft(report.supervisor_notes ?? '');
+                                  setIncidentReportFollowUpDraft('');
                                   setIncidentReportSaveStatus('');
                                 }}
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -3889,6 +3891,7 @@ export default function SupervisorPage() {
                                   setIncidentReportStatusDraft(report.status);
                                   setIncidentReportAssignedSupervisorDraft(report.assigned_supervisor ?? '');
                                   setIncidentReportNotesDraft(report.supervisor_notes ?? '');
+                                  setIncidentReportFollowUpDraft('');
                                   setIncidentReportSaveStatus('');
                                 }}
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
@@ -4636,6 +4639,16 @@ export default function SupervisorPage() {
                           </option>
                         ))}
                     </select>
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Employee Follow-Up Request
+                    <textarea
+                      value={incidentReportFollowUpDraft}
+                      onChange={(event) => setIncidentReportFollowUpDraft(event.target.value)}
+                      className="mt-1 min-h-[110px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      placeholder="Tell the employee exactly what additional information is needed."
+                    />
                   </label>
 
                   <label className="text-xs font-semibold text-slate-600">
