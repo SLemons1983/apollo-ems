@@ -1095,7 +1095,25 @@ export default function DashboardPage() {
     setUnitInspectionStatus('Submitting inspection...');
 
     try {
+      if (!/^\d+$/.test(inspectionMileage.trim())) {
+        setUnitInspectionStatus('Mileage must contain numbers only.');
+        return;
+      }
+
       const formData = new FormData(event.currentTarget);
+      const hasFailedInspectionItem = [
+        'vehicleCondition',
+        'mechanicalChecks',
+        'oxygenLevels',
+        'alsSupplies',
+        'blsSupplies',
+        'otherSupplies',
+      ].some((field) => formData.get(field) === 'FAIL');
+
+      if (hasFailedInspectionItem && !inspectionDeficiencies.trim()) {
+        setUnitInspectionStatus('Deficiency notes are required when any checklist item is marked FAIL.');
+        return;
+      }
 
       formData.append('employeeName', currentEmployee.name);
       formData.append('phoneNumber', currentEmployee.phone);
@@ -4950,6 +4968,7 @@ export default function DashboardPage() {
                   onChange={(event) => setInspectionMileage(event.target.value)}
                   placeholder="Vehicle mileage"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   required
                 />
               </div>
