@@ -2806,12 +2806,15 @@ export default function DashboardPage() {
         ? getEditableRowForDate(date)
         : editableTimecardRows[rowId];
 
-    if (!current) {
-      return;
-    }
-
     const updatedRow = {
-      ...current,
+      ...(current ?? {
+        shiftLabel: '',
+        payType: 'SICK_TIME',
+        clockInDate: '',
+        clockInTime: '',
+        clockOutDate: '',
+        clockOutTime: '',
+      }),
       ...partial,
       id: rowId,
     };
