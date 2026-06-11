@@ -267,6 +267,7 @@ type SubmittedTimecard = {
 };
 
 type EditableTimecardRow = {
+  id?: string;
   shiftLabel: string;
   payType:
     | 'DAILY_OT_DT'
@@ -1242,7 +1243,7 @@ export default function DashboardPage() {
             extra.employee3 = slot;
             extra.showEmployee3 = Boolean(slot.employeeId);
           }
-        } else {
+          } else {
           const shiftName = row.shift_key as ShiftName;
           if (!day.standard[shiftName]) continue;
           const shift = day.standard[shiftName];
@@ -1569,13 +1570,14 @@ export default function DashboardPage() {
               Object.fromEntries(
                 (data ?? []).map((row: any) => [
                   row.id,
-                  row.row_data ?? {
-                    shiftLabel: '',
-                    payType: 'DAILY_OT_DT',
-                    clockInDate: '',
-                    clockInTime: '',
-                    clockOutDate: '',
-                    clockOutTime: '',
+                  {
+                    id: row.id,
+                    shiftLabel: row.row_data?.shiftLabel ?? '',
+                    payType: row.row_data?.payType ?? 'DAILY_OT_DT',
+                    clockInDate: row.row_data?.clockInDate ?? '',
+                    clockInTime: row.row_data?.clockInTime ?? '',
+                    clockOutDate: row.row_data?.clockOutDate ?? '',
+                    clockOutTime: row.row_data?.clockOutTime ?? '',
                   },
                 ]),
               ),
@@ -2498,6 +2500,27 @@ export default function DashboardPage() {
     return `${currentEmployeeId}-${selectedPayPeriod.key}-${dateKey}`;
   }
 
+  function getEditableRowDateKey(rowKey: string): string {
+    return rowKey
+      .replace(`${currentEmployeeId}-${selectedPayPeriod.key}-`, '')
+      .replace(/-segment-\d+$/, '');
+  }
+
+  function getEditableRowsForDate(date: Date): EditableTimecardRow[] {
+    const dateKey = toDateKey(date);
+    const baseRow = getEditableRowForDate(date);
+    const segmentRows = Object.entries(editableTimecardRows)
+      .filter(([key]) =>
+        key.startsWith(`${getEditableRowKey(dateKey)}-segment-`)
+      )
+      .map(([, row]) => row)
+      .sort((a, b) =>
+        `${a.clockInDate}T${a.clockInTime}`.localeCompare(`${b.clockInDate}T${b.clockInTime}`)
+      );
+
+    return [baseRow, ...segmentRows];
+  }
+
   function getIsoDateInputValue(date: Date): string {
     const year = date.getFullYear();
     const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -2641,6 +2664,7 @@ export default function DashboardPage() {
           : 0;
 
         return {
+          id: rowKey,
           shiftLabel: assignment.label,
           payType: getDefaultPayType(assignment.label, scheduledHours, slot?.shiftType),
           clockInDate: scheduledRange ? getIsoDateInputValue(scheduledRange.start) : '',
@@ -2665,6 +2689,7 @@ export default function DashboardPage() {
 
       return {
         ...saved,
+        id: saved.id ?? rowKey,
         clockInDate:
           isBlankDateValue(saved.clockInDate) && scheduledRange
             ? getIsoDateInputValue(scheduledRange.start)
@@ -2722,6 +2747,7 @@ export default function DashboardPage() {
           : 0;
 
     return {
+      id: rowKey,
       shiftLabel: assignment?.label ?? '',
       payType: getDefaultPayType(
         assignment?.label ?? '',
@@ -2773,6 +2799,101 @@ export default function DashboardPage() {
       });
   }
 
+  function updateEditableRowById(date: Date, rowId: string, partial: Partial<EditableTimecardRow>) {
+    const dateKey = toDateKey(date);
+    const current =
+      rowId === getEditableRowKey(dateKey)
+        ? getEditableRowForDate(date)
+        : editableTimecardRows[rowId];
+
+    if (!current) {
+      return;
+    }
+
+    const updatedRow = {
+      ...current,
+      ...partial,
+      id: rowId,
+    };
+
+    const updatedRows = {
+      ...editableTimecardRows,
+      [rowId]: updatedRow,
+    };
+
+    setEditableTimecardRows(updatedRows);
+
+    void supabase
+      .from('editable_timecard_rows')
+      .upsert(
+        {
+          id: rowId,
+          employee_id: currentEmployeeId,
+          pay_period_key: selectedPayPeriod.key,
+          date_key: dateKey,
+          row_data: updatedRow,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      )
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to save editable timecard row:', error);
+          window.alert(`Editable timecard row save failed: ${error.message}`);
+        }
+      });
+  }
+
+  function addEditableSegmentRow(date: Date) {
+    const dateKey = toDateKey(date);
+    const rowKey = getEditableRowKey(dateKey);
+    const rows = getEditableRowsForDate(date);
+    const sourceRow = rows[rows.length - 1] ?? getEditableRowForDate(date);
+    const nextIndex = rows.length;
+    const segmentKey = `${rowKey}-segment-${nextIndex}`;
+    const segmentRow: EditableTimecardRow = {
+      id: segmentKey,
+      shiftLabel: sourceRow.shiftLabel || getEditableRowForDate(date).shiftLabel,
+      payType: 'SICK_TIME',
+      clockInDate: sourceRow.clockOutDate || sourceRow.clockInDate,
+      clockInTime: sourceRow.clockOutTime || sourceRow.clockInTime,
+      clockOutDate: sourceRow.clockOutDate,
+      clockOutTime: sourceRow.clockOutTime,
+    };
+
+    updateEditableRowById(date, segmentKey, segmentRow);
+  }
+
+  function clearEditableRowById(date: Date, rowId: string) {
+    const dateKey = toDateKey(date);
+    const baseRowKey = getEditableRowKey(dateKey);
+
+    if (rowId === baseRowKey) {
+      clearEditableRow(date);
+      return;
+    }
+
+    const confirmed = window.confirm('Remove this added timecard segment?');
+    if (!confirmed) {
+      return;
+    }
+
+    const updatedRows = { ...editableTimecardRows };
+    delete updatedRows[rowId];
+    setEditableTimecardRows(updatedRows);
+
+    void supabase
+      .from('editable_timecard_rows')
+      .delete()
+      .eq('id', rowId)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Failed to remove editable timecard segment:', error);
+          window.alert(`Editable timecard segment remove failed: ${error.message}`);
+        }
+      });
+  }
+
   function clearEditableRow(date: Date) {
     const confirmed = window.confirm('Clear this entire shift line? This will remove the shift, shift type, clock-in, clock-out, and calculated hours for this row.');
     if (!confirmed) {
@@ -2782,6 +2903,7 @@ export default function DashboardPage() {
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const clearedRow: EditableTimecardRow = {
+      id: rowKey,
       shiftLabel: '',
       payType: 'DAILY_OT_DT',
       clockInDate: '',
@@ -2860,58 +2982,60 @@ export default function DashboardPage() {
     let holidayPremiumHours = 0;
 
     dates.forEach((date, index) => {
-      const row = getEditableRowForDate(date);
-      const hours = getEditableRowHours(row);
-
-      if (!hours || !row.shiftLabel) {
-        return;
-      }
-
       const weekIndex = index < 7 ? 0 : 1;
-      const targetWeek = weekIndex === 0 ? week1 : week2;
-      let nextWeek = targetWeek;
 
-      if (isSpecialRegularOnlyPayType(row.payType)) {
-        // Sick, vacation, and jury/civic duty are regular pay only and do not accrue OT/DT.
-        nextWeek = addToWeekBreakdown(targetWeek, { regularHours: hours });
-      } else if (usesDailyOtDoubleTimeRule(row)) {
-        // Non 24-Shift rows still respect the weekly 40-hour regular cap.
-        // Anything over 12 hours in this row is double time first.
-        const doubleTimeHours = Math.max(0, hours - 12);
-        const nonDoubleTimeHours = Math.max(0, hours - doubleTimeHours);
-        const dailyOvertimeFloor = Math.max(0, Math.min(nonDoubleTimeHours, 12) - 8);
-        const weeklyRegularRemaining = Math.max(0, 40 - weeklyOtTrackedHours[weekIndex]);
-        const regularHours = Math.min(nonDoubleTimeHours - dailyOvertimeFloor, weeklyRegularRemaining);
-        const overtimeHours = Math.max(0, nonDoubleTimeHours - regularHours);
+      getEditableRowsForDate(date).forEach((row) => {
+        const hours = getEditableRowHours(row);
 
-        weeklyOtTrackedHours[weekIndex] += nonDoubleTimeHours;
-        nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours, doubleTimeHours });
-      } else {
-        // 24-Hour Shift rows use weekly OT after 40 hours.
-        const hoursBeforeThisShift = weeklyOtTrackedHours[weekIndex];
-        const regularRemainingThisWeek = Math.max(0, 40 - hoursBeforeThisShift);
-        const regularHours = Math.min(hours, regularRemainingThisWeek);
-        const overtimeHours = Math.max(0, hours - regularHours);
-
-        weeklyOtTrackedHours[weekIndex] += hours;
-        nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours });
-      }
-
-      const clockInDate = row.clockInDate ? parseDateKey(row.clockInDate) : date;
-
-      if (isCompanyHoliday(clockInDate)) {
-        if (row.payType === 'TWENTY_FOUR_HOUR') {
-          holidayPremiumHours += 12;
-        } else if (row.payType === 'DAILY_OT_DT') {
-          holidayPremiumHours += 6;
+        if (!hours || !row.shiftLabel) {
+          return;
         }
-      }
 
-      if (weekIndex === 0) {
-        week1 = nextWeek;
-      } else {
-        week2 = nextWeek;
-      }
+        const targetWeek = weekIndex === 0 ? week1 : week2;
+        let nextWeek = targetWeek;
+
+        if (isSpecialRegularOnlyPayType(row.payType)) {
+          // Sick, vacation, and jury/civic duty are regular pay only and do not accrue OT/DT.
+          nextWeek = addToWeekBreakdown(targetWeek, { regularHours: hours });
+        } else if (usesDailyOtDoubleTimeRule(row)) {
+          // Non 24-Shift rows still respect the weekly 40-hour regular cap.
+          // Anything over 12 hours in this row is double time first.
+          const doubleTimeHours = Math.max(0, hours - 12);
+          const nonDoubleTimeHours = Math.max(0, hours - doubleTimeHours);
+          const dailyOvertimeFloor = Math.max(0, Math.min(nonDoubleTimeHours, 12) - 8);
+          const weeklyRegularRemaining = Math.max(0, 40 - weeklyOtTrackedHours[weekIndex]);
+          const regularHours = Math.min(nonDoubleTimeHours - dailyOvertimeFloor, weeklyRegularRemaining);
+          const overtimeHours = Math.max(0, nonDoubleTimeHours - regularHours);
+
+          weeklyOtTrackedHours[weekIndex] += nonDoubleTimeHours;
+          nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours, doubleTimeHours });
+        } else {
+          // 24-Hour Shift rows use weekly OT after 40 hours.
+          const hoursBeforeThisShift = weeklyOtTrackedHours[weekIndex];
+          const regularRemainingThisWeek = Math.max(0, 40 - hoursBeforeThisShift);
+          const regularHours = Math.min(hours, regularRemainingThisWeek);
+          const overtimeHours = Math.max(0, hours - regularHours);
+
+          weeklyOtTrackedHours[weekIndex] += hours;
+          nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours });
+        }
+
+        const clockInDate = row.clockInDate ? parseDateKey(row.clockInDate) : date;
+
+        if (isCompanyHoliday(clockInDate)) {
+          if (row.payType === 'TWENTY_FOUR_HOUR') {
+            holidayPremiumHours += 12;
+          } else if (row.payType === 'DAILY_OT_DT') {
+            holidayPremiumHours += 6;
+          }
+        }
+
+        if (weekIndex === 0) {
+          week1 = nextWeek;
+        } else {
+          week2 = nextWeek;
+        }
+      });
     });
 
     const missedMealPenaltyHours = payPeriodMissedMealBreaks.length;
@@ -2928,10 +3052,11 @@ export default function DashboardPage() {
   }
 
   function getTimecardTotalHours(): number {
-    return dates.reduce((total, date) => {
-      const row = getEditableRowForDate(date);
-      return total + getEditableRowHours(row);
-    }, 0);
+    return dates.reduce(
+      (total, date) =>
+        total + getEditableRowsForDate(date).reduce((dateTotal, row) => dateTotal + getEditableRowHours(row), 0),
+      0,
+    );
   }
 
   function getEditableTimecardPunches(): TimePunch[] {
@@ -2939,43 +3064,46 @@ export default function DashboardPage() {
 
     dates.forEach((date) => {
       const dateKey = toDateKey(date);
-      const row = getEditableRowForDate(date);
 
-      if (!row.shiftLabel) {
-        return;
-      }
+      getEditableRowsForDate(date).forEach((row, rowIndex) => {
+        if (!row.shiftLabel) {
+          return;
+        }
 
-      if (row.clockInDate && row.clockInTime) {
-        punches.push({
-          id: `editable-clock-in-${dateKey}`,
-          employeeId: currentEmployeeId,
-          type: 'CLOCK_IN',
-          timestamp: new Date(`${row.clockInDate}T${row.clockInTime}:00`).toISOString(),
-          shiftDateKey: dateKey,
-          shiftLabel: row.shiftLabel,
-          locationLabel: 'Employee edited timecard',
-          latitude: null,
-          longitude: null,
-          distanceFeet: null,
-          geofenceStatus: 'LOCATION_UNAVAILABLE',
-        });
-      }
+        const punchSuffix = row.id ?? `${dateKey}-${rowIndex}`;
 
-      if (row.clockOutDate && row.clockOutTime) {
-        punches.push({
-          id: `editable-clock-out-${dateKey}`,
-          employeeId: currentEmployeeId,
-          type: 'CLOCK_OUT',
-          timestamp: new Date(`${row.clockOutDate}T${row.clockOutTime}:00`).toISOString(),
-          shiftDateKey: dateKey,
-          shiftLabel: row.shiftLabel,
-          locationLabel: 'Employee edited timecard',
-          latitude: null,
-          longitude: null,
-          distanceFeet: null,
-          geofenceStatus: 'LOCATION_UNAVAILABLE',
-        });
-      }
+        if (row.clockInDate && row.clockInTime) {
+          punches.push({
+            id: `editable-clock-in-${punchSuffix}`,
+            employeeId: currentEmployeeId,
+            type: 'CLOCK_IN',
+            timestamp: new Date(`${row.clockInDate}T${row.clockInTime}:00`).toISOString(),
+            shiftDateKey: dateKey,
+            shiftLabel: row.shiftLabel,
+            locationLabel: 'Employee edited timecard',
+            latitude: null,
+            longitude: null,
+            distanceFeet: null,
+            geofenceStatus: 'LOCATION_UNAVAILABLE',
+          });
+        }
+
+        if (row.clockOutDate && row.clockOutTime) {
+          punches.push({
+            id: `editable-clock-out-${punchSuffix}`,
+            employeeId: currentEmployeeId,
+            type: 'CLOCK_OUT',
+            timestamp: new Date(`${row.clockOutDate}T${row.clockOutTime}:00`).toISOString(),
+            shiftDateKey: dateKey,
+            shiftLabel: row.shiftLabel,
+            locationLabel: 'Employee edited timecard',
+            latitude: null,
+            longitude: null,
+            distanceFeet: null,
+            geofenceStatus: 'LOCATION_UNAVAILABLE',
+          });
+        }
+      });
     });
 
     return punches;
@@ -4229,127 +4357,145 @@ export default function DashboardPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {week.dates.map((date, index) => {
+                          {week.dates.flatMap((date, index) => {
                             const dateKey = toDateKey(date);
-                            const row = getEditableRowForDate(date);
-                            const totalHours = getEditableRowHours(row);
+                            const rows = getEditableRowsForDate(date);
 
-                            return (
-                              <tr key={`${week.label}-${dateKey}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
-                                <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{date.toLocaleDateString('en-US', { weekday: 'short' })}</td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <select
-                                    value={row.shiftLabel}
-                                    onChange={(event) => {
-                                      const nextShiftLabel = event.target.value;
-                                      updateEditableRow(date, {
-                                        shiftLabel: nextShiftLabel,
-                                        payType: getDefaultPayType(nextShiftLabel, getEditableRowHours(row)),
-                                      });
-                                    }}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
-                                  >
-                                    <option value="">Off</option>
-                                    {row.shiftLabel &&
-                                      ![
-                                        'Reedley 1',
-                                        'Reedley 2',
-                                        'Parlier',
-                                        'Orange Cove',
-                                        'Field Supervisor',
-                                        'Administrative Supervisor',
-                                        'Standby',
-                                        'Transfer',
-                                        'Other',
-                                      ].includes(row.shiftLabel) && (
-                                        <option value={row.shiftLabel}>{row.shiftLabel}</option>
-                                      )}
-                                    <option value="Reedley 1">Reedley 1</option>
-                                    <option value="Reedley 2">Reedley 2</option>
-                                    <option value="Parlier">Parlier</option>
-                                    <option value="Orange Cove">Orange Cove</option>
-                                    <option value="Field Supervisor">Field Supervisor</option>
-                                    <option value="Administrative Supervisor">Administrative Supervisor</option>
-                                    <option value="Standby">Standby</option>
-                                    <option value="Transfer">Transfer</option>
-                                    <option value="Other">Other</option>
-                                  </select>
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <select
-                                    value={row.payType}
-                                    onChange={(event) =>
-                                      updateEditableRow(date, {
-                                        payType: event.target.value as EditableTimecardRow['payType'],
-                                      })
-                                    }
-                                    disabled={!row.shiftLabel}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
-                                    title="Shift Type controls how this row calculates regular, overtime, and double time."
-                                  >
-                                                                        <option value="DAILY_OT_DT">Non 24-Shift</option>
-                                    <option value="TWENTY_FOUR_HOUR">24-Hour Shift</option>
-                                    <option value="CALL_IN">Call In</option>
-                                    <option value="SICK_TIME">Sick Time</option>
-                                    <option value="VACATION">Vacation</option>
-                                    <option value="JURY_DUTY">Jury Duty</option>
-                                  </select>
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <input
-                                    type="date"
-                                    value={row.clockInDate}
-                                    onChange={(event) => updateEditableRow(date, { clockInDate: event.target.value })}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
-                                  />
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="HH:MM"
-                                    pattern="[0-9]{2}:[0-9]{2}"
-                                    maxLength={5}
-                                    value={row.clockInTime}
-                                    onChange={(event) => updateEditableRow(date, { clockInTime: event.target.value })}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
-                                  />
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <input
-                                    type="date"
-                                    value={row.clockOutDate}
-                                    onChange={(event) => updateEditableRow(date, { clockOutDate: event.target.value })}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
-                                  />
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="HH:MM"
-                                    pattern="[0-9]{2}:[0-9]{2}"
-                                    maxLength={5}
-                                    value={row.clockOutTime}
-                                    onChange={(event) => updateEditableRow(date, { clockOutTime: event.target.value })}
-                                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
-                                  />
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
-                                  {totalHours > 0 ? totalHours.toFixed(2) : ''}
-                                </td>
-                                <td className="border border-slate-400 px-2 py-1 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => clearEditableRow(date)}
-                                    disabled={!row.shiftLabel && !row.clockInDate && !row.clockInTime && !row.clockOutDate && !row.clockOutTime}
-                                    className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
-                                  >
-                                    Clear
-                                  </button>
-                                </td>
-                              </tr>
-                            );
+                            return rows.map((row, rowIndex) => {
+                              const rowId = row.id ?? getEditableRowKey(dateKey);
+                              const totalHours = getEditableRowHours(row);
+                              const isBaseRow = rowIndex === 0;
+
+                              return (
+                                <tr key={`${week.label}-${dateKey}-${rowId}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
+                                  <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
+                                    {isBaseRow ? date.toLocaleDateString('en-US', { weekday: 'short' }) : '↳'}
+                                    {isBaseRow && (
+                                      <div className="mt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => addEditableSegmentRow(date)}
+                                          className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100"
+                                        >
+                                          Add Segment
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <select
+                                      value={row.shiftLabel}
+                                      onChange={(event) => {
+                                        const nextShiftLabel = event.target.value;
+                                        updateEditableRowById(date, rowId, {
+                                          shiftLabel: nextShiftLabel,
+                                          payType: getDefaultPayType(nextShiftLabel, getEditableRowHours(row)),
+                                        });
+                                      }}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                    >
+                                      <option value="">Off</option>
+                                      {row.shiftLabel &&
+                                        ![
+                                          'Reedley 1',
+                                          'Reedley 2',
+                                          'Parlier',
+                                          'Orange Cove',
+                                          'Field Supervisor',
+                                          'Administrative Supervisor',
+                                          'Standby',
+                                          'Transfer',
+                                          'Other',
+                                        ].includes(row.shiftLabel) && (
+                                          <option value={row.shiftLabel}>{row.shiftLabel}</option>
+                                        )}
+                                      <option value="Reedley 1">Reedley 1</option>
+                                      <option value="Reedley 2">Reedley 2</option>
+                                      <option value="Parlier">Parlier</option>
+                                      <option value="Orange Cove">Orange Cove</option>
+                                      <option value="Field Supervisor">Field Supervisor</option>
+                                      <option value="Administrative Supervisor">Administrative Supervisor</option>
+                                      <option value="Standby">Standby</option>
+                                      <option value="Transfer">Transfer</option>
+                                      <option value="Other">Other</option>
+                                    </select>
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <select
+                                      value={row.payType}
+                                      onChange={(event) =>
+                                        updateEditableRowById(date, rowId, {
+                                          payType: event.target.value as EditableTimecardRow['payType'],
+                                        })
+                                      }
+                                      disabled={!row.shiftLabel}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
+                                      title="Shift Type controls how this row calculates regular, overtime, and double time."
+                                    >
+                                      <option value="DAILY_OT_DT">Non 24-Shift</option>
+                                      <option value="TWENTY_FOUR_HOUR">24-Hour Shift</option>
+                                      <option value="CALL_IN">Call In</option>
+                                      <option value="SICK_TIME">Sick Time</option>
+                                      <option value="VACATION">Vacation</option>
+                                      <option value="JURY_DUTY">Jury Duty</option>
+                                    </select>
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <input
+                                      type="date"
+                                      value={row.clockInDate}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockInDate: event.target.value })}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                    />
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      placeholder="HH:MM"
+                                      pattern="[0-9]{2}:[0-9]{2}"
+                                      maxLength={5}
+                                      value={row.clockInTime}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockInTime: event.target.value })}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                    />
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <input
+                                      type="date"
+                                      value={row.clockOutDate}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockOutDate: event.target.value })}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                    />
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      placeholder="HH:MM"
+                                      pattern="[0-9]{2}:[0-9]{2}"
+                                      maxLength={5}
+                                      value={row.clockOutTime}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockOutTime: event.target.value })}
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                    />
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
+                                    {totalHours > 0 ? totalHours.toFixed(2) : ''}
+                                  </td>
+                                  <td className="border border-slate-400 px-2 py-1 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => clearEditableRowById(date, rowId)}
+                                      disabled={!row.shiftLabel && !row.clockInDate && !row.clockInTime && !row.clockOutDate && !row.clockOutTime}
+                                      className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
+                                    >
+                                      Clear
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            });
                           })}
                         </tbody>
                       </table>

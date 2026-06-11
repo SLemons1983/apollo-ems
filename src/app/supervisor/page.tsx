@@ -1922,15 +1922,31 @@ export default function SupervisorPage() {
   }
 
   function getPunchPairForDate(timecard: SubmittedTimecard, dateKey: string) {
+    const pairs = getPunchPairsForDate(timecard, dateKey);
+    return pairs[0] ?? { clockIn: null, clockOut: null, shiftLabel: '' };
+  }
+
+  function getPunchPairsForDate(timecard: SubmittedTimecard, dateKey: string) {
     const punches = timecard.punches
       .filter((punch) => punch.shiftDateKey === dateKey)
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-    const clockIn = punches.find((punch) => punch.type === 'CLOCK_IN') ?? null;
-    const clockOut = [...punches].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
-    const shiftLabel = clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '';
+    const grouped = new Map<string, TimePunch[]>();
 
-    return { clockIn, clockOut, shiftLabel };
+    punches.forEach((punch) => {
+      const groupKey = punch.id
+        .replace(/^editable-clock-in-/, '')
+        .replace(/^editable-clock-out-/, '');
+      grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), punch]);
+    });
+
+    return [...grouped.values()].map((group) => {
+      const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+      const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+      const shiftLabel = clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '';
+
+      return { clockIn, clockOut, shiftLabel };
+    });
   }
 
   function getHoursBetween(clockIn: TimePunch | null, clockOut: TimePunch | null): string {
@@ -2851,46 +2867,52 @@ export default function SupervisorPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {week.dates.map((date, index) => {
+                    {week.dates.flatMap((date, index) => {
                       const dateKey = getDateKeyFromDate(date);
-                      const pair = getPunchPairForDate(timecard, dateKey);
-                      const clockInDate = pair.clockIn ? new Date(pair.clockIn.timestamp) : null;
-                      const clockOutDate = pair.clockOut ? new Date(pair.clockOut.timestamp) : null;
-                      const hasMissingPunch = Boolean(pair.shiftLabel && (!pair.clockIn || !pair.clockOut));
-                      const hasGeofenceFlag = Boolean(
-                        pair.clockIn?.geofenceStatus !== 'APPROVED' || pair.clockOut?.geofenceStatus !== 'APPROVED',
-                      );
-                      const hasManualEdit = Boolean(
-                        pair.clockIn?.locationLabel === 'Employee edited timecard' ||
-                          pair.clockOut?.locationLabel === 'Employee edited timecard',
-                      );
+                      const pairs = getPunchPairsForDate(timecard, dateKey);
+                      const rows = pairs.length > 0 ? pairs : [{ clockIn: null, clockOut: null, shiftLabel: '' }];
 
-                      return (
-                        <tr key={`${timecard.id}-${week.label}-${dateKey}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
-                          <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{index + 1}</td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">{pair.shiftLabel}</td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">{clockInDate ? formatShortDate(clockInDate) : ''}</td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">
-                            {clockInDate ? clockInDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
-                          </td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">{clockOutDate ? formatShortDate(clockOutDate) : ''}</td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">
-                            {clockOutDate ? clockOutDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
-                          </td>
-                          <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{getHoursBetween(pair.clockIn, pair.clockOut)}</td>
-                          <td className="border border-slate-400 px-2 py-1 text-center">
-                            {hasMissingPunch ? (
-                              <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">Missing</span>
-                            ) : hasGeofenceFlag ? (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-700">Geofence</span>
-                            ) : hasManualEdit ? (
-                              <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-700">Edited</span>
-                            ) : pair.shiftLabel ? (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700">OK</span>
-                            ) : null}
-                          </td>
-                        </tr>
-                      );
+                      return rows.map((pair, pairIndex) => {
+                        const clockInDate = pair.clockIn ? new Date(pair.clockIn.timestamp) : null;
+                        const clockOutDate = pair.clockOut ? new Date(pair.clockOut.timestamp) : null;
+                        const hasMissingPunch = Boolean(pair.shiftLabel && (!pair.clockIn || !pair.clockOut));
+                        const hasGeofenceFlag = Boolean(
+                          pair.clockIn?.geofenceStatus !== 'APPROVED' || pair.clockOut?.geofenceStatus !== 'APPROVED',
+                        );
+                        const hasManualEdit = Boolean(
+                          pair.clockIn?.locationLabel === 'Employee edited timecard' ||
+                            pair.clockOut?.locationLabel === 'Employee edited timecard',
+                        );
+
+                        return (
+                          <tr key={`${timecard.id}-${week.label}-${dateKey}-${pairIndex}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
+                            <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
+                              {pairIndex === 0 ? index + 1 : '↳'}
+                            </td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">{pair.shiftLabel}</td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">{clockInDate ? formatShortDate(clockInDate) : ''}</td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">
+                              {clockInDate ? clockInDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
+                            </td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">{clockOutDate ? formatShortDate(clockOutDate) : ''}</td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">
+                              {clockOutDate ? clockOutDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
+                            </td>
+                            <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{getHoursBetween(pair.clockIn, pair.clockOut)}</td>
+                            <td className="border border-slate-400 px-2 py-1 text-center">
+                              {hasMissingPunch ? (
+                                <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700">Missing</span>
+                              ) : hasGeofenceFlag ? (
+                                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-700">Geofence</span>
+                              ) : hasManualEdit ? (
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-700">Edited</span>
+                              ) : pair.shiftLabel ? (
+                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700">OK</span>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      });
                     })}
                   </tbody>
                 </table>
