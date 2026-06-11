@@ -1243,7 +1243,7 @@ export default function DashboardPage() {
             extra.employee3 = slot;
             extra.showEmployee3 = Boolean(slot.employeeId);
           }
-          } else {
+        } else {
           const shiftName = row.shift_key as ShiftName;
           if (!day.standard[shiftName]) continue;
           const shift = day.standard[shiftName];
