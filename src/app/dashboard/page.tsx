@@ -1131,6 +1131,9 @@ export default function DashboardPage() {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Unit inspection API error:', errorText);
+        alert(`API Error: ${errorText}`);
         throw new Error('Inspection submission failed.');
       }
 
