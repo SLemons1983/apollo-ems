@@ -1084,10 +1084,33 @@ export default function DashboardPage() {
     }
   }
 
+  async function compressUnitInspectionPhoto(file: File): Promise<File> {
+    const image = await createImageBitmap(file);
+    const canvas = document.createElement('canvas');
+    const maxWidth = 1400;
+    const scale = Math.min(1, maxWidth / image.width);
+
+    canvas.width = Math.round(image.width * scale);
+    canvas.height = Math.round(image.height * scale);
+
+    const context = canvas.getContext('2d');
+    if (!context) return file;
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.65);
+    });
+
+    if (!blob) return file;
+
+    return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+      type: 'image/jpeg',
+    });
+  }
+
   async function handleUnitInspectionSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    alert('Unit Inspection submit handler reached');
-
     if (!currentEmployee) {
       setUnitInspectionStatus('Unable to identify the logged-in employee.');
       return;
@@ -1102,7 +1125,21 @@ export default function DashboardPage() {
         return;
       }
 
-      const formData = new FormData(event.currentTarget);
+      const rawFormData = new FormData(event.currentTarget);
+      const formData = new FormData();
+      rawFormData.forEach((value, key) => {
+        if (!['frontPhoto', 'driverPhoto', 'rearPhoto', 'passengerPhoto'].includes(key)) {
+          formData.append(key, value);
+        }
+      });
+
+      for (const field of ['frontPhoto', 'driverPhoto', 'rearPhoto', 'passengerPhoto']) {
+        const file = rawFormData.get(field);
+        if (file instanceof File && file.size > 0) {
+          formData.append(field, await compressUnitInspectionPhoto(file));
+        }
+      }
+
       const hasFailedInspectionItem = [
         'vehicleCondition',
         'mechanicalChecks',
