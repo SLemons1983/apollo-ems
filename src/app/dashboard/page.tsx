@@ -1176,7 +1176,7 @@ export default function DashboardPage() {
       setInspectionVehicle('');
       setInspectionMileage('');
       setInspectionDeficiencies('');
-      event.currentTarget.reset();
+      form.reset();
 
       setUnitInspectionStatus('Inspection submitted successfully.');
     } catch (error) {
