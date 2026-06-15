@@ -1111,6 +1111,8 @@ export default function DashboardPage() {
 
   async function handleUnitInspectionSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
+
     if (!currentEmployee) {
       setUnitInspectionStatus('Unable to identify the logged-in employee.');
       return;
