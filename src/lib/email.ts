@@ -21,11 +21,22 @@ export async function sendApolloEmail(params: {
 
   const resend = new Resend(apiKey);
 
-  return resend.emails.send({
+  const recipients = params.to
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  const result = await resend.emails.send({
     from: FROM_EMAIL,
-    to: [params.to],
+    to: recipients,
     subject: params.subject,
     text: params.text,
     attachments: params.attachments,
   });
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return result;
 }
