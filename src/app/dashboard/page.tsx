@@ -1170,8 +1170,7 @@ export default function DashboardPage() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Unit inspection API error:', errorText);
-        alert(`API Error: ${errorText}`);
-        throw new Error('Inspection submission failed.');
+        throw new Error(errorText || 'Inspection submission failed.');
       }
 
       setInspectionVehicle('');
@@ -1182,7 +1181,8 @@ export default function DashboardPage() {
       setUnitInspectionStatus('Inspection submitted successfully.');
     } catch (error) {
       console.error('Unit inspection submission failed:', error);
-      setUnitInspectionStatus('Unable to submit inspection.');
+      const message = error instanceof Error ? error.message : 'Unable to submit inspection.';
+      setUnitInspectionStatus(message);
     } finally {
       setIsSubmittingUnitInspection(false);
     }
