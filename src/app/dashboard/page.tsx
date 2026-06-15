@@ -5154,12 +5154,20 @@ export default function DashboardPage() {
 
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-600">
-                  Front Vehicle Photo
+                  Front of Vehicle
                   <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Rear Vehicle Photo
+                  Driver Side of Vehicle
+                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept="image/*" capture="environment" required />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Rear of Vehicle
                   <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept="image/*" capture="environment" required />
+                </label>
+                <label className="text-xs font-semibold text-slate-600">
+                  Passenger Side of Vehicle
+                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
                   Odometer Photo
