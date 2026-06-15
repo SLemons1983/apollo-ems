@@ -5158,16 +5158,12 @@ export default function DashboardPage() {
                   <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Driver Side Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept="image/*" capture="environment" required />
-                </label>
-                <label className="text-xs font-semibold text-slate-600">
                   Rear Vehicle Photo
                   <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept="image/*" capture="environment" required />
                 </label>
                 <label className="text-xs font-semibold text-slate-600">
-                  Passenger Side Photo
-                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept="image/*" capture="environment" required />
+                  Odometer Photo
+                  <input className="mt-1 w-full text-sm" type="file" name="odometerPhoto" accept="image/*" capture="environment" required />
                 </label>
               </div>
 
