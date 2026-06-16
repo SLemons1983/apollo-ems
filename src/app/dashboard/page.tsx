@@ -3774,6 +3774,94 @@ export default function DashboardPage() {
     });
   }
 
+  function getAllTradeAssignmentsForDate(date: Date): DisplayAssignment[] {
+    const day = getDaySchedule(scheduleData, toDateKey(date));
+
+    const standardAssignments: DisplayAssignment[] = SHIFT_ORDER.map((shiftName) => ({
+      key: `standard-${shiftName}`,
+      label: SHIFT_DISPLAY[shiftName],
+      slots: getAssignedSlots(day.standard[shiftName], shiftName === 'ADMIN_SUP' || shiftName === 'FIELD_SUP' ? 'SUPERVISOR' : 'UNIT'),
+      hiddenFromEmployees: Boolean(day.standard[shiftName].hiddenFromEmployees),
+    }));
+
+    const extraAssignments: DisplayAssignment[] = day.extras.map((extra) => ({
+      key: `extra-${extra.id}`,
+      label: extra.label,
+      slots: getAssignedSlots(extra, extra.category),
+      hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
+    }));
+
+    return [...standardAssignments, ...extraAssignments].filter((assignment) => !assignment.hiddenFromEmployees);
+  }
+
+  function getEligibleTradeTargets() {
+    const selectedShift = getMyTradeAssignments().find((item) => item.tradeKey === selectedTradeShiftKey);
+    if (!selectedShift || !currentEmployee) {
+      return [];
+    }
+
+    const selectedRange = getShiftDateTimeRange(selectedShift.date, selectedShift.slot);
+    const selectedHours = (selectedRange.end.getTime() - selectedRange.start.getTime()) / (1000 * 60 * 60);
+
+    return dates.flatMap((date) => {
+      const dateKey = toDateKey(date);
+
+      if (!isFutureOrToday(date)) {
+        return [];
+      }
+
+      return getAllTradeAssignmentsForDate(date).flatMap((assignment) =>
+        assignment.slots
+          .map((slot, index) => {
+            const targetRange = getShiftDateTimeRange(date, slot);
+            const targetHours = (targetRange.end.getTime() - targetRange.start.getTime()) / (1000 * 60 * 60);
+
+            if (Math.abs(targetHours - selectedHours) > 0.01) {
+              return null;
+            }
+
+            if (dateKey === selectedShift.dateKey && assignment.key === selectedShift.assignment.key) {
+              return null;
+            }
+
+            const isOpenSlot = isOpenShiftSlot(slot.employeeId);
+            const targetEmployee = employees.find((employee) => employee.id === slot.employeeId);
+
+            if (isOpenSlot && !isEligibleOpenShiftSlot(slot.employeeId)) {
+              return null;
+            }
+
+            if (!isOpenSlot && targetEmployee?.scope !== currentEmployee.scope) {
+              return null;
+            }
+
+            if (!isOpenSlot && slot.employeeId === currentEmployeeId) {
+              return null;
+            }
+
+            return {
+              date,
+              dateKey,
+              assignment,
+              slot,
+              targetKey: `${dateKey}-${assignment.key}-${slot.employeeId}-${index}`,
+              targetName: isOpenSlot ? 'Open Shift' : getEmployeeName(slot.employeeId),
+              isOpenSlot,
+            };
+          })
+          .filter(Boolean),
+      );
+    }) as Array<{
+      date: Date;
+      dateKey: string;
+      assignment: DisplayAssignment;
+      slot: DisplayAssignment['slots'][number];
+      targetKey: string;
+      targetName: string;
+      isOpenSlot: boolean;
+    }>;
+  }
+
   function renderMyScheduleCards() {
     const myAssignments = getMyTradeAssignments();
 
@@ -4855,17 +4943,17 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="space-y-4 p-5">
-                  {getMyTradeAssignments().length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                      No assigned shifts were found in this pay period.
+                <div className="grid gap-5 p-5 lg:grid-cols-2">
+                  <div>
+                    <div className="mb-3 text-sm font-bold text-slate-900">
+                      Step 1: Select one of your shifts
                     </div>
-                  ) : (
-                    <div>
-                      <div className="mb-3 text-sm font-bold text-slate-900">
-                        Your shifts in this pay period
+                    {getMyTradeAssignments().length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        No assigned shifts were found in this pay period.
                       </div>
-                      <div className="grid gap-3 md:grid-cols-2">
+                    ) : (
+                      <div className="space-y-3">
                         {getMyTradeAssignments().map(({ date, dateKey, assignment, slot, tradeKey }) => {
                           const selected = selectedTradeShiftKey === tradeKey;
 
@@ -4874,7 +4962,7 @@ export default function DashboardPage() {
                               type="button"
                               key={tradeKey}
                               onClick={() => setSelectedTradeShiftKey(tradeKey)}
-                              className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                              className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
                                 selected
                                   ? 'border-amber-500 bg-amber-50 shadow-md'
                                   : 'border-slate-300 bg-white'
@@ -4900,8 +4988,49 @@ export default function DashboardPage() {
                           );
                         })}
                       </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-3 text-sm font-bold text-slate-900">
+                      Step 2: Eligible trade targets
                     </div>
-                  )}
+                    {!selectedTradeShiftKey ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        Select one of your shifts first.
+                      </div>
+                    ) : getEligibleTradeTargets().length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        No eligible same-scope, same-duration future trade targets were found.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {getEligibleTradeTargets().map(({ date, dateKey, assignment, slot, targetKey, targetName, isOpenSlot }) => (
+                          <div
+                            key={targetKey}
+                            className="rounded-xl border border-slate-300 bg-white p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-bold text-slate-900">{targetName}</div>
+                                <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                isOpenSlot ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {isOpenSlot ? 'Open' : 'Employee'}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-700">
+                              {formatDayLabel(date)} • {slot.startTime} - {slot.endTime}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
