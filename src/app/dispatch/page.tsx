@@ -38,8 +38,21 @@ export default function DispatchPage() {
     return `${employee.first_name} ${employee.last_name}`;
   };
 
-  const weekDateKey = (offset: number) => {
-    const d = new Date();
+  const getOperationalToday = () => {
+    const now = new Date();
+    const pacificNow = new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }),
+    );
+
+    if (pacificNow.getHours() < 6) {
+      pacificNow.setDate(pacificNow.getDate() - 1);
+    }
+
+    return pacificNow;
+  };
+
+  const weekDateKey = (offset: number, baseDate = new Date()) => {
+    const d = new Date(baseDate);
     d.setDate(d.getDate() - d.getDay() + offset);
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -78,7 +91,8 @@ export default function DispatchPage() {
 
   const cellAssignments = (label: string, offset: number) => dayAssignments(offset).filter((item) => item.shift_label === label);
 
-  const todayKey = weekDateKey(new Date().getDay());
+  const operationalToday = getOperationalToday();
+  const todayKey = weekDateKey(operationalToday.getDay(), operationalToday);
   return (
     <main className="min-h-screen bg-slate-300 px-4 py-6">
       <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
