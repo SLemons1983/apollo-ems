@@ -947,6 +947,7 @@ export default function DashboardPage() {
   const [timecardStatus, setTimecardStatus] = useState('');
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
+  const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [showCertificationUpload, setShowCertificationUpload] = useState(false);
   const [certificationUploadName, setCertificationUploadName] = useState('');
@@ -4757,6 +4758,14 @@ export default function DashboardPage() {
                     Refresh Schedule
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => setShowShiftTradeModal(true)}
+                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                  >
+                    Shift Trade
+                  </button>
+
                   <div className="inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1">
                     <button
                       type="button"
@@ -4818,6 +4827,34 @@ export default function DashboardPage() {
                 Later, clicking a scheduled workday will open a shift detail page with public supervisor notes, time off requests, and open shift request actions.
               </div>
             </div>,
+          )}
+
+          {showShiftTradeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+              <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-start justify-between border-b border-slate-200 p-5">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Shift Trade</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Select one of your shifts, then choose an eligible shift to trade into.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowShiftTradeModal(false)}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="space-y-4 p-5">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                    Shift trade workflow shell is ready. The next phase will list your eligible shifts for this pay period.
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {renderTile(
