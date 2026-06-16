@@ -948,6 +948,7 @@ export default function DashboardPage() {
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
+  const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [showCertificationUpload, setShowCertificationUpload] = useState(false);
   const [certificationUploadName, setCertificationUploadName] = useState('');
@@ -3745,8 +3746,8 @@ export default function DashboardPage() {
     setSelectedVacationShift(null);
   }
 
-  function renderMyScheduleCards() {
-    const myAssignments = dates.flatMap((date) => {
+  function getMyTradeAssignments() {
+    return dates.flatMap((date) => {
       const dateKey = toDateKey(date);
       return (assignmentsByDate[dateKey] ?? [])
         .map((assignment) => {
@@ -3760,6 +3761,7 @@ export default function DashboardPage() {
             dateKey,
             assignment,
             slot,
+            tradeKey: `${dateKey}-${assignment.key}-${slot.employeeId}`,
           };
         })
         .filter(Boolean) as {
@@ -3767,8 +3769,13 @@ export default function DashboardPage() {
           dateKey: string;
           assignment: DisplayAssignment;
           slot: DisplayAssignment['slots'][number];
+          tradeKey: string;
         }[];
     });
+  }
+
+  function renderMyScheduleCards() {
+    const myAssignments = getMyTradeAssignments();
 
     if (myAssignments.length === 0) {
       return (
@@ -4849,9 +4856,52 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="space-y-4 p-5">
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                    Shift trade workflow shell is ready. The next phase will list your eligible shifts for this pay period.
-                  </div>
+                  {getMyTradeAssignments().length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                      No assigned shifts were found in this pay period.
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-3 text-sm font-bold text-slate-900">
+                        Your shifts in this pay period
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {getMyTradeAssignments().map(({ date, dateKey, assignment, slot, tradeKey }) => {
+                          const selected = selectedTradeShiftKey === tradeKey;
+
+                          return (
+                            <button
+                              type="button"
+                              key={tradeKey}
+                              onClick={() => setSelectedTradeShiftKey(tradeKey)}
+                              className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                                selected
+                                  ? 'border-amber-500 bg-amber-50 shadow-md'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-bold text-slate-900">{formatDayLabel(date)}</div>
+                                  <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
+                                </div>
+                                {selected && (
+                                  <span className="rounded-full bg-amber-600 px-2.5 py-1 text-xs font-bold text-white">
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
+                              <div className="mt-1 text-sm font-semibold text-slate-700">
+                                {slot.startTime} - {slot.endTime}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
