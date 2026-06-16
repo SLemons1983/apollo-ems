@@ -150,6 +150,27 @@ type OpenShiftRequest = {
   supervisorNote?: string;
 };
 
+type ShiftTradeRequest = {
+  id: string;
+  requestingEmployeeId: string;
+  requestingEmployeeName: string;
+  requestingDateKey: string;
+  requestingShiftKey: string;
+  requestingShiftLabel: string;
+  targetEmployeeId?: string;
+  targetEmployeeName?: string;
+  targetDateKey: string;
+  targetShiftKey: string;
+  targetShiftLabel: string;
+  targetIsOpenShift: boolean;
+  payPeriodKey: string;
+  requestedAt: string;
+  status: 'PENDING_EMPLOYEE' | 'DECLINED_BY_EMPLOYEE' | 'PENDING_SUPERVISOR' | 'APPROVED' | 'DENIED' | 'COMPLETED';
+  employeeNote?: string;
+  recipientNote?: string;
+  supervisorNote?: string;
+};
+
 type ApolloMessage = {
   id: string;
   conversationId: string;
@@ -1273,6 +1294,7 @@ export default function SchedulePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
   const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showRecentOpenShiftDecisions, setShowRecentOpenShiftDecisions] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
@@ -1351,6 +1373,42 @@ export default function SchedulePage() {
           }
         } catch (openShiftError) {
           console.error('Failed to load open shift requests:', openShiftError);
+        }
+
+        try {
+          const { data: shiftTradeData, error: shiftTradeError } = await supabase
+            .from('shift_trade_requests')
+            .select('*')
+            .order('requested_at', { ascending: false });
+
+          if (shiftTradeError) {
+            console.error('Failed to load shift trade requests:', shiftTradeError);
+          } else if (isActive) {
+            setShiftTradeRequests(
+              (shiftTradeData ?? []).map((row: any) => ({
+                id: row.id,
+                requestingEmployeeId: row.requesting_employee_id,
+                requestingEmployeeName: row.requesting_employee_name,
+                requestingDateKey: row.requesting_date_key,
+                requestingShiftKey: row.requesting_shift_key,
+                requestingShiftLabel: row.requesting_shift_label,
+                targetEmployeeId: row.target_employee_id ?? undefined,
+                targetEmployeeName: row.target_employee_name ?? undefined,
+                targetDateKey: row.target_date_key,
+                targetShiftKey: row.target_shift_key,
+                targetShiftLabel: row.target_shift_label,
+                targetIsOpenShift: Boolean(row.target_is_open_shift),
+                payPeriodKey: row.pay_period_key,
+                requestedAt: row.requested_at,
+                status: row.status,
+                employeeNote: row.employee_note ?? undefined,
+                recipientNote: row.recipient_note ?? undefined,
+                supervisorNote: row.supervisor_note ?? undefined,
+              })),
+            );
+          }
+        } catch (shiftTradeError) {
+          console.error('Failed to load shift trade requests:', shiftTradeError);
         }
 
         loadEmployeesFromSupabase()
@@ -1793,6 +1851,41 @@ export default function SchedulePage() {
     if (error) {
       console.error('Failed to save open shift requests:', error);
       window.alert('Failed to save open shift requests.');
+    }
+  }
+
+  async function saveShiftTradeRequests(nextRequests: ShiftTradeRequest[]) {
+    setShiftTradeRequests(nextRequests);
+
+    const rows = nextRequests.map((request) => ({
+      id: request.id,
+      requesting_employee_id: request.requestingEmployeeId,
+      requesting_employee_name: request.requestingEmployeeName,
+      requesting_date_key: request.requestingDateKey,
+      requesting_shift_key: request.requestingShiftKey,
+      requesting_shift_label: request.requestingShiftLabel,
+      target_employee_id: request.targetEmployeeId ?? null,
+      target_employee_name: request.targetEmployeeName ?? null,
+      target_date_key: request.targetDateKey,
+      target_shift_key: request.targetShiftKey,
+      target_shift_label: request.targetShiftLabel,
+      target_is_open_shift: request.targetIsOpenShift,
+      pay_period_key: request.payPeriodKey,
+      requested_at: request.requestedAt,
+      status: request.status,
+      employee_note: request.employeeNote ?? null,
+      recipient_note: request.recipientNote ?? null,
+      supervisor_note: request.supervisorNote ?? null,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('shift_trade_requests')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save shift trade requests:', error);
+      window.alert('Failed to save shift trade requests.');
     }
   }
 
