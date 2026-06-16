@@ -132,6 +132,28 @@ type OpenShiftRequest = {
   supervisorNote?: string;
 };
 
+type ShiftTradeRequest = {
+  id: string;
+  requestingEmployeeId: string;
+  requestingEmployeeName: string;
+  requestingDateKey: string;
+  requestingShiftKey: string;
+  requestingShiftLabel: string;
+  requestingStartTime: string;
+  requestingEndTime: string;
+  targetEmployeeId?: string;
+  targetEmployeeName?: string;
+  targetDateKey: string;
+  targetShiftKey: string;
+  targetShiftLabel: string;
+  targetStartTime: string;
+  targetEndTime: string;
+  targetIsOpenShift: boolean;
+  payPeriodKey: string;
+  requestedAt: string;
+  status: 'PENDING_EMPLOYEE' | 'PENDING_SUPERVISOR';
+};
+
 
 type VacationRequest = {
   id: string;
@@ -915,6 +937,7 @@ export default function DashboardPage() {
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
   const [showOpenShiftsOnly, setShowOpenShiftsOnly] = useState(false);
   const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>([]);
   const [timePunches, setTimePunches] = useState<TimePunch[]>([]);
@@ -949,6 +972,8 @@ export default function DashboardPage() {
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
   const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
+  const [selectedTradeTargetKey, setSelectedTradeTargetKey] = useState('');
+  const [shiftTradeRequestStatus, setShiftTradeRequestStatus] = useState('');
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [showCertificationUpload, setShowCertificationUpload] = useState(false);
   const [certificationUploadName, setCertificationUploadName] = useState('');
@@ -3672,6 +3697,45 @@ export default function DashboardPage() {
     );
   }
 
+  async function saveShiftTradeRequests(nextRequests: ShiftTradeRequest[]) {
+    setShiftTradeRequests(nextRequests);
+
+    const rows = nextRequests.map((request) => ({
+      id: request.id,
+      requesting_employee_id: request.requestingEmployeeId,
+      requesting_employee_name: request.requestingEmployeeName,
+      requesting_date_key: request.requestingDateKey,
+      requesting_shift_key: request.requestingShiftKey,
+      requesting_shift_label: request.requestingShiftLabel,
+      requesting_start_time: request.requestingStartTime,
+      requesting_end_time: request.requestingEndTime,
+      target_employee_id: request.targetEmployeeId ?? null,
+      target_employee_name: request.targetEmployeeName ?? null,
+      target_date_key: request.targetDateKey,
+      target_shift_key: request.targetShiftKey,
+      target_shift_label: request.targetShiftLabel,
+      target_start_time: request.targetStartTime,
+      target_end_time: request.targetEndTime,
+      target_is_open_shift: request.targetIsOpenShift,
+      pay_period_key: request.payPeriodKey,
+      requested_at: request.requestedAt,
+      status: request.status,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('shift_trade_requests')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to save shift trade request:', error);
+      setShiftTradeRequestStatus('Shift trade request could not be submitted. Please try again.');
+      return false;
+    }
+
+    return true;
+  }
+
   async function requestOpenShift(date: Date, assignment: DisplayAssignment) {
     const dateKey = toDateKey(date);
 
@@ -3713,6 +3777,64 @@ export default function DashboardPage() {
     };
 
     await saveOpenShiftRequests([request, ...openShiftRequests]);
+  }
+
+  async function submitShiftTradeRequest() {
+    if (!currentEmployee) {
+      setShiftTradeRequestStatus('Employee profile was not found.');
+      return;
+    }
+
+    const selectedShift = getMyTradeAssignments().find((item) => item.tradeKey === selectedTradeShiftKey);
+    const selectedTarget = getEligibleTradeTargets().find((item) => item.targetKey === selectedTradeTargetKey);
+
+    if (!selectedShift || !selectedTarget) {
+      setShiftTradeRequestStatus('Select one of your shifts and one eligible trade target.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Submit shift trade request for ${selectedShift.assignment.label} on ${selectedShift.dateKey} into ${selectedTarget.assignment.label} on ${selectedTarget.dateKey}?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const request: ShiftTradeRequest = {
+      id: `shift-trade-${Date.now()}`,
+      requestingEmployeeId: currentEmployeeId,
+      requestingEmployeeName: currentEmployee.name,
+      requestingDateKey: selectedShift.dateKey,
+      requestingShiftKey: selectedShift.assignment.key,
+      requestingShiftLabel: selectedShift.assignment.label,
+      requestingStartTime: selectedShift.slot.startTime,
+      requestingEndTime: selectedShift.slot.endTime,
+      targetEmployeeId: selectedTarget.isOpenSlot ? undefined : selectedTarget.slot.employeeId,
+      targetEmployeeName: selectedTarget.isOpenSlot ? undefined : selectedTarget.targetName,
+      targetDateKey: selectedTarget.dateKey,
+      targetShiftKey: selectedTarget.assignment.key,
+      targetShiftLabel: selectedTarget.assignment.label,
+      targetStartTime: selectedTarget.slot.startTime,
+      targetEndTime: selectedTarget.slot.endTime,
+      targetIsOpenShift: selectedTarget.isOpenSlot,
+      payPeriodKey: selectedPayPeriod.key,
+      requestedAt: new Date().toISOString(),
+      status: selectedTarget.isOpenSlot ? 'PENDING_SUPERVISOR' : 'PENDING_EMPLOYEE',
+    };
+
+    const saved = await saveShiftTradeRequests([request, ...shiftTradeRequests]);
+    if (!saved) {
+      return;
+    }
+
+    setShiftTradeRequestStatus(
+      selectedTarget.isOpenSlot
+        ? 'Shift trade request submitted to supervisors.'
+        : 'Shift trade request submitted to the selected employee.',
+    );
+    setSelectedTradeTargetKey('');
+    setSelectedTradeShiftKey('');
   }
 
   async function submitVacationRequest() {
@@ -4961,7 +5083,11 @@ export default function DashboardPage() {
                             <button
                               type="button"
                               key={tradeKey}
-                              onClick={() => setSelectedTradeShiftKey(tradeKey)}
+                              onClick={() => {
+                                setSelectedTradeShiftKey(tradeKey);
+                                setSelectedTradeTargetKey('');
+                                setShiftTradeRequestStatus('');
+                              }}
                               className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
                                 selected
                                   ? 'border-amber-500 bg-amber-50 shadow-md'
@@ -5006,9 +5132,18 @@ export default function DashboardPage() {
                     ) : (
                       <div className="space-y-3">
                         {getEligibleTradeTargets().map(({ date, dateKey, assignment, slot, targetKey, targetName, isOpenSlot }) => (
-                          <div
+                          <button
+                            type="button"
                             key={targetKey}
-                            className="rounded-xl border border-slate-300 bg-white p-4"
+                            onClick={() => {
+                              setSelectedTradeTargetKey(targetKey);
+                              setShiftTradeRequestStatus('');
+                            }}
+                            className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                              selectedTradeTargetKey === targetKey
+                                ? 'border-amber-500 bg-amber-50 shadow-md'
+                                : 'border-slate-300 bg-white'
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
@@ -5026,11 +5161,28 @@ export default function DashboardPage() {
                             <div className="mt-1 text-sm font-semibold text-slate-700">
                               {formatDayLabel(date)} • {slot.startTime} - {slot.endTime}
                             </div>
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
                   </div>
+                </div>
+
+                <div className="border-t border-slate-200 p-5">
+                  {shiftTradeRequestStatus && (
+                    <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                      {shiftTradeRequestStatus}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={submitShiftTradeRequest}
+                    disabled={!selectedTradeShiftKey || !selectedTradeTargetKey}
+                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    Submit Shift Trade Request
+                  </button>
                 </div>
               </div>
             </div>
