@@ -5048,7 +5048,7 @@ export default function DashboardPage() {
 
           {showShiftTradeModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-              <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl">
+              <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-start justify-between border-b border-slate-200 p-5">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Shift Trade</h2>
@@ -5065,7 +5065,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-                <div className="grid gap-5 p-5 lg:grid-cols-2">
+                <div className="grid flex-1 gap-5 overflow-y-auto p-5 lg:grid-cols-2">
                   <div>
                     <div className="mb-3 text-sm font-bold text-slate-900">
                       Step 1: Select one of your shifts
