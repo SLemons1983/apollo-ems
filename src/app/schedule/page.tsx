@@ -1870,6 +1870,88 @@ export default function SchedulePage() {
     }
   }
 
+  function findTradeSlot(schedule: ScheduleData, dateKey: string, shiftKey: string, employeeId: string) {
+    const day = schedule[dateKey];
+    if (!day) return null;
+
+    const slotKeys = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[];
+
+    if (shiftKey.startsWith('standard-')) {
+      const shiftName = shiftKey.replace('standard-', '') as ShiftName;
+      const shift = day.standard[shiftName];
+      if (!shift) return null;
+
+      const slotKey = slotKeys.find((key) => shift[key]?.employeeId === employeeId);
+      return slotKey ? { shift, slotKey } : null;
+    }
+
+    if (shiftKey.startsWith('extra-')) {
+      const extraId = shiftKey.replace('extra-', '');
+      const shift = day.extras.find((item) => item.id === extraId);
+      if (!shift) return null;
+
+      const slotKey = slotKeys.find((key) => shift[key]?.employeeId === employeeId);
+      return slotKey ? { shift, slotKey } : null;
+    }
+
+    return null;
+  }
+
+  function applyApprovedShiftTrade(current: ScheduleData, request: ShiftTradeRequest): { next: ScheduleData; applied: boolean } {
+    const next = cloneScheduleData(normalizeLoadedData(current));
+    const requestingEmployee = employees.find((employee) => employee.id === request.requestingEmployeeId);
+    const requestingOpenSlotId = requestingEmployee?.scope === 'BLS' ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+
+    const requestingSlot = findTradeSlot(
+      next,
+      request.requestingDateKey,
+      request.requestingShiftKey,
+      request.requestingEmployeeId,
+    );
+
+    if (!requestingSlot) {
+      return { next, applied: false };
+    }
+
+    if (request.targetIsOpenShift) {
+      const preferredOpenSlotId = requestingOpenSlotId;
+      const fallbackOpenSlotId = preferredOpenSlotId === OPEN_ALS_SLOT_ID ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+
+      const targetSlot =
+        findTradeSlot(next, request.targetDateKey, request.targetShiftKey, preferredOpenSlotId) ??
+        findTradeSlot(next, request.targetDateKey, request.targetShiftKey, fallbackOpenSlotId);
+
+      if (!targetSlot) {
+        return { next, applied: false };
+      }
+
+      requestingSlot.shift[requestingSlot.slotKey].employeeId = requestingOpenSlotId;
+      targetSlot.shift[targetSlot.slotKey].employeeId = request.requestingEmployeeId;
+
+      return { next, applied: true };
+    }
+
+    if (!request.targetEmployeeId) {
+      return { next, applied: false };
+    }
+
+    const targetSlot = findTradeSlot(
+      next,
+      request.targetDateKey,
+      request.targetShiftKey,
+      request.targetEmployeeId,
+    );
+
+    if (!targetSlot) {
+      return { next, applied: false };
+    }
+
+    requestingSlot.shift[requestingSlot.slotKey].employeeId = request.targetEmployeeId;
+    targetSlot.shift[targetSlot.slotKey].employeeId = request.requestingEmployeeId;
+
+    return { next, applied: true };
+  }
+
   async function updateShiftTradeRequestStatus(requestId: string, status: 'APPROVED' | 'DENIED') {
     const request = shiftTradeRequests.find((item) => item.id === requestId);
     if (!request) {
@@ -1884,20 +1966,43 @@ export default function SchedulePage() {
       return;
     }
 
-    const nextRequests = shiftTradeRequests.map((item) =>
+    let scheduleUpdated = false;
+
+    if (status === 'APPROVED') {
+      const tradeResult = applyApprovedShiftTrade(scheduleDataRef.current, request);
+      if (!tradeResult.applied) {
+        window.alert('Apollo could not locate one or more shift assignments. No schedule changes were made.');
+        return;
+      }
+
+      markUnsavedChanges(request.requestingDateKey);
+      markUnsavedChanges(request.targetDateKey);
+      setScheduleDataSafely(tradeResult.next);
+      scheduleUpdated = true;
+    }
+
+    const nextStatus: ShiftTradeRequest['status'] = status === 'APPROVED' ? 'COMPLETED' : 'DENIED';
+
+    const nextRequests: ShiftTradeRequest[] = shiftTradeRequests.map((item) =>
       item.id === requestId
         ? {
             ...item,
-            status,
+            status: nextStatus,
             supervisorNote:
               status === 'APPROVED'
-                ? 'Approved by supervisor. Schedule update will be added in the next phase.'
+                ? 'Approved by supervisor. Schedule updated automatically.'
                 : 'Denied by supervisor.',
           }
         : item,
     );
 
     await saveShiftTradeRequests(nextRequests);
+
+    if (scheduleUpdated) {
+      setSaveStatus('Saving approved shift trade...');
+      await saveScheduleToSupabase();
+      setHasUnsavedChanges(false);
+    }
   }
 
   async function saveShiftTradeRequests(nextRequests: ShiftTradeRequest[]) {
