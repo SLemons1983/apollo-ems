@@ -3950,6 +3950,20 @@ export default function DashboardPage() {
     return [...standardAssignments, ...extraAssignments].filter((assignment) => !assignment.hiddenFromEmployees);
   }
 
+  function getMyShiftTradeRequests() {
+    return shiftTradeRequests.filter(
+      (request) =>
+        request.payPeriodKey === selectedPayPeriod.key &&
+        request.requestingEmployeeId === currentEmployeeId,
+    );
+  }
+
+  function getShiftTradeStatusLabel(status: ShiftTradeRequest['status']) {
+    if (status === 'PENDING_EMPLOYEE') return 'Pending Employee Response';
+    if (status === 'PENDING_SUPERVISOR') return 'Pending Supervisor Approval';
+    return status;
+  }
+
   function getEligibleTradeTargets() {
     const selectedShift = getMyTradeAssignments().find((item) => item.tradeKey === selectedTradeShiftKey);
     if (!selectedShift || !currentEmployee) {
@@ -5209,14 +5223,51 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={submitShiftTradeRequest}
-                    disabled={!selectedTradeShiftKey || !selectedTradeTargetKey}
-                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  >
-                    Submit Shift Trade Request
-                  </button>
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <button
+                      type="button"
+                      onClick={submitShiftTradeRequest}
+                      disabled={!selectedTradeShiftKey || !selectedTradeTargetKey}
+                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Submit Shift Trade Request
+                    </button>
+
+                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 lg:max-w-xl">
+                      <div className="text-sm font-bold text-slate-900">Your Trade Requests</div>
+                      {getMyShiftTradeRequests().length === 0 ? (
+                        <div className="mt-2 text-sm text-slate-500">
+                          No shift trade requests submitted for this pay period.
+                        </div>
+                      ) : (
+                        <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {getMyShiftTradeRequests().map((request) => (
+                            <div
+                              key={request.id}
+                              className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                            >
+                              <div className="font-bold text-slate-900">
+                                {request.requestingShiftLabel} {request.requestingDateKey}
+                                {' → '}
+                                {request.targetShiftLabel} {request.targetDateKey}
+                              </div>
+                              <div className="mt-1 text-xs font-semibold text-slate-600">
+                                {request.requestingStartTime}-{request.requestingEndTime}
+                                {' → '}
+                                {request.targetStartTime}-{request.targetEndTime}
+                              </div>
+                              <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                                {getShiftTradeStatusLabel(request.status)}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                Target: {request.targetIsOpenShift ? 'Open Shift' : request.targetEmployeeName ?? 'Employee'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
