@@ -151,7 +151,7 @@ type ShiftTradeRequest = {
   targetIsOpenShift: boolean;
   payPeriodKey: string;
   requestedAt: string;
-  status: 'PENDING_EMPLOYEE' | 'PENDING_SUPERVISOR';
+  status: 'PENDING_EMPLOYEE' | 'PENDING_SUPERVISOR' | 'DECLINED_BY_EMPLOYEE';
 };
 
 
@@ -3910,6 +3910,80 @@ export default function DashboardPage() {
     setSelectedTradeShiftKey('');
   }
 
+  async function respondToShiftTradeRequest(message: ApolloMessage, response: 'ACCEPT' | 'DECLINE') {
+    if (!currentEmployee || !message.relatedId) {
+      return;
+    }
+
+    const request = shiftTradeRequests.find((item) => item.id === message.relatedId);
+    if (!request) {
+      window.alert('Shift trade request was not found.');
+      return;
+    }
+
+    if (request.status !== 'PENDING_EMPLOYEE') {
+      window.alert('This shift trade request has already been reviewed.');
+      return;
+    }
+
+    if (request.targetEmployeeId !== currentEmployeeId) {
+      window.alert('You are not the target employee for this shift trade request.');
+      return;
+    }
+
+    const nextStatus: ShiftTradeRequest['status'] =
+      response === 'ACCEPT' ? 'PENDING_SUPERVISOR' : 'DECLINED_BY_EMPLOYEE';
+
+    const nextRequests = shiftTradeRequests.map((item) =>
+      item.id === request.id ? { ...item, status: nextStatus } : item,
+    );
+
+    const saved = await saveShiftTradeRequests(nextRequests);
+    if (!saved) {
+      return;
+    }
+
+    const createdAt = new Date().toISOString();
+    const body =
+      response === 'ACCEPT'
+        ? `${currentEmployee.name} accepted this shift trade request. It is now pending supervisor approval.`
+        : `${currentEmployee.name} declined this shift trade request.`;
+
+    const reply: ApolloMessage = {
+      id: `message-shift-trade-response-${request.id}-${Date.now()}`,
+      conversationId: message.conversationId,
+      senderId: currentEmployeeId,
+      senderName: currentEmployee.name,
+      senderRole: 'EMPLOYEE',
+      recipients: [
+        {
+          employeeId: request.requestingEmployeeId,
+          deliveredAt: createdAt,
+          readAt: null,
+        },
+      ],
+      audienceLabel: request.requestingEmployeeName,
+      title: 'Shift Trade Request',
+      body,
+      createdAt,
+      relatedType: 'SCHEDULE',
+      relatedId: request.id,
+      priority: 'IMPORTANT',
+    };
+
+    saveApolloMessages([reply, ...apolloMessages]);
+
+    const requestingEmployee = employees.find((employee) => employee.id === request.requestingEmployeeId);
+    if (requestingEmployee) {
+      await notifyApolloMessageRecipients({
+        recipients: [requestingEmployee],
+        senderName: currentEmployee.name,
+        subject: 'ApolloEMS Shift Trade Update',
+        message: body,
+      });
+    }
+  }
+
   async function submitVacationRequest() {
     if (!currentEmployee || !selectedVacationShift) {
       return;
@@ -4000,6 +4074,7 @@ export default function DashboardPage() {
   function getShiftTradeStatusLabel(status: ShiftTradeRequest['status']) {
     if (status === 'PENDING_EMPLOYEE') return 'Pending Employee Response';
     if (status === 'PENDING_SUPERVISOR') return 'Pending Supervisor Approval';
+    if (status === 'DECLINED_BY_EMPLOYEE') return 'Declined by Employee';
     return status;
   }
 
@@ -5537,6 +5612,14 @@ export default function DashboardPage() {
                       {selectedConversation.messages.map((message) => {
                         const isMine = message.senderId === currentEmployeeId;
                         const isUrgent = message.priority === 'URGENT' || message.relatedType === 'URGENT';
+                        const messageShiftTradeRequest =
+                          message.relatedType === 'SCHEDULE' && message.relatedId
+                            ? shiftTradeRequests.find((request) => request.id === message.relatedId)
+                            : null;
+                        const canRespondToShiftTrade =
+                          Boolean(messageShiftTradeRequest) &&
+                          messageShiftTradeRequest?.status === 'PENDING_EMPLOYEE' &&
+                          messageShiftTradeRequest?.targetEmployeeId === currentEmployeeId;
 
                         return (
                           <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -5554,6 +5637,25 @@ export default function DashboardPage() {
                               <div className={`mt-2 text-right text-[11px] ${isMine ? 'text-slate-300' : 'text-slate-500'}`}>
                                 {formatDateTime(new Date(message.createdAt))} • {getMessageStatus(message)}
                               </div>
+
+                              {canRespondToShiftTrade && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => respondToShiftTradeRequest(message, 'ACCEPT')}
+                                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-800"
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => respondToShiftTradeRequest(message, 'DECLINE')}
+                                    className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-red-800"
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
