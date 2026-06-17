@@ -4520,6 +4520,29 @@ export default function SupervisorPage() {
           )}
 
           {renderTile(
+            'inventory-tracking',
+            'Inventory Tracking',
+            'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">Inventory Tracking</div>
+              <div className="mt-2 text-sm text-slate-600">Inventory management is being configured.</div>
+
+              <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
+                Future features:
+                <ul className="mt-2 list-disc pl-5">
+                  <li>Supply Rooms</li>
+                  <li>Inventory Items</li>
+                  <li>Add / Remove / Transfer</li>
+                  <li>PAR Level Monitoring</li>
+                  <li>Order Status Tracking</li>
+                  <li>Transaction History</li>
+                  <li>Quick Add via Packing Slip</li>
+                </ul>
+              </div>
+            </div>,
+          )}
+
+          {renderTile(
             'system-configuration',
             'System Configuration',
             'Configure company branding, permissions reference, important links, geofences, and review the activity log.',
