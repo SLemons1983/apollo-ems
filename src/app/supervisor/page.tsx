@@ -438,6 +438,7 @@ export default function SupervisorPage() {
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [inventorySupplyRooms, setInventorySupplyRooms] = useState<InventorySupplyRoom[]>([]);
   const [selectedSupplyRoomId, setSelectedSupplyRoomId] = useState('');
+  const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [inventoryStatus, setInventoryStatus] = useState('');
@@ -4688,11 +4689,13 @@ export default function SupervisorPage() {
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
-                            <a
+                            <button
                               key={room.id}
-                              href={`/supervisor?inventoryRoom=${room.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => {
+                                setSelectedSupplyRoomId(room.id);
+                                setShowInventoryRoomDetail(true);
+                              }}
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
                                   ? 'border-blue-300 bg-blue-50'
@@ -4701,13 +4704,13 @@ export default function SupervisorPage() {
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
                               <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
-                            </a>
+                            </button>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {new URLSearchParams(window.location.search).get('inventoryRoom') && (
+                    {showInventoryRoomDetail && (
                       <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
