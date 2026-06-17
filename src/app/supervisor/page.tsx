@@ -214,6 +214,22 @@ type OpenShiftRequest = {
   supervisorNote?: string;
 };
 
+type InventorySupplyRoom = {
+  id: string;
+  name: string;
+  createdAt: string;
+};
+
+type InventoryItem = {
+  id: string;
+  supplyRoomId: string;
+  itemName: string;
+  itemNumber: string;
+  qtyOnHand: number;
+  par: number;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -420,6 +436,11 @@ export default function SupervisorPage() {
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
+  const [inventorySupplyRooms, setInventorySupplyRooms] = useState<InventorySupplyRoom[]>([]);
+  const [selectedSupplyRoomId, setSelectedSupplyRoomId] = useState('');
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
+  const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
@@ -679,6 +700,8 @@ export default function SupervisorPage() {
           }
         });
 
+      loadInventorySupplyRooms();
+
       fetch('/api/incident-reports/list')
         .then((response) => {
           if (!response.ok) {
@@ -720,6 +743,15 @@ export default function SupervisorPage() {
       console.error('Failed to load supervisor data:', error);
     }
   }, [currentPayPeriod.key]);
+
+  useEffect(() => {
+    if (!selectedSupplyRoomId) {
+      setInventoryItems([]);
+      return;
+    }
+
+    loadInventoryItems(selectedSupplyRoomId);
+  }, [selectedSupplyRoomId]);
 
   const activeAnnouncements = useMemo(() => {
     const now = new Date();
@@ -3266,6 +3298,88 @@ export default function SupervisorPage() {
       });
   }
 
+  async function loadInventorySupplyRooms() {
+    const { data, error } = await supabase
+      .from('inventory_supply_rooms')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load inventory supply rooms:', error);
+      setInventoryStatus('Unable to load supply rooms.');
+      return;
+    }
+
+    const rooms = (data ?? []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      createdAt: row.created_at,
+    }));
+
+    setInventorySupplyRooms(rooms);
+
+    if (!selectedSupplyRoomId && rooms.length > 0) {
+      setSelectedSupplyRoomId(rooms[0].id);
+    }
+  }
+
+  async function loadInventoryItems(supplyRoomId: string) {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('supply_room_id', supplyRoomId)
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load inventory items:', error);
+      setInventoryStatus('Unable to load inventory items.');
+      return;
+    }
+
+    setInventoryItems(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        supplyRoomId: row.supply_room_id,
+        itemName: row.item_name,
+        itemNumber: row.item_number ?? '',
+        qtyOnHand: row.qty_on_hand ?? 0,
+        par: row.par ?? 0,
+        createdAt: row.created_at,
+      })),
+    );
+  }
+
+  async function handleCreateSupplyRoom() {
+    const roomName = newSupplyRoomName.trim();
+
+    if (!roomName) {
+      setInventoryStatus('Enter a supply room name.');
+      return;
+    }
+
+    setInventoryStatus('Creating supply room...');
+
+    const { data, error } = await supabase
+      .from('inventory_supply_rooms')
+      .insert({ name: roomName })
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to create supply room:', error);
+      setInventoryStatus('Unable to create supply room.');
+      return;
+    }
+
+    setNewSupplyRoomName('');
+    setInventoryStatus('Supply room created.');
+    await loadInventorySupplyRooms();
+
+    if (data?.id) {
+      setSelectedSupplyRoomId(data.id);
+    }
+  }
+
   function toggleTile(tileId: string) {
     setActiveTile((current) => (current === tileId ? null : tileId));
   }
@@ -4523,21 +4637,98 @@ export default function SupervisorPage() {
             'inventory-tracking',
             'Inventory Tracking',
             'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">Inventory Tracking</div>
-              <div className="mt-2 text-sm text-slate-600">Inventory management is being configured.</div>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
+                <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
+                  <label className="flex-1 text-xs font-semibold text-slate-600">
+                    New Supply Room Name
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      value={newSupplyRoomName}
+                      onChange={(event) => setNewSupplyRoomName(event.target.value)}
+                      placeholder="Main Supply Room"
+                    />
+                  </label>
 
-              <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-                Future features:
-                <ul className="mt-2 list-disc pl-5">
-                  <li>Supply Rooms</li>
-                  <li>Inventory Items</li>
-                  <li>Add / Remove / Transfer</li>
-                  <li>PAR Level Monitoring</li>
-                  <li>Order Status Tracking</li>
-                  <li>Transaction History</li>
-                  <li>Quick Add via Packing Slip</li>
-                </ul>
+                  <button
+                    type="button"
+                    onClick={handleCreateSupplyRoom}
+                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                  >
+                    Create Supply Room
+                  </button>
+                </div>
+
+                {inventoryStatus && <div className="mt-3 text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                {inventorySupplyRooms.length === 0 ? (
+                  <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    <label className="block text-xs font-semibold text-slate-600">
+                      Selected Supply Room
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={selectedSupplyRoomId}
+                        onChange={(event) => setSelectedSupplyRoomId(event.target.value)}
+                      >
+                        {inventorySupplyRooms.map((room) => (
+                          <option key={room.id} value={room.id}>
+                            {room.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                          <tr>
+                            <th className="px-3 py-2">Item Name</th>
+                            <th className="px-3 py-2">Item Number</th>
+                            <th className="px-3 py-2">Qty on Hand</th>
+                            <th className="px-3 py-2">PAR</th>
+                            <th className="px-3 py-2">Variance</th>
+                            <th className="px-3 py-2">Order Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {inventoryItems.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-3 py-4 text-center text-slate-500">
+                                No inventory items have been added to this supply room yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            inventoryItems.map((item) => {
+                              const variance = item.qtyOnHand - item.par;
+                              const orderStatus =
+                                item.par > 0 && item.qtyOnHand <= item.par * 0.25
+                                  ? 'Order Now'
+                                  : item.par > 0 && item.qtyOnHand <= item.par * 0.5
+                                    ? 'Order Soon'
+                                    : 'OK';
+
+                              return (
+                                <tr key={item.id}>
+                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                  <td className="px-3 py-2 text-slate-700">{variance}</td>
+                                  <td className="px-3 py-2 font-semibold text-slate-800">{orderStatus}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>,
           )}
