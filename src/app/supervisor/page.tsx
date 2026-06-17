@@ -540,6 +540,15 @@ export default function SupervisorPage() {
   }, []);
 
   useEffect(() => {
+    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
+
+    if (inventoryRoomId) {
+      setActiveTile('inventory-tracking');
+      setSelectedSupplyRoomId(inventoryRoomId);
+    }
+  }, []);
+
+  useEffect(() => {
     try {
       supabase
         .from('company_announcements')
@@ -3318,7 +3327,11 @@ export default function SupervisorPage() {
 
     setInventorySupplyRooms(rooms);
 
-    if (!selectedSupplyRoomId && rooms.length > 0) {
+    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
+
+    if (inventoryRoomId && rooms.some((room) => room.id === inventoryRoomId)) {
+      setSelectedSupplyRoomId(inventoryRoomId);
+    } else if (!selectedSupplyRoomId && rooms.length > 0) {
       setSelectedSupplyRoomId(rooms[0].id);
     }
   }
@@ -4668,20 +4681,26 @@ export default function SupervisorPage() {
                   <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
                 ) : (
                   <div className="space-y-4">
-                    <label className="block text-xs font-semibold text-slate-600">
-                      Selected Supply Room
-                      <select
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                        value={selectedSupplyRoomId}
-                        onChange={(event) => setSelectedSupplyRoomId(event.target.value)}
-                      >
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         {inventorySupplyRooms.map((room) => (
-                          <option key={room.id} value={room.id}>
-                            {room.name}
-                          </option>
+                          <button
+                            key={room.id}
+                            type="button"
+                            onClick={() => window.open(`/supervisor?inventoryRoom=${room.id}`, '_blank', 'noopener,noreferrer')}
+                            className={`rounded-xl border p-4 text-left transition ${
+                              selectedSupplyRoomId === room.id
+                                ? 'border-blue-300 bg-blue-50'
+                                : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="text-sm font-bold text-slate-900">{room.name}</div>
+                            <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
+                          </button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </div>
 
                     <div className="overflow-x-auto rounded-xl border border-slate-200">
                       <table className="min-w-full divide-y divide-slate-200 text-sm">
