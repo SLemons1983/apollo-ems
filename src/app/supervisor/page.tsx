@@ -538,18 +538,7 @@ export default function SupervisorPage() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
-  useEffect(() => {
-    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
-
-    if (inventoryRoomId) {
-      setActiveTile('inventory-tracking');
-      setSelectedSupplyRoomId(inventoryRoomId);
-      setShowInventoryRoomDetail(true);
-    }
-  }, []);
-
-  useEffect(() => {
+  }, []);  useEffect(() => {
     try {
       supabase
         .from('company_announcements')
@@ -4682,11 +4671,13 @@ export default function SupervisorPage() {
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
-                            <a
+                            <button
                               key={room.id}
-                              href={`/supervisor?inventoryRoom=${room.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => {
+                                setSelectedSupplyRoomId(room.id);
+                                setShowInventoryRoomDetail(true);
+                              }}
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
                                   ? 'border-blue-300 bg-blue-50'
@@ -4694,27 +4685,36 @@ export default function SupervisorPage() {
                               }`}
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">Open inventory room in new tab</div>
-                            </a>
+                              <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
+                            </button>
                           ))}
                         </div>
                       </div>
                     )}
 
                     {showInventoryRoomDetail && (
-                      <div className="space-y-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowInventoryRoomDetail(false);
-                            setSelectedSupplyRoomId('');
-                          }}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                        >
-                          Back to Supply Rooms
-                        </button>
+                      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+                        <div className="mt-6 w-full max-w-6xl rounded-2xl bg-white p-4 shadow-xl">
+                          <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                            <div>
+                              <div className="text-lg font-bold text-slate-900">
+                                {inventorySupplyRooms.find((room) => room.id === selectedSupplyRoomId)?.name ?? 'Supply Room'}
+                              </div>
+                              <div className="text-sm text-slate-500">Inventory detail</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowInventoryRoomDetail(false);
+                                setSelectedSupplyRoomId('');
+                              }}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                            >
+                              Close
+                            </button>
+                          </div>
 
-                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                          <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                           <tr>
@@ -4757,6 +4757,7 @@ export default function SupervisorPage() {
                           )}
                         </tbody>
                         </table>
+                          </div>
                         </div>
                       </div>
                     )}
