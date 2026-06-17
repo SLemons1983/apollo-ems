@@ -3862,6 +3862,45 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!selectedTarget.isOpenSlot && selectedTarget.slot.employeeId) {
+      const targetEmployee = employees.find((employee) => employee.id === selectedTarget.slot.employeeId);
+      const createdAt = new Date().toISOString();
+      const messageBody = `${currentEmployee.name} would like to trade their ${selectedShift.assignment.label} shift on ${selectedShift.dateKey} (${selectedShift.slot.startTime}-${selectedShift.slot.endTime}) with your ${selectedTarget.assignment.label} shift on ${selectedTarget.dateKey} (${selectedTarget.slot.startTime}-${selectedTarget.slot.endTime}).\n\nPlease review this shift trade request. Accept/decline buttons will be added in the next phase.`;
+
+      const tradeMessage: ApolloMessage = {
+        id: `message-shift-trade-${request.id}`,
+        conversationId: `shift-trade-${request.id}`,
+        senderId: currentEmployeeId,
+        senderName: currentEmployee.name,
+        senderRole: 'EMPLOYEE',
+        recipients: [
+          {
+            employeeId: selectedTarget.slot.employeeId,
+            deliveredAt: createdAt,
+            readAt: null,
+          },
+        ],
+        audienceLabel: targetEmployee?.name ?? 'Employee',
+        title: 'Shift Trade Request',
+        body: messageBody,
+        createdAt,
+        relatedType: 'SCHEDULE',
+        relatedId: request.id,
+        priority: 'IMPORTANT',
+      };
+
+      saveApolloMessages([tradeMessage, ...apolloMessages]);
+
+      if (targetEmployee) {
+        await notifyApolloMessageRecipients({
+          recipients: [targetEmployee],
+          senderName: currentEmployee.name,
+          subject: 'ApolloEMS Shift Trade Request',
+          message: messageBody,
+        });
+      }
+    }
+
     setShiftTradeRequestStatus(
       selectedTarget.isOpenSlot
         ? 'Shift trade request submitted to supervisors.'
