@@ -4651,6 +4651,7 @@ export default function SupervisorPage() {
             'Inventory Tracking',
             'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
             <div className="space-y-4">
+              {!new URLSearchParams(window.location.search).get('inventoryRoom') && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
                 <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
@@ -4675,6 +4676,7 @@ export default function SupervisorPage() {
 
                 {inventoryStatus && <div className="mt-3 text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
               </div>
+              )}
 
               <div className="rounded-xl border border-slate-200 bg-white p-4">
                 {inventorySupplyRooms.length === 0 ? (
