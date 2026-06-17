@@ -4684,7 +4684,7 @@ export default function SupervisorPage() {
                   <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
                 ) : (
                   <div className="space-y-4">
-                    {!new URLSearchParams(window.location.search).get('inventoryRoom') && (
+                    {!showInventoryRoomDetail && (
                       <div>
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
