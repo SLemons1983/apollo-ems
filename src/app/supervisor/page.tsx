@@ -3334,8 +3334,6 @@ export default function SupervisorPage() {
     if (inventoryRoomId && rooms.some((room) => room.id === inventoryRoomId)) {
       setSelectedSupplyRoomId(inventoryRoomId);
       setShowInventoryRoomDetail(true);
-    } else if (!selectedSupplyRoomId && rooms.length > 0) {
-      setSelectedSupplyRoomId(rooms[0].id);
     }
   }
 
@@ -4654,7 +4652,7 @@ export default function SupervisorPage() {
             'Inventory Tracking',
             'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
             <div className="space-y-4">
-              {!new URLSearchParams(window.location.search).get('inventoryRoom') && (
+              {!showInventoryRoomDetail && !new URLSearchParams(window.location.search).get('inventoryRoom') && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
                 <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
@@ -4686,17 +4684,16 @@ export default function SupervisorPage() {
                   <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
                 ) : (
                   <div className="space-y-4">
-                    {!showInventoryRoomDetail && (
+                    {!showInventoryRoomDetail && !new URLSearchParams(window.location.search).get('inventoryRoom') && (
                       <div>
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
-                            <button
+                            <a
                               key={room.id}
-                              type="button"
-                              onClick={() => {
-                                window.open(`/supervisor?inventoryRoom=${room.id}`, '_blank', 'noopener,noreferrer');
-                              }}
+                              href={`/supervisor?inventoryRoom=${room.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
                                   ? 'border-blue-300 bg-blue-50'
@@ -4705,13 +4702,13 @@ export default function SupervisorPage() {
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
                               <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
-                            </button>
+                            </a>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {showInventoryRoomDetail && (
+                    {(showInventoryRoomDetail || new URLSearchParams(window.location.search).get('inventoryRoom')) && (
                       <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
