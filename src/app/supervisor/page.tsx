@@ -546,6 +546,7 @@ export default function SupervisorPage() {
     if (inventoryRoomId) {
       setActiveTile('inventory-tracking');
       setSelectedSupplyRoomId(inventoryRoomId);
+      setShowInventoryRoomDetail(true);
     }
   }, []);
 
@@ -3332,6 +3333,7 @@ export default function SupervisorPage() {
 
     if (inventoryRoomId && rooms.some((room) => room.id === inventoryRoomId)) {
       setSelectedSupplyRoomId(inventoryRoomId);
+      setShowInventoryRoomDetail(true);
     } else if (!selectedSupplyRoomId && rooms.length > 0) {
       setSelectedSupplyRoomId(rooms[0].id);
     }
@@ -4693,8 +4695,7 @@ export default function SupervisorPage() {
                               key={room.id}
                               type="button"
                               onClick={() => {
-                                setSelectedSupplyRoomId(room.id);
-                                setShowInventoryRoomDetail(true);
+                                window.open(`/supervisor?inventoryRoom=${room.id}`, '_blank', 'noopener,noreferrer');
                               }}
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
