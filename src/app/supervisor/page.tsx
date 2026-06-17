@@ -4681,27 +4681,29 @@ export default function SupervisorPage() {
                   <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
                 ) : (
                   <div className="space-y-4">
-                    <div>
-                      <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {inventorySupplyRooms.map((room) => (
-                          <a
-                            key={room.id}
-                            href={`/supervisor?inventoryRoom=${room.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`rounded-xl border p-4 text-left transition ${
-                              selectedSupplyRoomId === room.id
-                                ? 'border-blue-300 bg-blue-50'
-                                : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
-                            }`}
-                          >
-                            <div className="text-sm font-bold text-slate-900">{room.name}</div>
-                            <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
-                          </a>
-                        ))}
+                    {!new URLSearchParams(window.location.search).get('inventoryRoom') && (
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          {inventorySupplyRooms.map((room) => (
+                            <a
+                              key={room.id}
+                              href={`/supervisor?inventoryRoom=${room.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`rounded-xl border p-4 text-left transition ${
+                                selectedSupplyRoomId === room.id
+                                  ? 'border-blue-300 bg-blue-50'
+                                  : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                              }`}
+                            >
+                              <div className="text-sm font-bold text-slate-900">{room.name}</div>
+                              <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
+                            </a>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {new URLSearchParams(window.location.search).get('inventoryRoom') && (
                       <div className="overflow-x-auto rounded-xl border border-slate-200">
