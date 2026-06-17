@@ -441,6 +441,9 @@ export default function SupervisorPage() {
   const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
+  const [newInventoryItemName, setNewInventoryItemName] = useState('');
+  const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
+  const [newInventoryItemPar, setNewInventoryItemPar] = useState('');
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
@@ -3344,6 +3347,49 @@ export default function SupervisorPage() {
     );
   }
 
+  async function handleCreateInventoryItem() {
+    const itemName = newInventoryItemName.trim();
+    const itemNumber = newInventoryItemNumber.trim();
+    const par = Number(newInventoryItemPar);
+
+    if (!selectedSupplyRoomId) {
+      setInventoryStatus('Select a supply room first.');
+      return;
+    }
+
+    if (!itemName) {
+      setInventoryStatus('Enter an item name.');
+      return;
+    }
+
+    if (!Number.isFinite(par) || par < 0) {
+      setInventoryStatus('Enter a valid PAR.');
+      return;
+    }
+
+    setInventoryStatus('Creating inventory item...');
+
+    const { error } = await supabase.from('inventory_items').insert({
+      supply_room_id: selectedSupplyRoomId,
+      item_name: itemName,
+      item_number: itemNumber || null,
+      qty_on_hand: 0,
+      par,
+    });
+
+    if (error) {
+      console.error('Failed to create inventory item:', error);
+      setInventoryStatus('Unable to create inventory item.');
+      return;
+    }
+
+    setNewInventoryItemName('');
+    setNewInventoryItemNumber('');
+    setNewInventoryItemPar('');
+    setInventoryStatus('Inventory item created.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleCreateSupplyRoom() {
     const roomName = newSupplyRoomName.trim();
 
@@ -4712,6 +4758,50 @@ export default function SupervisorPage() {
                             >
                               Close
                             </button>
+                          </div>
+
+                          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-sm font-bold text-slate-900">Add Inventory Item</div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-4">
+                              <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                                Item Name
+                                <input
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={newInventoryItemName}
+                                  onChange={(event) => setNewInventoryItemName(event.target.value)}
+                                  placeholder="Nitroglycerin Sublingual Tabs"
+                                />
+                              </label>
+                              <label className="text-xs font-semibold text-slate-600">
+                                Item Number / SKU
+                                <input
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={newInventoryItemNumber}
+                                  onChange={(event) => setNewInventoryItemNumber(event.target.value)}
+                                  placeholder="0639-01"
+                                />
+                              </label>
+                              <label className="text-xs font-semibold text-slate-600">
+                                PAR
+                                <input
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={newInventoryItemPar}
+                                  onChange={(event) => setNewInventoryItemPar(event.target.value)}
+                                  inputMode="numeric"
+                                  placeholder="12"
+                                />
+                              </label>
+                            </div>
+                            <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+                              <button
+                                type="button"
+                                onClick={handleCreateInventoryItem}
+                                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                              >
+                                Create Item
+                              </button>
+                              {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+                            </div>
                           </div>
 
                           <div className="overflow-x-auto rounded-xl border border-slate-200">
