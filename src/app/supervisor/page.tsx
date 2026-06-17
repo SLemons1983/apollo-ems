@@ -4814,12 +4814,13 @@ export default function SupervisorPage() {
                             <th className="px-3 py-2">PAR</th>
                             <th className="px-3 py-2">Variance</th>
                             <th className="px-3 py-2">Order Status</th>
+                            <th className="px-3 py-2">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {inventoryItems.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-3 py-4 text-center text-slate-500">
+                              <td colSpan={7} className="px-3 py-4 text-center text-slate-500">
                                 No inventory items have been added to this supply room yet.
                               </td>
                             </tr>
@@ -4841,6 +4842,28 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2 text-slate-700">{item.par}</td>
                                   <td className="px-3 py-2 text-slate-700">{variance}</td>
                                   <td className="px-3 py-2 font-semibold text-slate-800">{orderStatus}</td>
+                                  <td className="px-3 py-2">
+                                    <div className="flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="rounded-lg bg-green-700 px-3 py-1 text-xs font-bold text-white hover:bg-green-800"
+                                      >
+                                        Add
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded-lg bg-red-700 px-3 py-1 text-xs font-bold text-white hover:bg-red-800"
+                                      >
+                                        Remove
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-bold text-white hover:bg-slate-800"
+                                      >
+                                        Transfer
+                                      </button>
+                                    </div>
+                                  </td>
                                 </tr>
                               );
                             })
