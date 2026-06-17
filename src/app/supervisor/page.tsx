@@ -540,6 +540,16 @@ export default function SupervisorPage() {
     };
   }, []);
   useEffect(() => {
+    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
+
+    if (inventoryRoomId) {
+      setActiveTile('inventory-tracking');
+      setSelectedSupplyRoomId(inventoryRoomId);
+      setShowInventoryRoomDetail(true);
+    }
+  }, []);
+
+  useEffect(() => {
     try {
       supabase
         .from('company_announcements')
@@ -4672,13 +4682,11 @@ export default function SupervisorPage() {
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
-                            <button
+                            <a
                               key={room.id}
-                              type="button"
-                              onClick={() => {
-                                setSelectedSupplyRoomId(room.id);
-                                setShowInventoryRoomDetail(true);
-                              }}
+                              href={`/supervisor?inventoryRoom=${room.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
                                   ? 'border-blue-300 bg-blue-50'
@@ -4686,8 +4694,8 @@ export default function SupervisorPage() {
                               }`}
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
-                            </button>
+                              <div className="mt-1 text-xs text-slate-500">Open inventory room in new tab</div>
+                            </a>
                           ))}
                         </div>
                       </div>
