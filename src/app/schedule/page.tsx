@@ -157,11 +157,15 @@ type ShiftTradeRequest = {
   requestingDateKey: string;
   requestingShiftKey: string;
   requestingShiftLabel: string;
+  requestingStartTime?: string;
+  requestingEndTime?: string;
   targetEmployeeId?: string;
   targetEmployeeName?: string;
   targetDateKey: string;
   targetShiftKey: string;
   targetShiftLabel: string;
+  targetStartTime?: string;
+  targetEndTime?: string;
   targetIsOpenShift: boolean;
   payPeriodKey: string;
   requestedAt: string;
@@ -1392,11 +1396,15 @@ export default function SchedulePage() {
                 requestingDateKey: row.requesting_date_key,
                 requestingShiftKey: row.requesting_shift_key,
                 requestingShiftLabel: row.requesting_shift_label,
+                requestingStartTime: row.requesting_start_time ?? undefined,
+                requestingEndTime: row.requesting_end_time ?? undefined,
                 targetEmployeeId: row.target_employee_id ?? undefined,
                 targetEmployeeName: row.target_employee_name ?? undefined,
                 targetDateKey: row.target_date_key,
                 targetShiftKey: row.target_shift_key,
                 targetShiftLabel: row.target_shift_label,
+                targetStartTime: row.target_start_time ?? undefined,
+                targetEndTime: row.target_end_time ?? undefined,
                 targetIsOpenShift: Boolean(row.target_is_open_shift),
                 payPeriodKey: row.pay_period_key,
                 requestedAt: row.requested_at,
@@ -1864,11 +1872,15 @@ export default function SchedulePage() {
       requesting_date_key: request.requestingDateKey,
       requesting_shift_key: request.requestingShiftKey,
       requesting_shift_label: request.requestingShiftLabel,
+      requesting_start_time: request.requestingStartTime ?? null,
+      requesting_end_time: request.requestingEndTime ?? null,
       target_employee_id: request.targetEmployeeId ?? null,
       target_employee_name: request.targetEmployeeName ?? null,
       target_date_key: request.targetDateKey,
       target_shift_key: request.targetShiftKey,
       target_shift_label: request.targetShiftLabel,
+      target_start_time: request.targetStartTime ?? null,
+      target_end_time: request.targetEndTime ?? null,
       target_is_open_shift: request.targetIsOpenShift,
       pay_period_key: request.payPeriodKey,
       requested_at: request.requestedAt,
