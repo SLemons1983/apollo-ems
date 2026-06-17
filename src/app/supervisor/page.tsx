@@ -539,17 +539,6 @@ export default function SupervisorPage() {
       subscription.unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
-
-    if (inventoryRoomId) {
-      setActiveTile('inventory-tracking');
-      setSelectedSupplyRoomId(inventoryRoomId);
-      setShowInventoryRoomDetail(true);
-    }
-  }, []);
-
   useEffect(() => {
     try {
       supabase
@@ -3328,13 +3317,6 @@ export default function SupervisorPage() {
     }));
 
     setInventorySupplyRooms(rooms);
-
-    const inventoryRoomId = new URLSearchParams(window.location.search).get('inventoryRoom');
-
-    if (inventoryRoomId && rooms.some((room) => room.id === inventoryRoomId)) {
-      setSelectedSupplyRoomId(inventoryRoomId);
-      setShowInventoryRoomDetail(true);
-    }
   }
 
   async function loadInventoryItems(supplyRoomId: string) {
@@ -3391,6 +3373,7 @@ export default function SupervisorPage() {
 
     if (data?.id) {
       setSelectedSupplyRoomId(data.id);
+      setShowInventoryRoomDetail(true);
     }
   }
 
@@ -4652,7 +4635,7 @@ export default function SupervisorPage() {
             'Inventory Tracking',
             'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
             <div className="space-y-4">
-              {!showInventoryRoomDetail && !new URLSearchParams(window.location.search).get('inventoryRoom') && (
+              {!showInventoryRoomDetail && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
                 <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
@@ -4684,16 +4667,18 @@ export default function SupervisorPage() {
                   <div className="text-sm text-slate-600">No supply rooms have been created yet.</div>
                 ) : (
                   <div className="space-y-4">
-                    {!showInventoryRoomDetail && !new URLSearchParams(window.location.search).get('inventoryRoom') && (
+                    {!showInventoryRoomDetail && (
                       <div>
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
-                            <a
+                            <button
                               key={room.id}
-                              href={`/supervisor?inventoryRoom=${room.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              type="button"
+                              onClick={() => {
+                                setSelectedSupplyRoomId(room.id);
+                                setShowInventoryRoomDetail(true);
+                              }}
                               className={`rounded-xl border p-4 text-left transition ${
                                 selectedSupplyRoomId === room.id
                                   ? 'border-blue-300 bg-blue-50'
@@ -4702,14 +4687,26 @@ export default function SupervisorPage() {
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
                               <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
-                            </a>
+                            </button>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {(showInventoryRoomDetail || new URLSearchParams(window.location.search).get('inventoryRoom')) && (
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    {showInventoryRoomDetail && (
+                      <div className="space-y-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInventoryRoomDetail(false);
+                            setSelectedSupplyRoomId('');
+                          }}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          Back to Supply Rooms
+                        </button>
+
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                           <tr>
@@ -4752,6 +4749,7 @@ export default function SupervisorPage() {
                           )}
                         </tbody>
                         </table>
+                        </div>
                       </div>
                     )}
                   </div>
