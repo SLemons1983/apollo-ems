@@ -1471,6 +1471,40 @@ export default function DashboardPage() {
         });
 
       supabase
+        .from('shift_trade_requests')
+        .select('*')
+        .order('requested_at', { ascending: false })
+        .then(({ data: shiftTradeData, error: shiftTradeError }) => {
+          if (shiftTradeError) {
+            console.error('Failed to load shift trade requests:', shiftTradeError);
+          } else {
+            setShiftTradeRequests(
+              (shiftTradeData ?? []).map((row: any) => ({
+                id: row.id,
+                requestingEmployeeId: row.requesting_employee_id,
+                requestingEmployeeName: row.requesting_employee_name,
+                requestingDateKey: row.requesting_date_key,
+                requestingShiftKey: row.requesting_shift_key,
+                requestingShiftLabel: row.requesting_shift_label,
+                requestingStartTime: row.requesting_start_time ?? '',
+                requestingEndTime: row.requesting_end_time ?? '',
+                targetEmployeeId: row.target_employee_id ?? undefined,
+                targetEmployeeName: row.target_employee_name ?? undefined,
+                targetDateKey: row.target_date_key,
+                targetShiftKey: row.target_shift_key,
+                targetShiftLabel: row.target_shift_label,
+                targetStartTime: row.target_start_time ?? '',
+                targetEndTime: row.target_end_time ?? '',
+                targetIsOpenShift: Boolean(row.target_is_open_shift),
+                payPeriodKey: row.pay_period_key,
+                requestedAt: row.requested_at,
+                status: row.status,
+              })),
+            );
+          }
+        });
+
+      supabase
         .from('announcement_reads')
         .select('announcement_id')
         .eq('employee_id', currentEmployeeId)
