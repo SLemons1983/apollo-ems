@@ -232,6 +232,17 @@ type InventoryItem = {
   createdAt: string;
 };
 
+type InventoryLot = {
+  id: string;
+  itemId: string;
+  lotNumber: string;
+  expirationDate: string;
+  qtyOnHand: number;
+  manufacturer: string;
+  notes: string;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -442,6 +453,8 @@ export default function SupervisorPage() {
   const [selectedSupplyRoomId, setSelectedSupplyRoomId] = useState('');
   const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryLotsByItemId, setInventoryLotsByItemId] = useState<Record<string, InventoryLot[]>>({});
+  const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
   const [showCreateInventoryItemForm, setShowCreateInventoryItemForm] = useState(false);
@@ -3385,13 +3398,16 @@ export default function SupervisorPage() {
     if (itemIds.length > 0) {
       const { data: lots, error: lotsError } = await supabase
         .from('inventory_lots')
-        .select('item_id, expiration_date')
+        .select('*')
         .in('item_id', itemIds)
-        .gt('qty_on_hand', 0);
+        .gt('qty_on_hand', 0)
+        .order('expiration_date', { ascending: true });
 
       if (lotsError) {
         console.error('Failed to load inventory lots:', lotsError);
       } else {
+        const lotsByItemId: Record<string, InventoryLot[]> = {};
+
         (lots ?? []).forEach((lot: any) => {
           const itemId = lot.item_id;
           const current = lotSummaryByItemId[itemId] ?? { lotCount: 0, nearestExpiration: '' };
@@ -3404,8 +3420,26 @@ export default function SupervisorPage() {
                 ? expiration
                 : current.nearestExpiration,
           };
+
+          lotsByItemId[itemId] = [
+            ...(lotsByItemId[itemId] ?? []),
+            {
+              id: lot.id,
+              itemId,
+              lotNumber: lot.lot_number ?? '',
+              expirationDate: lot.expiration_date ?? '',
+              qtyOnHand: lot.qty_on_hand ?? 0,
+              manufacturer: lot.manufacturer ?? '',
+              notes: lot.notes ?? '',
+              createdAt: lot.created_at,
+            },
+          ];
         });
+
+        setInventoryLotsByItemId(lotsByItemId);
       }
+    } else {
+      setInventoryLotsByItemId({});
     }
 
     setInventoryItems(
@@ -5242,8 +5276,17 @@ export default function SupervisorPage() {
                                     : 'OK';
 
                               return (
-                                <tr key={item.id}>
-                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                <React.Fragment key={item.id}>
+                                <tr>
+                                  <td className="px-3 py-2 font-semibold text-slate-900">
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedInventoryItemId((current) => (current === item.id ? '' : item.id))}
+                                      className="text-left font-semibold text-blue-700 hover:text-blue-900 hover:underline"
+                                    >
+                                      {item.itemName}
+                                    </button>
+                                  </td>
                                   <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.par}</td>
@@ -5309,6 +5352,48 @@ export default function SupervisorPage() {
                                     </div>
                                   </td>
                                 </tr>
+                                {expandedInventoryItemId === item.id && (
+                                  <tr>
+                                    <td colSpan={9} className="bg-slate-50 px-3 py-3">
+                                      <div className="rounded-xl border border-slate-200 bg-white p-3">
+                                        <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Lots</div>
+                                        {(inventoryLotsByItemId[item.id] ?? []).length === 0 ? (
+                                          <div className="text-sm text-slate-500">No active lots found for this item.</div>
+                                        ) : (
+                                          <div className="overflow-x-auto">
+                                            <table className="min-w-full text-xs">
+                                              <thead className="text-left font-bold uppercase tracking-wide text-slate-500">
+                                                <tr>
+                                                  <th className="px-2 py-1">Lot Number</th>
+                                                  <th className="px-2 py-1">Qty</th>
+                                                  <th className="px-2 py-1">Expiration</th>
+                                                  <th className="px-2 py-1">Manufacturer</th>
+                                                  <th className="px-2 py-1">Notes</th>
+                                                </tr>
+                                              </thead>
+                                              <tbody className="divide-y divide-slate-100">
+                                                {(inventoryLotsByItemId[item.id] ?? []).map((lot) => (
+                                                  <tr key={lot.id}>
+                                                    <td className="px-2 py-1 font-semibold text-slate-800">{lot.lotNumber || '—'}</td>
+                                                    <td className="px-2 py-1 text-slate-700">{lot.qtyOnHand}</td>
+                                                    <td className="px-2 py-1">
+                                                      <span className={getInventoryExpirationClass(lot.expirationDate)}>
+                                                        {lot.expirationDate || '—'}
+                                                      </span>
+                                                    </td>
+                                                    <td className="px-2 py-1 text-slate-700">{lot.manufacturer || '—'}</td>
+                                                    <td className="px-2 py-1 text-slate-700">{lot.notes || '—'}</td>
+                                                  </tr>
+                                                ))}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                                </React.Fragment>
                               );
                             })
                           )}
