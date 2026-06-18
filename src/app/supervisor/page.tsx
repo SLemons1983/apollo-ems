@@ -518,6 +518,11 @@ export default function SupervisorPage() {
       })
       .map((lot) => ({ item, lot })),
   );
+
+  const totalInventoryValue = inventoryItems.reduce(
+    (total, item) => total + (item.qtyOnHand * item.unitCost),
+    0,
+  );
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
@@ -5589,6 +5594,65 @@ export default function SupervisorPage() {
                                 </tr>
                               ))}
                             </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-bold text-emerald-900">Inventory Value</div>
+                          <div className="text-xs text-emerald-800">
+                            Current selected room only. Calculates replacement value based on Qty On Hand and Unit Cost.
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-900">
+                          ${totalInventoryValue.toFixed(2)}
+                        </div>
+                      </div>
+
+                      {inventoryItems.length === 0 ? (
+                        <div className="mt-4 rounded-lg border border-emerald-100 bg-white p-3 text-sm text-slate-600">
+                          No inventory items found for the selected supply room.
+                        </div>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto rounded-lg border border-emerald-100 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-emerald-100 text-emerald-950">
+                              <tr>
+                                <th className="px-3 py-2">Item</th>
+                                <th className="px-3 py-2">Item Number</th>
+                                <th className="px-3 py-2">Qty On Hand</th>
+                                <th className="px-3 py-2">Unit Cost</th>
+                                <th className="px-3 py-2">Inventory Value</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {inventoryItems.map((item) => {
+                                const inventoryValue = item.qtyOnHand * item.unitCost;
+
+                                return (
+                                  <tr key={item.id} className="border-t border-emerald-100">
+                                    <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                    <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                    <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                    <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                    <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-emerald-200 bg-emerald-50">
+                                <td colSpan={4} className="px-3 py-3 text-right font-bold text-emerald-900">
+                                  Total Inventory Value
+                                </td>
+                                <td className="px-3 py-3 font-bold text-emerald-900">
+                                  ${totalInventoryValue.toFixed(2)}
+                                </td>
+                              </tr>
+                            </tfoot>
                           </table>
                         </div>
                       )}
