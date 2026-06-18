@@ -3335,11 +3335,11 @@ export default function SupervisorPage() {
     }
 
     if (daysUntilExpiration <= 30) {
-      return 'rounded-lg bg-orange-100 px-2 py-1 font-bold text-orange-800';
+      return 'rounded-lg bg-orange-200 px-2 py-1 font-bold text-orange-900';
     }
 
     if (daysUntilExpiration <= 90) {
-      return 'rounded-lg bg-amber-100 px-2 py-1 font-bold text-amber-800';
+      return 'rounded-lg bg-yellow-100 px-2 py-1 font-bold text-yellow-700';
     }
 
     return 'text-slate-700';
@@ -3440,6 +3440,11 @@ export default function SupervisorPage() {
 
     if (!Number.isFinite(par) || par < 0) {
       setInventoryStatus('Enter a valid PAR.');
+      return;
+    }
+
+    if (itemNumber && inventoryItems.some((item) => item.itemNumber.toLowerCase() === itemNumber.toLowerCase())) {
+      setInventoryStatus('An item with this item number already exists in this supply room.');
       return;
     }
 
