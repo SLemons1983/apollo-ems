@@ -455,6 +455,10 @@ export default function SupervisorPage() {
   const [removeInventoryQty, setRemoveInventoryQty] = useState('');
   const [removeInventoryReason, setRemoveInventoryReason] = useState('Expired');
 
+  const [selectedTransferInventoryItem, setSelectedTransferInventoryItem] = useState<InventoryItem | null>(null);
+  const [transferInventoryQty, setTransferInventoryQty] = useState('');
+  const [transferDestinationRoomId, setTransferDestinationRoomId] = useState('');
+
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
@@ -3520,6 +3524,117 @@ export default function SupervisorPage() {
     await loadInventoryItems(selectedSupplyRoomId);
   }
 
+  async function handleTransferInventoryQuantity() {
+    if (!selectedTransferInventoryItem || !selectedSupplyRoomId) {
+      setInventoryStatus('Select an inventory item first.');
+      return;
+    }
+
+    if (!transferDestinationRoomId) {
+      setInventoryStatus('Select a destination supply room.');
+      return;
+    }
+
+    if (transferDestinationRoomId === selectedSupplyRoomId) {
+      setInventoryStatus('Destination must be different from source room.');
+      return;
+    }
+
+    const quantity = Number(transferInventoryQty);
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setInventoryStatus('Enter a valid quantity.');
+      return;
+    }
+
+    if (quantity > selectedTransferInventoryItem.qtyOnHand) {
+      setInventoryStatus('Cannot transfer more than qty on hand.');
+      return;
+    }
+
+    setInventoryStatus('Transferring inventory...');
+
+    const { error: sourceError } = await supabase
+      .from('inventory_items')
+      .update({ qty_on_hand: selectedTransferInventoryItem.qtyOnHand - quantity })
+      .eq('id', selectedTransferInventoryItem.id);
+
+    if (sourceError) {
+      console.error('Failed to update source inventory item:', sourceError);
+      setInventoryStatus('Unable to update source inventory.');
+      return;
+    }
+
+    const { data: existingDestinationItem, error: lookupError } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .eq('supply_room_id', transferDestinationRoomId)
+      .eq('item_number', selectedTransferInventoryItem.itemNumber || '')
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('Failed to find destination inventory item:', lookupError);
+      setInventoryStatus('Source was updated, but destination lookup failed.');
+      return;
+    }
+
+    let destinationItemId = existingDestinationItem?.id;
+
+    if (existingDestinationItem) {
+      const { error: destinationUpdateError } = await supabase
+        .from('inventory_items')
+        .update({ qty_on_hand: (existingDestinationItem.qty_on_hand ?? 0) + quantity })
+        .eq('id', existingDestinationItem.id);
+
+      if (destinationUpdateError) {
+        console.error('Failed to update destination inventory item:', destinationUpdateError);
+        setInventoryStatus('Source was updated, but destination update failed.');
+        return;
+      }
+    } else {
+      const { data: newDestinationItem, error: destinationInsertError } = await supabase
+        .from('inventory_items')
+        .insert({
+          supply_room_id: transferDestinationRoomId,
+          item_name: selectedTransferInventoryItem.itemName,
+          item_number: selectedTransferInventoryItem.itemNumber || null,
+          qty_on_hand: quantity,
+          par: selectedTransferInventoryItem.par,
+        })
+        .select('id')
+        .single();
+
+      if (destinationInsertError) {
+        console.error('Failed to create destination inventory item:', destinationInsertError);
+        setInventoryStatus('Source was updated, but destination item was not created.');
+        return;
+      }
+
+      destinationItemId = newDestinationItem.id;
+    }
+
+    const { error: transactionError } = await supabase.from('inventory_transactions').insert({
+      item_id: selectedTransferInventoryItem.id,
+      transaction_type: 'TRANSFER',
+      quantity,
+      source_room_id: selectedSupplyRoomId,
+      destination_room_id: transferDestinationRoomId,
+      created_by: authEmail || null,
+    });
+
+    if (transactionError) {
+      console.error('Failed to create inventory transaction:', transactionError);
+      setInventoryStatus('Inventory was transferred, but transaction history did not save.');
+      return;
+    }
+
+    setSelectedTransferInventoryItem(null);
+    setTransferInventoryQty('');
+    setTransferDestinationRoomId('');
+    setInventoryStatus('Inventory transferred.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleCreateSupplyRoom() {
     const roomName = newSupplyRoomName.trim();
 
@@ -5003,6 +5118,12 @@ export default function SupervisorPage() {
                                       </button>
                                       <button
                                         type="button"
+                                        onClick={() => {
+                                          setSelectedTransferInventoryItem(item);
+                                          setTransferInventoryQty('');
+                                          setTransferDestinationRoomId('');
+                                          setInventoryStatus('');
+                                        }}
                                         className="rounded-lg bg-slate-700 px-3 py-1 text-xs font-bold text-white hover:bg-slate-800"
                                       >
                                         Transfer
@@ -5162,6 +5283,69 @@ export default function SupervisorPage() {
                     className="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800"
                   >
                     Save Removal
+                  </button>
+                  {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedTransferInventoryItem && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl">
+                <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">Transfer Inventory</div>
+                    <div className="text-sm text-slate-500">{selectedTransferInventoryItem.itemName}</div>
+                    <div className="text-xs text-slate-500">Qty on hand: {selectedTransferInventoryItem.qtyOnHand}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTransferInventoryItem(null)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Quantity *
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={transferInventoryQty}
+                      onChange={(event) => setTransferInventoryQty(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="1"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Destination Supply Room
+                    <select
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={transferDestinationRoomId}
+                      onChange={(event) => setTransferDestinationRoomId(event.target.value)}
+                    >
+                      <option value="">Select destination</option>
+                      {inventorySupplyRooms
+                        .filter((room) => room.id !== selectedSupplyRoomId)
+                        .map((room) => (
+                          <option key={room.id} value={room.id}>
+                            {room.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                  <button
+                    type="button"
+                    onClick={handleTransferInventoryQuantity}
+                    className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    Save Transfer
                   </button>
                   {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
                 </div>
