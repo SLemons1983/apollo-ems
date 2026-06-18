@@ -5531,6 +5531,7 @@ export default function SupervisorPage() {
                       value={removeInventoryReason}
                       onChange={(event) => setRemoveInventoryReason(event.target.value)}
                     >
+                      <option value="Normal Usage">Normal Usage</option>
                       <option value="Expired">Expired</option>
                       <option value="Damaged">Damaged</option>
                       <option value="Shrink">Shrink</option>
