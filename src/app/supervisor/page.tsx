@@ -4985,7 +4985,7 @@ export default function SupervisorPage() {
 
                     {showInventoryRoomDetail && (
                       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-                        <div className="mt-6 w-full max-w-6xl rounded-2xl bg-white p-4 shadow-xl">
+                        <div className="mt-6 max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
                           <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
                             <div>
                               <div className="text-lg font-bold text-slate-900">
@@ -5086,7 +5086,17 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.par}</td>
                                   <td className="px-3 py-2 text-slate-700">{variance}</td>
-                                  <td className="px-3 py-2 font-semibold text-slate-800">{orderStatus}</td>
+                                  <td
+                                    className={`px-3 py-2 font-semibold ${
+                                      orderStatus === 'Order Now'
+                                        ? 'text-red-700'
+                                        : orderStatus === 'Order Soon'
+                                          ? 'text-amber-600'
+                                          : 'text-green-700'
+                                    }`}
+                                  >
+                                    {orderStatus}
+                                  </td>
                                   <td className="px-3 py-2">
                                     <div className="flex flex-wrap gap-2">
                                       <button
