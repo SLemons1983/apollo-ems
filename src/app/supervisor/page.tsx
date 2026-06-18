@@ -457,6 +457,7 @@ export default function SupervisorPage() {
   const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
+  const [showCreateInventoryReports, setShowCreateInventoryReports] = useState(false);
   const [showCreateInventoryItemForm, setShowCreateInventoryItemForm] = useState(false);
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
@@ -5179,13 +5180,23 @@ export default function SupervisorPage() {
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateSupplyRoomForm((value) => !value)}
-                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
-                  >
-                    {showCreateSupplyRoomForm ? 'Cancel' : 'Add Supply Room'}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateInventoryReports((value) => !value)}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                    >
+                      {showCreateInventoryReports ? 'Hide Inventory Reports' : 'Run Inventory Reports'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateSupplyRoomForm((value) => !value)}
+                      className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                    >
+                      {showCreateSupplyRoomForm ? 'Cancel' : 'Add Supply Room'}
+                    </button>
+                  </div>
                 </div>
 
                 {showCreateSupplyRoomForm && (
@@ -5207,6 +5218,36 @@ export default function SupervisorPage() {
                     >
                       Create Supply Room
                     </button>
+                  </div>
+                )}
+
+                {showCreateInventoryReports && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">Inventory Reports</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Report tools will be added here for usage, transfers, expirations, low stock, and inventory value.
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      {[
+                        'Usage by Date Range',
+                        'Usage by Item',
+                        'Usage by Supply Room',
+                        'Transfers',
+                        'Expired Inventory',
+                        'Expiring Soon',
+                        'Low Stock / Order Now',
+                        'Inventory Value',
+                      ].map((reportName) => (
+                        <button
+                          key={reportName}
+                          type="button"
+                          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-100"
+                        >
+                          {reportName}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
