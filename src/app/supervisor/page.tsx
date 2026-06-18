@@ -227,6 +227,8 @@ type InventoryItem = {
   itemNumber: string;
   qtyOnHand: number;
   par: number;
+  lotCount: number;
+  nearestExpiration: string;
   createdAt: string;
 };
 
@@ -3349,6 +3351,35 @@ export default function SupervisorPage() {
       return;
     }
 
+    const itemIds = (data ?? []).map((row: any) => row.id);
+    const lotSummaryByItemId: Record<string, { lotCount: number; nearestExpiration: string }> = {};
+
+    if (itemIds.length > 0) {
+      const { data: lots, error: lotsError } = await supabase
+        .from('inventory_lots')
+        .select('item_id, expiration_date')
+        .in('item_id', itemIds)
+        .gt('qty_on_hand', 0);
+
+      if (lotsError) {
+        console.error('Failed to load inventory lots:', lotsError);
+      } else {
+        (lots ?? []).forEach((lot: any) => {
+          const itemId = lot.item_id;
+          const current = lotSummaryByItemId[itemId] ?? { lotCount: 0, nearestExpiration: '' };
+          const expiration = lot.expiration_date ?? '';
+
+          lotSummaryByItemId[itemId] = {
+            lotCount: current.lotCount + 1,
+            nearestExpiration:
+              expiration && (!current.nearestExpiration || expiration < current.nearestExpiration)
+                ? expiration
+                : current.nearestExpiration,
+          };
+        });
+      }
+    }
+
     setInventoryItems(
       (data ?? []).map((row: any) => ({
         id: row.id,
@@ -3357,6 +3388,8 @@ export default function SupervisorPage() {
         itemNumber: row.item_number ?? '',
         qtyOnHand: row.qty_on_hand ?? 0,
         par: row.par ?? 0,
+        lotCount: lotSummaryByItemId[row.id]?.lotCount ?? 0,
+        nearestExpiration: lotSummaryByItemId[row.id]?.nearestExpiration ?? '',
         createdAt: row.created_at,
       })),
     );
@@ -5057,6 +5090,8 @@ export default function SupervisorPage() {
                             <th className="px-3 py-2">Item Number</th>
                             <th className="px-3 py-2">Qty on Hand</th>
                             <th className="px-3 py-2">PAR</th>
+                            <th className="px-3 py-2">Lots</th>
+                            <th className="px-3 py-2">Nearest Expiration</th>
                             <th className="px-3 py-2">Variance</th>
                             <th className="px-3 py-2">Order Status</th>
                             <th className="px-3 py-2">Actions</th>
@@ -5065,7 +5100,7 @@ export default function SupervisorPage() {
                         <tbody className="divide-y divide-slate-100">
                           {inventoryItems.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="px-3 py-4 text-center text-slate-500">
+                              <td colSpan={9} className="px-3 py-4 text-center text-slate-500">
                                 No inventory items have been added to this supply room yet.
                               </td>
                             </tr>
@@ -5085,6 +5120,8 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.lotCount}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.nearestExpiration || '—'}</td>
                                   <td className="px-3 py-2 text-slate-700">{variance}</td>
                                   <td
                                     className={`px-3 py-2 font-semibold ${
