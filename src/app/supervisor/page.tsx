@@ -5065,6 +5065,7 @@ export default function SupervisorPage() {
                             </div>
 
                             {showCreateInventoryItemForm && (
+                              <> 
                             <div className="mt-3 grid gap-3 md:grid-cols-4">
                               <label className="text-xs font-semibold text-slate-600 md:col-span-2">
                                 Item Name
@@ -5105,6 +5106,7 @@ export default function SupervisorPage() {
                               </button>
                               {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
                             </div>
+                              </>
                             )}
                           </div>
 
