@@ -476,6 +476,11 @@ export default function SupervisorPage() {
   const [transferInventoryQty, setTransferInventoryQty] = useState('');
   const [transferDestinationRoomId, setTransferDestinationRoomId] = useState('');
 
+  const [selectedEditInventoryItem, setSelectedEditInventoryItem] = useState<InventoryItem | null>(null);
+  const [editInventoryItemName, setEditInventoryItemName] = useState('');
+  const [editInventoryItemNumber, setEditInventoryItemNumber] = useState('');
+  const [editInventoryItemPar, setEditInventoryItemPar] = useState('');
+
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
@@ -3505,6 +3510,63 @@ export default function SupervisorPage() {
     await loadInventoryItems(selectedSupplyRoomId);
   }
 
+  async function handleUpdateInventoryItem() {
+    if (!selectedEditInventoryItem || !selectedSupplyRoomId) {
+      setInventoryStatus('Select an inventory item first.');
+      return;
+    }
+
+    const itemName = editInventoryItemName.trim();
+    const itemNumber = editInventoryItemNumber.trim();
+    const par = Number(editInventoryItemPar);
+
+    if (!itemName) {
+      setInventoryStatus('Enter an item name.');
+      return;
+    }
+
+    if (!Number.isFinite(par) || par < 0) {
+      setInventoryStatus('Enter a valid PAR.');
+      return;
+    }
+
+    if (
+      itemNumber &&
+      inventoryItems.some(
+        (item) =>
+          item.id !== selectedEditInventoryItem.id &&
+          item.itemNumber.toLowerCase() === itemNumber.toLowerCase(),
+      )
+    ) {
+      setInventoryStatus('An item with this item number already exists in this supply room.');
+      return;
+    }
+
+    setInventoryStatus('Updating inventory item...');
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .update({
+        item_name: itemName,
+        item_number: itemNumber || null,
+        par,
+      })
+      .eq('id', selectedEditInventoryItem.id);
+
+    if (error) {
+      console.error('Failed to update inventory item:', error);
+      setInventoryStatus('Unable to update inventory item.');
+      return;
+    }
+
+    setSelectedEditInventoryItem(null);
+    setEditInventoryItemName('');
+    setEditInventoryItemNumber('');
+    setEditInventoryItemPar('');
+    setInventoryStatus('Inventory item updated.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleAddInventoryQuantity() {
     if (!selectedAddInventoryItem || !selectedSupplyRoomId) {
       setInventoryStatus('Select an inventory item first.');
@@ -5313,6 +5375,19 @@ export default function SupervisorPage() {
                                       <button
                                         type="button"
                                         onClick={() => {
+                                          setSelectedEditInventoryItem(item);
+                                          setEditInventoryItemName(item.itemName);
+                                          setEditInventoryItemNumber(item.itemNumber);
+                                          setEditInventoryItemPar(String(item.par));
+                                          setInventoryStatus('');
+                                        }}
+                                        className="rounded-lg bg-blue-700 px-3 py-1 text-xs font-bold text-white hover:bg-blue-800"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
                                           setSelectedAddInventoryItem(item);
                                           setAddInventoryQty('');
                                           setAddInventoryLotNumber('');
@@ -5407,6 +5482,67 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
+          )}
+
+          {selectedEditInventoryItem && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl">
+                <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">Edit Inventory Item</div>
+                    <div className="text-sm text-slate-500">{selectedEditInventoryItem.itemName}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEditInventoryItem(null)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                    Item Name
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={editInventoryItemName}
+                      onChange={(event) => setEditInventoryItemName(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Item Number / SKU
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={editInventoryItemNumber}
+                      onChange={(event) => setEditInventoryItemNumber(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    PAR
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={editInventoryItemPar}
+                      onChange={(event) => setEditInventoryItemPar(event.target.value)}
+                      inputMode="numeric"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                  <button
+                    type="button"
+                    onClick={handleUpdateInventoryItem}
+                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                  >
+                    Save Changes
+                  </button>
+                  {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+                </div>
+              </div>
+            </div>
           )}
 
           {selectedAddInventoryItem && (
