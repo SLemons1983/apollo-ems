@@ -484,6 +484,11 @@ export default function SupervisorPage() {
 
   const [inventoryStatus, setInventoryStatus] = useState('');
   const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
+  const expiredInventoryLots = inventoryItems.flatMap((item) =>
+    (inventoryLotsByItemId[item.id] ?? [])
+      .filter((lot) => lot.expirationDate && new Date(`${lot.expirationDate}T00:00:00`) < new Date(new Date().toDateString()))
+      .map((lot) => ({ item, lot })),
+  );
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
@@ -5291,6 +5296,60 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2">
                                     <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
                                       Order Now
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+
+                    <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-bold text-red-900">Expired Inventory</div>
+                          <div className="text-xs text-red-800">
+                            Current selected room only. Lots appear here when the expiration date has passed.
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-red-900">
+                          {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+
+                      {expiredInventoryLots.length === 0 ? (
+                        <div className="mt-4 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-600">
+                          No expired lots found for the selected supply room.
+                        </div>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto rounded-lg border border-red-100 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-red-100 text-red-950">
+                              <tr>
+                                <th className="px-3 py-2">Item</th>
+                                <th className="px-3 py-2">Item Number</th>
+                                <th className="px-3 py-2">Lot Number</th>
+                                <th className="px-3 py-2">Manufacturer</th>
+                                <th className="px-3 py-2">Qty On Hand</th>
+                                <th className="px-3 py-2">Expiration Date</th>
+                                <th className="px-3 py-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {expiredInventoryLots.map(({ item, lot }) => (
+                                <tr key={lot.id} className="border-t border-red-100">
+                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                  <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
+                                  <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
+                                  <td className="px-3 py-2 font-bold text-red-700">{lot.expirationDate}</td>
+                                  <td className="px-3 py-2">
+                                    <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
+                                      Expired
                                     </span>
                                   </td>
                                 </tr>
