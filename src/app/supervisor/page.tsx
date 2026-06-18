@@ -483,6 +483,7 @@ export default function SupervisorPage() {
   const [editInventoryItemPar, setEditInventoryItemPar] = useState('');
 
   const [inventoryStatus, setInventoryStatus] = useState('');
+  const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
@@ -5247,6 +5248,57 @@ export default function SupervisorPage() {
                           {reportName}
                         </button>
                       ))}
+                    </div>
+
+                    <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-bold text-amber-900">Low Stock / Order Now</div>
+                          <div className="text-xs text-amber-800">
+                            Current selected room only. Items appear here when Qty On Hand is below PAR.
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-900">
+                          {lowStockInventoryItems.length} item{lowStockInventoryItems.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+
+                      {lowStockInventoryItems.length === 0 ? (
+                        <div className="mt-4 rounded-lg border border-amber-100 bg-white p-3 text-sm text-slate-600">
+                          No low-stock items found for the selected supply room.
+                        </div>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto rounded-lg border border-amber-100 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-amber-100 text-amber-950">
+                              <tr>
+                                <th className="px-3 py-2">Item</th>
+                                <th className="px-3 py-2">Item Number</th>
+                                <th className="px-3 py-2">Qty On Hand</th>
+                                <th className="px-3 py-2">PAR</th>
+                                <th className="px-3 py-2">Variance</th>
+                                <th className="px-3 py-2">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lowStockInventoryItems.map((item) => (
+                                <tr key={item.id} className="border-t border-amber-100">
+                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                  <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                  <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                  <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                  <td className="px-3 py-2 font-bold text-red-700">{item.qtyOnHand - item.par}</td>
+                                  <td className="px-3 py-2">
+                                    <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
+                                      Order Now
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
