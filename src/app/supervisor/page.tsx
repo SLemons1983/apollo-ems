@@ -243,6 +243,18 @@ type InventoryLot = {
   createdAt: string;
 };
 
+type InventoryTransaction = {
+  id: string;
+  itemId: string;
+  transactionType: 'ADD' | 'REMOVE' | 'TRANSFER';
+  quantity: number;
+  reason: string;
+  sourceRoomId: string;
+  destinationRoomId: string;
+  createdBy: string;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -483,6 +495,9 @@ export default function SupervisorPage() {
   const [editInventoryItemPar, setEditInventoryItemPar] = useState('');
 
   const [inventoryStatus, setInventoryStatus] = useState('');
+  const [inventoryReportStartDate, setInventoryReportStartDate] = useState('');
+  const [inventoryReportEndDate, setInventoryReportEndDate] = useState('');
+  const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
   const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
   const inventoryToday = new Date(new Date().toDateString());
   const expiredInventoryLots = inventoryItems.flatMap((item) =>
@@ -3480,6 +3495,49 @@ export default function SupervisorPage() {
     );
   }
 
+  async function handleRunInventoryUsageReport() {
+    if (!inventoryReportStartDate || !inventoryReportEndDate) {
+      setInventoryStatus('Select a start and end date for the usage report.');
+      return;
+    }
+
+    if (inventoryReportStartDate > inventoryReportEndDate) {
+      setInventoryStatus('Usage report start date must be before the end date.');
+      return;
+    }
+
+    setInventoryStatus('Running usage report...');
+
+    const { data, error } = await supabase
+      .from('inventory_transactions')
+      .select('*')
+      .eq('transaction_type', 'REMOVE')
+      .gte('created_at', `${inventoryReportStartDate}T00:00:00`)
+      .lte('created_at', `${inventoryReportEndDate}T23:59:59`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load inventory usage report:', error);
+      setInventoryStatus('Unable to load usage report.');
+      return;
+    }
+
+    setInventoryUsageTransactions(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        itemId: row.item_id,
+        transactionType: row.transaction_type,
+        quantity: row.quantity ?? 0,
+        reason: row.reason ?? '',
+        sourceRoomId: row.source_room_id ?? '',
+        destinationRoomId: row.destination_room_id ?? '',
+        createdBy: row.created_by ?? '',
+        createdAt: row.created_at,
+      })),
+    );
+    setInventoryStatus(`Usage report loaded: ${(data ?? []).length} transaction${(data ?? []).length === 1 ? '' : 's'}.`);
+  }
+
   async function handleCreateInventoryItem() {
     const itemName = newInventoryItemName.trim();
     const itemNumber = newInventoryItemNumber.trim();
@@ -5428,6 +5486,88 @@ export default function SupervisorPage() {
                                   </tr>
                                 );
                               })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+
+                    <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-bold text-blue-900">Usage by Date Range</div>
+                          <div className="text-xs text-blue-800">
+                            Shows removed inventory transactions for the selected date range.
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-900">
+                          {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <label className="text-xs font-semibold text-blue-900">
+                          Start Date
+                          <input
+                            type="date"
+                            className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-900"
+                            value={inventoryReportStartDate}
+                            onChange={(event) => setInventoryReportStartDate(event.target.value)}
+                          />
+                        </label>
+
+                        <label className="text-xs font-semibold text-blue-900">
+                          End Date
+                          <input
+                            type="date"
+                            className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-900"
+                            value={inventoryReportEndDate}
+                            onChange={(event) => setInventoryReportEndDate(event.target.value)}
+                          />
+                        </label>
+
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={handleRunInventoryUsageReport}
+                            className="w-full rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                          >
+                            Run Usage Report
+                          </button>
+                        </div>
+                      </div>
+
+                      {inventoryUsageTransactions.length === 0 ? (
+                        <div className="mt-4 rounded-lg border border-blue-100 bg-white p-3 text-sm text-slate-600">
+                          No usage transactions loaded for the selected date range.
+                        </div>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto rounded-lg border border-blue-100 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-blue-100 text-blue-950">
+                              <tr>
+                                <th className="px-3 py-2">Date</th>
+                                <th className="px-3 py-2">Item ID</th>
+                                <th className="px-3 py-2">Qty Removed</th>
+                                <th className="px-3 py-2">Reason</th>
+                                <th className="px-3 py-2">Source Room</th>
+                                <th className="px-3 py-2">Created By</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {inventoryUsageTransactions.map((transaction) => (
+                                <tr key={transaction.id} className="border-t border-blue-100">
+                                  <td className="px-3 py-2 text-slate-700">
+                                    {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : '—'}
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-slate-600">{transaction.itemId}</td>
+                                  <td className="px-3 py-2 font-bold text-slate-900">{transaction.quantity}</td>
+                                  <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
+                                  <td className="px-3 py-2 font-mono text-slate-600">{transaction.sourceRoomId || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{transaction.createdBy || '—'}</td>
+                                </tr>
+                              ))}
                             </tbody>
                           </table>
                         </div>
