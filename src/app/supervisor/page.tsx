@@ -3567,6 +3567,46 @@ export default function SupervisorPage() {
     await loadInventoryItems(selectedSupplyRoomId);
   }
 
+  async function handleDeleteInventoryItem() {
+    if (!selectedEditInventoryItem || !selectedSupplyRoomId) {
+      setInventoryStatus('Select an inventory item first.');
+      return;
+    }
+
+    if (selectedEditInventoryItem.qtyOnHand > 0) {
+      setInventoryStatus('Remove or transfer all inventory before deleting this item.');
+      return;
+    }
+
+    if ((inventoryLotsByItemId[selectedEditInventoryItem.id] ?? []).some((lot) => lot.qtyOnHand > 0)) {
+      setInventoryStatus('Remove or transfer all active lots before deleting this item.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete inventory item "${selectedEditInventoryItem.itemName}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setInventoryStatus('Deleting inventory item...');
+
+    const { error } = await supabase.from('inventory_items').delete().eq('id', selectedEditInventoryItem.id);
+
+    if (error) {
+      console.error('Failed to delete inventory item:', error);
+      setInventoryStatus('Unable to delete inventory item.');
+      return;
+    }
+
+    setSelectedEditInventoryItem(null);
+    setEditInventoryItemName('');
+    setEditInventoryItemNumber('');
+    setEditInventoryItemPar('');
+    setInventoryStatus('Inventory item deleted.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleAddInventoryQuantity() {
     if (!selectedAddInventoryItem || !selectedSupplyRoomId) {
       setInventoryStatus('Select an inventory item first.');
@@ -5538,6 +5578,13 @@ export default function SupervisorPage() {
                     className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
                   >
                     Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteInventoryItem}
+                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800"
+                  >
+                    Delete Item
                   </button>
                   {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
                 </div>
