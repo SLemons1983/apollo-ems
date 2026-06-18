@@ -444,6 +444,12 @@ export default function SupervisorPage() {
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
   const [newInventoryItemPar, setNewInventoryItemPar] = useState('');
+  const [selectedAddInventoryItem, setSelectedAddInventoryItem] = useState<InventoryItem | null>(null);
+  const [addInventoryQty, setAddInventoryQty] = useState('');
+  const [addInventoryLotNumber, setAddInventoryLotNumber] = useState('');
+  const [addInventoryExpirationDate, setAddInventoryExpirationDate] = useState('');
+  const [addInventoryManufacturer, setAddInventoryManufacturer] = useState('');
+  const [addInventoryNotes, setAddInventoryNotes] = useState('');
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
@@ -3390,6 +3396,72 @@ export default function SupervisorPage() {
     await loadInventoryItems(selectedSupplyRoomId);
   }
 
+  async function handleAddInventoryQuantity() {
+    if (!selectedAddInventoryItem || !selectedSupplyRoomId) {
+      setInventoryStatus('Select an inventory item first.');
+      return;
+    }
+
+    const quantity = Number(addInventoryQty);
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setInventoryStatus('Enter a valid quantity.');
+      return;
+    }
+
+    setInventoryStatus('Adding inventory...');
+
+    const { error: lotError } = await supabase.from('inventory_lots').insert({
+      item_id: selectedAddInventoryItem.id,
+      supply_room_id: selectedSupplyRoomId,
+      lot_number: addInventoryLotNumber.trim() || null,
+      expiration_date: addInventoryExpirationDate || null,
+      qty_on_hand: quantity,
+      manufacturer: addInventoryManufacturer.trim() || null,
+      notes: addInventoryNotes.trim() || null,
+    });
+
+    if (lotError) {
+      console.error('Failed to create inventory lot:', lotError);
+      setInventoryStatus('Unable to add inventory lot.');
+      return;
+    }
+
+    const { error: itemError } = await supabase
+      .from('inventory_items')
+      .update({ qty_on_hand: selectedAddInventoryItem.qtyOnHand + quantity })
+      .eq('id', selectedAddInventoryItem.id);
+
+    if (itemError) {
+      console.error('Failed to update inventory item quantity:', itemError);
+      setInventoryStatus('Inventory lot was created, but item quantity did not update.');
+      return;
+    }
+
+    const { error: transactionError } = await supabase.from('inventory_transactions').insert({
+      item_id: selectedAddInventoryItem.id,
+      transaction_type: 'ADD',
+      quantity,
+      destination_room_id: selectedSupplyRoomId,
+      created_by: authEmail || null,
+    });
+
+    if (transactionError) {
+      console.error('Failed to create inventory transaction:', transactionError);
+      setInventoryStatus('Inventory was added, but transaction history did not save.');
+      return;
+    }
+
+    setSelectedAddInventoryItem(null);
+    setAddInventoryQty('');
+    setAddInventoryLotNumber('');
+    setAddInventoryExpirationDate('');
+    setAddInventoryManufacturer('');
+    setAddInventoryNotes('');
+    setInventoryStatus('Inventory added.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleCreateSupplyRoom() {
     const roomName = newSupplyRoomName.trim();
 
@@ -4846,6 +4918,15 @@ export default function SupervisorPage() {
                                     <div className="flex flex-wrap gap-2">
                                       <button
                                         type="button"
+                                        onClick={() => {
+                                          setSelectedAddInventoryItem(item);
+                                          setAddInventoryQty('');
+                                          setAddInventoryLotNumber('');
+                                          setAddInventoryExpirationDate('');
+                                          setAddInventoryManufacturer('');
+                                          setAddInventoryNotes('');
+                                          setInventoryStatus('');
+                                        }}
                                         className="rounded-lg bg-green-700 px-3 py-1 text-xs font-bold text-white hover:bg-green-800"
                                       >
                                         Add
@@ -4878,6 +4959,91 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
+          )}
+
+          {selectedAddInventoryItem && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-2xl rounded-2xl bg-white p-4 shadow-xl">
+                <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">Add Inventory</div>
+                    <div className="text-sm text-slate-500">{selectedAddInventoryItem.itemName}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAddInventoryItem(null)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Quantity *
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={addInventoryQty}
+                      onChange={(event) => setAddInventoryQty(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="1"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Lot Number
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={addInventoryLotNumber}
+                      onChange={(event) => setAddInventoryLotNumber(event.target.value)}
+                      placeholder="17260413A"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Expiration Date
+                    <input
+                      type="date"
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={addInventoryExpirationDate}
+                      onChange={(event) => setAddInventoryExpirationDate(event.target.value)}
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Manufacturer
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={addInventoryManufacturer}
+                      onChange={(event) => setAddInventoryManufacturer(event.target.value)}
+                      placeholder="Bound Tree"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                    Notes
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={addInventoryNotes}
+                      onChange={(event) => setAddInventoryNotes(event.target.value)}
+                      rows={3}
+                      placeholder="Packing slip, invoice, or receiving notes"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                  <button
+                    type="button"
+                    onClick={handleAddInventoryQuantity}
+                    className="rounded-lg bg-green-700 px-4 py-2 text-sm font-bold text-white hover:bg-green-800"
+                  >
+                    Save Inventory
+                  </button>
+                  {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+                </div>
+              </div>
+            </div>
           )}
 
           {renderTile(
