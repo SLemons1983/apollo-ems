@@ -450,6 +450,11 @@ export default function SupervisorPage() {
   const [addInventoryExpirationDate, setAddInventoryExpirationDate] = useState('');
   const [addInventoryManufacturer, setAddInventoryManufacturer] = useState('');
   const [addInventoryNotes, setAddInventoryNotes] = useState('');
+
+  const [selectedRemoveInventoryItem, setSelectedRemoveInventoryItem] = useState<InventoryItem | null>(null);
+  const [removeInventoryQty, setRemoveInventoryQty] = useState('');
+  const [removeInventoryReason, setRemoveInventoryReason] = useState('Expired');
+
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
@@ -3462,6 +3467,59 @@ export default function SupervisorPage() {
     await loadInventoryItems(selectedSupplyRoomId);
   }
 
+  async function handleRemoveInventoryQuantity() {
+    if (!selectedRemoveInventoryItem || !selectedSupplyRoomId) {
+      setInventoryStatus('Select an inventory item first.');
+      return;
+    }
+
+    const quantity = Number(removeInventoryQty);
+
+    if (!Number.isInteger(quantity) || quantity <= 0) {
+      setInventoryStatus('Enter a valid quantity.');
+      return;
+    }
+
+    if (quantity > selectedRemoveInventoryItem.qtyOnHand) {
+      setInventoryStatus('Cannot remove more than qty on hand.');
+      return;
+    }
+
+    setInventoryStatus('Removing inventory...');
+
+    const { error: itemError } = await supabase
+      .from('inventory_items')
+      .update({ qty_on_hand: selectedRemoveInventoryItem.qtyOnHand - quantity })
+      .eq('id', selectedRemoveInventoryItem.id);
+
+    if (itemError) {
+      console.error('Failed to update inventory item quantity:', itemError);
+      setInventoryStatus('Unable to update inventory quantity.');
+      return;
+    }
+
+    const { error: transactionError } = await supabase.from('inventory_transactions').insert({
+      item_id: selectedRemoveInventoryItem.id,
+      transaction_type: 'REMOVE',
+      quantity,
+      reason: removeInventoryReason,
+      source_room_id: selectedSupplyRoomId,
+      created_by: authEmail || null,
+    });
+
+    if (transactionError) {
+      console.error('Failed to create inventory transaction:', transactionError);
+      setInventoryStatus('Inventory was removed, but transaction history did not save.');
+      return;
+    }
+
+    setSelectedRemoveInventoryItem(null);
+    setRemoveInventoryQty('');
+    setRemoveInventoryReason('Expired');
+    setInventoryStatus('Inventory removed.');
+    await loadInventoryItems(selectedSupplyRoomId);
+  }
+
   async function handleCreateSupplyRoom() {
     const roomName = newSupplyRoomName.trim();
 
@@ -4933,6 +4991,12 @@ export default function SupervisorPage() {
                                       </button>
                                       <button
                                         type="button"
+                                        onClick={() => {
+                                          setSelectedRemoveInventoryItem(item);
+                                          setRemoveInventoryQty('');
+                                          setRemoveInventoryReason('Expired');
+                                          setInventoryStatus('');
+                                        }}
                                         className="rounded-lg bg-red-700 px-3 py-1 text-xs font-bold text-white hover:bg-red-800"
                                       >
                                         Remove
@@ -5039,6 +5103,65 @@ export default function SupervisorPage() {
                     className="rounded-lg bg-green-700 px-4 py-2 text-sm font-bold text-white hover:bg-green-800"
                   >
                     Save Inventory
+                  </button>
+                  {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedRemoveInventoryItem && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+              <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl">
+                <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">Remove Inventory</div>
+                    <div className="text-sm text-slate-500">{selectedRemoveInventoryItem.itemName}</div>
+                    <div className="text-xs text-slate-500">Qty on hand: {selectedRemoveInventoryItem.qtyOnHand}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRemoveInventoryItem(null)}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Quantity *
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={removeInventoryQty}
+                      onChange={(event) => setRemoveInventoryQty(event.target.value)}
+                      inputMode="numeric"
+                      placeholder="1"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Reason
+                    <select
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={removeInventoryReason}
+                      onChange={(event) => setRemoveInventoryReason(event.target.value)}
+                    >
+                      <option value="Expired">Expired</option>
+                      <option value="Damaged">Damaged</option>
+                      <option value="Shrink">Shrink</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+                  <button
+                    type="button"
+                    onClick={handleRemoveInventoryQuantity}
+                    className="rounded-lg bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800"
+                  >
+                    Save Removal
                   </button>
                   {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
                 </div>
