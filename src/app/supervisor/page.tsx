@@ -3702,6 +3702,54 @@ export default function SupervisorPage() {
     }
   }
 
+  async function handleDeleteSupplyRoom(room: InventorySupplyRoom) {
+    const confirmed = window.confirm(
+      `Delete supply room "${room.name}"? This can only be done if the room has no inventory items.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setInventoryStatus('Checking supply room inventory...');
+
+    const { data: items, error: itemsError } = await supabase
+      .from('inventory_items')
+      .select('id')
+      .eq('supply_room_id', room.id)
+      .limit(1);
+
+    if (itemsError) {
+      console.error('Failed to check supply room inventory:', itemsError);
+      setInventoryStatus('Unable to check supply room inventory.');
+      return;
+    }
+
+    if ((items ?? []).length > 0) {
+      setInventoryStatus('Cannot delete supply room. Remove or transfer inventory items first.');
+      return;
+    }
+
+    setInventoryStatus('Deleting supply room...');
+
+    const { error } = await supabase.from('inventory_supply_rooms').delete().eq('id', room.id);
+
+    if (error) {
+      console.error('Failed to delete supply room:', error);
+      setInventoryStatus('Unable to delete supply room.');
+      return;
+    }
+
+    if (selectedSupplyRoomId === room.id) {
+      setSelectedSupplyRoomId('');
+      setShowInventoryRoomDetail(false);
+      setInventoryItems([]);
+    }
+
+    setInventoryStatus('Supply room deleted.');
+    await loadInventorySupplyRooms();
+  }
+
   function toggleTile(tileId: string) {
     setActiveTile((current) => (current === tileId ? null : tileId));
   }
@@ -5024,6 +5072,26 @@ export default function SupervisorPage() {
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
                               <div className="mt-1 text-xs text-slate-500">Open inventory room</div>
+                              <div className="mt-3">
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleDeleteSupplyRoom(room);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      handleDeleteSupplyRoom(room);
+                                    }
+                                  }}
+                                  className="inline-flex rounded-lg border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-100"
+                                >
+                                  Delete Supply Room
+                                </span>
+                              </div>
                             </button>
                           ))}
                         </div>
