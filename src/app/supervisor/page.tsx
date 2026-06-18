@@ -227,6 +227,7 @@ type InventoryItem = {
   itemNumber: string;
   qtyOnHand: number;
   par: number;
+  unitCost: number;
   lotCount: number;
   nearestExpiration: string;
   createdAt: string;
@@ -474,6 +475,7 @@ export default function SupervisorPage() {
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
   const [newInventoryItemPar, setNewInventoryItemPar] = useState('');
+  const [newInventoryItemUnitCost, setNewInventoryItemUnitCost] = useState('');
   const [selectedAddInventoryItem, setSelectedAddInventoryItem] = useState<InventoryItem | null>(null);
   const [addInventoryQty, setAddInventoryQty] = useState('');
   const [addInventoryLotNumber, setAddInventoryLotNumber] = useState('');
@@ -493,6 +495,7 @@ export default function SupervisorPage() {
   const [editInventoryItemName, setEditInventoryItemName] = useState('');
   const [editInventoryItemNumber, setEditInventoryItemNumber] = useState('');
   const [editInventoryItemPar, setEditInventoryItemPar] = useState('');
+  const [editInventoryItemUnitCost, setEditInventoryItemUnitCost] = useState('');
 
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [inventoryReportStartDate, setInventoryReportStartDate] = useState('');
@@ -3488,6 +3491,7 @@ export default function SupervisorPage() {
         itemNumber: row.item_number ?? '',
         qtyOnHand: row.qty_on_hand ?? 0,
         par: row.par ?? 0,
+        unitCost: Number(row.unit_cost ?? 0),
         lotCount: lotSummaryByItemId[row.id]?.lotCount ?? 0,
         nearestExpiration: lotSummaryByItemId[row.id]?.nearestExpiration ?? '',
         createdAt: row.created_at,
@@ -3542,6 +3546,7 @@ export default function SupervisorPage() {
     const itemName = newInventoryItemName.trim();
     const itemNumber = newInventoryItemNumber.trim();
     const par = Number(newInventoryItemPar);
+    const unitCost = newInventoryItemUnitCost.trim() ? Number(newInventoryItemUnitCost) : 0;
 
     if (!selectedSupplyRoomId) {
       setInventoryStatus('Select a supply room first.');
@@ -3558,6 +3563,11 @@ export default function SupervisorPage() {
       return;
     }
 
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      setInventoryStatus('Enter a valid unit cost.');
+      return;
+    }
+
     if (itemNumber && inventoryItems.some((item) => item.itemNumber.toLowerCase() === itemNumber.toLowerCase())) {
       setInventoryStatus('An item with this item number already exists in this supply room.');
       return;
@@ -3571,6 +3581,7 @@ export default function SupervisorPage() {
       item_number: itemNumber || null,
       qty_on_hand: 0,
       par,
+      unit_cost: unitCost,
     });
 
     if (error) {
@@ -3582,6 +3593,7 @@ export default function SupervisorPage() {
     setNewInventoryItemName('');
     setNewInventoryItemNumber('');
     setNewInventoryItemPar('');
+    setNewInventoryItemUnitCost('');
     setInventoryStatus('Inventory item created.');
     await loadInventoryItems(selectedSupplyRoomId);
   }
@@ -3595,6 +3607,7 @@ export default function SupervisorPage() {
     const itemName = editInventoryItemName.trim();
     const itemNumber = editInventoryItemNumber.trim();
     const par = Number(editInventoryItemPar);
+    const unitCost = editInventoryItemUnitCost.trim() ? Number(editInventoryItemUnitCost) : 0;
 
     if (!itemName) {
       setInventoryStatus('Enter an item name.');
@@ -3603,6 +3616,11 @@ export default function SupervisorPage() {
 
     if (!Number.isFinite(par) || par < 0) {
       setInventoryStatus('Enter a valid PAR.');
+      return;
+    }
+
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      setInventoryStatus('Enter a valid unit cost.');
       return;
     }
 
@@ -3626,6 +3644,7 @@ export default function SupervisorPage() {
         item_name: itemName,
         item_number: itemNumber || null,
         par,
+        unit_cost: unitCost,
       })
       .eq('id', selectedEditInventoryItem.id);
 
@@ -3639,6 +3658,7 @@ export default function SupervisorPage() {
     setEditInventoryItemName('');
     setEditInventoryItemNumber('');
     setEditInventoryItemPar('');
+    setEditInventoryItemUnitCost('');
     setInventoryStatus('Inventory item updated.');
     await loadInventoryItems(selectedSupplyRoomId);
   }
@@ -5696,6 +5716,16 @@ export default function SupervisorPage() {
                                   placeholder="12"
                                 />
                               </label>
+                              <label className="text-xs font-semibold text-slate-600">
+                                Unit Cost
+                                <input
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                  value={newInventoryItemUnitCost}
+                                  onChange={(event) => setNewInventoryItemUnitCost(event.target.value)}
+                                  inputMode="decimal"
+                                  placeholder="0.00"
+                                />
+                              </label>
                             </div>
                             <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
                               <button
@@ -5933,6 +5963,16 @@ export default function SupervisorPage() {
                       value={editInventoryItemPar}
                       onChange={(event) => setEditInventoryItemPar(event.target.value)}
                       inputMode="numeric"
+                    />
+                  </label>
+
+                  <label className="text-xs font-semibold text-slate-600">
+                    Unit Cost
+                    <input
+                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      value={editInventoryItemUnitCost}
+                      onChange={(event) => setEditInventoryItemUnitCost(event.target.value)}
+                      inputMode="decimal"
                     />
                   </label>
                 </div>
