@@ -443,6 +443,8 @@ export default function SupervisorPage() {
   const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
+  const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
+  const [showCreateInventoryItemForm, setShowCreateInventoryItemForm] = useState(false);
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
   const [newInventoryItemPar, setNewInventoryItemPar] = useState('');
@@ -4960,26 +4962,38 @@ export default function SupervisorPage() {
             <div className="space-y-4">
               {!showInventoryRoomDetail && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
-                <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
-                  <label className="flex-1 text-xs font-semibold text-slate-600">
-                    New Supply Room Name
-                    <input
-                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                      value={newSupplyRoomName}
-                      onChange={(event) => setNewSupplyRoomName(event.target.value)}
-                      placeholder="Main Supply Room"
-                    />
-                  </label>
-
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">Supply Rooms</div>
                   <button
                     type="button"
-                    onClick={handleCreateSupplyRoom}
+                    onClick={() => setShowCreateSupplyRoomForm((value) => !value)}
                     className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
                   >
-                    Create Supply Room
+                    {showCreateSupplyRoomForm ? 'Cancel' : 'Add Supply Room'}
                   </button>
                 </div>
+
+                {showCreateSupplyRoomForm && (
+                  <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
+                    <label className="flex-1 text-xs font-semibold text-slate-600">
+                      New Supply Room Name
+                      <input
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={newSupplyRoomName}
+                        onChange={(event) => setNewSupplyRoomName(event.target.value)}
+                        placeholder="Main Supply Room"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={handleCreateSupplyRoom}
+                      className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                    >
+                      Create Supply Room
+                    </button>
+                  </div>
+                )}
 
                 {inventoryStatus && <div className="mt-3 text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
               </div>
@@ -5039,7 +5053,18 @@ export default function SupervisorPage() {
                           </div>
 
                           <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                            <div className="text-sm font-bold text-slate-900">Add Inventory Item</div>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="text-sm font-bold text-slate-900">Inventory Items</div>
+                              <button
+                                type="button"
+                                onClick={() => setShowCreateInventoryItemForm((value) => !value)}
+                                className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                              >
+                                {showCreateInventoryItemForm ? 'Cancel' : 'Add Inventory Item'}
+                              </button>
+                            </div>
+
+                            {showCreateInventoryItemForm && (
                             <div className="mt-3 grid gap-3 md:grid-cols-4">
                               <label className="text-xs font-semibold text-slate-600 md:col-span-2">
                                 Item Name
@@ -5080,6 +5105,7 @@ export default function SupervisorPage() {
                               </button>
                               {inventoryStatus && <div className="text-sm font-semibold text-slate-700">{inventoryStatus}</div>}
                             </div>
+                            )}
                           </div>
 
                           <div className="overflow-x-auto rounded-xl border border-slate-200">
