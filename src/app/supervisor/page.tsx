@@ -3319,6 +3319,32 @@ export default function SupervisorPage() {
       });
   }
 
+  function getInventoryExpirationClass(expirationDate: string) {
+    if (!expirationDate) {
+      return 'text-slate-700';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expiration = new Date(`${expirationDate}T00:00:00`);
+    const daysUntilExpiration = Math.ceil((expiration.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntilExpiration < 0) {
+      return 'rounded-lg bg-red-100 px-2 py-1 font-bold text-red-800';
+    }
+
+    if (daysUntilExpiration <= 30) {
+      return 'rounded-lg bg-orange-100 px-2 py-1 font-bold text-orange-800';
+    }
+
+    if (daysUntilExpiration <= 90) {
+      return 'rounded-lg bg-amber-100 px-2 py-1 font-bold text-amber-800';
+    }
+
+    return 'text-slate-700';
+  }
+
   async function loadInventorySupplyRooms() {
     const { data, error } = await supabase
       .from('inventory_supply_rooms')
@@ -5217,7 +5243,11 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.par}</td>
                                   <td className="px-3 py-2 text-slate-700">{item.lotCount}</td>
-                                  <td className="px-3 py-2 text-slate-700">{item.nearestExpiration || '—'}</td>
+                                  <td className="px-3 py-2">
+                                    <span className={getInventoryExpirationClass(item.nearestExpiration)}>
+                                      {item.nearestExpiration || '—'}
+                                    </span>
+                                  </td>
                                   <td className="px-3 py-2 text-slate-700">{variance}</td>
                                   <td
                                     className={`px-3 py-2 font-semibold ${
