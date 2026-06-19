@@ -230,6 +230,11 @@ type InventoryItem = {
   unitCost: number;
   lotCount: number;
   nearestExpiration: string;
+  orderStatus: string;
+  orderedBy: string;
+  orderedDate: string;
+  expectedDeliveryDate: string;
+  receivedDate: string;
   createdAt: string;
 };
 
@@ -3475,6 +3480,11 @@ export default function SupervisorPage() {
         unitCost: row.unit_cost ?? 0,
         lotCount: 0,
         nearestExpiration: '',
+        orderStatus: row.order_status ?? 'NEEDS_ORDER',
+        orderedBy: row.ordered_by ?? '',
+        orderedDate: row.ordered_date ?? '',
+        expectedDeliveryDate: row.expected_delivery_date ?? '',
+        receivedDate: row.received_date ?? '',
         createdAt: row.created_at,
       })),
     );
@@ -3554,6 +3564,11 @@ export default function SupervisorPage() {
         unitCost: Number(row.unit_cost ?? 0),
         lotCount: lotSummaryByItemId[row.id]?.lotCount ?? 0,
         nearestExpiration: lotSummaryByItemId[row.id]?.nearestExpiration ?? '',
+        orderStatus: row.order_status ?? 'NEEDS_ORDER',
+        orderedBy: row.ordered_by ?? '',
+        orderedDate: row.ordered_date ?? '',
+        expectedDeliveryDate: row.expected_delivery_date ?? '',
+        receivedDate: row.received_date ?? '',
         createdAt: row.created_at,
       })),
     );
