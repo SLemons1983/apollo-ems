@@ -503,6 +503,8 @@ export default function SupervisorPage() {
   const [inventoryReportStartDate, setInventoryReportStartDate] = useState('');
   const [inventoryReportEndDate, setInventoryReportEndDate] = useState('');
   const [inventoryReportSupplyRoomId, setInventoryReportSupplyRoomId] = useState('');
+  const [inventoryReportItemId, setInventoryReportItemId] = useState('');
+  const [inventoryReportReason, setInventoryReportReason] = useState('');
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
   const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
   const inventoryToday = new Date(new Date().toDateString());
@@ -526,40 +528,6 @@ export default function SupervisorPage() {
     (total, item) => total + (item.qtyOnHand * item.unitCost),
     0,
   );
-
-  const inventoryUsageByItemRows = Object.values(
-    inventoryUsageTransactions.reduce<Record<string, { itemId: string; quantity: number; transactions: number }>>((summary, transaction) => {
-      const current = summary[transaction.itemId] ?? { itemId: transaction.itemId, quantity: 0, transactions: 0 };
-
-      summary[transaction.itemId] = {
-        itemId: transaction.itemId,
-        quantity: current.quantity + transaction.quantity,
-        transactions: current.transactions + 1,
-      };
-
-      return summary;
-    }, {}),
-  ).sort((a, b) => b.quantity - a.quantity);
-
-  const inventoryUsageByRoomRows = Object.values(
-    inventoryUsageTransactions.reduce<Record<string, { roomId: string; quantity: number; transactions: number }>>((summary, transaction) => {
-      const roomId = transaction.sourceRoomId || 'unknown';
-
-      const current = summary[roomId] ?? {
-        roomId,
-        quantity: 0,
-        transactions: 0,
-      };
-
-      summary[roomId] = {
-        roomId,
-        quantity: current.quantity + transaction.quantity,
-        transactions: current.transactions + 1,
-      };
-
-      return summary;
-    }, {}),
-  ).sort((a, b) => b.quantity - a.quantity);
 
   function getInventoryItemLabel(itemId: string) {
     const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === itemId)
@@ -3615,6 +3583,14 @@ export default function SupervisorPage() {
       query = query.eq('source_room_id', inventoryReportSupplyRoomId);
     }
 
+    if (inventoryReportItemId) {
+      query = query.eq('item_id', inventoryReportItemId);
+    }
+
+    if (inventoryReportReason) {
+      query = query.eq('reason', inventoryReportReason);
+    }
+
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
@@ -5423,8 +5399,6 @@ export default function SupervisorPage() {
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       {[
                         'Usage by Date Range',
-                        'Usage by Item',
-                        'Usage by Supply Room',
                         'Transfers',
                         'Expired Inventory',
                         'Expiring Soon',
@@ -5471,11 +5445,11 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Usage by Supply Room' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
+                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
-                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Usage by Supply Room' ? (
+                                  {inventoryReportModal === 'Usage by Date Range' ? (
                                     <>
                                       <select
                                         value={inventoryReportSupplyRoomId}
@@ -5501,9 +5475,9 @@ export default function SupervisorPage() {
                                   )}
                                 </div>
 
-                                {(inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Usage by Supply Room') && (
+                                {inventoryReportModal === 'Usage by Date Range' && (
                                   <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
-                                    <div className="grid gap-3 md:grid-cols-3">
+                                    <div className="grid gap-3 md:grid-cols-5">
                                       <label className="text-xs font-semibold text-slate-700">
                                         Start Date
                                         <input
@@ -5522,6 +5496,37 @@ export default function SupervisorPage() {
                                           onChange={(event) => setInventoryReportEndDate(event.target.value)}
                                           className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                                         />
+                                      </label>
+
+                                      <label className="text-xs font-semibold text-slate-700">
+                                        Item
+                                        <select
+                                          value={inventoryReportItemId}
+                                          onChange={(event) => setInventoryReportItemId(event.target.value)}
+                                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        >
+                                          <option value="">All Items</option>
+                                          {allInventoryItems.map((item) => (
+                                            <option key={item.id} value={item.id}>
+                                              {item.itemName}{item.itemNumber ? ` (${item.itemNumber})` : ''}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </label>
+
+                                      <label className="text-xs font-semibold text-slate-700">
+                                        Reason
+                                        <select
+                                          value={inventoryReportReason}
+                                          onChange={(event) => setInventoryReportReason(event.target.value)}
+                                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        >
+                                          <option value="">All Reasons</option>
+                                          <option value="Expired">Expired</option>
+                                          <option value="Damaged">Damaged</option>
+                                          <option value="Shrink">Shrink</option>
+                                          <option value="Other">Other</option>
+                                        </select>
                                       </label>
 
                                       <div className="flex items-end">
@@ -5571,16 +5576,6 @@ export default function SupervisorPage() {
                               {inventoryReportModal === 'Usage by Date Range' && (
                                 <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
                                   {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
-                                </div>
-                              )}
-                              {inventoryReportModal === 'Usage by Item' && (
-                                <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
-                                  {inventoryUsageByItemRows.length} item{inventoryUsageByItemRows.length === 1 ? '' : 's'}
-                                </div>
-                              )}
-                              {inventoryReportModal === 'Usage by Supply Room' && (
-                                <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
-                                  {inventoryUsageByRoomRows.length} room{inventoryUsageByRoomRows.length === 1 ? '' : 's'}
                                 </div>
                               )}
                             </div>
@@ -5742,60 +5737,6 @@ export default function SupervisorPage() {
                                           <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
                                           <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
                                           <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )
-                            ) : inventoryReportModal === 'Usage by Item' ? (
-                              inventoryUsageByItemRows.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  Run the report to summarize usage by item for the selected date range.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Qty Removed</th>
-                                        <th className="px-3 py-2">Remove Events</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {inventoryUsageByItemRows.map((row) => (
-                                        <tr key={row.itemId} className="border-t border-slate-100">
-                                          <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(row.itemId)}</td>
-                                          <td className="px-3 py-2 font-bold text-slate-900">{row.quantity}</td>
-                                          <td className="px-3 py-2 text-slate-700">{row.transactions}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )
-                            ) : inventoryReportModal === 'Usage by Supply Room' ? (
-                              inventoryUsageByRoomRows.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  Run the report to summarize usage by supply room for the selected date range.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Supply Room</th>
-                                        <th className="px-3 py-2">Qty Removed</th>
-                                        <th className="px-3 py-2">Remove Events</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {inventoryUsageByRoomRows.map((row) => (
-                                        <tr key={row.roomId} className="border-t border-slate-100">
-                                          <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryRoomLabel(row.roomId)}</td>
-                                          <td className="px-3 py-2 font-bold text-slate-900">{row.quantity}</td>
-                                          <td className="px-3 py-2 text-slate-700">{row.transactions}</td>
                                         </tr>
                                       ))}
                                     </tbody>
