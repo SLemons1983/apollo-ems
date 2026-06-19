@@ -471,6 +471,7 @@ export default function SupervisorPage() {
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
   const [showCreateInventoryReports, setShowCreateInventoryReports] = useState(false);
+  const [inventoryReportModal, setInventoryReportModal] = useState<string | null>(null);
   const [showCreateInventoryItemForm, setShowCreateInventoryItemForm] = useState(false);
   const [newInventoryItemName, setNewInventoryItemName] = useState('');
   const [newInventoryItemNumber, setNewInventoryItemNumber] = useState('');
@@ -5342,6 +5343,7 @@ export default function SupervisorPage() {
                         <button
                           key={reportName}
                           type="button"
+                          onClick={() => setInventoryReportModal(reportName)}
                           className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-bold text-slate-700 hover:bg-slate-100"
                         >
                           {reportName}
@@ -5349,111 +5351,168 @@ export default function SupervisorPage() {
                       ))}
                     </div>
 
-                    <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-bold text-amber-900">Low Stock / Order Now</div>
-                          <div className="text-xs text-amber-800">
-                            Current selected room only. Items appear here when Qty On Hand is below PAR.
+                    {inventoryReportModal && (
+                      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+                        <div className="mt-6 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+                          <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                            <div>
+                              <div className="text-lg font-bold text-slate-900">{inventoryReportModal}</div>
+                              <div className="text-sm text-slate-500">Inventory report viewer</div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                                onClick={() => window.alert('Print / Save PDF will be added in a future update.')}
+                              >
+                                Print / Save PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setInventoryReportModal(null)}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-sm font-bold text-slate-900">Report Parameters</div>
+
+                            {inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' ? (
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
+                                  <div className="mt-1 text-sm font-bold text-slate-900">
+                                    {inventorySupplyRooms.find((room) => room.id === selectedSupplyRoomId)?.name ?? 'Selected Supply Room'}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
+                                </div>
+
+                                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Report Rule</div>
+                                  <div className="mt-1 text-sm font-bold text-slate-900">
+                                    {inventoryReportModal === 'Expired Inventory' ? 'Expiration date has passed' : 'Qty On Hand below PAR'}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {inventoryReportModal === 'Expired Inventory'
+                                      ? 'Lots with past expiration dates are marked Expired.'
+                                      : 'Items below PAR are marked Order Now.'}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-sm text-slate-600">
+                                Parameters for this report will be shown here as each report is moved into this viewer.
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-sm font-bold text-slate-900">Report Results</div>
+                              {inventoryReportModal === 'Low Stock / Order Now' && (
+                                <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-900">
+                                  {lowStockInventoryItems.length} item{lowStockInventoryItems.length === 1 ? '' : 's'}
+                                </div>
+                              )}
+                              {inventoryReportModal === 'Expired Inventory' && (
+                                <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-900">
+                                  {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
+                                </div>
+                              )}
+                            </div>
+
+                            {inventoryReportModal === 'Low Stock / Order Now' ? (
+                              lowStockInventoryItems.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  No low-stock items found for the selected supply room.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Item Number</th>
+                                        <th className="px-3 py-2">Qty On Hand</th>
+                                        <th className="px-3 py-2">PAR</th>
+                                        <th className="px-3 py-2">Variance</th>
+                                        <th className="px-3 py-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {lowStockInventoryItems.map((item) => {
+                                        const variance = item.qtyOnHand - item.par;
+
+                                        return (
+                                          <tr key={item.id} className="border-t border-slate-100">
+                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                            <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                            <td className="px-3 py-2 font-bold text-red-700">{variance}</td>
+                                            <td className="px-3 py-2">
+                                              <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800">
+                                                Order Now
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )
+                            ) : inventoryReportModal === 'Expired Inventory' ? (
+                              expiredInventoryLots.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  No expired lots found for the selected supply room.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Item Number</th>
+                                        <th className="px-3 py-2">Lot Number</th>
+                                        <th className="px-3 py-2">Manufacturer</th>
+                                        <th className="px-3 py-2">Qty On Hand</th>
+                                        <th className="px-3 py-2">Expiration Date</th>
+                                        <th className="px-3 py-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {expiredInventoryLots.map(({ item, lot }) => (
+                                        <tr key={lot.id} className="border-t border-slate-100">
+                                          <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                          <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                          <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
+                                          <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
+                                          <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
+                                          <td className="px-3 py-2 font-bold text-red-700">{lot.expirationDate}</td>
+                                          <td className="px-3 py-2">
+                                            <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
+                                              Expired
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )
+                            ) : (
+                              <div className="mt-2 text-sm text-slate-600">
+                                Report results will appear here as each report is moved into this viewer.
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-amber-900">
-                          {lowStockInventoryItems.length} item{lowStockInventoryItems.length === 1 ? '' : 's'}
-                        </div>
                       </div>
-
-                      {lowStockInventoryItems.length === 0 ? (
-                        <div className="mt-4 rounded-lg border border-amber-100 bg-white p-3 text-sm text-slate-600">
-                          No low-stock items found for the selected supply room.
-                        </div>
-                      ) : (
-                        <div className="mt-4 overflow-x-auto rounded-lg border border-amber-100 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-amber-100 text-amber-950">
-                              <tr>
-                                <th className="px-3 py-2">Item</th>
-                                <th className="px-3 py-2">Item Number</th>
-                                <th className="px-3 py-2">Qty On Hand</th>
-                                <th className="px-3 py-2">PAR</th>
-                                <th className="px-3 py-2">Variance</th>
-                                <th className="px-3 py-2">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {lowStockInventoryItems.map((item) => (
-                                <tr key={item.id} className="border-t border-amber-100">
-                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                  <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                  <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                  <td className="px-3 py-2 text-slate-700">{item.par}</td>
-                                  <td className="px-3 py-2 font-bold text-red-700">{item.qtyOnHand - item.par}</td>
-                                  <td className="px-3 py-2">
-                                    <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
-                                      Order Now
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-
-
-                    <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-bold text-red-900">Expired Inventory</div>
-                          <div className="text-xs text-red-800">
-                            Current selected room only. Lots appear here when the expiration date has passed.
-                          </div>
-                        </div>
-                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-red-900">
-                          {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
-                        </div>
-                      </div>
-
-                      {expiredInventoryLots.length === 0 ? (
-                        <div className="mt-4 rounded-lg border border-red-100 bg-white p-3 text-sm text-slate-600">
-                          No expired lots found for the selected supply room.
-                        </div>
-                      ) : (
-                        <div className="mt-4 overflow-x-auto rounded-lg border border-red-100 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-red-100 text-red-950">
-                              <tr>
-                                <th className="px-3 py-2">Item</th>
-                                <th className="px-3 py-2">Item Number</th>
-                                <th className="px-3 py-2">Lot Number</th>
-                                <th className="px-3 py-2">Manufacturer</th>
-                                <th className="px-3 py-2">Qty On Hand</th>
-                                <th className="px-3 py-2">Expiration Date</th>
-                                <th className="px-3 py-2">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {expiredInventoryLots.map(({ item, lot }) => (
-                                <tr key={lot.id} className="border-t border-red-100">
-                                  <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                  <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
-                                  <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
-                                  <td className="px-3 py-2 font-bold text-red-700">{lot.expirationDate}</td>
-                                  <td className="px-3 py-2">
-                                    <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
-                                      Expired
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-
+                    )}
 
                     <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
