@@ -3628,6 +3628,31 @@ export default function SupervisorPage() {
     }
   }
 
+  async function handleMarkInventoryItemAwaitingDelivery(item: InventoryItem) {
+    setInventoryStatus(`Marking ${item.itemName} as awaiting delivery...`);
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .update({
+        order_status: 'AWAITING_DELIVERY',
+        expected_delivery_date: item.expectedDeliveryDate || null,
+      })
+      .eq('id', item.id);
+
+    if (error) {
+      console.error('Failed to mark inventory item awaiting delivery:', error);
+      setInventoryStatus('Unable to mark item as awaiting delivery.');
+      return;
+    }
+
+    setInventoryStatus(`${item.itemName} marked as awaiting delivery.`);
+    await loadAllInventoryItemsForReports();
+
+    if (selectedSupplyRoomId) {
+      await loadInventoryItems(selectedSupplyRoomId);
+    }
+  }
+
   async function handleRunInventoryUsageReport() {
     if (!inventoryReportStartDate || !inventoryReportEndDate) {
       setInventoryStatus('Select a start and end date for the usage report.');
@@ -5946,7 +5971,7 @@ export default function SupervisorPage() {
                                               <tr key={item.id} className="border-t border-slate-100">
                                                 <td className="px-3 py-2 text-center">
                                                   <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-400 bg-white text-xs font-bold text-blue-700">
-                                                    {item.orderStatus === 'ORDERED' ? '✓' : ''}
+                                                    {item.orderStatus === 'ORDERED' || item.orderStatus === 'AWAITING_DELIVERY' ? '✓' : ''}
                                                   </span>
                                                 </td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
@@ -5962,7 +5987,17 @@ export default function SupervisorPage() {
                                                   </span>
                                                   {item.orderedBy && (
                                                     <div className="mt-1 text-[10px] text-slate-500">
-                                                      By {getInventoryUserLabel(item.orderedBy)}
+                                                      Ordered by {getInventoryUserLabel(item.orderedBy)}
+                                                    </div>
+                                                  )}
+                                                  {item.orderedDate && (
+                                                    <div className="text-[10px] text-slate-500">
+                                                      Ordered {new Date(item.orderedDate).toLocaleString()}
+                                                    </div>
+                                                  )}
+                                                  {item.orderStatus === 'AWAITING_DELIVERY' && (
+                                                    <div className="mt-1 text-[10px] font-bold text-purple-700">
+                                                      Awaiting delivery
                                                     </div>
                                                   )}
                                                 </td>
@@ -5970,14 +6005,31 @@ export default function SupervisorPage() {
                                                   <div className="h-6 min-w-20 border-b border-slate-400"></div>
                                                 </td>
                                                 <td className="apollo-no-print px-3 py-2">
-                                                  <button
-                                                    type="button"
-                                                    disabled={item.orderStatus === 'ORDERED'}
-                                                    onClick={() => handleMarkInventoryItemOrdered(item)}
-                                                    className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                                                  >
-                                                    {item.orderStatus === 'ORDERED' ? 'Ordered' : 'Mark Ordered'}
-                                                  </button>
+                                                  {item.orderStatus === 'ORDERED' ? (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleMarkInventoryItemAwaitingDelivery(item)}
+                                                      className="rounded-lg border border-purple-200 bg-purple-50 px-2 py-1 text-[11px] font-bold text-purple-800 hover:bg-purple-100"
+                                                    >
+                                                      Awaiting Delivery
+                                                    </button>
+                                                  ) : item.orderStatus === 'AWAITING_DELIVERY' ? (
+                                                    <button
+                                                      type="button"
+                                                      disabled
+                                                      className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-400"
+                                                    >
+                                                      Awaiting Delivery
+                                                    </button>
+                                                  ) : (
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleMarkInventoryItemOrdered(item)}
+                                                      className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-bold text-blue-800 hover:bg-blue-100"
+                                                    >
+                                                      Mark Ordered
+                                                    </button>
+                                                  )}
                                                 </td>
                                               </tr>
                                             ))}
