@@ -5480,6 +5480,39 @@ export default function SupervisorPage() {
                                   )}
                                 </div>
 
+                                {inventoryReportModal === 'Order List' && (
+                                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                    {(() => {
+                                      const orderItems = allInventoryItems
+                                        .filter((item) => item.par > 0 && item.qtyOnHand < item.par)
+                                        .filter((item) => !inventoryReportSupplyRoomId || item.supplyRoomId === inventoryReportSupplyRoomId);
+
+                                      const supplyRoomCount = new Set(orderItems.map((item) => item.supplyRoomId)).size;
+                                      const totalUnitsToOrder = orderItems.reduce((sum, item) => sum + (item.par - item.qtyOnHand), 0);
+
+                                      return (
+                                        <>
+                                          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Order Summary</div>
+                                          <div className="mt-2 grid gap-2 text-sm">
+                                            <div className="flex justify-between gap-3">
+                                              <span className="text-slate-600">Supply Rooms Included</span>
+                                              <span className="font-bold text-slate-900">{supplyRoomCount}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-3">
+                                              <span className="text-slate-600">Items Requiring Order</span>
+                                              <span className="font-bold text-slate-900">{orderItems.length}</span>
+                                            </div>
+                                            <div className="flex justify-between gap-3">
+                                              <span className="text-slate-600">Total Units To Order</span>
+                                              <span className="font-bold text-red-700">{totalUnitsToOrder}</span>
+                                            </div>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
+
                                 {inventoryReportModal === 'Usage by Date Range' && (
                                   <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
                                     <div className="grid gap-3 md:grid-cols-5">
@@ -5781,8 +5814,11 @@ export default function SupervisorPage() {
                                   <div className="mt-4 space-y-4">
                                     {groupedOrderItems.map(({ room, items }) => (
                                       <div key={room.id} className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">
-                                          {room.name}
+                                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
+                                          <div className="text-sm font-bold text-slate-900">{room.name}</div>
+                                          <div className="mt-1 text-xs font-semibold text-slate-500">
+                                            {items.length} item{items.length === 1 ? '' : 's'} requiring order • {items.reduce((sum, item) => sum + (item.par - item.qtyOnHand), 0)} unit{items.reduce((sum, item) => sum + (item.par - item.qtyOnHand), 0) === 1 ? '' : 's'} to order
+                                          </div>
                                         </div>
                                         <table className="w-full text-left text-xs">
                                           <thead className="bg-slate-100 text-slate-800">
