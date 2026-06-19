@@ -5450,7 +5450,7 @@ export default function SupervisorPage() {
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
-                                  {inventoryReportModal === 'Usage by Date Range' ? (
+                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' ? (
                                     <>
                                       <select
                                         value={inventoryReportSupplyRoomId}
@@ -5464,14 +5464,18 @@ export default function SupervisorPage() {
                                           </option>
                                         ))}
                                       </select>
-                                      <div className="mt-1 text-xs text-slate-500">Filters usage transactions by source supply room.</div>
+                                      <div className="mt-1 text-xs text-slate-500">
+                                        {inventoryReportModal === 'Usage by Date Range'
+                                          ? 'Filters usage transactions by source supply room.'
+                                          : 'Builds an order worksheet for one supply room or all supply rooms.'}
+                                      </div>
                                     </>
                                   ) : (
                                     <>
                                       <div className="mt-1 text-sm font-bold text-slate-900">
                                         {inventorySupplyRooms.find((room) => room.id === selectedSupplyRoomId)?.name ?? 'Selected Supply Room'}
                                       </div>
-                                      <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
+                                      <div className="mt-1 text-xs text-slate-500">This report uses the currently selected supply room.</div>
                                     </>
                                   )}
                                 </div>
@@ -5746,44 +5750,70 @@ export default function SupervisorPage() {
                               )
                             ) : inventoryReportModal === 'Order List' ? (
                               (() => {
-                                const orderItems = inventoryItems
+                                const orderItems = allInventoryItems
                                   .filter((item) => item.par > 0 && item.qtyOnHand < item.par)
-                                  .sort((a, b) => (a.par - a.qtyOnHand) < (b.par - b.qtyOnHand) ? 1 : -1);
+                                  .filter((item) => !inventoryReportSupplyRoomId || item.supplyRoomId === inventoryReportSupplyRoomId)
+                                  .sort((a, b) => {
+                                    const roomCompare = getInventoryRoomLabel(a.supplyRoomId).localeCompare(getInventoryRoomLabel(b.supplyRoomId));
+                                    if (roomCompare !== 0) return roomCompare;
+                                    return (b.par - b.qtyOnHand) - (a.par - a.qtyOnHand);
+                                  });
+
+                                const groupedOrderItems = inventorySupplyRooms
+                                  .map((room) => ({
+                                    room,
+                                    items: orderItems.filter((item) => item.supplyRoomId === room.id),
+                                  }))
+                                  .filter((group) => group.items.length > 0);
+
+                                const generatedAt = new Date().toLocaleString();
 
                                 return orderItems.length === 0 ? (
                                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                    No items currently require ordering.
+                                    No items currently require ordering for the selected supply room filter.
                                   </div>
                                 ) : (
-                                  <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                    <table className="w-full text-left text-xs">
-                                      <thead className="bg-slate-100 text-slate-800">
-                                        <tr>
-                                          <th className="px-3 py-2">Item Name</th>
-                                          <th className="px-3 py-2">Item Number</th>
-                                          <th className="px-3 py-2">Qty On Hand</th>
-                                          <th className="px-3 py-2">PAR</th>
-                                          <th className="px-3 py-2">Qty To Order</th>
-                                          <th className="px-3 py-2">Ordered</th>
-                                          <th className="px-3 py-2">Qty Ordered</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {orderItems.map((item) => (
-                                          <tr key={item.id} className="border-t border-slate-100">
-                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                            <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
-                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                            <td className="px-3 py-2 text-slate-700">{item.par}</td>
-                                            <td className="px-3 py-2 font-bold text-red-700">
-                                              {item.par - item.qtyOnHand}
-                                            </td>
-                                            <td className="px-3 py-2 text-center text-lg">☐</td>
-                                            <td className="px-3 py-2">__________</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
+                                  <div className="mt-4 space-y-4">
+                                    {groupedOrderItems.map(({ room, items }) => (
+                                      <div key={room.id} className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">
+                                          {room.name}
+                                        </div>
+                                        <table className="w-full text-left text-xs">
+                                          <thead className="bg-slate-100 text-slate-800">
+                                            <tr>
+                                              <th className="px-3 py-2">Ordered</th>
+                                              <th className="px-3 py-2">Item Name</th>
+                                              <th className="px-3 py-2">Item Number</th>
+                                              <th className="px-3 py-2">Qty On Hand</th>
+                                              <th className="px-3 py-2">PAR</th>
+                                              <th className="px-3 py-2">Qty To Order</th>
+                                              <th className="px-3 py-2">Qty Ordered</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {items.map((item) => (
+                                              <tr key={item.id} className="border-t border-slate-100">
+                                                <td className="px-3 py-2 text-center text-lg">☐</td>
+                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                                <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                                <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                                <td className="px-3 py-2 font-bold text-red-700">
+                                                  {item.par - item.qtyOnHand}
+                                                </td>
+                                                <td className="px-3 py-2">__________</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    ))}
+
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                                      <div><span className="font-bold text-slate-900">Generated:</span> {generatedAt}</div>
+                                      <div><span className="font-bold text-slate-900">Total Items Requiring Order:</span> {orderItems.length}</div>
+                                    </div>
                                   </div>
                                 );
                               })()
