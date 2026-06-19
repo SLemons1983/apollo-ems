@@ -3653,6 +3653,31 @@ export default function SupervisorPage() {
     }
   }
 
+  async function handleMarkInventoryItemReceived(item: InventoryItem) {
+    setInventoryStatus(`Marking ${item.itemName} as received...`);
+
+    const { error } = await supabase
+      .from('inventory_items')
+      .update({
+        order_status: 'RECEIVED',
+        received_date: new Date().toISOString(),
+      })
+      .eq('id', item.id);
+
+    if (error) {
+      console.error('Failed to mark inventory item received:', error);
+      setInventoryStatus('Unable to mark item as received.');
+      return;
+    }
+
+    setInventoryStatus(`${item.itemName} marked as received. Use Add to place received supplies into inventory.`);
+    await loadAllInventoryItemsForReports();
+
+    if (selectedSupplyRoomId) {
+      await loadInventoryItems(selectedSupplyRoomId);
+    }
+  }
+
   async function handleRunInventoryUsageReport() {
     if (!inventoryReportStartDate || !inventoryReportEndDate) {
       setInventoryStatus('Select a start and end date for the usage report.');
@@ -5971,7 +5996,7 @@ export default function SupervisorPage() {
                                               <tr key={item.id} className="border-t border-slate-100">
                                                 <td className="px-3 py-2 text-center">
                                                   <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-400 bg-white text-xs font-bold text-blue-700">
-                                                    {item.orderStatus === 'ORDERED' || item.orderStatus === 'AWAITING_DELIVERY' ? '✓' : ''}
+                                                    {item.orderStatus === 'ORDERED' || item.orderStatus === 'AWAITING_DELIVERY' || item.orderStatus === 'RECEIVED' ? '✓' : ''}
                                                   </span>
                                                 </td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
@@ -6000,6 +6025,11 @@ export default function SupervisorPage() {
                                                       Awaiting delivery
                                                     </div>
                                                   )}
+                                                  {item.receivedDate && (
+                                                    <div className="mt-1 text-[10px] font-bold text-emerald-700">
+                                                      Received {new Date(item.receivedDate).toLocaleString()}
+                                                    </div>
+                                                  )}
                                                 </td>
                                                 <td className="px-3 py-2">
                                                   <div className="h-6 min-w-20 border-b border-slate-400"></div>
@@ -6016,10 +6046,18 @@ export default function SupervisorPage() {
                                                   ) : item.orderStatus === 'AWAITING_DELIVERY' ? (
                                                     <button
                                                       type="button"
+                                                      onClick={() => handleMarkInventoryItemReceived(item)}
+                                                      className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
+                                                    >
+                                                      Received
+                                                    </button>
+                                                  ) : item.orderStatus === 'RECEIVED' ? (
+                                                    <button
+                                                      type="button"
                                                       disabled
                                                       className="rounded-lg border border-slate-200 bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-400"
                                                     >
-                                                      Awaiting Delivery
+                                                      Received
                                                     </button>
                                                   ) : (
                                                     <button
