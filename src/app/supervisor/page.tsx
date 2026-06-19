@@ -466,6 +466,7 @@ export default function SupervisorPage() {
   const [selectedSupplyRoomId, setSelectedSupplyRoomId] = useState('');
   const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [allInventoryItems, setAllInventoryItems] = useState<InventoryItem[]>([]);
   const [inventoryLotsByItemId, setInventoryLotsByItemId] = useState<Record<string, InventoryLot[]>>({});
   const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
@@ -526,7 +527,9 @@ export default function SupervisorPage() {
   );
 
   function getInventoryItemLabel(itemId: string) {
-    const item = inventoryItems.find((inventoryItem) => inventoryItem.id === itemId);
+    const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === itemId)
+      ?? inventoryItems.find((inventoryItem) => inventoryItem.id === itemId);
+
     return item ? `${item.itemName}${item.itemNumber ? ` (${item.itemNumber})` : ''}` : itemId || '—';
   }
 
@@ -802,6 +805,7 @@ export default function SupervisorPage() {
         });
 
       loadInventorySupplyRooms();
+      loadAllInventoryItemsForReports();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -3444,6 +3448,33 @@ export default function SupervisorPage() {
     }));
 
     setInventorySupplyRooms(rooms);
+  }
+
+  async function loadAllInventoryItemsForReports() {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select('*')
+      .order('item_name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load all inventory items for reports:', error);
+      return;
+    }
+
+    setAllInventoryItems(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        supplyRoomId: row.supply_room_id,
+        itemName: row.item_name,
+        itemNumber: row.item_number ?? '',
+        qtyOnHand: row.qty_on_hand ?? 0,
+        par: row.par ?? 0,
+        unitCost: row.unit_cost ?? 0,
+        lotCount: 0,
+        nearestExpiration: '',
+        createdAt: row.created_at,
+      })),
+    );
   }
 
   async function loadInventoryItems(supplyRoomId: string) {
