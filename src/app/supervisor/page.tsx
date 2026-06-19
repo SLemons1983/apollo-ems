@@ -502,6 +502,7 @@ export default function SupervisorPage() {
   const [inventoryStatus, setInventoryStatus] = useState('');
   const [inventoryReportStartDate, setInventoryReportStartDate] = useState('');
   const [inventoryReportEndDate, setInventoryReportEndDate] = useState('');
+  const [inventoryReportSupplyRoomId, setInventoryReportSupplyRoomId] = useState('');
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
   const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
   const inventoryToday = new Date(new Date().toDateString());
@@ -3603,13 +3604,18 @@ export default function SupervisorPage() {
 
     setInventoryStatus('Running usage report...');
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('inventory_transactions')
       .select('*')
       .eq('transaction_type', 'REMOVE')
       .gte('created_at', `${inventoryReportStartDate}T00:00:00`)
-      .lte('created_at', `${inventoryReportEndDate}T23:59:59`)
-      .order('created_at', { ascending: false });
+      .lte('created_at', `${inventoryReportEndDate}T23:59:59`);
+
+    if (inventoryReportSupplyRoomId) {
+      query = query.eq('source_room_id', inventoryReportSupplyRoomId);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Failed to load inventory usage report:', error);
@@ -5469,10 +5475,30 @@ export default function SupervisorPage() {
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
-                                  <div className="mt-1 text-sm font-bold text-slate-900">
-                                    {inventorySupplyRooms.find((room) => room.id === selectedSupplyRoomId)?.name ?? 'Selected Supply Room'}
-                                  </div>
-                                  <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
+                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Usage by Supply Room' ? (
+                                    <>
+                                      <select
+                                        value={inventoryReportSupplyRoomId}
+                                        onChange={(event) => setInventoryReportSupplyRoomId(event.target.value)}
+                                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900"
+                                      >
+                                        <option value="">All Supply Rooms</option>
+                                        {inventorySupplyRooms.map((room) => (
+                                          <option key={room.id} value={room.id}>
+                                            {room.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <div className="mt-1 text-xs text-slate-500">Filters usage transactions by source supply room.</div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="mt-1 text-sm font-bold text-slate-900">
+                                        {inventorySupplyRooms.find((room) => room.id === selectedSupplyRoomId)?.name ?? 'Selected Supply Room'}
+                                      </div>
+                                      <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
+                                    </>
+                                  )}
                                 </div>
 
                                 {(inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Usage by Supply Room') && (
@@ -5511,39 +5537,6 @@ export default function SupervisorPage() {
                                   </div>
                                 )}
 
-                                <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                  <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Report Rule</div>
-                                  <div className="mt-1 text-sm font-bold text-slate-900">
-                                    {inventoryReportModal === 'Expired Inventory'
-                                      ? 'Expiration date has passed'
-                                      : inventoryReportModal === 'Expiring Soon'
-                                        ? 'Expires within 90 days'
-                                        : inventoryReportModal === 'Inventory Value'
-                                          ? 'Qty On Hand × Unit Cost'
-                                          : inventoryReportModal === 'Usage by Date Range'
-                                            ? 'Removed inventory transactions'
-                                            : inventoryReportModal === 'Usage by Item'
-                                              ? 'Removed inventory grouped by item'
-                                              : inventoryReportModal === 'Usage by Supply Room'
-                                                ? 'Removed inventory grouped by supply room'
-                                                : 'Qty On Hand below PAR'}
-                                  </div>
-                                  <div className="mt-1 text-xs text-slate-500">
-                                    {inventoryReportModal === 'Expired Inventory'
-                                      ? 'Lots with past expiration dates are marked Expired.'
-                                      : inventoryReportModal === 'Expiring Soon'
-                                        ? 'Lots expiring within the current 90 day window are shown.'
-                                        : inventoryReportModal === 'Inventory Value'
-                                          ? 'Replacement value is calculated from Qty On Hand and Unit Cost.'
-                                          : inventoryReportModal === 'Usage by Date Range'
-                                            ? 'Shows removed inventory transactions for the selected date range.'
-                                            : inventoryReportModal === 'Usage by Item'
-                                              ? 'Summarizes removed inventory totals by item for the selected date range.'
-                                              : inventoryReportModal === 'Usage by Supply Room'
-                                                ? 'Summarizes removed inventory totals by supply room for the selected date range.'
-                                                : 'Items below PAR are marked Order Now.'}
-                                  </div>
-                                </div>
                               </div>
                             ) : (
                               <div className="mt-2 text-sm text-slate-600">
@@ -5767,7 +5760,7 @@ export default function SupervisorPage() {
                                       <tr>
                                         <th className="px-3 py-2">Item</th>
                                         <th className="px-3 py-2">Qty Removed</th>
-                                        <th className="px-3 py-2">Transactions</th>
+                                        <th className="px-3 py-2">Remove Events</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -5794,7 +5787,7 @@ export default function SupervisorPage() {
                                       <tr>
                                         <th className="px-3 py-2">Supply Room</th>
                                         <th className="px-3 py-2">Qty Removed</th>
-                                        <th className="px-3 py-2">Transactions</th>
+                                        <th className="px-3 py-2">Remove Events</th>
                                       </tr>
                                     </thead>
                                     <tbody>
