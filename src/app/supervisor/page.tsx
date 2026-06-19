@@ -5380,7 +5380,7 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' ? (
+                            {inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
@@ -5393,12 +5393,22 @@ export default function SupervisorPage() {
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Report Rule</div>
                                   <div className="mt-1 text-sm font-bold text-slate-900">
-                                    {inventoryReportModal === 'Expired Inventory' ? 'Expiration date has passed' : 'Qty On Hand below PAR'}
+                                    {inventoryReportModal === 'Expired Inventory'
+                                      ? 'Expiration date has passed'
+                                      : inventoryReportModal === 'Expiring Soon'
+                                        ? 'Expires within 90 days'
+                                        : inventoryReportModal === 'Inventory Value'
+                                          ? 'Qty On Hand × Unit Cost'
+                                          : 'Qty On Hand below PAR'}
                                   </div>
                                   <div className="mt-1 text-xs text-slate-500">
                                     {inventoryReportModal === 'Expired Inventory'
                                       ? 'Lots with past expiration dates are marked Expired.'
-                                      : 'Items below PAR are marked Order Now.'}
+                                      : inventoryReportModal === 'Expiring Soon'
+                                        ? 'Lots expiring within the current 90 day window are shown.'
+                                        : inventoryReportModal === 'Inventory Value'
+                                          ? 'Replacement value is calculated from Qty On Hand and Unit Cost.'
+                                          : 'Items below PAR are marked Order Now.'}
                                   </div>
                                 </div>
                               </div>
@@ -5420,6 +5430,16 @@ export default function SupervisorPage() {
                               {inventoryReportModal === 'Expired Inventory' && (
                                 <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-900">
                                   {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
+                                </div>
+                              )}
+                              {inventoryReportModal === 'Expiring Soon' && (
+                                <div className="rounded-full bg-yellow-50 px-3 py-1 text-xs font-bold text-yellow-900">
+                                  {expiringSoonInventoryLots.length} lot{expiringSoonInventoryLots.length === 1 ? '' : 's'}
+                                </div>
+                              )}
+                              {inventoryReportModal === 'Inventory Value' && (
+                                <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">
+                                  ${totalInventoryValue.toFixed(2)}
                                 </div>
                               )}
                             </div>
@@ -5504,6 +5524,99 @@ export default function SupervisorPage() {
                                   </table>
                                 </div>
                               )
+                            ) : inventoryReportModal === 'Expiring Soon' ? (
+                              expiringSoonInventoryLots.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  No lots expiring within 90 days found for the selected supply room.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Item Number</th>
+                                        <th className="px-3 py-2">Lot Number</th>
+                                        <th className="px-3 py-2">Manufacturer</th>
+                                        <th className="px-3 py-2">Qty On Hand</th>
+                                        <th className="px-3 py-2">Expiration Date</th>
+                                        <th className="px-3 py-2">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {expiringSoonInventoryLots.map(({ item, lot }) => {
+                                        const expiration = new Date(`${lot.expirationDate}T00:00:00`);
+                                        const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
+
+                                        return (
+                                          <tr key={lot.id} className="border-t border-slate-100">
+                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                            <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
+                                            <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
+                                            <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
+                                            <td className="px-3 py-2">
+                                              <span className={getInventoryExpirationClass(lot.expirationDate)}>
+                                                {lot.expirationDate}
+                                              </span>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                              <span className="rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-bold text-yellow-800">
+                                                {daysUntilExpiration === 0 ? 'Expires Today' : `${daysUntilExpiration} day${daysUntilExpiration === 1 ? '' : 's'}`}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )
+                            ) : inventoryReportModal === 'Inventory Value' ? (
+                              inventoryItems.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  No inventory items found for the selected supply room.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Item Number</th>
+                                        <th className="px-3 py-2">Qty On Hand</th>
+                                        <th className="px-3 py-2">Unit Cost</th>
+                                        <th className="px-3 py-2">Inventory Value</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {inventoryItems.map((item) => {
+                                        const inventoryValue = item.qtyOnHand * item.unitCost;
+
+                                        return (
+                                          <tr key={item.id} className="border-t border-slate-100">
+                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                            <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                            <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                    <tfoot>
+                                      <tr className="border-t-2 border-slate-200 bg-slate-50">
+                                        <td colSpan={4} className="px-3 py-3 text-right font-bold text-slate-900">
+                                          Total Inventory Value
+                                        </td>
+                                        <td className="px-3 py-3 font-bold text-emerald-700">
+                                          ${totalInventoryValue.toFixed(2)}
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              )
                             ) : (
                               <div className="mt-2 text-sm text-slate-600">
                                 Report results will appear here as each report is moved into this viewer.
@@ -5513,69 +5626,6 @@ export default function SupervisorPage() {
                         </div>
                       </div>
                     )}
-
-                    <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-bold text-yellow-900">Expiring Soon</div>
-                          <div className="text-xs text-yellow-800">
-                            Current selected room only. Lots appear here when they expire within 90 days.
-                          </div>
-                        </div>
-                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-yellow-900">
-                          {expiringSoonInventoryLots.length} lot{expiringSoonInventoryLots.length === 1 ? '' : 's'}
-                        </div>
-                      </div>
-
-                      {expiringSoonInventoryLots.length === 0 ? (
-                        <div className="mt-4 rounded-lg border border-yellow-100 bg-white p-3 text-sm text-slate-600">
-                          No lots expiring within 90 days found for the selected supply room.
-                        </div>
-                      ) : (
-                        <div className="mt-4 overflow-x-auto rounded-lg border border-yellow-100 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-yellow-100 text-yellow-950">
-                              <tr>
-                                <th className="px-3 py-2">Item</th>
-                                <th className="px-3 py-2">Item Number</th>
-                                <th className="px-3 py-2">Lot Number</th>
-                                <th className="px-3 py-2">Manufacturer</th>
-                                <th className="px-3 py-2">Qty On Hand</th>
-                                <th className="px-3 py-2">Expiration Date</th>
-                                <th className="px-3 py-2">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {expiringSoonInventoryLots.map(({ item, lot }) => {
-                                const expiration = new Date(`${lot.expirationDate}T00:00:00`);
-                                const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
-
-                                return (
-                                  <tr key={lot.id} className="border-t border-yellow-100">
-                                    <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                    <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                    <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
-                                    <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
-                                    <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
-                                    <td className="px-3 py-2">
-                                      <span className={getInventoryExpirationClass(lot.expirationDate)}>
-                                        {lot.expirationDate}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <span className="rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-bold text-yellow-800">
-                                        {daysUntilExpiration === 0 ? 'Expires Today' : `${daysUntilExpiration} day${daysUntilExpiration === 1 ? '' : 's'}`}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-
 
                     <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -5658,64 +5708,6 @@ export default function SupervisorPage() {
                       )}
                     </div>
 
-                    <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-bold text-emerald-900">Inventory Value</div>
-                          <div className="text-xs text-emerald-800">
-                            Current selected room only. Calculates replacement value based on Qty On Hand and Unit Cost.
-                          </div>
-                        </div>
-                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-900">
-                          ${totalInventoryValue.toFixed(2)}
-                        </div>
-                      </div>
-
-                      {inventoryItems.length === 0 ? (
-                        <div className="mt-4 rounded-lg border border-emerald-100 bg-white p-3 text-sm text-slate-600">
-                          No inventory items found for the selected supply room.
-                        </div>
-                      ) : (
-                        <div className="mt-4 overflow-x-auto rounded-lg border border-emerald-100 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-emerald-100 text-emerald-950">
-                              <tr>
-                                <th className="px-3 py-2">Item</th>
-                                <th className="px-3 py-2">Item Number</th>
-                                <th className="px-3 py-2">Qty On Hand</th>
-                                <th className="px-3 py-2">Unit Cost</th>
-                                <th className="px-3 py-2">Inventory Value</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {inventoryItems.map((item) => {
-                                const inventoryValue = item.qtyOnHand * item.unitCost;
-
-                                return (
-                                  <tr key={item.id} className="border-t border-emerald-100">
-                                    <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                    <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                    <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                    <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
-                                    <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                            <tfoot>
-                              <tr className="border-t-2 border-emerald-200 bg-emerald-50">
-                                <td colSpan={4} className="px-3 py-3 text-right font-bold text-emerald-900">
-                                  Total Inventory Value
-                                </td>
-                                <td className="px-3 py-3 font-bold text-emerald-900">
-                                  ${totalInventoryValue.toFixed(2)}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
 
