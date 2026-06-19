@@ -526,6 +526,20 @@ export default function SupervisorPage() {
     0,
   );
 
+  const inventoryUsageByItemRows = Object.values(
+    inventoryUsageTransactions.reduce<Record<string, { itemId: string; quantity: number; transactions: number }>>((summary, transaction) => {
+      const current = summary[transaction.itemId] ?? { itemId: transaction.itemId, quantity: 0, transactions: 0 };
+
+      summary[transaction.itemId] = {
+        itemId: transaction.itemId,
+        quantity: current.quantity + transaction.quantity,
+        transactions: current.transactions + 1,
+      };
+
+      return summary;
+    }, {}),
+  ).sort((a, b) => b.quantity - a.quantity);
+
   function getInventoryItemLabel(itemId: string) {
     const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === itemId)
       ?? inventoryItems.find((inventoryItem) => inventoryItem.id === itemId);
@@ -5431,7 +5445,7 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
+                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
@@ -5441,7 +5455,7 @@ export default function SupervisorPage() {
                                   <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
                                 </div>
 
-                                {inventoryReportModal === 'Usage by Date Range' && (
+                                {(inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Usage by Item') && (
                                   <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
                                     <div className="grid gap-3 md:grid-cols-3">
                                       <label className="text-xs font-semibold text-slate-700">
@@ -5488,7 +5502,9 @@ export default function SupervisorPage() {
                                           ? 'Qty On Hand × Unit Cost'
                                           : inventoryReportModal === 'Usage by Date Range'
                                             ? 'Removed inventory transactions'
-                                            : 'Qty On Hand below PAR'}
+                                            : inventoryReportModal === 'Usage by Item'
+                                              ? 'Removed inventory grouped by item'
+                                              : 'Qty On Hand below PAR'}
                                   </div>
                                   <div className="mt-1 text-xs text-slate-500">
                                     {inventoryReportModal === 'Expired Inventory'
@@ -5499,7 +5515,9 @@ export default function SupervisorPage() {
                                           ? 'Replacement value is calculated from Qty On Hand and Unit Cost.'
                                           : inventoryReportModal === 'Usage by Date Range'
                                             ? 'Shows removed inventory transactions for the selected date range.'
-                                            : 'Items below PAR are marked Order Now.'}
+                                            : inventoryReportModal === 'Usage by Item'
+                                              ? 'Summarizes removed inventory totals by item for the selected date range.'
+                                              : 'Items below PAR are marked Order Now.'}
                                   </div>
                                 </div>
                               </div>
@@ -5536,6 +5554,11 @@ export default function SupervisorPage() {
                               {inventoryReportModal === 'Usage by Date Range' && (
                                 <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
                                   {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
+                                </div>
+                              )}
+                              {inventoryReportModal === 'Usage by Item' && (
+                                <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
+                                  {inventoryUsageByItemRows.length} item{inventoryUsageByItemRows.length === 1 ? '' : 's'}
                                 </div>
                               )}
                             </div>
@@ -5697,6 +5720,33 @@ export default function SupervisorPage() {
                                           <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
                                           <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
                                           <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )
+                            ) : inventoryReportModal === 'Usage by Item' ? (
+                              inventoryUsageByItemRows.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  Run the report to summarize usage by item for the selected date range.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Qty Removed</th>
+                                        <th className="px-3 py-2">Transactions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {inventoryUsageByItemRows.map((row) => (
+                                        <tr key={row.itemId} className="border-t border-slate-100">
+                                          <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(row.itemId)}</td>
+                                          <td className="px-3 py-2 font-bold text-slate-900">{row.quantity}</td>
+                                          <td className="px-3 py-2 text-slate-700">{row.transactions}</td>
                                         </tr>
                                       ))}
                                     </tbody>
