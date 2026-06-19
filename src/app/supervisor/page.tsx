@@ -5399,6 +5399,7 @@ export default function SupervisorPage() {
                     <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       {[
                         'Usage by Date Range',
+                        'Order List',
                         'Transfers',
                         'Expired Inventory',
                         'Expiring Soon',
@@ -5445,7 +5446,7 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
+                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
@@ -5743,6 +5744,49 @@ export default function SupervisorPage() {
                                   </table>
                                 </div>
                               )
+                            ) : inventoryReportModal === 'Order List' ? (
+                              (() => {
+                                const orderItems = inventoryItems
+                                  .filter((item) => item.par > 0 && item.qtyOnHand < item.par)
+                                  .sort((a, b) => (a.par - a.qtyOnHand) < (b.par - b.qtyOnHand) ? 1 : -1);
+
+                                return orderItems.length === 0 ? (
+                                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                    No items currently require ordering.
+                                  </div>
+                                ) : (
+                                  <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                    <table className="w-full text-left text-xs">
+                                      <thead className="bg-slate-100 text-slate-800">
+                                        <tr>
+                                          <th className="px-3 py-2">Item Name</th>
+                                          <th className="px-3 py-2">Item Number</th>
+                                          <th className="px-3 py-2">Qty On Hand</th>
+                                          <th className="px-3 py-2">PAR</th>
+                                          <th className="px-3 py-2">Qty To Order</th>
+                                          <th className="px-3 py-2">Ordered</th>
+                                          <th className="px-3 py-2">Qty Ordered</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {orderItems.map((item) => (
+                                          <tr key={item.id} className="border-t border-slate-100">
+                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                            <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                            <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                            <td className="px-3 py-2 font-bold text-red-700">
+                                              {item.par - item.qtyOnHand}
+                                            </td>
+                                            <td className="px-3 py-2 text-center text-lg">☐</td>
+                                            <td className="px-3 py-2">__________</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                );
+                              })()
                             ) : inventoryReportModal === 'Inventory Value' ? (
                               inventoryItems.length === 0 ? (
                                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
