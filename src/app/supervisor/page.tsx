@@ -5431,7 +5431,7 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
+                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
@@ -5440,6 +5440,42 @@ export default function SupervisorPage() {
                                   </div>
                                   <div className="mt-1 text-xs text-slate-500">All Rooms option will be added later.</div>
                                 </div>
+
+                                {inventoryReportModal === 'Usage by Date Range' && (
+                                  <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
+                                    <div className="grid gap-3 md:grid-cols-3">
+                                      <label className="text-xs font-semibold text-slate-700">
+                                        Start Date
+                                        <input
+                                          type="date"
+                                          value={inventoryReportStartDate}
+                                          onChange={(event) => setInventoryReportStartDate(event.target.value)}
+                                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        />
+                                      </label>
+
+                                      <label className="text-xs font-semibold text-slate-700">
+                                        End Date
+                                        <input
+                                          type="date"
+                                          value={inventoryReportEndDate}
+                                          onChange={(event) => setInventoryReportEndDate(event.target.value)}
+                                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        />
+                                      </label>
+
+                                      <div className="flex items-end">
+                                        <button
+                                          type="button"
+                                          onClick={handleRunInventoryUsageReport}
+                                          className="w-full rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                                        >
+                                          Run Usage Report
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
 
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Report Rule</div>
@@ -5450,7 +5486,9 @@ export default function SupervisorPage() {
                                         ? 'Expires within 90 days'
                                         : inventoryReportModal === 'Inventory Value'
                                           ? 'Qty On Hand × Unit Cost'
-                                          : 'Qty On Hand below PAR'}
+                                          : inventoryReportModal === 'Usage by Date Range'
+                                            ? 'Removed inventory transactions'
+                                            : 'Qty On Hand below PAR'}
                                   </div>
                                   <div className="mt-1 text-xs text-slate-500">
                                     {inventoryReportModal === 'Expired Inventory'
@@ -5459,7 +5497,9 @@ export default function SupervisorPage() {
                                         ? 'Lots expiring within the current 90 day window are shown.'
                                         : inventoryReportModal === 'Inventory Value'
                                           ? 'Replacement value is calculated from Qty On Hand and Unit Cost.'
-                                          : 'Items below PAR are marked Order Now.'}
+                                          : inventoryReportModal === 'Usage by Date Range'
+                                            ? 'Shows removed inventory transactions for the selected date range.'
+                                            : 'Items below PAR are marked Order Now.'}
                                   </div>
                                 </div>
                               </div>
@@ -5491,6 +5531,11 @@ export default function SupervisorPage() {
                               {inventoryReportModal === 'Inventory Value' && (
                                 <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">
                                   ${totalInventoryValue.toFixed(2)}
+                                </div>
+                              )}
+                              {inventoryReportModal === 'Usage by Date Range' && (
+                                <div className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-900">
+                                  {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
                                 </div>
                               )}
                             </div>
@@ -5623,6 +5668,41 @@ export default function SupervisorPage() {
                                   </table>
                                 </div>
                               )
+                            ) : inventoryReportModal === 'Usage by Date Range' ? (
+                              inventoryUsageTransactions.length === 0 ? (
+                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                  No usage transactions loaded for the selected date range.
+                                </div>
+                              ) : (
+                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-100 text-slate-800">
+                                      <tr>
+                                        <th className="px-3 py-2">Date</th>
+                                        <th className="px-3 py-2">Item</th>
+                                        <th className="px-3 py-2">Qty Removed</th>
+                                        <th className="px-3 py-2">Reason</th>
+                                        <th className="px-3 py-2">Source Room</th>
+                                        <th className="px-3 py-2">Created By</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {inventoryUsageTransactions.map((transaction) => (
+                                        <tr key={transaction.id} className="border-t border-slate-100">
+                                          <td className="px-3 py-2 text-slate-700">
+                                            {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : '—'}
+                                          </td>
+                                          <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(transaction.itemId)}</td>
+                                          <td className="px-3 py-2 font-bold text-slate-900">{transaction.quantity}</td>
+                                          <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
+                                          <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
+                                          <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )
                             ) : inventoryReportModal === 'Inventory Value' ? (
                               inventoryItems.length === 0 ? (
                                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -5678,86 +5758,7 @@ export default function SupervisorPage() {
                       </div>
                     )}
 
-                    <div className="mt-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-sm font-bold text-blue-900">Usage by Date Range</div>
-                          <div className="text-xs text-blue-800">
-                            Shows removed inventory transactions for the selected date range.
-                          </div>
-                        </div>
-                        <div className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-900">
-                          {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
-                        </div>
-                      </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <label className="text-xs font-semibold text-blue-900">
-                          Start Date
-                          <input
-                            type="date"
-                            className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-900"
-                            value={inventoryReportStartDate}
-                            onChange={(event) => setInventoryReportStartDate(event.target.value)}
-                          />
-                        </label>
-
-                        <label className="text-xs font-semibold text-blue-900">
-                          End Date
-                          <input
-                            type="date"
-                            className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-slate-900"
-                            value={inventoryReportEndDate}
-                            onChange={(event) => setInventoryReportEndDate(event.target.value)}
-                          />
-                        </label>
-
-                        <div className="flex items-end">
-                          <button
-                            type="button"
-                            onClick={handleRunInventoryUsageReport}
-                            className="w-full rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
-                          >
-                            Run Usage Report
-                          </button>
-                        </div>
-                      </div>
-
-                      {inventoryUsageTransactions.length === 0 ? (
-                        <div className="mt-4 rounded-lg border border-blue-100 bg-white p-3 text-sm text-slate-600">
-                          No usage transactions loaded for the selected date range.
-                        </div>
-                      ) : (
-                        <div className="mt-4 overflow-x-auto rounded-lg border border-blue-100 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-blue-100 text-blue-950">
-                              <tr>
-                                <th className="px-3 py-2">Date</th>
-                                <th className="px-3 py-2">Item</th>
-                                <th className="px-3 py-2">Qty Removed</th>
-                                <th className="px-3 py-2">Reason</th>
-                                <th className="px-3 py-2">Source Room</th>
-                                <th className="px-3 py-2">Created By</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {inventoryUsageTransactions.map((transaction) => (
-                                <tr key={transaction.id} className="border-t border-blue-100">
-                                  <td className="px-3 py-2 text-slate-700">
-                                    {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : '—'}
-                                  </td>
-                                  <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(transaction.itemId)}</td>
-                                  <td className="px-3 py-2 font-bold text-slate-900">{transaction.quantity}</td>
-                                  <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
-                                  <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
 
                   </div>
                 )}
