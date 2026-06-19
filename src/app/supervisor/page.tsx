@@ -5419,17 +5419,55 @@ export default function SupervisorPage() {
 
                     {inventoryReportModal && (
                       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
-                        <div className="mt-6 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+                        <div className="apollo-print-report mt-6 max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+                          <style>{`
+                            @media print {
+                              body * {
+                                visibility: hidden;
+                              }
+
+                              .apollo-print-report,
+                              .apollo-print-report * {
+                                visibility: visible;
+                              }
+
+                              .apollo-print-report {
+                                position: absolute !important;
+                                left: 0 !important;
+                                top: 0 !important;
+                                width: 100% !important;
+                                max-width: none !important;
+                                max-height: none !important;
+                                overflow: visible !important;
+                                border-radius: 0 !important;
+                                box-shadow: none !important;
+                                padding: 16px !important;
+                              }
+
+                              .apollo-no-print {
+                                display: none !important;
+                              }
+
+                              table {
+                                page-break-inside: auto;
+                              }
+
+                              tr {
+                                page-break-inside: avoid;
+                                page-break-after: auto;
+                              }
+                            }
+                          `}</style>
                           <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
                             <div>
                               <div className="text-lg font-bold text-slate-900">{inventoryReportModal}</div>
                               <div className="text-sm text-slate-500">Inventory report viewer</div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="apollo-no-print flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                                onClick={() => window.alert('Print / Save PDF will be added in a future update.')}
+                                onClick={() => window.print()}
                               >
                                 Print / Save PDF
                               </button>
