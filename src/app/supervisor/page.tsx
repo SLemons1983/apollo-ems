@@ -5583,6 +5583,11 @@ export default function SupervisorPage() {
                                   {inventoryUsageTransactions.length} transaction{inventoryUsageTransactions.length === 1 ? '' : 's'}
                                 </div>
                               )}
+                              {inventoryReportModal === 'Order List' && (
+                                <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-900">
+                                  Order Worksheet
+                                </div>
+                              )}
                             </div>
 
                             {inventoryReportModal === 'Low Stock / Order Now' ? (
@@ -5794,7 +5799,9 @@ export default function SupervisorPage() {
                                           <tbody>
                                             {items.map((item) => (
                                               <tr key={item.id} className="border-t border-slate-100">
-                                                <td className="px-3 py-2 text-center text-lg">☐</td>
+                                                <td className="px-3 py-2 text-center">
+                                                  <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-slate-400 bg-white"></span>
+                                                </td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
                                                 <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
                                                 <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
@@ -5802,7 +5809,9 @@ export default function SupervisorPage() {
                                                 <td className="px-3 py-2 font-bold text-red-700">
                                                   {item.par - item.qtyOnHand}
                                                 </td>
-                                                <td className="px-3 py-2">__________</td>
+                                                <td className="px-3 py-2">
+                                                  <div className="h-6 min-w-20 border-b border-slate-400"></div>
+                                                </td>
                                               </tr>
                                             ))}
                                           </tbody>
