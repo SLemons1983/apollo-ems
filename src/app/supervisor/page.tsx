@@ -524,6 +524,26 @@ export default function SupervisorPage() {
     (total, item) => total + (item.qtyOnHand * item.unitCost),
     0,
   );
+
+  function getInventoryItemLabel(itemId: string) {
+    const item = inventoryItems.find((inventoryItem) => inventoryItem.id === itemId);
+    return item ? `${item.itemName}${item.itemNumber ? ` (${item.itemNumber})` : ''}` : itemId || '—';
+  }
+
+  function getInventoryRoomLabel(roomId: string) {
+    const room = inventorySupplyRooms.find((supplyRoom) => supplyRoom.id === roomId);
+    return room?.name || roomId || '—';
+  }
+
+  function getInventoryUserLabel(createdBy: string) {
+    const normalizedCreatedBy = createdBy.trim().toLowerCase();
+    const employee = employees.find((employeeOption) => (
+      employeeOption.email?.trim().toLowerCase() === normalizedCreatedBy
+      || employeeOption.name.trim().toLowerCase() === normalizedCreatedBy
+    ));
+
+    return employee?.name || createdBy || '—';
+  }
   const [incidentReports, setIncidentReports] = useState<IncidentReport[]>([]);
   const [selectedIncidentReportId, setSelectedIncidentReportId] = useState<string | null>(null);
   const [incidentReportStatusDraft, setIncidentReportStatusDraft] = useState('NEW');
@@ -5682,7 +5702,7 @@ export default function SupervisorPage() {
                             <thead className="bg-blue-100 text-blue-950">
                               <tr>
                                 <th className="px-3 py-2">Date</th>
-                                <th className="px-3 py-2">Item ID</th>
+                                <th className="px-3 py-2">Item</th>
                                 <th className="px-3 py-2">Qty Removed</th>
                                 <th className="px-3 py-2">Reason</th>
                                 <th className="px-3 py-2">Source Room</th>
@@ -5695,11 +5715,11 @@ export default function SupervisorPage() {
                                   <td className="px-3 py-2 text-slate-700">
                                     {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : '—'}
                                   </td>
-                                  <td className="px-3 py-2 font-mono text-slate-600">{transaction.itemId}</td>
+                                  <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(transaction.itemId)}</td>
                                   <td className="px-3 py-2 font-bold text-slate-900">{transaction.quantity}</td>
                                   <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
-                                  <td className="px-3 py-2 font-mono text-slate-600">{transaction.sourceRoomId || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{transaction.createdBy || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
+                                  <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
                                 </tr>
                               ))}
                             </tbody>
