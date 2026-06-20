@@ -2632,6 +2632,47 @@ export default function DashboardPage() {
     return `${year}-${month}-${day}`;
   }
 
+  function normalizeManualTimeInput(value: string): string {
+    const rawValue = value.trim();
+
+    if (!rawValue) {
+      return '';
+    }
+
+    if (rawValue.includes(':')) {
+      const [rawHour = '', rawMinute = ''] = rawValue.split(':');
+      const hour = rawHour.replace(/\D/g, '').slice(0, 2);
+      const minute = rawMinute.replace(/\D/g, '').slice(0, 2);
+      return rawValue.endsWith(':') || minute ? `${hour}:${minute}` : hour;
+    }
+
+    const digits = rawValue.replace(/\D/g, '').slice(0, 4);
+
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    if (digits.length === 3) {
+      return `0${digits.slice(0, 1)}:${digits.slice(1)}`;
+    }
+
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  }
+
+  function isCompleteTimeValue(value: string | undefined): boolean {
+    const trimmed = (value ?? '').trim();
+    const match = /^(\d{2}):(\d{2})$/.exec(trimmed);
+
+    if (!match) {
+      return false;
+    }
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+
+    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+  }
+
   function getDefaultPayType(
     shiftLabel: string,
     hours: number,
@@ -2742,7 +2783,7 @@ export default function DashboardPage() {
 
       const isBlankTimeValue = (value: string | undefined) => {
         const trimmed = (value ?? '').trim();
-        return !trimmed || trimmed === 'HH:MM' || !/^\d{2}:\d{2}$/.test(trimmed);
+        return !trimmed || trimmed === 'HH:MM';
       };
 
       const savedHasBlankTimes =
@@ -3179,7 +3220,7 @@ export default function DashboardPage() {
 
         const punchSuffix = row.id ?? `${dateKey}-${rowIndex}`;
 
-        if (row.clockInDate && row.clockInTime) {
+        if (row.clockInDate && isCompleteTimeValue(row.clockInTime)) {
           punches.push({
             id: `editable-clock-in-${punchSuffix}`,
             employeeId: currentEmployeeId,
@@ -3195,7 +3236,7 @@ export default function DashboardPage() {
           });
         }
 
-        if (row.clockOutDate && row.clockOutTime) {
+        if (row.clockOutDate && isCompleteTimeValue(row.clockOutTime)) {
           punches.push({
             id: `editable-clock-out-${punchSuffix}`,
             employeeId: currentEmployeeId,
@@ -4882,7 +4923,7 @@ export default function DashboardPage() {
                                       pattern="[0-9]{2}:[0-9]{2}"
                                       maxLength={5}
                                       value={row.clockInTime}
-                                      onChange={(event) => updateEditableRowById(date, rowId, { clockInTime: event.target.value })}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockInTime: normalizeManualTimeInput(event.target.value) })}
                                       className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
                                     />
                                   </td>
@@ -4902,7 +4943,7 @@ export default function DashboardPage() {
                                       pattern="[0-9]{2}:[0-9]{2}"
                                       maxLength={5}
                                       value={row.clockOutTime}
-                                      onChange={(event) => updateEditableRowById(date, rowId, { clockOutTime: event.target.value })}
+                                      onChange={(event) => updateEditableRowById(date, rowId, { clockOutTime: normalizeManualTimeInput(event.target.value) })}
                                       className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
                                     />
                                   </td>
