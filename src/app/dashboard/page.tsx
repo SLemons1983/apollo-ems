@@ -3020,7 +3020,7 @@ export default function DashboardPage() {
     updateEditableRowById(date, segmentKey, segmentRow);
   }
 
-  function clearEditableRowById(date: Date, rowId: string) {
+  async function clearEditableRowById(date: Date, rowId: string) {
     const dateKey = toDateKey(date);
     const baseRowKey = getEditableRowKey(dateKey);
 
@@ -3034,22 +3034,27 @@ export default function DashboardPage() {
       return;
     }
 
+    const { error, count } = await supabase
+      .from('editable_timecard_rows')
+      .delete({ count: 'exact' })
+      .eq('id', rowId)
+      .eq('employee_id', currentEmployeeId)
+      .eq('pay_period_key', selectedPayPeriod.key);
+
+    if (error) {
+      console.error('Failed to remove editable timecard segment:', error);
+      window.alert(`Editable timecard segment remove failed: ${error.message}`);
+      return;
+    }
+
+    if (count !== 1) {
+      window.alert('Editable timecard segment remove failed: no matching saved segment was deleted. Please refresh and try again.');
+      return;
+    }
+
     const updatedRows = { ...editableTimecardRows };
     delete updatedRows[rowId];
     setEditableTimecardRows(updatedRows);
-
-    void supabase
-      .from('editable_timecard_rows')
-      .delete()
-      .eq('id', rowId)
-      .eq('employee_id', currentEmployeeId)
-      .eq('pay_period_key', selectedPayPeriod.key)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to remove editable timecard segment:', error);
-          window.alert(`Editable timecard segment remove failed: ${error.message}`);
-        }
-      });
   }
 
   function clearEditableRow(date: Date) {
