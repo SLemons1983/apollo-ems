@@ -1674,18 +1674,20 @@ export default function DashboardPage() {
           } else {
             setEditableTimecardRows(
               Object.fromEntries(
-                (data ?? []).map((row: any) => [
-                  row.id,
-                  {
-                    id: row.id,
-                    shiftLabel: row.row_data?.shiftLabel ?? '',
-                    payType: row.row_data?.payType ?? 'DAILY_OT_DT',
-                    clockInDate: row.row_data?.clockInDate ?? '',
-                    clockInTime: row.row_data?.clockInTime ?? '',
-                    clockOutDate: row.row_data?.clockOutDate ?? '',
-                    clockOutTime: row.row_data?.clockOutTime ?? '',
-                  },
-                ]),
+                (data ?? [])
+                  .filter((row: any) => !row.row_data?.deleted)
+                  .map((row: any) => [
+                    row.id,
+                    {
+                      id: row.id,
+                      shiftLabel: row.row_data?.shiftLabel ?? '',
+                      payType: row.row_data?.payType ?? 'DAILY_OT_DT',
+                      clockInDate: row.row_data?.clockInDate ?? '',
+                      clockInTime: row.row_data?.clockInTime ?? '',
+                      clockOutDate: row.row_data?.clockOutDate ?? '',
+                      clockOutTime: row.row_data?.clockOutTime ?? '',
+                    },
+                  ]),
               ),
             );
           }
@@ -3034,19 +3036,38 @@ export default function DashboardPage() {
       return;
     }
 
-    const { error, count } = await supabase
+    const deletedRow = {
+      ...(editableTimecardRows[rowId] ?? {
+        id: rowId,
+        shiftLabel: '',
+        payType: 'SICK_TIME',
+        clockInDate: '',
+        clockInTime: '',
+        clockOutDate: '',
+        clockOutTime: '',
+      }),
+      id: rowId,
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
       .from('editable_timecard_rows')
-      .delete({ count: 'exact' })
-      .eq('id', rowId);
+      .upsert(
+        {
+          id: rowId,
+          employee_id: currentEmployeeId,
+          pay_period_key: selectedPayPeriod.key,
+          date_key: dateKey,
+          row_data: deletedRow,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' },
+      );
 
     if (error) {
       console.error('Failed to remove editable timecard segment:', error);
       window.alert(`Editable timecard segment remove failed: ${error.message}`);
-      return;
-    }
-
-    if (count !== 1) {
-      window.alert('Editable timecard segment remove failed: no matching saved segment was deleted. Please refresh and try again.');
       return;
     }
 
