@@ -2653,6 +2653,12 @@ export default function DashboardPage() {
     }
 
     if (digits.length === 3) {
+      const firstTwoDigits = Number(digits.slice(0, 2));
+
+      if (firstTwoDigits >= 0 && firstTwoDigits <= 23) {
+        return digits;
+      }
+
       return `0${digits.slice(0, 1)}:${digits.slice(1)}`;
     }
 
@@ -4954,10 +4960,17 @@ export default function DashboardPage() {
                                     <button
                                       type="button"
                                       onClick={() => clearEditableRowById(date, rowId)}
-                                      disabled={!row.shiftLabel && !row.clockInDate && !row.clockInTime && !row.clockOutDate && !row.clockOutTime}
+                                      disabled={
+                                        isBaseRow &&
+                                        !row.shiftLabel &&
+                                        !row.clockInDate &&
+                                        !row.clockInTime &&
+                                        !row.clockOutDate &&
+                                        !row.clockOutTime
+                                      }
                                       className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
                                     >
-                                      Clear
+                                      {isBaseRow ? 'Clear' : 'Remove'}
                                     </button>
                                   </td>
                                 </tr>
