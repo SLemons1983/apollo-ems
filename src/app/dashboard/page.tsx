@@ -1666,6 +1666,8 @@ export default function DashboardPage() {
       supabase
         .from('editable_timecard_rows')
         .select('*')
+        .eq('employee_id', currentEmployeeId)
+        .eq('pay_period_key', currentPayPeriod.key)
         .then(({ data, error }) => {
           if (error) {
             console.error('Failed to load editable timecard rows:', error);
@@ -3040,6 +3042,8 @@ export default function DashboardPage() {
       .from('editable_timecard_rows')
       .delete()
       .eq('id', rowId)
+      .eq('employee_id', currentEmployeeId)
+      .eq('pay_period_key', selectedPayPeriod.key)
       .then(({ error }) => {
         if (error) {
           console.error('Failed to remove editable timecard segment:', error);
