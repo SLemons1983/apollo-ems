@@ -3037,9 +3037,7 @@ export default function DashboardPage() {
     const { error, count } = await supabase
       .from('editable_timecard_rows')
       .delete({ count: 'exact' })
-      .eq('id', rowId)
-      .eq('employee_id', currentEmployeeId)
-      .eq('pay_period_key', selectedPayPeriod.key);
+      .eq('id', rowId);
 
     if (error) {
       console.error('Failed to remove editable timecard segment:', error);
