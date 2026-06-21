@@ -6123,6 +6123,26 @@ export default function SupervisorPage() {
                                 const valueTotal = valueItems.reduce((sum, item) => sum + (item.qtyOnHand * item.unitCost), 0);
                                 const totalUnits = valueItems.reduce((sum, item) => sum + item.qtyOnHand, 0);
                                 const itemsMissingCost = valueItems.filter((item) => item.qtyOnHand > 0 && item.unitCost <= 0).length;
+                                const valueBySupplyRoom = inventorySupplyRooms
+                                  .map((room) => {
+                                    const roomItems = valueItems.filter((item) => item.supplyRoomId === room.id);
+                                    const roomValue = roomItems.reduce((sum, item) => sum + (item.qtyOnHand * item.unitCost), 0);
+                                    const roomUnits = roomItems.reduce((sum, item) => sum + item.qtyOnHand, 0);
+
+                                    return {
+                                      roomId: room.id,
+                                      roomName: room.name,
+                                      itemCount: roomItems.length,
+                                      roomUnits,
+                                      roomValue,
+                                    };
+                                  })
+                                  .filter((roomSummary) => roomSummary.itemCount > 0)
+                                  .sort((a, b) => b.roomValue - a.roomValue);
+
+                                const topValueItems = valueItems
+                                  .filter((item) => item.qtyOnHand > 0)
+                                  .slice(0, 10);
 
                                 return valueItems.length === 0 ? (
                                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
@@ -6152,6 +6172,68 @@ export default function SupervisorPage() {
                                         {itemsMissingCost} item{itemsMissingCost === 1 ? '' : 's'} with quantity on hand have no unit cost entered, so their value is calculating as $0.00.
                                       </div>
                                     )}
+
+                                    <div className="grid gap-4 lg:grid-cols-2">
+                                      <div className="rounded-lg border border-slate-200 bg-white">
+                                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">
+                                          Inventory Value by Supply Room
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-100 text-slate-800">
+                                              <tr>
+                                                <th className="px-3 py-2">Supply Room</th>
+                                                <th className="px-3 py-2">Items</th>
+                                                <th className="px-3 py-2">Units</th>
+                                                <th className="px-3 py-2">Value</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {valueBySupplyRoom.map((roomSummary) => (
+                                                <tr key={roomSummary.roomId} className="border-t border-slate-100">
+                                                  <td className="px-3 py-2 font-semibold text-slate-900">{roomSummary.roomName}</td>
+                                                  <td className="px-3 py-2 text-slate-700">{roomSummary.itemCount}</td>
+                                                  <td className="px-3 py-2 text-slate-700">{roomSummary.roomUnits}</td>
+                                                  <td className="px-3 py-2 font-bold text-emerald-700">${roomSummary.roomValue.toFixed(2)}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+
+                                      <div className="rounded-lg border border-slate-200 bg-white">
+                                        <div className="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-900">
+                                          Top Value Items
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                          <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-100 text-slate-800">
+                                              <tr>
+                                                <th className="px-3 py-2">Item</th>
+                                                <th className="px-3 py-2">Qty</th>
+                                                <th className="px-3 py-2">Unit Cost</th>
+                                                <th className="px-3 py-2">Value</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {topValueItems.map((item) => {
+                                                const inventoryValue = item.qtyOnHand * item.unitCost;
+
+                                                return (
+                                                  <tr key={item.id} className="border-t border-slate-100">
+                                                    <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                    <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
+                                                    <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                                    <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      </div>
+                                    </div>
 
                                     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                                       <table className="w-full text-left text-xs">
