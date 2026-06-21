@@ -5607,7 +5607,7 @@ export default function SupervisorPage() {
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
-                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' ? (
+                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Inventory Value' ? (
                                     <>
                                       <select
                                         value={inventoryReportSupplyRoomId}
@@ -5624,7 +5624,9 @@ export default function SupervisorPage() {
                                       <div className="mt-1 text-xs text-slate-500">
                                         {inventoryReportModal === 'Usage by Date Range'
                                           ? 'Filters usage transactions by source supply room.'
-                                          : 'Builds an order worksheet for one supply room or all supply rooms.'}
+                                          : inventoryReportModal === 'Order List'
+                                            ? 'Builds an order worksheet for one supply room or all supply rooms.'
+                                            : 'Calculates inventory value for one supply room or all supply rooms.'}
                                       </div>
                                     </>
                                   ) : (
@@ -5667,6 +5669,34 @@ export default function SupervisorPage() {
                                         </>
                                       );
                                     })()}
+                                  </div>
+                                )}
+
+                                {inventoryReportModal === 'Inventory Value' && (
+                                  <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <label className="text-xs font-semibold text-slate-700">
+                                        Item
+                                        <select
+                                          value={inventoryReportItemId}
+                                          onChange={(event) => setInventoryReportItemId(event.target.value)}
+                                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                        >
+                                          <option value="">All Items</option>
+                                          {allInventoryItems
+                                            .filter((item) => !inventoryReportSupplyRoomId || item.supplyRoomId === inventoryReportSupplyRoomId)
+                                            .map((item) => (
+                                              <option key={item.id} value={item.id}>
+                                                {item.itemName}{item.itemNumber ? ` (${item.itemNumber})` : ''}
+                                              </option>
+                                            ))}
+                                        </select>
+                                      </label>
+
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                                        This report calculates value using Qty On Hand × Unit Cost. Items with no unit cost entered will calculate as $0.00.
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
 
@@ -6084,50 +6114,89 @@ export default function SupervisorPage() {
                                 );
                               })()
                             ) : inventoryReportModal === 'Inventory Value' ? (
-                              inventoryItems.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  No inventory items found for the selected supply room.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Item Number</th>
-                                        <th className="px-3 py-2">Qty On Hand</th>
-                                        <th className="px-3 py-2">Unit Cost</th>
-                                        <th className="px-3 py-2">Inventory Value</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {inventoryItems.map((item) => {
-                                        const inventoryValue = item.qtyOnHand * item.unitCost;
+                              (() => {
+                                const valueItems = allInventoryItems
+                                  .filter((item) => !inventoryReportSupplyRoomId || item.supplyRoomId === inventoryReportSupplyRoomId)
+                                  .filter((item) => !inventoryReportItemId || item.id === inventoryReportItemId)
+                                  .sort((a, b) => (b.qtyOnHand * b.unitCost) - (a.qtyOnHand * a.unitCost));
 
-                                        return (
-                                          <tr key={item.id} className="border-t border-slate-100">
-                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                            <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
-                                            <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
+                                const valueTotal = valueItems.reduce((sum, item) => sum + (item.qtyOnHand * item.unitCost), 0);
+                                const totalUnits = valueItems.reduce((sum, item) => sum + item.qtyOnHand, 0);
+                                const itemsMissingCost = valueItems.filter((item) => item.qtyOnHand > 0 && item.unitCost <= 0).length;
+
+                                return valueItems.length === 0 ? (
+                                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                    No inventory items found for the selected report parameters.
+                                  </div>
+                                ) : (
+                                  <div className="mt-4 space-y-4">
+                                    <div className="grid gap-3 md:grid-cols-3">
+                                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">Total Inventory Value</div>
+                                        <div className="mt-1 text-2xl font-black text-emerald-800">${valueTotal.toFixed(2)}</div>
+                                      </div>
+
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Items Included</div>
+                                        <div className="mt-1 text-2xl font-black text-slate-900">{valueItems.length}</div>
+                                      </div>
+
+                                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Total Units On Hand</div>
+                                        <div className="mt-1 text-2xl font-black text-slate-900">{totalUnits}</div>
+                                      </div>
+                                    </div>
+
+                                    {itemsMissingCost > 0 && (
+                                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                                        {itemsMissingCost} item{itemsMissingCost === 1 ? '' : 's'} with quantity on hand have no unit cost entered, so their value is calculating as $0.00.
+                                      </div>
+                                    )}
+
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                      <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-100 text-slate-800">
+                                          <tr>
+                                            <th className="px-3 py-2">Supply Room</th>
+                                            <th className="px-3 py-2">Item</th>
+                                            <th className="px-3 py-2">Item Number</th>
+                                            <th className="px-3 py-2">Qty On Hand</th>
+                                            <th className="px-3 py-2">Unit Cost</th>
+                                            <th className="px-3 py-2">Inventory Value</th>
                                           </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                    <tfoot>
-                                      <tr className="border-t-2 border-slate-200 bg-slate-50">
-                                        <td colSpan={4} className="px-3 py-3 text-right font-bold text-slate-900">
-                                          Total Inventory Value
-                                        </td>
-                                        <td className="px-3 py-3 font-bold text-emerald-700">
-                                          ${totalInventoryValue.toFixed(2)}
-                                        </td>
-                                      </tr>
-                                    </tfoot>
-                                  </table>
-                                </div>
-                              )
+                                        </thead>
+                                        <tbody>
+                                          {valueItems.map((item) => {
+                                            const inventoryValue = item.qtyOnHand * item.unitCost;
+                                            const supplyRoomName = inventorySupplyRooms.find((room) => room.id === item.supplyRoomId)?.name ?? 'Unknown Room';
+
+                                            return (
+                                              <tr key={item.id} className="border-t border-slate-100">
+                                                <td className="px-3 py-2 text-slate-700">{supplyRoomName}</td>
+                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                                <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
+                                                <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                                <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                        <tfoot>
+                                          <tr className="border-t-2 border-slate-200 bg-slate-50">
+                                            <td colSpan={5} className="px-3 py-3 text-right font-bold text-slate-900">
+                                              Total Inventory Value
+                                            </td>
+                                            <td className="px-3 py-3 font-bold text-emerald-700">
+                                              ${valueTotal.toFixed(2)}
+                                            </td>
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  </div>
+                                );
+                              })()
                             ) : (
                               <div className="mt-2 text-sm text-slate-600">
                                 Report results will appear here as each report is moved into this viewer.
