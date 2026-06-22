@@ -270,6 +270,24 @@ type InventoryTransaction = {
   createdAt: string;
 };
 
+type FleetVehicle = {
+  id: string;
+  vehicleName: string;
+  unitNumber: string;
+  year: number | null;
+  make: string;
+  model: string;
+  vin: string;
+  currentMileage: number;
+  status: 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'MAINTENANCE_SCHEDULED' | 'RESERVE';
+  statusReason: string;
+  outOfServiceDate: string;
+  expectedReturnDate: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -522,6 +540,20 @@ export default function SupervisorPage() {
   const [inventoryReportItemId, setInventoryReportItemId] = useState('');
   const [inventoryReportReason, setInventoryReportReason] = useState('');
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
+
+  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
+  const [showCreateFleetVehicleForm, setShowCreateFleetVehicleForm] = useState(false);
+  const [newFleetVehicleName, setNewFleetVehicleName] = useState('');
+  const [newFleetUnitNumber, setNewFleetUnitNumber] = useState('');
+  const [newFleetYear, setNewFleetYear] = useState('');
+  const [newFleetMake, setNewFleetMake] = useState('');
+  const [newFleetModel, setNewFleetModel] = useState('');
+  const [newFleetVin, setNewFleetVin] = useState('');
+  const [newFleetMileage, setNewFleetMileage] = useState('');
+  const [newFleetStatus, setNewFleetStatus] = useState<FleetVehicle['status']>('IN_SERVICE');
+  const [newFleetStatusReason, setNewFleetStatusReason] = useState('');
+  const [fleetStatus, setFleetStatus] = useState('');
+
   const inventoryToday = new Date(new Date().toDateString());
 
   const totalInventoryValue = inventoryItems.reduce(
@@ -810,6 +842,7 @@ export default function SupervisorPage() {
       loadInventorySupplyRooms();
       loadAllInventoryItemsForReports();
       loadAllInventoryLotsForSearch();
+      loadFleetVehicles();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -4243,6 +4276,143 @@ export default function SupervisorPage() {
     await loadInventorySupplyRooms();
   }
 
+  function getFleetVehicleStatusLabel(status: FleetVehicle['status']) {
+    switch (status) {
+      case 'OUT_OF_SERVICE':
+        return 'Out of Service';
+      case 'MAINTENANCE_SCHEDULED':
+        return 'Maintenance Scheduled';
+      case 'RESERVE':
+        return 'Reserve Unit';
+      case 'IN_SERVICE':
+      default:
+        return 'In Service';
+    }
+  }
+
+  function getFleetVehicleStatusClass(status: FleetVehicle['status']) {
+    switch (status) {
+      case 'OUT_OF_SERVICE':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'MAINTENANCE_SCHEDULED':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'RESERVE':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'IN_SERVICE':
+      default:
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    }
+  }
+
+  async function loadFleetVehicles() {
+    const { data, error } = await supabase
+      .from('fleet_vehicles')
+      .select('*')
+      .order('vehicle_name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load fleet vehicles:', error);
+      setFleetStatus('Unable to load fleet vehicles.');
+      return;
+    }
+
+    setFleetVehicles(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        vehicleName: row.vehicle_name,
+        unitNumber: row.unit_number ?? '',
+        year: row.year ?? null,
+        make: row.make ?? '',
+        model: row.model ?? '',
+        vin: row.vin ?? '',
+        currentMileage: row.current_mileage ?? 0,
+        status: row.status ?? 'IN_SERVICE',
+        statusReason: row.status_reason ?? '',
+        outOfServiceDate: row.out_of_service_date ?? '',
+        expectedReturnDate: row.expected_return_date ?? '',
+        notes: row.notes ?? '',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    );
+  }
+
+  async function handleCreateFleetVehicle() {
+    const vehicleName = newFleetVehicleName.trim();
+    const unitNumber = newFleetUnitNumber.trim();
+    const year = newFleetYear.trim() ? Number(newFleetYear) : null;
+    const mileage = Number(newFleetMileage);
+
+    if (!vehicleName) {
+      setFleetStatus('Enter a vehicle name.');
+      return;
+    }
+
+    if (newFleetYear.trim() && (!Number.isInteger(year) || Number(year) < 1900)) {
+      setFleetStatus('Enter a valid vehicle year.');
+      return;
+    }
+
+    if (!Number.isInteger(mileage) || mileage < 0) {
+      setFleetStatus('Enter a valid mileage.');
+      return;
+    }
+
+    setFleetStatus('Creating fleet vehicle...');
+
+    const { error } = await supabase.from('fleet_vehicles').insert({
+      vehicle_name: vehicleName,
+      unit_number: unitNumber || null,
+      year,
+      make: newFleetMake.trim() || null,
+      model: newFleetModel.trim() || null,
+      vin: newFleetVin.trim() || null,
+      current_mileage: mileage,
+      status: newFleetStatus,
+      status_reason: newFleetStatusReason.trim() || null,
+    });
+
+    if (error) {
+      console.error('Failed to create fleet vehicle:', error);
+      setFleetStatus('Unable to create fleet vehicle.');
+      return;
+    }
+
+    setNewFleetVehicleName('');
+    setNewFleetUnitNumber('');
+    setNewFleetYear('');
+    setNewFleetMake('');
+    setNewFleetModel('');
+    setNewFleetVin('');
+    setNewFleetMileage('');
+    setNewFleetStatus('IN_SERVICE');
+    setNewFleetStatusReason('');
+    setShowCreateFleetVehicleForm(false);
+    setFleetStatus('Fleet vehicle created.');
+    await loadFleetVehicles();
+  }
+
+  async function handleDeleteFleetVehicle(vehicle: FleetVehicle) {
+    const confirmed = window.confirm(`Delete fleet vehicle "${vehicle.vehicleName}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setFleetStatus('Deleting fleet vehicle...');
+
+    const { error } = await supabase.from('fleet_vehicles').delete().eq('id', vehicle.id);
+
+    if (error) {
+      console.error('Failed to delete fleet vehicle:', error);
+      setFleetStatus('Unable to delete fleet vehicle.');
+      return;
+    }
+
+    setFleetStatus('Fleet vehicle deleted.');
+    await loadFleetVehicles();
+  }
+
   function toggleTile(tileId: string) {
     setActiveTile((current) => (current === tileId ? null : tileId));
   }
@@ -5494,6 +5664,207 @@ export default function SupervisorPage() {
               </a>
             </div>,
             employeeCertificationAlertCount > 0,
+          )}
+
+          {renderTile(
+            'fleet-services',
+            'Fleet Services',
+            'Track vehicle status, mileage, service readiness, and maintenance records.',
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">Fleet Vehicles</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Add vehicles and track in-service status, current mileage, and availability.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateFleetVehicleForm((value) => !value)}
+                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                  >
+                    {showCreateFleetVehicleForm ? 'Cancel' : 'Add Vehicle'}
+                  </button>
+                </div>
+
+                {showCreateFleetVehicleForm && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Vehicle Name
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetVehicleName}
+                          onChange={(event) => setNewFleetVehicleName(event.target.value)}
+                          placeholder="ALS 325"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Unit Number
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetUnitNumber}
+                          onChange={(event) => setNewFleetUnitNumber(event.target.value)}
+                          placeholder="325"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Year
+                        <input
+                          type="number"
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetYear}
+                          onChange={(event) => setNewFleetYear(event.target.value)}
+                          placeholder="2021"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Make
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetMake}
+                          onChange={(event) => setNewFleetMake(event.target.value)}
+                          placeholder="Ford"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Model
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetModel}
+                          onChange={(event) => setNewFleetModel(event.target.value)}
+                          placeholder="E-450"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        VIN
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetVin}
+                          onChange={(event) => setNewFleetVin(event.target.value)}
+                          placeholder="Vehicle VIN"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Current Mileage
+                        <input
+                          type="number"
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetMileage}
+                          onChange={(event) => setNewFleetMileage(event.target.value)}
+                          placeholder="184322"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Status
+                        <select
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetStatus}
+                          onChange={(event) => setNewFleetStatus(event.target.value as FleetVehicle['status'])}
+                        >
+                          <option value="IN_SERVICE">In Service</option>
+                          <option value="OUT_OF_SERVICE">Out of Service</option>
+                          <option value="MAINTENANCE_SCHEDULED">Maintenance Scheduled</option>
+                          <option value="RESERVE">Reserve Unit</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="mt-3 block text-xs font-semibold text-slate-600">
+                      Status Reason / Notes
+                      <textarea
+                        className="mt-1 min-h-[80px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={newFleetStatusReason}
+                        onChange={(event) => setNewFleetStatusReason(event.target.value)}
+                        placeholder="Reason for out-of-service status, scheduled maintenance, or reserve designation."
+                      />
+                    </label>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCreateFleetVehicle}
+                        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                      >
+                        Create Vehicle
+                      </button>
+
+                      {fleetStatus && <span className="text-sm font-semibold text-slate-700">{fleetStatus}</span>}
+                    </div>
+                  </div>
+                )}
+
+                {!showCreateFleetVehicleForm && fleetStatus && (
+                  <div className="mt-3 text-sm font-semibold text-slate-700">{fleetStatus}</div>
+                )}
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {fleetVehicles.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500 md:col-span-2 xl:col-span-3">
+                      No fleet vehicles have been added yet.
+                    </div>
+                  ) : (
+                    fleetVehicles.map((vehicle) => (
+                      <div key={vehicle.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-base font-bold text-slate-900">{vehicle.vehicleName}</div>
+                            <div className="mt-1 text-sm text-slate-600">
+                              {[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle details not entered'}
+                            </div>
+                          </div>
+
+                          <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${getFleetVehicleStatusClass(vehicle.status)}`}>
+                            {getFleetVehicleStatusLabel(vehicle.status)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-2 text-sm">
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">Unit Number</span>
+                            <span className="font-semibold text-slate-900">{vehicle.unitNumber || '—'}</span>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">Mileage</span>
+                            <span className="font-semibold text-slate-900">{vehicle.currentMileage.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">VIN</span>
+                            <span className="font-semibold text-slate-900">{vehicle.vin || '—'}</span>
+                          </div>
+                        </div>
+
+                        {vehicle.statusReason && (
+                          <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                            {vehicle.statusReason}
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFleetVehicle(vehicle)}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                          >
+                            Delete Vehicle
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>,
+            fleetVehicles.some((vehicle) => vehicle.status === 'OUT_OF_SERVICE'),
           )}
 
           {renderTile(
