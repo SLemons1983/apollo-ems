@@ -481,6 +481,7 @@ export default function SupervisorPage() {
   const [showInventoryRoomDetail, setShowInventoryRoomDetail] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [allInventoryItems, setAllInventoryItems] = useState<InventoryItem[]>([]);
+  const [allInventoryLots, setAllInventoryLots] = useState<InventoryLot[]>([]);
   const [inventoryLotsByItemId, setInventoryLotsByItemId] = useState<Record<string, InventoryLot[]>>({});
   const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
   const [inventorySearch, setInventorySearch] = useState('');
@@ -823,6 +824,7 @@ export default function SupervisorPage() {
 
       loadInventorySupplyRooms();
       loadAllInventoryItemsForReports();
+      loadAllInventoryLotsForSearch();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -3511,6 +3513,32 @@ export default function SupervisorPage() {
         expectedDeliveryDate: row.expected_delivery_date ?? '',
         receivedDate: row.received_date ?? '',
         createdAt: row.created_at,
+      })),
+    );
+  }
+
+  async function loadAllInventoryLotsForSearch() {
+    const { data, error } = await supabase
+      .from('inventory_lots')
+      .select('*')
+      .gt('qty_on_hand', 0)
+      .order('expiration_date', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load all inventory lots for search:', error);
+      return;
+    }
+
+    setAllInventoryLots(
+      (data ?? []).map((lot: any) => ({
+        id: lot.id,
+        itemId: lot.item_id,
+        lotNumber: lot.lot_number ?? '',
+        expirationDate: lot.expiration_date ?? '',
+        qtyOnHand: lot.qty_on_hand ?? 0,
+        manufacturer: lot.manufacturer ?? '',
+        notes: lot.notes ?? '',
+        createdAt: lot.created_at,
       })),
     );
   }
@@ -6305,30 +6333,66 @@ export default function SupervisorPage() {
                               <thead className="bg-slate-100 text-slate-800">
                                 <tr>
                                   <th className="px-3 py-2">Item</th>
-                                  <th className="px-3 py-2">Item Number</th>
+                                  <th className="px-3 py-2">Match</th>
                                   <th className="px-3 py-2">Supply Room</th>
                                   <th className="px-3 py-2">Qty</th>
                                   <th className="px-3 py-2">PAR</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {allInventoryItems
-                                  .filter((item) => {
-                                    const search = inventorySearch.trim().toLowerCase();
-                                    return (
+                                {(() => {
+                                  const search = inventorySearch.trim().toLowerCase();
+                                  const itemMatches = allInventoryItems
+                                    .filter((item) =>
                                       item.itemName.toLowerCase().includes(search) ||
                                       item.itemNumber.toLowerCase().includes(search)
+                                    )
+                                    .map((item) => ({
+                                      item,
+                                      matchLabel: item.itemName.toLowerCase().includes(search) ? 'Item Name' : 'Item Number',
+                                      matchValue: item.itemName.toLowerCase().includes(search) ? item.itemName : item.itemNumber,
+                                    }));
+
+                                  const lotMatches = allInventoryLots
+                                    .filter((lot) =>
+                                      lot.lotNumber.toLowerCase().includes(search) ||
+                                      lot.manufacturer.toLowerCase().includes(search)
+                                    )
+                                    .map((lot) => {
+                                      const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === lot.itemId);
+
+                                      if (!item) return null;
+
+                                      return {
+                                        item,
+                                        matchLabel: lot.lotNumber.toLowerCase().includes(search) ? 'Lot Number' : 'Manufacturer',
+                                        matchValue: lot.lotNumber.toLowerCase().includes(search) ? lot.lotNumber : lot.manufacturer,
+                                      };
+                                    })
+                                    .filter((result): result is { item: InventoryItem; matchLabel: string; matchValue: string } => Boolean(result));
+
+                                  const searchResults = [...itemMatches, ...lotMatches]
+                                    .filter((result, index, results) => results.findIndex((candidate) => candidate.item.id === result.item.id && candidate.matchLabel === result.matchLabel && candidate.matchValue === result.matchValue) === index)
+                                    .slice(0, 25);
+
+                                  if (searchResults.length === 0) {
+                                    return (
+                                      <tr>
+                                        <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
+                                          No inventory matches found.
+                                        </td>
+                                      </tr>
                                     );
-                                  })
-                                  .slice(0, 25)
-                                  .map((item) => {
+                                  }
+
+                                  return searchResults.map(({ item, matchLabel, matchValue }) => {
                                     const roomName =
                                       inventorySupplyRooms.find((room) => room.id === item.supplyRoomId)?.name ??
                                       'Unknown Room';
 
                                     return (
                                       <tr
-                                        key={item.id}
+                                        key={`${item.id}-${matchLabel}-${matchValue}`}
                                         className="cursor-pointer border-t border-slate-100 hover:bg-blue-50"
                                         onClick={() => {
                                           setSelectedSupplyRoomId(item.supplyRoomId);
@@ -6338,13 +6402,16 @@ export default function SupervisorPage() {
                                         }}
                                       >
                                         <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                        <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-700">
+                                          <span className="font-bold text-slate-900">{matchLabel}:</span> {matchValue || '—'}
+                                        </td>
                                         <td className="px-3 py-2 text-slate-700">{roomName}</td>
                                         <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
                                         <td className="px-3 py-2 text-slate-700">{item.par}</td>
                                       </tr>
                                     );
-                                  })}
+                                  });
+                                })()}
                               </tbody>
                             </table>
                           </div>
