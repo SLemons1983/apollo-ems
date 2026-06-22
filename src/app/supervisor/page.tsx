@@ -5805,11 +5805,6 @@ export default function SupervisorPage() {
                                   {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
                                 </div>
                               )}
-                              {inventoryReportModal === 'Expiration Management_DISABLED' && (
-                                <div className="rounded-full bg-yellow-50 px-3 py-1 text-xs font-bold text-yellow-900">
-                                  {expiringSoonInventoryLots.length} lot{expiringSoonInventoryLots.length === 1 ? '' : 's'}
-                                </div>
-                              )}
                               {inventoryReportModal === 'Inventory Value' && (
                                 <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-900">
                                   ${totalInventoryValue.toFixed(2)}
