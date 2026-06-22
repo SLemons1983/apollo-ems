@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
 
+const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
 const MAX_PHOTO_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -24,6 +26,40 @@ export async function POST(request: NextRequest) {
 
     if (!employeeName || !phoneNumber || !companyEmail || !inspectionDate || !vehicle || !mileage) {
       return NextResponse.json({ error: 'Missing required fields.' }, { status: 400 });
+    }
+
+    const parsedMileage = Number(mileage);
+
+    if (!Number.isInteger(parsedMileage) || parsedMileage < 0) {
+      return NextResponse.json({ error: 'Mileage must be a valid number.' }, { status: 400 });
+    }
+
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!serviceRoleKey) {
+      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable.');
+    }
+
+    const supabase = createClient(SUPABASE_URL, serviceRoleKey);
+
+    const { error: insertError } = await supabase.from('fleet_inspections').insert({
+      vehicle,
+      employee_name: employeeName,
+      employee_phone: phoneNumber,
+      employee_email: companyEmail,
+      inspection_date: inspectionDate,
+      mileage: parsedMileage,
+      vehicle_condition: vehicleCondition || null,
+      mechanical_checks: mechanicalChecks || null,
+      oxygen_levels: oxygenLevels || null,
+      als_supplies: alsSupplies || null,
+      bls_supplies: blsSupplies || null,
+      other_supplies: otherSupplies || null,
+      deficiencies: deficiencies || null,
+    });
+
+    if (insertError) {
+      throw insertError;
     }
 
     const photoFields = ['frontPhoto', 'driverPhoto', 'rearPhoto', 'passengerPhoto'];
