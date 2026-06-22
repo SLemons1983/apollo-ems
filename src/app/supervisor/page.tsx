@@ -71,6 +71,14 @@ type CompanyAnnouncement = {
   postedBy: string;
 };
 
+type TimecardPayType =
+  | 'DAILY_OT_DT'
+  | 'TWENTY_FOUR_HOUR'
+  | 'CALL_IN'
+  | 'SICK_TIME'
+  | 'VACATION'
+  | 'JURY_DUTY';
+
 type TimePunch = {
   id: string;
   employeeId: string;
@@ -78,6 +86,7 @@ type TimePunch = {
   timestamp: string;
   shiftDateKey: string;
   shiftLabel: string;
+  payType?: TimecardPayType;
   locationLabel: string;
   latitude: number | null;
   longitude: number | null;
@@ -511,7 +520,6 @@ export default function SupervisorPage() {
   const [inventoryReportItemId, setInventoryReportItemId] = useState('');
   const [inventoryReportReason, setInventoryReportReason] = useState('');
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
-  const lowStockInventoryItems = inventoryItems.filter((item) => item.par > 0 && item.qtyOnHand < item.par);
   const inventoryToday = new Date(new Date().toDateString());
   const expiredInventoryLots = inventoryItems.flatMap((item) =>
     (inventoryLotsByItemId[item.id] ?? [])
@@ -2089,9 +2097,23 @@ export default function SupervisorPage() {
       const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
       const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
       const shiftLabel = clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '';
+      const payType = clockIn?.payType ?? clockOut?.payType ?? '';
 
-      return { clockIn, clockOut, shiftLabel };
+      return { clockIn, clockOut, shiftLabel, payType };
     });
+  }
+
+  function getPayTypeLabel(payType: string | undefined): string {
+    const labels: Record<string, string> = {
+      DAILY_OT_DT: 'Non 24-Shift',
+      TWENTY_FOUR_HOUR: '24-Hour Shift',
+      CALL_IN: 'Call In',
+      SICK_TIME: 'Sick Time',
+      VACATION: 'Vacation',
+      JURY_DUTY: 'Jury Duty',
+    };
+
+    return payType ? labels[payType] ?? payType : '';
   }
 
   function getHoursBetween(clockIn: TimePunch | null, clockOut: TimePunch | null): string {
@@ -2988,7 +3010,7 @@ export default function SupervisorPage() {
         )}
 
         <div className="mt-4 overflow-auto rounded-xl border border-slate-300">
-          <div className="min-w-[980px] p-4">
+          <div className="min-w-[1080px] p-4">
             {weeks.map((week) => (
               <div key={`${timecard.id}-${week.label}`} className="mb-5">
                 <div className="border border-slate-400 bg-slate-100 py-1 text-center text-xs font-bold">
@@ -2999,6 +3021,7 @@ export default function SupervisorPage() {
                     <tr>
                       <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift #</th>
                       <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Shift</th>
+                      <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Pay Type</th>
                       <th colSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Date &amp; Time In</th>
                       <th colSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Date &amp; Time Out</th>
                       <th rowSpan={2} className="border border-slate-400 bg-slate-50 px-2 py-1">Total Hours</th>
@@ -3015,7 +3038,7 @@ export default function SupervisorPage() {
                     {week.dates.flatMap((date, index) => {
                       const dateKey = getDateKeyFromDate(date);
                       const pairs = getPunchPairsForDate(timecard, dateKey);
-                      const rows = pairs.length > 0 ? pairs : [{ clockIn: null, clockOut: null, shiftLabel: '' }];
+                      const rows = pairs.length > 0 ? pairs : [{ clockIn: null, clockOut: null, shiftLabel: '', payType: '' }];
 
                       return rows.map((pair, pairIndex) => {
                         const clockInDate = pair.clockIn ? new Date(pair.clockIn.timestamp) : null;
@@ -3035,6 +3058,7 @@ export default function SupervisorPage() {
                               {pairIndex === 0 ? index + 1 : '↳'}
                             </td>
                             <td className="border border-slate-400 px-2 py-1 text-center">{pair.shiftLabel}</td>
+                            <td className="border border-slate-400 px-2 py-1 text-center font-semibold">{getPayTypeLabel(pair.payType)}</td>
                             <td className="border border-slate-400 px-2 py-1 text-center">{clockInDate ? formatShortDate(clockInDate) : ''}</td>
                             <td className="border border-slate-400 px-2 py-1 text-center">
                               {clockInDate ? clockInDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''}
@@ -5520,9 +5544,7 @@ export default function SupervisorPage() {
                         'Usage by Date Range',
                         'Order List',
                         'Transfers',
-                        'Expired Inventory',
-                        'Expiring Soon',
-                        'Low Stock / Order Now',
+                        'Expiration Management',
                         'Inventory Value',
                       ].map((reportName) => (
                         <button
@@ -5603,7 +5625,7 @@ export default function SupervisorPage() {
                           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <div className="text-sm font-bold text-slate-900">Report Parameters</div>
 
-                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Low Stock / Order Now' || inventoryReportModal === 'Expired Inventory' || inventoryReportModal === 'Expiring Soon' || inventoryReportModal === 'Inventory Value' ? (
+                            {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Expiration Management' || inventoryReportModal === 'Inventory Value' ? (
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
@@ -5778,17 +5800,12 @@ export default function SupervisorPage() {
                           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="text-sm font-bold text-slate-900">Report Results</div>
-                              {inventoryReportModal === 'Low Stock / Order Now' && (
-                                <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-900">
-                                  {lowStockInventoryItems.length} item{lowStockInventoryItems.length === 1 ? '' : 's'}
-                                </div>
-                              )}
-                              {inventoryReportModal === 'Expired Inventory' && (
+                              {inventoryReportModal === 'Expiration Management' && (
                                 <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-900">
                                   {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
                                 </div>
                               )}
-                              {inventoryReportModal === 'Expiring Soon' && (
+                              {inventoryReportModal === 'Expiration Management_DISABLED' && (
                                 <div className="rounded-full bg-yellow-50 px-3 py-1 text-xs font-bold text-yellow-900">
                                   {expiringSoonInventoryLots.length} lot{expiringSoonInventoryLots.length === 1 ? '' : 's'}
                                 </div>
@@ -5810,134 +5827,97 @@ export default function SupervisorPage() {
                               )}
                             </div>
 
-                            {inventoryReportModal === 'Low Stock / Order Now' ? (
-                              lowStockInventoryItems.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  No low-stock items found for the selected supply room.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Item Number</th>
-                                        <th className="px-3 py-2">Qty On Hand</th>
-                                        <th className="px-3 py-2">PAR</th>
-                                        <th className="px-3 py-2">Variance</th>
-                                        <th className="px-3 py-2">Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {lowStockInventoryItems.map((item) => {
-                                        const variance = item.qtyOnHand - item.par;
+                            {inventoryReportModal === 'Expiration Management' ? (
+                              (() => {
+                                const expirationLots = [...expiredInventoryLots, ...expiringSoonInventoryLots]
+                                  .map(({ item, lot }) => {
+                                    const expiration = new Date(`${lot.expirationDate}T00:00:00`);
+                                    const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
+                                    return { item, lot, daysUntilExpiration };
+                                  })
+                                  .sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
 
-                                        return (
-                                          <tr key={item.id} className="border-t border-slate-100">
-                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                            <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                            <td className="px-3 py-2 text-slate-700">{item.par}</td>
-                                            <td className="px-3 py-2 font-bold text-red-700">{variance}</td>
-                                            <td className="px-3 py-2">
-                                              <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800">
-                                                Order Now
-                                              </span>
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )
-                            ) : inventoryReportModal === 'Expired Inventory' ? (
-                              expiredInventoryLots.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  No expired lots found for the selected supply room.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Item Number</th>
-                                        <th className="px-3 py-2">Lot Number</th>
-                                        <th className="px-3 py-2">Manufacturer</th>
-                                        <th className="px-3 py-2">Qty On Hand</th>
-                                        <th className="px-3 py-2">Expiration Date</th>
-                                        <th className="px-3 py-2">Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {expiredInventoryLots.map(({ item, lot }) => (
-                                        <tr key={lot.id} className="border-t border-slate-100">
-                                          <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                          <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                          <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
-                                          <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
-                                          <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
-                                          <td className="px-3 py-2 font-bold text-red-700">{lot.expirationDate}</td>
-                                          <td className="px-3 py-2">
-                                            <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700">
-                                              Expired
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )
-                            ) : inventoryReportModal === 'Expiring Soon' ? (
-                              expiringSoonInventoryLots.length === 0 ? (
-                                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                  No lots expiring within 90 days found for the selected supply room.
-                                </div>
-                              ) : (
-                                <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-100 text-slate-800">
-                                      <tr>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Item Number</th>
-                                        <th className="px-3 py-2">Lot Number</th>
-                                        <th className="px-3 py-2">Manufacturer</th>
-                                        <th className="px-3 py-2">Qty On Hand</th>
-                                        <th className="px-3 py-2">Expiration Date</th>
-                                        <th className="px-3 py-2">Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {expiringSoonInventoryLots.map(({ item, lot }) => {
-                                        const expiration = new Date(`${lot.expirationDate}T00:00:00`);
-                                        const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
+                                const expiredCount = expirationLots.filter(({ daysUntilExpiration }) => daysUntilExpiration < 0).length;
+                                const expiresTodayCount = expirationLots.filter(({ daysUntilExpiration }) => daysUntilExpiration === 0).length;
+                                const expiresThirtyCount = expirationLots.filter(({ daysUntilExpiration }) => daysUntilExpiration >= 1 && daysUntilExpiration <= 30).length;
+                                const expiresNinetyCount = expirationLots.filter(({ daysUntilExpiration }) => daysUntilExpiration >= 31 && daysUntilExpiration <= 90).length;
 
-                                        return (
-                                          <tr key={lot.id} className="border-t border-slate-100">
-                                            <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                            <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                            <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
-                                            <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
-                                            <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
-                                            <td className="px-3 py-2">
-                                              <span className={getInventoryExpirationClass(lot.expirationDate)}>
-                                                {lot.expirationDate}
-                                              </span>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                              <span className="rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-bold text-yellow-800">
-                                                {daysUntilExpiration === 0 ? 'Expires Today' : `${daysUntilExpiration} day${daysUntilExpiration === 1 ? '' : 's'}`}
-                                              </span>
-                                            </td>
+                                return expirationLots.length === 0 ? (
+                                  <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                                    No expired or expiring lots found for the selected supply room.
+                                  </div>
+                                ) : (
+                                  <div className="mt-4 space-y-4">
+                                    <div className="grid gap-3 md:grid-cols-4">
+                                      <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-red-700">Expired</div>
+                                        <div className="mt-1 text-2xl font-black text-red-800">{expiredCount}</div>
+                                      </div>
+                                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-orange-700">Expires Today</div>
+                                        <div className="mt-1 text-2xl font-black text-orange-800">{expiresTodayCount}</div>
+                                      </div>
+                                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-amber-700">Expiring 1-30 Days</div>
+                                        <div className="mt-1 text-2xl font-black text-amber-800">{expiresThirtyCount}</div>
+                                      </div>
+                                      <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                                        <div className="text-xs font-bold uppercase tracking-wide text-yellow-700">Expiring 31-90 Days</div>
+                                        <div className="mt-1 text-2xl font-black text-yellow-800">{expiresNinetyCount}</div>
+                                      </div>
+                                    </div>
+
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                      <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-100 text-slate-800">
+                                          <tr>
+                                            <th className="px-3 py-2">Item</th>
+                                            <th className="px-3 py-2">Item Number</th>
+                                            <th className="px-3 py-2">Lot Number</th>
+                                            <th className="px-3 py-2">Manufacturer</th>
+                                            <th className="px-3 py-2">Qty On Hand</th>
+                                            <th className="px-3 py-2">Expiration Date</th>
+                                            <th className="px-3 py-2">Status</th>
                                           </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )
+                                        </thead>
+                                        <tbody>
+                                          {expirationLots.map(({ item, lot, daysUntilExpiration }) => {
+                                            const statusText = daysUntilExpiration < 0
+                                              ? `${Math.abs(daysUntilExpiration)} day${Math.abs(daysUntilExpiration) === 1 ? '' : 's'} expired`
+                                              : daysUntilExpiration === 0
+                                                ? 'Expires Today'
+                                                : `${daysUntilExpiration} day${daysUntilExpiration === 1 ? '' : 's'}`;
+
+                                            const statusClass = daysUntilExpiration < 0
+                                              ? 'rounded-full bg-red-100 px-2 py-1 text-[11px] font-bold text-red-700'
+                                              : daysUntilExpiration <= 30
+                                                ? 'rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800'
+                                                : 'rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-bold text-yellow-800';
+
+                                            return (
+                                              <tr key={lot.id} className="border-t border-slate-100">
+                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
+                                                <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
+                                                <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
+                                                <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
+                                                <td className="px-3 py-2">
+                                                  <span className={getInventoryExpirationClass(lot.expirationDate)}>
+                                                    {lot.expirationDate}
+                                                  </span>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  <span className={statusClass}>{statusText}</span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                );
+                              })()
                             ) : inventoryReportModal === 'Usage by Date Range' ? (
                               inventoryUsageTransactions.length === 0 ? (
                                 <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">

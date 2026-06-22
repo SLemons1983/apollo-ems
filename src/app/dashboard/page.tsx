@@ -209,6 +209,14 @@ type ApolloMessage = {
   priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
 };
 
+type TimecardPayType =
+  | 'DAILY_OT_DT'
+  | 'TWENTY_FOUR_HOUR'
+  | 'CALL_IN'
+  | 'SICK_TIME'
+  | 'VACATION'
+  | 'JURY_DUTY';
+
 type TimePunch = {
   id: string;
   employeeId: string;
@@ -216,6 +224,7 @@ type TimePunch = {
   timestamp: string;
   shiftDateKey: string;
   shiftLabel: string;
+  payType?: TimecardPayType;
   locationLabel: string;
   latitude: number | null;
   longitude: number | null;
@@ -291,13 +300,7 @@ type SubmittedTimecard = {
 type EditableTimecardRow = {
   id?: string;
   shiftLabel: string;
-  payType:
-    | 'DAILY_OT_DT'
-    | 'TWENTY_FOUR_HOUR'
-    | 'CALL_IN'
-    | 'SICK_TIME'
-    | 'VACATION'
-    | 'JURY_DUTY';
+  payType: TimecardPayType;
   clockInDate: string;
   clockInTime: string;
   clockOutDate: string;
@@ -947,6 +950,7 @@ export default function DashboardPage() {
   const [additionalCompensation, setAdditionalCompensation] = useState<AdditionalCompensation[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [editableTimecardRows, setEditableTimecardRows] = useState<Record<string, EditableTimecardRow>>({});
+  const [restoredReturnedTimecardIds, setRestoredReturnedTimecardIds] = useState<string[]>([]);
   const [missedMealDateKey, setMissedMealDateKey] = useState('');
   const [missedMealReason, setMissedMealReason] = useState('');
   const [correctionDateKey, setCorrectionDateKey] = useState('');
@@ -2604,6 +2608,105 @@ export default function DashboardPage() {
       item.status === 'RETURNED',
   ) ?? null;
 
+  function normalizeReturnedPayType(value: string | undefined): TimecardPayType {
+    if (
+      value === 'DAILY_OT_DT' ||
+      value === 'TWENTY_FOUR_HOUR' ||
+      value === 'CALL_IN' ||
+      value === 'SICK_TIME' ||
+      value === 'VACATION' ||
+      value === 'JURY_DUTY'
+    ) {
+      return value;
+    }
+
+    return 'DAILY_OT_DT';
+  }
+
+  function getDateInputFromTimestamp(timestamp: string): string {
+    const date = new Date(timestamp);
+    return getIsoDateInputValue(date);
+  }
+
+  function getTimeInputFromTimestamp(timestamp: string): string {
+    const date = new Date(timestamp);
+    return `${date.getHours()}`.padStart(2, '0') + ':' + `${date.getMinutes()}`.padStart(2, '0');
+  }
+
+  async function restoreEditableRowsFromReturnedTimecard(timecard: SubmittedTimecard) {
+    const grouped = new Map<string, TimePunch[]>();
+
+    timecard.punches.forEach((punch) => {
+      const groupKey = punch.id
+        .replace(/^editable-clock-in-/, '')
+        .replace(/^editable-clock-out-/, '');
+
+      grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), punch]);
+    });
+
+    const restoredRows: Record<string, EditableTimecardRow> = {};
+
+    grouped.forEach((group, groupKey) => {
+      const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+      const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+      const dateKey = clockIn?.shiftDateKey ?? clockOut?.shiftDateKey ?? '';
+
+      if (!dateKey) {
+        return;
+      }
+
+      const rowId = groupKey.startsWith(`${currentEmployeeId}-${selectedPayPeriod.key}-`)
+        ? groupKey
+        : `${getEditableRowKey(dateKey)}-returned-${Object.keys(restoredRows).length}`;
+
+      restoredRows[rowId] = {
+        id: rowId,
+        shiftLabel: clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '',
+        payType: normalizeReturnedPayType(clockIn?.payType ?? clockOut?.payType),
+        clockInDate: clockIn ? getDateInputFromTimestamp(clockIn.timestamp) : '',
+        clockInTime: clockIn ? getTimeInputFromTimestamp(clockIn.timestamp) : '',
+        clockOutDate: clockOut ? getDateInputFromTimestamp(clockOut.timestamp) : '',
+        clockOutTime: clockOut ? getTimeInputFromTimestamp(clockOut.timestamp) : '',
+      };
+    });
+
+    if (Object.keys(restoredRows).length === 0) {
+      return;
+    }
+
+    setEditableTimecardRows((current) => ({
+      ...current,
+      ...restoredRows,
+    }));
+
+    const rows = Object.entries(restoredRows).map(([id, row]) => ({
+      id,
+      employee_id: currentEmployeeId,
+      pay_period_key: selectedPayPeriod.key,
+      date_key: getEditableRowDateKey(id),
+      row_data: row,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('editable_timecard_rows')
+      .upsert(rows, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Failed to restore returned timecard rows:', error);
+      window.alert(`Returned timecard restore failed: ${error.message}`);
+    }
+  }
+
+  useEffect(() => {
+    if (!returnedTimecard || restoredReturnedTimecardIds.includes(returnedTimecard.id)) {
+      return;
+    }
+
+    setRestoredReturnedTimecardIds((current) => [...current, returnedTimecard.id]);
+    void restoreEditableRowsFromReturnedTimecard(returnedTimecard);
+  }, [returnedTimecard?.id, restoredReturnedTimecardIds]);
+
   function getEditableRowKey(dateKey: string): string {
     return `${currentEmployeeId}-${selectedPayPeriod.key}-${dateKey}`;
   }
@@ -3262,6 +3365,7 @@ export default function DashboardPage() {
             timestamp: new Date(`${row.clockInDate}T${row.clockInTime}:00`).toISOString(),
             shiftDateKey: dateKey,
             shiftLabel: row.shiftLabel,
+            payType: row.payType,
             locationLabel: 'Employee edited timecard',
             latitude: null,
             longitude: null,
@@ -3278,6 +3382,7 @@ export default function DashboardPage() {
             timestamp: new Date(`${row.clockOutDate}T${row.clockOutTime}:00`).toISOString(),
             shiftDateKey: dateKey,
             shiftLabel: row.shiftLabel,
+            payType: row.payType,
             locationLabel: 'Employee edited timecard',
             latitude: null,
             longitude: null,
