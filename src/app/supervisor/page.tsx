@@ -483,6 +483,7 @@ export default function SupervisorPage() {
   const [allInventoryItems, setAllInventoryItems] = useState<InventoryItem[]>([]);
   const [inventoryLotsByItemId, setInventoryLotsByItemId] = useState<Record<string, InventoryLot[]>>({});
   const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
+  const [inventorySearch, setInventorySearch] = useState('');
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
   const [showCreateInventoryReports, setShowCreateInventoryReports] = useState(false);
@@ -5802,7 +5803,7 @@ export default function SupervisorPage() {
                               <div className="text-sm font-bold text-slate-900">Report Results</div>
                               {inventoryReportModal === 'Expiration Management' && (
                                 <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-900">
-                                  {expiredInventoryLots.length} lot{expiredInventoryLots.length === 1 ? '' : 's'}
+                                  {expiredInventoryLots.length + expiringSoonInventoryLots.length} lot{expiredInventoryLots.length + expiringSoonInventoryLots.length === 1 ? '' : 's'}
                                 </div>
                               )}
                               {inventoryReportModal === 'Inventory Value' && (
@@ -5866,12 +5867,14 @@ export default function SupervisorPage() {
                                       <table className="w-full text-left text-xs">
                                         <thead className="bg-slate-100 text-slate-800">
                                           <tr>
+                                            <th className="px-3 py-2">Supply Room</th>
                                             <th className="px-3 py-2">Item</th>
                                             <th className="px-3 py-2">Item Number</th>
                                             <th className="px-3 py-2">Lot Number</th>
                                             <th className="px-3 py-2">Manufacturer</th>
                                             <th className="px-3 py-2">Qty On Hand</th>
                                             <th className="px-3 py-2">Expiration Date</th>
+                                            <th className="px-3 py-2">Days Remaining</th>
                                             <th className="px-3 py-2">Status</th>
                                           </tr>
                                         </thead>
@@ -5889,8 +5892,11 @@ export default function SupervisorPage() {
                                                 ? 'rounded-full bg-amber-100 px-2 py-1 text-[11px] font-bold text-amber-800'
                                                 : 'rounded-full bg-yellow-100 px-2 py-1 text-[11px] font-bold text-yellow-800';
 
+                                            const supplyRoomName = inventorySupplyRooms.find((room) => room.id === item.supplyRoomId)?.name ?? 'Selected Supply Room';
+
                                             return (
                                               <tr key={lot.id} className="border-t border-slate-100">
+                                                <td className="px-3 py-2 text-slate-700">{supplyRoomName}</td>
                                                 <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
                                                 <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
                                                 <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
@@ -5901,6 +5907,7 @@ export default function SupervisorPage() {
                                                     {lot.expirationDate}
                                                   </span>
                                                 </td>
+                                                <td className="px-3 py-2 font-bold text-slate-900">{daysUntilExpiration}</td>
                                                 <td className="px-3 py-2">
                                                   <span className={statusClass}>{statusText}</span>
                                                 </td>
@@ -6281,6 +6288,68 @@ export default function SupervisorPage() {
                     {!showInventoryRoomDetail && (
                       <div>
                         <div className="text-sm font-bold text-slate-900">Supply Rooms</div>
+
+                        <div className="mt-3">
+                          <input
+                            type="text"
+                            value={inventorySearch}
+                            onChange={(event) => setInventorySearch(event.target.value)}
+                            placeholder="Search inventory by item name or SKU..."
+                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          />
+                        </div>
+
+                        {inventorySearch.trim() && (
+                          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-100 text-slate-800">
+                                <tr>
+                                  <th className="px-3 py-2">Item</th>
+                                  <th className="px-3 py-2">Item Number</th>
+                                  <th className="px-3 py-2">Supply Room</th>
+                                  <th className="px-3 py-2">Qty</th>
+                                  <th className="px-3 py-2">PAR</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {allInventoryItems
+                                  .filter((item) => {
+                                    const search = inventorySearch.trim().toLowerCase();
+                                    return (
+                                      item.itemName.toLowerCase().includes(search) ||
+                                      item.itemNumber.toLowerCase().includes(search)
+                                    );
+                                  })
+                                  .slice(0, 25)
+                                  .map((item) => {
+                                    const roomName =
+                                      inventorySupplyRooms.find((room) => room.id === item.supplyRoomId)?.name ??
+                                      'Unknown Room';
+
+                                    return (
+                                      <tr
+                                        key={item.id}
+                                        className="cursor-pointer border-t border-slate-100 hover:bg-blue-50"
+                                        onClick={() => {
+                                          setSelectedSupplyRoomId(item.supplyRoomId);
+                                          setShowInventoryRoomDetail(true);
+                                          setExpandedInventoryItemId(item.id);
+                                          setInventorySearch('');
+                                        }}
+                                      >
+                                        <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                        <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                        <td className="px-3 py-2 text-slate-700">{roomName}</td>
+                                        <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
+                                        <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                      </tr>
+                                    );
+                                  })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {inventorySupplyRooms.map((room) => (
                             <button
