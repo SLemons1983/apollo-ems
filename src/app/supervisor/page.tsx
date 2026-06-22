@@ -523,21 +523,6 @@ export default function SupervisorPage() {
   const [inventoryReportReason, setInventoryReportReason] = useState('');
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
   const inventoryToday = new Date(new Date().toDateString());
-  const expiredInventoryLots = inventoryItems.flatMap((item) =>
-    (inventoryLotsByItemId[item.id] ?? [])
-      .filter((lot) => lot.expirationDate && new Date(`${lot.expirationDate}T00:00:00`) < inventoryToday)
-      .map((lot) => ({ item, lot })),
-  );
-  const expiringSoonInventoryLots = inventoryItems.flatMap((item) =>
-    (inventoryLotsByItemId[item.id] ?? [])
-      .filter((lot) => {
-        if (!lot.expirationDate) return false;
-        const expiration = new Date(`${lot.expirationDate}T00:00:00`);
-        const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
-        return daysUntilExpiration >= 0 && daysUntilExpiration <= 90;
-      })
-      .map((lot) => ({ item, lot })),
-  );
 
   const totalInventoryValue = inventoryItems.reduce(
     (total, item) => total + (item.qtyOnHand * item.unitCost),
@@ -5572,7 +5557,6 @@ export default function SupervisorPage() {
                       {[
                         'Usage by Date Range',
                         'Order List',
-                        'Transfers',
                         'Expiration Management',
                         'Inventory Value',
                       ].map((reportName) => (
@@ -5658,7 +5642,7 @@ export default function SupervisorPage() {
                               <div className="mt-3 grid gap-3 md:grid-cols-2">
                                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                                   <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Supply Room</div>
-                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Inventory Value' ? (
+                                  {inventoryReportModal === 'Usage by Date Range' || inventoryReportModal === 'Order List' || inventoryReportModal === 'Expiration Management' || inventoryReportModal === 'Inventory Value' ? (
                                     <>
                                       <select
                                         value={inventoryReportSupplyRoomId}
@@ -5723,7 +5707,7 @@ export default function SupervisorPage() {
                                   </div>
                                 )}
 
-                                {inventoryReportModal === 'Inventory Value' && (
+                                {(inventoryReportModal === 'Inventory Value' || inventoryReportModal === 'Expiration Management') && (
                                   <div className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
                                     <div className="grid gap-3 md:grid-cols-2">
                                       <label className="text-xs font-semibold text-slate-700">
@@ -5745,7 +5729,9 @@ export default function SupervisorPage() {
                                       </label>
 
                                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                                        This report calculates value using Qty On Hand × Unit Cost. Items with no unit cost entered will calculate as $0.00.
+                                        {inventoryReportModal === 'Expiration Management'
+                                          ? 'This report includes expired lots and active lots expiring within 90 days.'
+                                          : 'This report calculates value using Qty On Hand × Unit Cost. Items with no unit cost entered will calculate as $0.00.'}
                                       </div>
                                     </div>
                                   </div>
@@ -5831,7 +5817,7 @@ export default function SupervisorPage() {
                               <div className="text-sm font-bold text-slate-900">Report Results</div>
                               {inventoryReportModal === 'Expiration Management' && (
                                 <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-900">
-                                  {expiredInventoryLots.length + expiringSoonInventoryLots.length} lot{expiredInventoryLots.length + expiringSoonInventoryLots.length === 1 ? '' : 's'}
+                                  Expiration Review
                                 </div>
                               )}
                               {inventoryReportModal === 'Inventory Value' && (
@@ -5853,12 +5839,22 @@ export default function SupervisorPage() {
 
                             {inventoryReportModal === 'Expiration Management' ? (
                               (() => {
-                                const expirationLots = [...expiredInventoryLots, ...expiringSoonInventoryLots]
-                                  .map(({ item, lot }) => {
+                                const expirationLots = allInventoryLots
+                                  .map((lot) => {
+                                    const item = allInventoryItems.find((inventoryItem) => inventoryItem.id === lot.itemId);
+
+                                    if (!item || !lot.expirationDate) return null;
+
                                     const expiration = new Date(`${lot.expirationDate}T00:00:00`);
                                     const daysUntilExpiration = Math.ceil((expiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24));
+
+                                    if (daysUntilExpiration > 90) return null;
+                                    if (inventoryReportSupplyRoomId && item.supplyRoomId !== inventoryReportSupplyRoomId) return null;
+                                    if (inventoryReportItemId && item.id !== inventoryReportItemId) return null;
+
                                     return { item, lot, daysUntilExpiration };
                                   })
+                                  .filter((entry): entry is { item: InventoryItem; lot: InventoryLot; daysUntilExpiration: number } => Boolean(entry))
                                   .sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
 
                                 const expiredCount = expirationLots.filter(({ daysUntilExpiration }) => daysUntilExpiration < 0).length;
@@ -5868,7 +5864,7 @@ export default function SupervisorPage() {
 
                                 return expirationLots.length === 0 ? (
                                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                                    No expired or expiring lots found for the selected supply room.
+                                    No expired or expiring lots found for the selected report parameters.
                                   </div>
                                 ) : (
                                   <div className="mt-4 space-y-4">
