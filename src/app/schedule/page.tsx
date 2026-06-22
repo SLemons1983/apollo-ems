@@ -2714,13 +2714,27 @@ export default function SchedulePage() {
             ? 'Open BLS'
             : selectedEmployee?.name || 'Open';
 
+      const isSpecialShiftType =
+        slot.shiftType &&
+        slot.shiftType !== 'REGULAR';
+
       return (
-        <div className="rounded-lg border border-slate-300 bg-white px-3 py-2">
-          <div className="text-sm font-semibold text-slate-800">
+        <div
+          className={`rounded-lg border px-3 py-2 ${
+            isSpecialShiftType
+              ? 'border-yellow-300 bg-yellow-100'
+              : 'border-slate-300 bg-white'
+          }`}
+        >
+          <div
+            className={`text-sm font-semibold ${
+              isSpecialShiftType
+                ? 'text-yellow-900'
+                : 'text-slate-800'
+            }`}
+          >
             {collapsedName}
           </div>
-
-
         </div>
       );
     }
