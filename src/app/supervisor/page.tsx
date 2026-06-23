@@ -279,7 +279,7 @@ type FleetVehicle = {
   model: string;
   vin: string;
   currentMileage: number;
-  status: 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'MAINTENANCE_SCHEDULED' | 'RESERVE';
+  status: 'IN_SERVICE' | 'OUT_OF_SERVICE' | 'MAINTENANCE_SCHEDULED' | 'RESERVE' | 'CUSTOM';
   statusReason: string;
   outOfServiceDate: string;
   expectedReturnDate: string;
@@ -4344,6 +4344,8 @@ export default function SupervisorPage() {
         return 'Maintenance Scheduled';
       case 'RESERVE':
         return 'Reserve Unit';
+      case 'CUSTOM':
+        return 'Custom Status';
       case 'IN_SERVICE':
       default:
         return 'In Service';
@@ -4358,6 +4360,8 @@ export default function SupervisorPage() {
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'RESERVE':
         return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'CUSTOM':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'IN_SERVICE':
       default:
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -4728,6 +4732,39 @@ export default function SupervisorPage() {
 
     setFleetStatus('Vehicle updated.');
     setIsEditingFleetVehicle(false);
+  }
+
+  async function handleUpdateFleetVehicleReadiness() {
+    if (!selectedFleetVehicle) {
+      return;
+    }
+
+    if (
+      (selectedFleetVehicle.status === 'OUT_OF_SERVICE' || selectedFleetVehicle.status === 'CUSTOM') &&
+      !selectedFleetVehicle.statusReason.trim()
+    ) {
+      setFleetStatus('A reason is required for Out of Service or Custom status.');
+      return;
+    }
+
+    setFleetStatus('Updating vehicle readiness...');
+
+    const { error } = await supabase
+      .from('fleet_vehicles')
+      .update({
+        status: selectedFleetVehicle.status,
+        status_reason: selectedFleetVehicle.statusReason.trim() || null,
+      })
+      .eq('id', selectedFleetVehicle.id);
+
+    if (error) {
+      console.error('Failed to update vehicle readiness:', error);
+      setFleetStatus('Unable to update vehicle readiness.');
+      return;
+    }
+
+    await loadFleetVehicles();
+    setFleetStatus('Vehicle readiness updated.');
   }
 
   async function handleDeleteFleetVehicle(vehicle: FleetVehicle) {
@@ -6219,6 +6256,7 @@ export default function SupervisorPage() {
                           <option value="OUT_OF_SERVICE">Out of Service</option>
                           <option value="MAINTENANCE_SCHEDULED">Maintenance Scheduled</option>
                           <option value="RESERVE">Reserve Unit</option>
+                          <option value="CUSTOM">Custom Status</option>
                         </select>
                       </label>
                     </div>
@@ -6555,11 +6593,51 @@ export default function SupervisorPage() {
                           </span>
                         </div>
 
-                        {selectedFleetVehicle.statusReason && (
-                          <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
-                            {selectedFleetVehicle.statusReason}
-                          </div>
-                        )}
+                        <div className="mt-4 grid gap-3">
+                          <label className="text-xs font-semibold text-slate-600">
+                            Vehicle Status
+                            <select
+                              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                              value={selectedFleetVehicle.status}
+                              onChange={(event) =>
+                                setSelectedFleetVehicle({
+                                  ...selectedFleetVehicle,
+                                  status: event.target.value as FleetVehicle['status'],
+                                })
+                              }
+                            >
+                              <option value="IN_SERVICE">In Service</option>
+                              <option value="OUT_OF_SERVICE">Out of Service</option>
+                              <option value="RESERVE">Reserve Unit</option>
+                              <option value="CUSTOM">Custom Status</option>
+                            </select>
+                          </label>
+
+                          {(selectedFleetVehicle.status === 'OUT_OF_SERVICE' || selectedFleetVehicle.status === 'CUSTOM' || selectedFleetVehicle.statusReason) && (
+                            <label className="text-xs font-semibold text-slate-600">
+                              Status Reason
+                              <textarea
+                                className="mt-1 min-h-[80px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={selectedFleetVehicle.statusReason}
+                                onChange={(event) =>
+                                  setSelectedFleetVehicle({
+                                    ...selectedFleetVehicle,
+                                    statusReason: event.target.value,
+                                  })
+                                }
+                                placeholder="Required for Out of Service or Custom status."
+                              />
+                            </label>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleUpdateFleetVehicleReadiness}
+                            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                          >
+                            Save Readiness Status
+                          </button>
+                        </div>
                       </div>
                     </div>
 
