@@ -8207,10 +8207,10 @@ export default function SupervisorPage() {
                                 setSelectedSupplyRoomId(room.id);
                                 setShowInventoryRoomDetail(true);
                               }}
-                              className={`rounded-xl border p-4 text-left transition ${
+                              className={`rounded-xl border-2 p-4 text-left shadow-md transition-all hover:-translate-y-0.5 ${
                                 selectedSupplyRoomId === room.id
-                                  ? 'border-blue-300 bg-blue-50'
-                                  : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
+                                  ? 'border-blue-600 bg-blue-50 shadow-lg'
+                                  : 'border-slate-700 bg-slate-50 hover:bg-slate-100 hover:shadow-lg'
                               }`}
                             >
                               <div className="text-sm font-bold text-slate-900">{room.name}</div>
