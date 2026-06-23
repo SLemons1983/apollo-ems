@@ -6625,6 +6625,8 @@ export default function SupervisorPage() {
                           </tbody>
                         </table>
                       </div>
+                      </>
+                      )}
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -6651,7 +6653,6 @@ export default function SupervisorPage() {
                         >
                           {showAddFleetServiceRecord ? 'Cancel' : 'Add Service Record'}
                         </button>
-                      </div>
 
                       {showAddFleetServiceRecord && (
                         <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
