@@ -6571,11 +6571,26 @@ export default function SupervisorPage() {
                           display: none !important;
                         }
 
-                        table {
-                          page-break-inside: auto;
+                        .apollo-print-report .overflow-x-auto {
+                          overflow: visible !important;
                         }
 
-                        tr {
+                        .apollo-print-report table {
+                          width: 100% !important;
+                          min-width: 0 !important;
+                          table-layout: fixed !important;
+                          page-break-inside: auto;
+                          font-size: 10px !important;
+                        }
+
+                        .apollo-print-report th,
+                        .apollo-print-report td {
+                          white-space: normal !important;
+                          word-break: break-word !important;
+                          padding: 6px !important;
+                        }
+
+                        .apollo-print-report tr {
                           page-break-inside: avoid;
                           page-break-after: auto;
                         }
@@ -6632,7 +6647,7 @@ export default function SupervisorPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-4">
                       <div className="text-sm font-bold text-slate-900">Daily Vehicle Inspection Mileage Audit</div>
                       <div className="mt-3 overflow-x-auto">
-                        <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                        <table className="w-full border-collapse text-left text-xs">
                           <thead>
                             <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
                               <th className="px-3 py-2 font-bold">Vehicle</th>
@@ -6668,7 +6683,7 @@ export default function SupervisorPage() {
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                       <div className="text-sm font-bold text-slate-900">Maintenance Records</div>
                       <div className="mt-3 overflow-x-auto">
-                        <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                        <table className="w-full border-collapse text-left text-xs">
                           <thead>
                             <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
                               <th className="px-3 py-2 font-bold">Vehicle</th>
