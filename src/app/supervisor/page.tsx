@@ -6271,7 +6271,7 @@ export default function SupervisorPage() {
                               ? 'border-yellow-300 ring-2 ring-yellow-100'
                               : vehicle.status === 'RESERVE'
                                 ? 'border-blue-300 ring-2 ring-blue-100'
-                                : 'border-slate-200'
+                                : 'border-slate-900 ring-2 ring-slate-200'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
