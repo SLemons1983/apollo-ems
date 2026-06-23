@@ -310,6 +310,22 @@ type FleetServiceRecord = {
   createdAt: string;
 };
 
+type FleetInspection = {
+  id: string;
+  vehicle: string;
+  employeeName: string;
+  inspectionDate: string;
+  mileage: number;
+  vehicleCondition: string;
+  mechanicalChecks: string;
+  oxygenLevels: string;
+  alsSupplies: string;
+  blsSupplies: string;
+  otherSupplies: string;
+  deficiencies: string;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -566,6 +582,7 @@ export default function SupervisorPage() {
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
   const [fleetServiceTemplates, setFleetServiceTemplates] = useState<FleetServiceTemplate[]>([]);
   const [fleetServiceRecords, setFleetServiceRecords] = useState<FleetServiceRecord[]>([]);
+  const [fleetInspections, setFleetInspections] = useState<FleetInspection[]>([]);
   const [showCreateFleetVehicleForm, setShowCreateFleetVehicleForm] = useState(false);
   const [showFleetServiceTemplates, setShowFleetServiceTemplates] = useState(false);
   const [newFleetVehicleName, setNewFleetVehicleName] = useState('');
@@ -882,6 +899,7 @@ export default function SupervisorPage() {
       loadAllInventoryLotsForSearch();
       loadFleetVehicles();
       loadFleetServiceTemplates();
+      loadFleetInspections();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -4376,6 +4394,57 @@ export default function SupervisorPage() {
     );
   }
 
+  function getFleetInspectionsForVehicle(vehicle: FleetVehicle) {
+    const unitNumber = vehicle.unitNumber.trim().toLowerCase();
+    const vehicleName = vehicle.vehicleName.trim().toLowerCase();
+
+    return fleetInspections.filter((inspection) => {
+      const inspectionVehicle = inspection.vehicle.trim().toLowerCase();
+
+      return (
+        inspectionVehicle === unitNumber ||
+        inspectionVehicle === vehicleName ||
+        (!!unitNumber && inspectionVehicle.includes(unitNumber))
+      );
+    });
+  }
+
+  function getLatestFleetInspectionForVehicle(vehicle: FleetVehicle) {
+    return getFleetInspectionsForVehicle(vehicle)[0] ?? null;
+  }
+
+  async function loadFleetInspections() {
+    const { data, error } = await supabase
+      .from('fleet_inspections')
+      .select('*')
+      .order('inspection_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load fleet inspections:', error);
+      setFleetStatus('Unable to load fleet inspections.');
+      return;
+    }
+
+    setFleetInspections(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        vehicle: row.vehicle ?? '',
+        employeeName: row.employee_name ?? '',
+        inspectionDate: row.inspection_date ?? '',
+        mileage: row.mileage ?? 0,
+        vehicleCondition: row.vehicle_condition ?? '',
+        mechanicalChecks: row.mechanical_checks ?? '',
+        oxygenLevels: row.oxygen_levels ?? '',
+        alsSupplies: row.als_supplies ?? '',
+        blsSupplies: row.bls_supplies ?? '',
+        otherSupplies: row.other_supplies ?? '',
+        deficiencies: row.deficiencies ?? '',
+        createdAt: row.created_at,
+      })),
+    );
+  }
+
   async function loadFleetServiceTemplates() {
     const { data, error } = await supabase
       .from('fleet_service_templates')
@@ -6223,7 +6292,16 @@ export default function SupervisorPage() {
                         <div className="mt-4 grid gap-2 text-sm">
                           <div className="flex justify-between gap-3">
                             <span className="text-slate-500">Mileage</span>
-                            <span className="font-semibold text-slate-900">{vehicle.currentMileage.toLocaleString()}</span>
+                            <span className="font-semibold text-slate-900">
+                              {(getLatestFleetInspectionForVehicle(vehicle)?.mileage ?? vehicle.currentMileage).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between gap-3">
+                            <span className="text-slate-500">Last Inspection</span>
+                            <span className="font-semibold text-slate-900">
+                              {getLatestFleetInspectionForVehicle(vehicle)?.inspectionDate || 'No inspection yet'}
+                            </span>
                           </div>
 
                           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
@@ -6442,6 +6520,59 @@ export default function SupervisorPage() {
                             {selectedFleetVehicle.statusReason}
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm font-bold text-slate-900">Daily Vehicle Inspection History</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Newest inspection submissions are listed first.
+                      </div>
+
+                      <div className="mt-4 overflow-x-auto">
+                        <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                              <th className="px-3 py-2 font-bold">Date</th>
+                              <th className="px-3 py-2 font-bold">Mileage</th>
+                              <th className="px-3 py-2 font-bold">Noted Issues</th>
+                              <th className="px-3 py-2 font-bold">Submitting Employee</th>
+                              <th className="px-3 py-2 font-bold">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {getFleetInspectionsForVehicle(selectedFleetVehicle).length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
+                                  No daily vehicle inspections have been submitted for this vehicle yet.
+                                </td>
+                              </tr>
+                            ) : (
+                              getFleetInspectionsForVehicle(selectedFleetVehicle).map((inspection) => (
+                                <tr key={inspection.id} className="border-b border-slate-100">
+                                  <td className="px-3 py-2 font-semibold text-slate-900">{inspection.inspectionDate}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.mileage.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.employeeName || '—'}</td>
+                                  <td className="px-3 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowAddFleetServiceRecord(true);
+                                        setNewFleetServiceRecordDate(inspection.inspectionDate);
+                                        setNewFleetServiceRecordMileage(String(inspection.mileage));
+                                        setNewFleetServiceRecordNotes(inspection.deficiencies || '');
+                                      }}
+                                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                                    >
+                                      Add Service
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
 
