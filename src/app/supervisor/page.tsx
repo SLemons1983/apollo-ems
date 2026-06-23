@@ -582,6 +582,7 @@ export default function SupervisorPage() {
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
   const [fleetServiceTemplates, setFleetServiceTemplates] = useState<FleetServiceTemplate[]>([]);
   const [fleetServiceRecords, setFleetServiceRecords] = useState<FleetServiceRecord[]>([]);
+  const [allFleetServiceRecords, setAllFleetServiceRecords] = useState<FleetServiceRecord[]>([]);
   const [fleetInspections, setFleetInspections] = useState<FleetInspection[]>([]);
   const [showCreateFleetVehicleForm, setShowCreateFleetVehicleForm] = useState(false);
   const [showFleetServiceTemplates, setShowFleetServiceTemplates] = useState(false);
@@ -602,6 +603,12 @@ export default function SupervisorPage() {
   const [showVehicleInformation, setShowVehicleInformation] = useState(false);
   const [showInspectionHistory, setShowInspectionHistory] = useState(false);
   const [showMaintenanceRecords, setShowMaintenanceRecords] = useState(false);
+  const [showFleetPrintReport, setShowFleetPrintReport] = useState(false);
+  const [fleetReportVehicleFilter, setFleetReportVehicleFilter] = useState('');
+  const [fleetReportStartDate, setFleetReportStartDate] = useState('');
+  const [fleetReportEndDate, setFleetReportEndDate] = useState('');
+  const [fleetReportEmployeeFilter, setFleetReportEmployeeFilter] = useState('');
+  const [fleetReportDeficienciesOnly, setFleetReportDeficienciesOnly] = useState(false);
   const [newFleetServiceRecordTemplateId, setNewFleetServiceRecordTemplateId] = useState('');
   const [newFleetServiceRecordName, setNewFleetServiceRecordName] = useState('');
   const [newFleetServiceRecordDate, setNewFleetServiceRecordDate] = useState('');
@@ -903,6 +910,7 @@ export default function SupervisorPage() {
       loadFleetVehicles();
       loadFleetServiceTemplates();
       loadFleetInspections();
+      loadAllFleetServiceRecords();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -4542,6 +4550,21 @@ export default function SupervisorPage() {
     return `Every ${template.intervalValue.toLocaleString()} miles`;
   }
 
+  function mapFleetServiceRecord(row: any): FleetServiceRecord {
+    return {
+      id: row.id,
+      vehicleId: row.vehicle_id,
+      serviceTemplateId: row.service_template_id ?? '',
+      serviceName: row.service_name,
+      description: row.description ?? '',
+      completedDate: row.completed_date,
+      completedMileage: row.completed_mileage ?? null,
+      performedBy: row.performed_by ?? '',
+      notes: row.notes ?? '',
+      createdAt: row.created_at,
+    };
+  }
+
   async function loadFleetServiceRecords(vehicleId: string) {
     const { data, error } = await supabase
       .from('fleet_service_records')
@@ -4556,21 +4579,78 @@ export default function SupervisorPage() {
       return;
     }
 
-    setFleetServiceRecords(
-      (data ?? []).map((row: any) => ({
-        id: row.id,
-        vehicleId: row.vehicle_id,
-        serviceTemplateId: row.service_template_id ?? '',
-        serviceName: row.service_name,
-        description: row.description ?? '',
-        completedDate: row.completed_date,
-        completedMileage: row.completed_mileage ?? null,
-        performedBy: row.performed_by ?? '',
-        notes: row.notes ?? '',
-        createdAt: row.created_at,
-      })),
-    );
+    setFleetServiceRecords((data ?? []).map(mapFleetServiceRecord));
   }
+
+  async function loadAllFleetServiceRecords() {
+    const { data, error } = await supabase
+      .from('fleet_service_records')
+      .select('*')
+      .order('completed_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load all fleet service records:', error);
+      return;
+    }
+
+    setAllFleetServiceRecords((data ?? []).map(mapFleetServiceRecord));
+  }
+
+  function getFleetVehicleLabelById(vehicleId: string) {
+    const vehicle = fleetVehicles.find((item) => item.id === vehicleId);
+    return vehicle?.unitNumber || vehicle?.vehicleName || vehicleId;
+  }
+
+  function fleetVehicleMatchesFilter(vehicle: string) {
+    if (!fleetReportVehicleFilter) {
+      return true;
+    }
+
+    return vehicle.trim().toLowerCase().includes(fleetReportVehicleFilter.trim().toLowerCase());
+  }
+
+  function fleetDateIsInRange(dateValue: string) {
+    if (fleetReportStartDate && dateValue < fleetReportStartDate) {
+      return false;
+    }
+
+    if (fleetReportEndDate && dateValue > fleetReportEndDate) {
+      return false;
+    }
+
+    return true;
+  }
+
+  const filteredFleetInspections = fleetInspections.filter((inspection) => {
+    const employeeMatches =
+      !fleetReportEmployeeFilter ||
+      inspection.employeeName.toLowerCase().includes(fleetReportEmployeeFilter.trim().toLowerCase());
+
+    const deficiencyMatches =
+      !fleetReportDeficienciesOnly ||
+      !!inspection.deficiencies.trim();
+
+    return (
+      fleetVehicleMatchesFilter(inspection.vehicle) &&
+      fleetDateIsInRange(inspection.inspectionDate) &&
+      employeeMatches &&
+      deficiencyMatches
+    );
+  });
+
+  const filteredFleetServiceRecords = allFleetServiceRecords.filter((record) => {
+    const vehicleLabel = getFleetVehicleLabelById(record.vehicleId);
+    const employeeMatches =
+      !fleetReportEmployeeFilter ||
+      record.performedBy.toLowerCase().includes(fleetReportEmployeeFilter.trim().toLowerCase());
+
+    return (
+      fleetVehicleMatchesFilter(vehicleLabel) &&
+      fleetDateIsInRange(record.completedDate) &&
+      employeeMatches
+    );
+  });
 
   async function handleCreateFleetServiceRecord() {
     if (!selectedFleetVehicle) {
@@ -4642,6 +4722,7 @@ export default function SupervisorPage() {
     setShowAddFleetServiceRecord(false);
     setFleetStatus('Service record added.');
     await loadFleetServiceRecords(selectedFleetVehicle.id);
+    await loadAllFleetServiceRecords();
     await loadFleetVehicles();
   }
 
@@ -6058,6 +6139,14 @@ export default function SupervisorPage() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
+                      onClick={() => setShowFleetPrintReport(true)}
+                      className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800"
+                    >
+                      Print / Save PDF
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setShowFleetServiceTemplates((value) => !value)}
                       className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
                     >
@@ -6285,6 +6374,88 @@ export default function SupervisorPage() {
                   </div>
                 )}
 
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                  <div className="text-sm font-bold text-slate-900">Fleet Filters</div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <label className="text-xs font-semibold text-slate-600">
+                      Vehicle
+                      <select
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={fleetReportVehicleFilter}
+                        onChange={(event) => setFleetReportVehicleFilter(event.target.value)}
+                      >
+                        <option value="">All Vehicles</option>
+                        {fleetVehicles.map((vehicle) => (
+                          <option key={vehicle.id} value={vehicle.unitNumber || vehicle.vehicleName}>
+                            {vehicle.unitNumber || vehicle.vehicleName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Start Date
+                      <input
+                        type="date"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={fleetReportStartDate}
+                        onChange={(event) => setFleetReportStartDate(event.target.value)}
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      End Date
+                      <input
+                        type="date"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={fleetReportEndDate}
+                        onChange={(event) => setFleetReportEndDate(event.target.value)}
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Employee / Performed By
+                      <input
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        value={fleetReportEmployeeFilter}
+                        onChange={(event) => setFleetReportEmployeeFilter(event.target.value)}
+                        placeholder="Name"
+                      />
+                    </label>
+
+                    <label className="flex items-center gap-2 pt-6 text-xs font-semibold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={fleetReportDeficienciesOnly}
+                        onChange={(event) => setFleetReportDeficienciesOnly(event.target.checked)}
+                      />
+                      Deficiencies only
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold">
+                      Inspection Rows: {filteredFleetInspections.length}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold">
+                      Service Records: {filteredFleetServiceRecords.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFleetReportVehicleFilter('');
+                        setFleetReportStartDate('');
+                        setFleetReportEndDate('');
+                        setFleetReportEmployeeFilter('');
+                        setFleetReportDeficienciesOnly(false);
+                      }}
+                      className="rounded-full border border-slate-300 bg-white px-3 py-1 font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </div>
+
                 {!showCreateFleetVehicleForm && fleetStatus && (
                   <div className="mt-3 text-sm font-semibold text-slate-700">{fleetStatus}</div>
                 )}
@@ -6368,6 +6539,172 @@ export default function SupervisorPage() {
                   )}
                 </div>
               </div>
+
+              {showFleetPrintReport && (
+                <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+                  <div className="apollo-print-report mt-6 max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+                    <style>{`
+                      @media print {
+                        body * {
+                          visibility: hidden;
+                        }
+
+                        .apollo-print-report,
+                        .apollo-print-report * {
+                          visibility: visible;
+                        }
+
+                        .apollo-print-report {
+                          position: absolute !important;
+                          left: 0 !important;
+                          top: 0 !important;
+                          width: 100% !important;
+                          max-width: none !important;
+                          max-height: none !important;
+                          overflow: visible !important;
+                          border-radius: 0 !important;
+                          box-shadow: none !important;
+                          padding: 16px !important;
+                        }
+
+                        .apollo-no-print {
+                          display: none !important;
+                        }
+
+                        table {
+                          page-break-inside: auto;
+                        }
+
+                        tr {
+                          page-break-inside: avoid;
+                          page-break-after: auto;
+                        }
+                      }
+                    `}</style>
+
+                    <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-200 pb-3">
+                      <div>
+                        <div className="text-lg font-bold text-slate-900">Fleet Mileage Audit Report</div>
+                        <div className="text-sm text-slate-500">
+                          Vehicle inspections, mileage submissions, deficiencies, and maintenance records.
+                        </div>
+                      </div>
+
+                      <div className="apollo-no-print flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                          onClick={() => window.print()}
+                        >
+                          Print / Save PDF
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowFleetPrintReport(false)}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mb-4 grid gap-3 md:grid-cols-4">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Vehicle</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">{fleetReportVehicleFilter || 'All Vehicles'}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Date Range</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">
+                          {fleetReportStartDate || 'Any'} → {fleetReportEndDate || 'Any'}
+                        </div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Inspection Rows</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">{filteredFleetInspections.length}</div>
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Service Records</div>
+                        <div className="mt-1 text-sm font-bold text-slate-900">{filteredFleetServiceRecords.length}</div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm font-bold text-slate-900">Daily Vehicle Inspection Mileage Audit</div>
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                              <th className="px-3 py-2 font-bold">Vehicle</th>
+                              <th className="px-3 py-2 font-bold">Date</th>
+                              <th className="px-3 py-2 font-bold">Mileage</th>
+                              <th className="px-3 py-2 font-bold">Employee</th>
+                              <th className="px-3 py-2 font-bold">Deficiencies</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredFleetInspections.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="px-3 py-4 text-center text-slate-500">
+                                  No inspection records match the selected filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredFleetInspections.map((inspection) => (
+                                <tr key={inspection.id} className="border-b border-slate-100">
+                                  <td className="px-3 py-2 font-bold text-slate-900">{inspection.vehicle}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.inspectionDate}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.mileage.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.employeeName || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="text-sm font-bold text-slate-900">Maintenance Records</div>
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                              <th className="px-3 py-2 font-bold">Vehicle</th>
+                              <th className="px-3 py-2 font-bold">Date</th>
+                              <th className="px-3 py-2 font-bold">Service</th>
+                              <th className="px-3 py-2 font-bold">Mileage</th>
+                              <th className="px-3 py-2 font-bold">Performed By</th>
+                              <th className="px-3 py-2 font-bold">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredFleetServiceRecords.length === 0 ? (
+                              <tr>
+                                <td colSpan={6} className="px-3 py-4 text-center text-slate-500">
+                                  No maintenance records match the selected filters.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredFleetServiceRecords.map((record) => (
+                                <tr key={record.id} className="border-b border-slate-100">
+                                  <td className="px-3 py-2 font-bold text-slate-900">{getFleetVehicleLabelById(record.vehicleId)}</td>
+                                  <td className="px-3 py-2 text-slate-700">{record.completedDate}</td>
+                                  <td className="px-3 py-2 text-slate-700">{record.serviceName}</td>
+                                  <td className="px-3 py-2 text-slate-700">{record.completedMileage !== null ? record.completedMileage.toLocaleString() : '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{record.performedBy || '—'}</td>
+                                  <td className="px-3 py-2 text-slate-700">{record.notes || '—'}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {selectedFleetVehicle && (
                 <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
