@@ -553,6 +553,7 @@ export default function SupervisorPage() {
   const [newFleetStatus, setNewFleetStatus] = useState<FleetVehicle['status']>('IN_SERVICE');
   const [newFleetStatusReason, setNewFleetStatusReason] = useState('');
   const [selectedFleetVehicle, setSelectedFleetVehicle] = useState<FleetVehicle | null>(null);
+  const [isEditingFleetVehicle, setIsEditingFleetVehicle] = useState(false);
   const [fleetStatus, setFleetStatus] = useState('');
 
   const inventoryToday = new Date(new Date().toDateString());
@@ -4393,6 +4394,40 @@ export default function SupervisorPage() {
     await loadFleetVehicles();
   }
 
+  async function handleUpdateFleetVehicle() {
+    if (!selectedFleetVehicle) {
+      return;
+    }
+
+    setFleetStatus('Saving vehicle changes...');
+
+    const { error } = await supabase
+      .from('fleet_vehicles')
+      .update({
+        vehicle_name: selectedFleetVehicle.vehicleName,
+        unit_number: selectedFleetVehicle.unitNumber || null,
+        year: selectedFleetVehicle.year,
+        make: selectedFleetVehicle.make || null,
+        model: selectedFleetVehicle.model || null,
+        vin: selectedFleetVehicle.vin || null,
+        current_mileage: selectedFleetVehicle.currentMileage,
+        status: selectedFleetVehicle.status,
+        status_reason: selectedFleetVehicle.statusReason || null,
+      })
+      .eq('id', selectedFleetVehicle.id);
+
+    if (error) {
+      console.error('Failed to update fleet vehicle:', error);
+      setFleetStatus('Unable to save vehicle changes.');
+      return;
+    }
+
+    await loadFleetVehicles();
+
+    setFleetStatus('Vehicle updated.');
+    setIsEditingFleetVehicle(false);
+  }
+
   async function handleDeleteFleetVehicle(vehicle: FleetVehicle) {
     const confirmed = window.confirm(`Delete fleet vehicle "${vehicle.vehicleName}"?`);
 
@@ -5887,6 +5922,140 @@ export default function SupervisorPage() {
                       </button>
                     </div>
 
+                    {isEditingFleetVehicle && (
+                      <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                        <div className="mb-3 text-sm font-bold text-blue-900">
+                          Edit Vehicle
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <input
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.vehicleName}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                vehicleName: event.target.value,
+                              })
+                            }
+                            placeholder="Vehicle Name"
+                          />
+
+                          <input
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.unitNumber}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                unitNumber: event.target.value,
+                              })
+                            }
+                            placeholder="Unit Number"
+                          />
+
+                          <input
+                            type="number"
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.year ?? ''}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                year: Number(event.target.value) || null,
+                              })
+                            }
+                            placeholder="Year"
+                          />
+
+                          <input
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.make}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                make: event.target.value,
+                              })
+                            }
+                            placeholder="Make"
+                          />
+
+                          <input
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.model}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                model: event.target.value,
+                              })
+                            }
+                            placeholder="Model"
+                          />
+
+                          <input
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.vin}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                vin: event.target.value,
+                              })
+                            }
+                            placeholder="VIN"
+                          />
+
+                          <input
+                            type="number"
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.currentMileage}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                currentMileage: Number(event.target.value) || 0,
+                              })
+                            }
+                            placeholder="Mileage"
+                          />
+
+                          <select
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                            value={selectedFleetVehicle.status}
+                            onChange={(event) =>
+                              setSelectedFleetVehicle({
+                                ...selectedFleetVehicle,
+                                status: event.target.value as FleetVehicle['status'],
+                              })
+                            }
+                          >
+                            <option value="IN_SERVICE">In Service</option>
+                            <option value="OUT_OF_SERVICE">Out of Service</option>
+                            <option value="MAINTENANCE_SCHEDULED">Maintenance Scheduled</option>
+                            <option value="RESERVE">Reserve Unit</option>
+                          </select>
+                        </div>
+
+                        <textarea
+                          className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                          value={selectedFleetVehicle.statusReason}
+                          onChange={(event) =>
+                            setSelectedFleetVehicle({
+                              ...selectedFleetVehicle,
+                              statusReason: event.target.value,
+                            })
+                          }
+                          placeholder="Status reason"
+                        />
+
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={handleUpdateFleetVehicle}
+                            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                          >
+                            Save Changes
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                         <div className="text-sm font-bold text-slate-900">Vehicle Information</div>
@@ -5936,11 +6105,10 @@ export default function SupervisorPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
-                          disabled
-                          className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold text-slate-400"
-                          title="Edit vehicle will be added in the next Fleet patch."
+                          onClick={() => setIsEditingFleetVehicle((value) => !value)}
+                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
                         >
-                          Edit Vehicle
+                          {isEditingFleetVehicle ? 'Cancel Edit' : 'Edit Vehicle'}
                         </button>
 
                         <button
