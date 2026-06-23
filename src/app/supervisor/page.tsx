@@ -7039,10 +7039,17 @@ export default function SupervisorPage() {
                                     <button
                                       type="button"
                                       onClick={() => {
+                                        setShowMaintenanceRecords(true);
                                         setShowAddFleetServiceRecord(true);
                                         setNewFleetServiceRecordDate(inspection.inspectionDate);
                                         setNewFleetServiceRecordMileage(String(inspection.mileage));
                                         setNewFleetServiceRecordNotes(inspection.deficiencies || '');
+
+                                        setTimeout(() => {
+                                          document
+                                            .querySelector('[data-fleet-service-form]')
+                                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                        }, 100);
                                       }}
                                       className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
                                     >
@@ -7085,7 +7092,10 @@ export default function SupervisorPage() {
                         </button>
 
                       {showAddFleetServiceRecord && (
-                        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                        <div
+                          data-fleet-service-form
+                          className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4"
+                        >
                           <div className="grid gap-3 md:grid-cols-2">
                             <label className="text-xs font-semibold text-slate-600">
                               Service Template
