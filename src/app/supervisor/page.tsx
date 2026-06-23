@@ -6498,6 +6498,7 @@ export default function SupervisorPage() {
                         </button>
 
                         {showVehicleInformation && (
+                        <>
                         <div className="mt-3 grid gap-2 text-sm">
                           <div className="flex justify-between gap-3">
                             <span className="text-slate-500">Unit Number</span>
@@ -6539,6 +6540,7 @@ export default function SupervisorPage() {
                             Delete Vehicle
                           </button>
                         </div>
+                        </>
                         )}
                       </div>
 
@@ -6559,8 +6561,6 @@ export default function SupervisorPage() {
                           </div>
                         )}
                       </div>
-                      </>
-                      )}
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
