@@ -297,6 +297,19 @@ type FleetServiceTemplate = {
   createdAt: string;
 };
 
+type FleetServiceRecord = {
+  id: string;
+  vehicleId: string;
+  serviceTemplateId: string;
+  serviceName: string;
+  description: string;
+  completedDate: string;
+  completedMileage: number | null;
+  performedBy: string;
+  notes: string;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -552,6 +565,7 @@ export default function SupervisorPage() {
 
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
   const [fleetServiceTemplates, setFleetServiceTemplates] = useState<FleetServiceTemplate[]>([]);
+  const [fleetServiceRecords, setFleetServiceRecords] = useState<FleetServiceRecord[]>([]);
   const [showCreateFleetVehicleForm, setShowCreateFleetVehicleForm] = useState(false);
   const [showFleetServiceTemplates, setShowFleetServiceTemplates] = useState(false);
   const [newFleetVehicleName, setNewFleetVehicleName] = useState('');
@@ -567,6 +581,13 @@ export default function SupervisorPage() {
   const [newFleetServiceDescription, setNewFleetServiceDescription] = useState('');
   const [newFleetServiceIntervalType, setNewFleetServiceIntervalType] = useState<FleetServiceTemplate['intervalType']>('MILEAGE');
   const [newFleetServiceIntervalValue, setNewFleetServiceIntervalValue] = useState('');
+  const [showAddFleetServiceRecord, setShowAddFleetServiceRecord] = useState(false);
+  const [newFleetServiceRecordTemplateId, setNewFleetServiceRecordTemplateId] = useState('');
+  const [newFleetServiceRecordName, setNewFleetServiceRecordName] = useState('');
+  const [newFleetServiceRecordDate, setNewFleetServiceRecordDate] = useState('');
+  const [newFleetServiceRecordMileage, setNewFleetServiceRecordMileage] = useState('');
+  const [newFleetServiceRecordPerformedBy, setNewFleetServiceRecordPerformedBy] = useState('');
+  const [newFleetServiceRecordNotes, setNewFleetServiceRecordNotes] = useState('');
   const [selectedFleetVehicle, setSelectedFleetVehicle] = useState<FleetVehicle | null>(null);
   const [isEditingFleetVehicle, setIsEditingFleetVehicle] = useState(false);
   const [fleetStatus, setFleetStatus] = useState('');
@@ -4445,6 +4466,109 @@ export default function SupervisorPage() {
     return `Every ${template.intervalValue.toLocaleString()} miles`;
   }
 
+  async function loadFleetServiceRecords(vehicleId: string) {
+    const { data, error } = await supabase
+      .from('fleet_service_records')
+      .select('*')
+      .eq('vehicle_id', vehicleId)
+      .order('completed_date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load fleet service records:', error);
+      setFleetStatus('Unable to load service records.');
+      return;
+    }
+
+    setFleetServiceRecords(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        vehicleId: row.vehicle_id,
+        serviceTemplateId: row.service_template_id ?? '',
+        serviceName: row.service_name,
+        description: row.description ?? '',
+        completedDate: row.completed_date,
+        completedMileage: row.completed_mileage ?? null,
+        performedBy: row.performed_by ?? '',
+        notes: row.notes ?? '',
+        createdAt: row.created_at,
+      })),
+    );
+  }
+
+  async function handleCreateFleetServiceRecord() {
+    if (!selectedFleetVehicle) {
+      setFleetStatus('Select a vehicle first.');
+      return;
+    }
+
+    const selectedTemplate = fleetServiceTemplates.find((template) => template.id === newFleetServiceRecordTemplateId);
+    const serviceName = selectedTemplate?.serviceName ?? newFleetServiceRecordName.trim();
+    const description = selectedTemplate?.description ?? '';
+    const completedMileage = newFleetServiceRecordMileage.trim() ? Number(newFleetServiceRecordMileage) : null;
+
+    if (!serviceName) {
+      setFleetStatus('Enter a service name or select a service template.');
+      return;
+    }
+
+    if (!newFleetServiceRecordDate) {
+      setFleetStatus('Enter the completed date.');
+      return;
+    }
+
+    if (completedMileage !== null && (!Number.isInteger(completedMileage) || completedMileage < 0)) {
+      setFleetStatus('Enter a valid completed mileage.');
+      return;
+    }
+
+    setFleetStatus('Adding service record...');
+
+    const { error } = await supabase.from('fleet_service_records').insert({
+      vehicle_id: selectedFleetVehicle.id,
+      service_template_id: selectedTemplate?.id ?? null,
+      service_name: serviceName,
+      description: description || null,
+      completed_date: newFleetServiceRecordDate,
+      completed_mileage: completedMileage,
+      performed_by: newFleetServiceRecordPerformedBy.trim() || null,
+      notes: newFleetServiceRecordNotes.trim() || null,
+    });
+
+    if (error) {
+      console.error('Failed to create fleet service record:', error);
+      setFleetStatus('Unable to add service record.');
+      return;
+    }
+
+    if (completedMileage !== null && completedMileage > selectedFleetVehicle.currentMileage) {
+      const { error: mileageError } = await supabase
+        .from('fleet_vehicles')
+        .update({ current_mileage: completedMileage })
+        .eq('id', selectedFleetVehicle.id);
+
+      if (mileageError) {
+        console.error('Failed to update vehicle mileage from service record:', mileageError);
+      } else {
+        setSelectedFleetVehicle({
+          ...selectedFleetVehicle,
+          currentMileage: completedMileage,
+        });
+      }
+    }
+
+    setNewFleetServiceRecordTemplateId('');
+    setNewFleetServiceRecordName('');
+    setNewFleetServiceRecordDate('');
+    setNewFleetServiceRecordMileage('');
+    setNewFleetServiceRecordPerformedBy('');
+    setNewFleetServiceRecordNotes('');
+    setShowAddFleetServiceRecord(false);
+    setFleetStatus('Service record added.');
+    await loadFleetServiceRecords(selectedFleetVehicle.id);
+    await loadFleetVehicles();
+  }
+
   async function handleCreateFleetVehicle() {
     const vehicleName = newFleetVehicleName.trim();
     const unitNumber = newFleetUnitNumber.trim();
@@ -6065,7 +6189,12 @@ export default function SupervisorPage() {
                       <button
                         key={vehicle.id}
                         type="button"
-                        onClick={() => setSelectedFleetVehicle(vehicle)}
+                        onClick={() => {
+                          setSelectedFleetVehicle(vehicle);
+                          setIsEditingFleetVehicle(false);
+                          setShowAddFleetServiceRecord(false);
+                          void loadFleetServiceRecords(vehicle.id);
+                        }}
                         className={`rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                           vehicle.status === 'OUT_OF_SERVICE'
                             ? 'border-red-300 ring-2 ring-red-100'
@@ -6099,7 +6228,11 @@ export default function SupervisorPage() {
 
                           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                             <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">Service Status</div>
-                            <div className="mt-1 text-sm font-semibold text-emerald-800">No services due</div>
+                            <div className="mt-1 text-sm font-semibold text-emerald-800">
+                              {fleetServiceRecords.find((record) => record.vehicleId === vehicle.id)?.serviceName
+                                ? `Last Service: ${fleetServiceRecords.find((record) => record.vehicleId === vehicle.id)?.serviceName}`
+                                : 'No services due'}
+                            </div>
                           </div>
 
                           {vehicle.statusReason && vehicle.status !== 'IN_SERVICE' && (
@@ -6308,6 +6441,140 @@ export default function SupervisorPage() {
                           <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">
                             {selectedFleetVehicle.statusReason}
                           </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">Maintenance Records</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Log completed services for this vehicle.
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setShowAddFleetServiceRecord((value) => !value)}
+                          className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800"
+                        >
+                          {showAddFleetServiceRecord ? 'Cancel' : 'Add Service Record'}
+                        </button>
+                      </div>
+
+                      {showAddFleetServiceRecord && (
+                        <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <label className="text-xs font-semibold text-slate-600">
+                              Service Template
+                              <select
+                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={newFleetServiceRecordTemplateId}
+                                onChange={(event) => {
+                                  const templateId = event.target.value;
+                                  const template = fleetServiceTemplates.find((item) => item.id === templateId);
+                                  setNewFleetServiceRecordTemplateId(templateId);
+                                  setNewFleetServiceRecordName(template?.serviceName ?? '');
+                                }}
+                              >
+                                <option value="">Custom Service</option>
+                                {fleetServiceTemplates.map((template) => (
+                                  <option key={template.id} value={template.id}>
+                                    {template.serviceName}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="text-xs font-semibold text-slate-600">
+                              Service Name
+                              <input
+                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={newFleetServiceRecordName}
+                                onChange={(event) => setNewFleetServiceRecordName(event.target.value)}
+                                placeholder="Oil Change"
+                              />
+                            </label>
+
+                            <label className="text-xs font-semibold text-slate-600">
+                              Completed Date
+                              <input
+                                type="date"
+                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={newFleetServiceRecordDate}
+                                onChange={(event) => setNewFleetServiceRecordDate(event.target.value)}
+                              />
+                            </label>
+
+                            <label className="text-xs font-semibold text-slate-600">
+                              Completed Mileage
+                              <input
+                                type="number"
+                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={newFleetServiceRecordMileage}
+                                onChange={(event) => setNewFleetServiceRecordMileage(event.target.value)}
+                                placeholder={String(selectedFleetVehicle.currentMileage)}
+                              />
+                            </label>
+
+                            <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                              Performed By
+                              <input
+                                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                value={newFleetServiceRecordPerformedBy}
+                                onChange={(event) => setNewFleetServiceRecordPerformedBy(event.target.value)}
+                                placeholder="Vendor, mechanic, or supervisor"
+                              />
+                            </label>
+                          </div>
+
+                          <label className="mt-3 block text-xs font-semibold text-slate-600">
+                            Notes
+                            <textarea
+                              className="mt-1 min-h-[80px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                              value={newFleetServiceRecordNotes}
+                              onChange={(event) => setNewFleetServiceRecordNotes(event.target.value)}
+                              placeholder="Describe completed work, findings, parts replaced, or follow-up needed."
+                            />
+                          </label>
+
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              onClick={handleCreateFleetServiceRecord}
+                              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                            >
+                              Save Service Record
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-4 space-y-2">
+                        {fleetServiceRecords.length === 0 ? (
+                          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+                            No service records have been added for this vehicle.
+                          </div>
+                        ) : (
+                          fleetServiceRecords.map((record) => (
+                            <div key={record.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-bold text-slate-900">{record.serviceName}</div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    Completed {record.completedDate}
+                                    {record.completedMileage !== null ? ` at ${record.completedMileage.toLocaleString()} miles` : ''}
+                                    {record.performedBy ? ` • ${record.performedBy}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {record.notes && (
+                                <div className="mt-2 text-xs text-slate-600">{record.notes}</div>
+                              )}
+                            </div>
+                          ))
                         )}
                       </div>
                     </div>
