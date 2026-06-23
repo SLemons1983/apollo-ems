@@ -288,6 +288,15 @@ type FleetVehicle = {
   updatedAt: string;
 };
 
+type FleetServiceTemplate = {
+  id: string;
+  serviceName: string;
+  description: string;
+  intervalType: 'MILEAGE' | 'DATE';
+  intervalValue: number;
+  createdAt: string;
+};
+
 type BuilderShiftKey = 'R1' | 'R2' | 'P' | 'OC' | 'FIELD_SUP';
 
 type BuilderShift = {
@@ -542,7 +551,9 @@ export default function SupervisorPage() {
   const [inventoryUsageTransactions, setInventoryUsageTransactions] = useState<InventoryTransaction[]>([]);
 
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
+  const [fleetServiceTemplates, setFleetServiceTemplates] = useState<FleetServiceTemplate[]>([]);
   const [showCreateFleetVehicleForm, setShowCreateFleetVehicleForm] = useState(false);
+  const [showFleetServiceTemplates, setShowFleetServiceTemplates] = useState(false);
   const [newFleetVehicleName, setNewFleetVehicleName] = useState('');
   const [newFleetUnitNumber, setNewFleetUnitNumber] = useState('');
   const [newFleetYear, setNewFleetYear] = useState('');
@@ -552,6 +563,10 @@ export default function SupervisorPage() {
   const [newFleetMileage, setNewFleetMileage] = useState('');
   const [newFleetStatus, setNewFleetStatus] = useState<FleetVehicle['status']>('IN_SERVICE');
   const [newFleetStatusReason, setNewFleetStatusReason] = useState('');
+  const [newFleetServiceName, setNewFleetServiceName] = useState('');
+  const [newFleetServiceDescription, setNewFleetServiceDescription] = useState('');
+  const [newFleetServiceIntervalType, setNewFleetServiceIntervalType] = useState<FleetServiceTemplate['intervalType']>('MILEAGE');
+  const [newFleetServiceIntervalValue, setNewFleetServiceIntervalValue] = useState('');
   const [selectedFleetVehicle, setSelectedFleetVehicle] = useState<FleetVehicle | null>(null);
   const [isEditingFleetVehicle, setIsEditingFleetVehicle] = useState(false);
   const [fleetStatus, setFleetStatus] = useState('');
@@ -845,6 +860,7 @@ export default function SupervisorPage() {
       loadAllInventoryItemsForReports();
       loadAllInventoryLotsForSearch();
       loadFleetVehicles();
+      loadFleetServiceTemplates();
 
       fetch('/api/incident-reports/list')
         .then((response) => {
@@ -4339,6 +4355,96 @@ export default function SupervisorPage() {
     );
   }
 
+  async function loadFleetServiceTemplates() {
+    const { data, error } = await supabase
+      .from('fleet_service_templates')
+      .select('*')
+      .order('service_name', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load fleet service templates:', error);
+      setFleetStatus('Unable to load fleet service templates.');
+      return;
+    }
+
+    setFleetServiceTemplates(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        serviceName: row.service_name,
+        description: row.description ?? '',
+        intervalType: row.interval_type ?? 'MILEAGE',
+        intervalValue: row.interval_value ?? 0,
+        createdAt: row.created_at,
+      })),
+    );
+  }
+
+  async function handleCreateFleetServiceTemplate() {
+    const serviceName = newFleetServiceName.trim();
+    const intervalValue = Number(newFleetServiceIntervalValue);
+
+    if (!serviceName) {
+      setFleetStatus('Enter a service name.');
+      return;
+    }
+
+    if (!Number.isInteger(intervalValue) || intervalValue <= 0) {
+      setFleetStatus('Enter a valid service interval.');
+      return;
+    }
+
+    setFleetStatus('Creating service template...');
+
+    const { error } = await supabase.from('fleet_service_templates').insert({
+      service_name: serviceName,
+      description: newFleetServiceDescription.trim() || null,
+      interval_type: newFleetServiceIntervalType,
+      interval_value: intervalValue,
+    });
+
+    if (error) {
+      console.error('Failed to create fleet service template:', error);
+      setFleetStatus('Unable to create service template.');
+      return;
+    }
+
+    setNewFleetServiceName('');
+    setNewFleetServiceDescription('');
+    setNewFleetServiceIntervalType('MILEAGE');
+    setNewFleetServiceIntervalValue('');
+    setFleetStatus('Service template created.');
+    await loadFleetServiceTemplates();
+  }
+
+  async function handleDeleteFleetServiceTemplate(template: FleetServiceTemplate) {
+    const confirmed = window.confirm(`Delete service template "${template.serviceName}"?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setFleetStatus('Deleting service template...');
+
+    const { error } = await supabase.from('fleet_service_templates').delete().eq('id', template.id);
+
+    if (error) {
+      console.error('Failed to delete fleet service template:', error);
+      setFleetStatus('Unable to delete service template.');
+      return;
+    }
+
+    setFleetStatus('Service template deleted.');
+    await loadFleetServiceTemplates();
+  }
+
+  function getFleetServiceIntervalLabel(template: FleetServiceTemplate) {
+    if (template.intervalType === 'DATE') {
+      return `Every ${template.intervalValue} month${template.intervalValue === 1 ? '' : 's'}`;
+    }
+
+    return `Every ${template.intervalValue.toLocaleString()} miles`;
+  }
+
   async function handleCreateFleetVehicle() {
     const vehicleName = newFleetVehicleName.trim();
     const unitNumber = newFleetUnitNumber.trim();
@@ -5716,14 +5822,120 @@ export default function SupervisorPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateFleetVehicleForm((value) => !value)}
-                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
-                  >
-                    {showCreateFleetVehicleForm ? 'Cancel' : 'Add Vehicle'}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFleetServiceTemplates((value) => !value)}
+                      className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                    >
+                      {showFleetServiceTemplates ? 'Hide Service Templates' : 'Manage Service Templates'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateFleetVehicleForm((value) => !value)}
+                      className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                    >
+                      {showCreateFleetVehicleForm ? 'Cancel' : 'Add Vehicle'}
+                    </button>
+                  </div>
                 </div>
+
+                {showFleetServiceTemplates && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">Service Templates</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Build reusable mileage or date interval services such as A Service, B Service, Oil Change, or Annual Inspection.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <label className="text-xs font-semibold text-slate-600">
+                        Service Name
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetServiceName}
+                          onChange={(event) => setNewFleetServiceName(event.target.value)}
+                          placeholder="A Service"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600 xl:col-span-2">
+                        Description
+                        <input
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetServiceDescription}
+                          onChange={(event) => setNewFleetServiceDescription(event.target.value)}
+                          placeholder="Oil, filters, fluids, safety inspection"
+                        />
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Interval Type
+                        <select
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetServiceIntervalType}
+                          onChange={(event) => setNewFleetServiceIntervalType(event.target.value as FleetServiceTemplate['intervalType'])}
+                        >
+                          <option value="MILEAGE">Mileage</option>
+                          <option value="DATE">Date</option>
+                        </select>
+                      </label>
+
+                      <label className="text-xs font-semibold text-slate-600">
+                        Interval Value
+                        <input
+                          type="number"
+                          className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                          value={newFleetServiceIntervalValue}
+                          onChange={(event) => setNewFleetServiceIntervalValue(event.target.value)}
+                          placeholder={newFleetServiceIntervalType === 'DATE' ? '3 months' : '5000 miles'}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={handleCreateFleetServiceTemplate}
+                        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800"
+                      >
+                        Create Service Template
+                      </button>
+                    </div>
+
+                    <div className="mt-4 grid gap-2">
+                      {fleetServiceTemplates.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+                          No service templates have been created yet.
+                        </div>
+                      ) : (
+                        fleetServiceTemplates.map((template) => (
+                          <div key={template.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">{template.serviceName}</div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {getFleetServiceIntervalLabel(template)}
+                                {template.description ? ` • ${template.description}` : ''}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteFleetServiceTemplate(template)}
+                              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {showCreateFleetVehicleForm && (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
