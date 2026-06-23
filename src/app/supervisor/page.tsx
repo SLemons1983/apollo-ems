@@ -599,6 +599,9 @@ export default function SupervisorPage() {
   const [newFleetServiceIntervalType, setNewFleetServiceIntervalType] = useState<FleetServiceTemplate['intervalType']>('MILEAGE');
   const [newFleetServiceIntervalValue, setNewFleetServiceIntervalValue] = useState('');
   const [showAddFleetServiceRecord, setShowAddFleetServiceRecord] = useState(false);
+  const [showVehicleInformation, setShowVehicleInformation] = useState(false);
+  const [showInspectionHistory, setShowInspectionHistory] = useState(false);
+  const [showMaintenanceRecords, setShowMaintenanceRecords] = useState(false);
   const [newFleetServiceRecordTemplateId, setNewFleetServiceRecordTemplateId] = useState('');
   const [newFleetServiceRecordName, setNewFleetServiceRecordName] = useState('');
   const [newFleetServiceRecordDate, setNewFleetServiceRecordDate] = useState('');
@@ -6262,6 +6265,9 @@ export default function SupervisorPage() {
                           setSelectedFleetVehicle(vehicle);
                           setIsEditingFleetVehicle(false);
                           setShowAddFleetServiceRecord(false);
+                          setShowVehicleInformation(false);
+                          setShowInspectionHistory(false);
+                          setShowMaintenanceRecords(false);
                           void loadFleetServiceRecords(vehicle.id);
                         }}
                         className={`rounded-xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
@@ -6481,7 +6487,17 @@ export default function SupervisorPage() {
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-sm font-bold text-slate-900">Vehicle Information</div>
+                        <button
+                          type="button"
+                          onClick={() => setShowVehicleInformation((value) => !value)}
+                          className="flex w-full items-center justify-between text-left"
+                        >
+                          <div className="text-sm font-bold text-slate-900">
+                            {showVehicleInformation ? '▼ Hide Vehicle Information' : '▶ Show Vehicle Information'}
+                          </div>
+                        </button>
+
+                        {showVehicleInformation && (
                         <div className="mt-3 grid gap-2 text-sm">
                           <div className="flex justify-between gap-3">
                             <span className="text-slate-500">Unit Number</span>
@@ -6502,6 +6518,28 @@ export default function SupervisorPage() {
                             <span className="font-semibold text-slate-900">{selectedFleetVehicle.currentMileage.toLocaleString()}</span>
                           </div>
                         </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingFleetVehicle((value) => !value)}
+                            className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                          >
+                            {isEditingFleetVehicle ? 'Cancel Edit' : 'Edit Vehicle'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await handleDeleteFleetVehicle(selectedFleetVehicle);
+                              setSelectedFleetVehicle(null);
+                            }}
+                            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
+                          >
+                            Delete Vehicle
+                          </button>
+                        </div>
+                        )}
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -6521,10 +6559,23 @@ export default function SupervisorPage() {
                           </div>
                         )}
                       </div>
+                      </>
+                      )}
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="text-sm font-bold text-slate-900">Daily Vehicle Inspection History</div>
+                      <button
+                        type="button"
+                        onClick={() => setShowInspectionHistory((value) => !value)}
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <div className="text-sm font-bold text-slate-900">
+                          {showInspectionHistory ? '▼ Hide Daily Vehicle Inspection History' : '▶ Show Daily Vehicle Inspection History'}
+                        </div>
+                      </button>
+
+                      {showInspectionHistory && (
+                      <>
                       <div className="mt-1 text-xs text-slate-500">
                         Newest inspection submissions are listed first.
                       </div>
@@ -6577,15 +6628,23 @@ export default function SupervisorPage() {
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">Maintenance Records</div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Log completed services for this vehicle.
-                          </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowMaintenanceRecords((value) => !value)}
+                        className="flex w-full items-center justify-between text-left"
+                      >
+                        <div className="text-sm font-bold text-slate-900">
+                          {showMaintenanceRecords ? '▼ Hide Maintenance Records' : '▶ Show Maintenance Records'}
                         </div>
+                      </button>
 
-                        <button
+                      {showMaintenanceRecords && (
+                      <>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Log completed services for this vehicle.
+                      </div>
+
+                      <button
                           type="button"
                           onClick={() => setShowAddFleetServiceRecord((value) => !value)}
                           className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800"
@@ -6708,29 +6767,14 @@ export default function SupervisorPage() {
                           ))
                         )}
                       </div>
+                      </>
+                      )}
                     </div>
 
                     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                       <div className="text-sm font-bold text-slate-900">Vehicle Actions</div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingFleetVehicle((value) => !value)}
-                          className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
-                        >
-                          {isEditingFleetVehicle ? 'Cancel Edit' : 'Edit Vehicle'}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            await handleDeleteFleetVehicle(selectedFleetVehicle);
-                            setSelectedFleetVehicle(null);
-                          }}
-                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-100"
-                        >
-                          Delete Vehicle
-                        </button>
+                      <div className="mt-3 text-xs text-slate-500">
+                        Fleet reporting and export actions will appear here.
                       </div>
                     </div>
                   </div>
