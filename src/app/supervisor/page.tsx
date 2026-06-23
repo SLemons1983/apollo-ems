@@ -4113,16 +4113,73 @@ export default function SupervisorPage() {
       return;
     }
 
-    if (quantity > selectedRemoveInventoryItem.qtyOnHand) {
-      setInventoryStatus('Cannot remove more than qty on hand.');
+    setInventoryStatus('Removing inventory...');
+
+    const { data: lots, error: lotsError } = await supabase
+      .from('inventory_lots')
+      .select('id, qty_on_hand, expiration_date, created_at')
+      .eq('item_id', selectedRemoveInventoryItem.id)
+      .eq('supply_room_id', selectedSupplyRoomId)
+      .gt('qty_on_hand', 0)
+      .order('expiration_date', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true });
+
+    if (lotsError) {
+      console.error('Failed to load inventory lots:', lotsError);
+      setInventoryStatus('Unable to load inventory lots.');
       return;
     }
 
-    setInventoryStatus('Removing inventory...');
+    const lotQtyOnHand = (lots ?? []).reduce((sum, lot) => sum + (lot.qty_on_hand ?? 0), 0);
+
+    if (quantity > lotQtyOnHand) {
+      setInventoryStatus('Cannot remove more than qty available in lots.');
+      return;
+    }
+
+    let remainingToRemove = quantity;
+
+    for (const lot of lots ?? []) {
+      if (remainingToRemove <= 0) {
+        break;
+      }
+
+      const currentLotQty = lot.qty_on_hand ?? 0;
+      const removeFromLot = Math.min(currentLotQty, remainingToRemove);
+      const newLotQty = currentLotQty - removeFromLot;
+
+      const { error: lotUpdateError } = await supabase
+        .from('inventory_lots')
+        .update({ qty_on_hand: newLotQty })
+        .eq('id', lot.id);
+
+      if (lotUpdateError) {
+        console.error('Failed to update inventory lot:', lotUpdateError);
+        setInventoryStatus('Unable to update inventory lot.');
+        return;
+      }
+
+      remainingToRemove -= removeFromLot;
+    }
+
+    const { error: cleanupError } = await supabase
+      .from('inventory_lots')
+      .delete()
+      .eq('item_id', selectedRemoveInventoryItem.id)
+      .eq('supply_room_id', selectedSupplyRoomId)
+      .eq('qty_on_hand', 0);
+
+    if (cleanupError) {
+      console.error('Failed to clean up empty lots:', cleanupError);
+      setInventoryStatus('Inventory was removed, but empty lots did not clean up.');
+      return;
+    }
+
+    const updatedQtyOnHand = lotQtyOnHand - quantity;
 
     const { error: itemError } = await supabase
       .from('inventory_items')
-      .update({ qty_on_hand: selectedRemoveInventoryItem.qtyOnHand - quantity })
+      .update({ qty_on_hand: updatedQtyOnHand })
       .eq('id', selectedRemoveInventoryItem.id);
 
     if (itemError) {
