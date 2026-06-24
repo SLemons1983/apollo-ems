@@ -3927,6 +3927,7 @@ export default function SupervisorPage() {
     setNewInventoryItemUnitCost('');
     setInventoryStatus('Inventory item created.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleUpdateInventoryItem() {
@@ -3992,6 +3993,7 @@ export default function SupervisorPage() {
     setEditInventoryItemUnitCost('');
     setInventoryStatus('Inventory item updated.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleDeleteInventoryItem() {
@@ -4032,6 +4034,7 @@ export default function SupervisorPage() {
     setEditInventoryItemPar('');
     setInventoryStatus('Inventory item deleted.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleAddInventoryQuantity() {
@@ -4098,6 +4101,7 @@ export default function SupervisorPage() {
     setAddInventoryNotes('');
     setInventoryStatus('Inventory added.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleRemoveInventoryQuantity() {
@@ -4208,6 +4212,7 @@ export default function SupervisorPage() {
     setRemoveInventoryReason('Expired');
     setInventoryStatus('Inventory removed.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleTransferInventoryQuantity() {
@@ -4286,6 +4291,7 @@ export default function SupervisorPage() {
           item_number: selectedTransferInventoryItem.itemNumber || null,
           qty_on_hand: quantity,
           par: selectedTransferInventoryItem.par,
+          unit_cost: selectedTransferInventoryItem.unitCost,
         })
         .select('id')
         .single();
@@ -4319,6 +4325,7 @@ export default function SupervisorPage() {
     setTransferDestinationRoomId('');
     setInventoryStatus('Inventory transferred.');
     await loadInventoryItems(selectedSupplyRoomId);
+    await loadAllInventoryItemsForReports();
   }
 
   async function handleCreateSupplyRoom() {
@@ -8405,6 +8412,7 @@ export default function SupervisorPage() {
                                           setEditInventoryItemName(item.itemName);
                                           setEditInventoryItemNumber(item.itemNumber);
                                           setEditInventoryItemPar(String(item.par));
+                                          setEditInventoryItemUnitCost(String(item.unitCost ?? 0));
                                           setInventoryStatus('');
                                         }}
                                         className="rounded-lg bg-blue-700 px-3 py-1 text-xs font-bold text-white hover:bg-blue-800"
