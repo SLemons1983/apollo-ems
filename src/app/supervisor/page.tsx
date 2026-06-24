@@ -541,6 +541,8 @@ export default function SupervisorPage() {
   const [inventoryLotsByItemId, setInventoryLotsByItemId] = useState<Record<string, InventoryLot[]>>({});
   const [expandedInventoryItemId, setExpandedInventoryItemId] = useState('');
   const [inventorySearch, setInventorySearch] = useState('');
+  const [roomInventorySearch, setRoomInventorySearch] = useState('');
+  const [roomInventoryFilter, setRoomInventoryFilter] = useState('');
   const [newSupplyRoomName, setNewSupplyRoomName] = useState('');
   const [showCreateSupplyRoomForm, setShowCreateSupplyRoomForm] = useState(false);
   const [showCreateInventoryReports, setShowCreateInventoryReports] = useState(false);
@@ -8263,6 +8265,8 @@ export default function SupervisorPage() {
                               onClick={() => {
                                 setShowInventoryRoomDetail(false);
                                 setSelectedSupplyRoomId('');
+                                setRoomInventorySearch('');
+                                setRoomInventoryFilter('');
                               }}
                               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
                             >
@@ -8338,6 +8342,40 @@ export default function SupervisorPage() {
                             )}
                           </div>
 
+                          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+                            <div className="grid gap-3 md:grid-cols-3">
+                              <label className="text-xs font-semibold text-slate-600 md:col-span-2">
+                                Search This Supply Room
+                                <input
+                                  type="text"
+                                  value={roomInventorySearch}
+                                  onChange={(event) => setRoomInventorySearch(event.target.value)}
+                                  placeholder="Search by item name or SKU..."
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                />
+                              </label>
+
+                              <label className="text-xs font-semibold text-slate-600">
+                                Filter
+                                <select
+                                  value={roomInventoryFilter}
+                                  onChange={(event) => setRoomInventoryFilter(event.target.value)}
+                                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                                >
+                                  <option value="">All Items</option>
+                                  <option value="ORDER_NOW">Order Now</option>
+                                  <option value="ORDER_SOON">Order Soon</option>
+                                  <option value="OK">OK</option>
+                                  <option value="LOW_STOCK">Below PAR</option>
+                                  <option value="EXPIRED">Expired</option>
+                                  <option value="EXPIRING_SOON">Expiring Within 90 Days</option>
+                                  <option value="HAS_LOTS">Has Active Lots</option>
+                                  <option value="NO_LOTS">No Active Lots</option>
+                                </select>
+                              </label>
+                            </div>
+                          </div>
+
                           <div className="overflow-x-auto rounded-xl border border-slate-200">
                         <table className="min-w-full divide-y divide-slate-200 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -8354,14 +8392,62 @@ export default function SupervisorPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {inventoryItems.length === 0 ? (
-                            <tr>
-                              <td colSpan={9} className="px-3 py-4 text-center text-slate-500">
-                                No inventory items have been added to this supply room yet.
-                              </td>
-                            </tr>
-                          ) : (
-                            inventoryItems.map((item) => {
+                          {(() => {
+                            const visibleInventoryItems = inventoryItems.filter((item) => {
+                              const search = roomInventorySearch.trim().toLowerCase();
+                              const variance = item.qtyOnHand - item.par;
+                              const orderStatus =
+                                item.par > 0 && item.qtyOnHand <= item.par * 0.25
+                                  ? 'Order Now'
+                                  : item.par > 0 && item.qtyOnHand <= item.par * 0.5
+                                    ? 'Order Soon'
+                                    : 'OK';
+
+                              const itemMatchesSearch =
+                                !search ||
+                                item.itemName.toLowerCase().includes(search) ||
+                                item.itemNumber.toLowerCase().includes(search);
+
+                              const itemExpiration = item.nearestExpiration ? new Date(`${item.nearestExpiration}T00:00:00`) : null;
+                              const daysUntilExpiration = itemExpiration
+                                ? Math.ceil((itemExpiration.getTime() - inventoryToday.getTime()) / (1000 * 60 * 60 * 24))
+                                : null;
+
+                              const itemMatchesFilter =
+                                !roomInventoryFilter ||
+                                (roomInventoryFilter === 'ORDER_NOW' && orderStatus === 'Order Now') ||
+                                (roomInventoryFilter === 'ORDER_SOON' && orderStatus === 'Order Soon') ||
+                                (roomInventoryFilter === 'OK' && orderStatus === 'OK') ||
+                                (roomInventoryFilter === 'LOW_STOCK' && item.par > 0 && variance < 0) ||
+                                (roomInventoryFilter === 'EXPIRED' && daysUntilExpiration !== null && daysUntilExpiration < 0) ||
+                                (roomInventoryFilter === 'EXPIRING_SOON' && daysUntilExpiration !== null && daysUntilExpiration >= 0 && daysUntilExpiration <= 90) ||
+                                (roomInventoryFilter === 'HAS_LOTS' && item.lotCount > 0) ||
+                                (roomInventoryFilter === 'NO_LOTS' && item.lotCount === 0);
+
+                              return itemMatchesSearch && itemMatchesFilter;
+                            });
+
+                            if (inventoryItems.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={9} className="px-3 py-4 text-center text-slate-500">
+                                    No inventory items have been added to this supply room yet.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            if (visibleInventoryItems.length === 0) {
+                              return (
+                                <tr>
+                                  <td colSpan={9} className="px-3 py-4 text-center text-slate-500">
+                                    No inventory items match the current search or filter.
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return visibleInventoryItems.map((item) => {
                               const variance = item.qtyOnHand - item.par;
                               const orderStatus =
                                 item.par > 0 && item.qtyOnHand <= item.par * 0.25
@@ -8504,8 +8590,8 @@ export default function SupervisorPage() {
                                 )}
                                 </React.Fragment>
                               );
-                            })
-                          )}
+                            });
+                          })()}
                         </tbody>
                         </table>
                           </div>
