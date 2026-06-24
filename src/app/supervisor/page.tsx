@@ -5708,26 +5708,26 @@ export default function SupervisorPage() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
-                        <th className="px-3 py-2">Incident #</th>
-                        <th className="px-3 py-2">Date</th>
-                        <th className="px-3 py-2">Employee</th>
-                        <th className="px-3 py-2">Category</th>
-                        <th className="px-3 py-2">Assigned To</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Action</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Incident #</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Date</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Employee</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Category</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Assigned To</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Status</th>
+                        <th className="border-y-2 border-slate-700 px-3 py-3">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {openIncidentReports.map((report) => (
                         <React.Fragment key={report.id}>
                           <tr className="border-t border-slate-200">
-                            <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
+                            <td className="rounded-l-xl border-y-2 border-l-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{report.incident_number}</td>
                             <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.category}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.employee_name}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.category}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
                             <td className="px-3 py-2 font-semibold text-blue-700">{report.status}</td>
-                            <td className="px-3 py-2">
+                            <td className="border-y-2 border-slate-700 px-3 py-3">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5763,23 +5763,23 @@ export default function SupervisorPage() {
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                         <tr>
-                          <th className="px-3 py-2">Incident #</th>
-                          <th className="px-3 py-2">Date</th>
-                          <th className="px-3 py-2">Employee</th>
-                          <th className="px-3 py-2">Category</th>
-                          <th className="px-3 py-2">Assigned To</th>
-                          <th className="px-3 py-2">Action</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Incident #</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Date</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Employee</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Category</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Assigned To</th>
+                          <th className="border-y-2 border-slate-700 px-3 py-3">Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {closedIncidentReports.map((report) => (
                           <tr key={report.id} className="border-t border-slate-200">
-                            <td className="px-3 py-2 font-semibold text-slate-900">{report.incident_number}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{report.incident_number}</td>
                             <td className="px-3 py-2 text-slate-600">{formatShortDate(new Date(report.created_at))}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.employee_name}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.category}</td>
-                            <td className="px-3 py-2 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
-                            <td className="px-3 py-2">
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.employee_name}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.category}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{report.assigned_supervisor || 'Unassigned'}</td>
+                            <td className="border-y-2 border-slate-700 px-3 py-3">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -6734,10 +6734,10 @@ export default function SupervisorPage() {
                               filteredFleetInspections.map((inspection) => (
                                 <tr key={inspection.id} className="border-b border-slate-100">
                                   <td className="px-3 py-2 font-bold text-slate-900">{inspection.vehicle}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.inspectionDate}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.mileage.toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.employeeName || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.inspectionDate}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.mileage.toLocaleString()}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.employeeName || '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
                                 </tr>
                               ))
                             )}
@@ -6771,11 +6771,11 @@ export default function SupervisorPage() {
                               filteredFleetServiceRecords.map((record) => (
                                 <tr key={record.id} className="border-b border-slate-100">
                                   <td className="px-3 py-2 font-bold text-slate-900">{getFleetVehicleLabelById(record.vehicleId)}</td>
-                                  <td className="px-3 py-2 text-slate-700">{record.completedDate}</td>
-                                  <td className="px-3 py-2 text-slate-700">{record.serviceName}</td>
-                                  <td className="px-3 py-2 text-slate-700">{record.completedMileage !== null ? record.completedMileage.toLocaleString() : '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{record.performedBy || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{record.notes || '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{record.completedDate}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{record.serviceName}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{record.completedMileage !== null ? record.completedMileage.toLocaleString() : '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{record.performedBy || '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{record.notes || '—'}</td>
                                 </tr>
                               ))
                             )}
@@ -7097,11 +7097,11 @@ export default function SupervisorPage() {
                             ) : (
                               getFleetInspectionsForVehicle(selectedFleetVehicle).map((inspection) => (
                                 <tr key={inspection.id} className="border-b border-slate-100">
-                                  <td className="px-3 py-2 font-semibold text-slate-900">{inspection.inspectionDate}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.mileage.toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{inspection.employeeName || '—'}</td>
-                                  <td className="px-3 py-2">
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{inspection.inspectionDate}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.mileage.toLocaleString()}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.deficiencies || 'None reported'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{inspection.employeeName || '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3">
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -7684,16 +7684,16 @@ export default function SupervisorPage() {
                                     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                                       <table className="w-full text-left text-xs">
                                         <thead className="bg-slate-100 text-slate-800">
-                                          <tr>
-                                            <th className="px-3 py-2">Supply Room</th>
-                                            <th className="px-3 py-2">Item</th>
-                                            <th className="px-3 py-2">Item Number</th>
-                                            <th className="px-3 py-2">Lot Number</th>
-                                            <th className="px-3 py-2">Manufacturer</th>
-                                            <th className="px-3 py-2">Qty On Hand</th>
-                                            <th className="px-3 py-2">Expiration Date</th>
-                                            <th className="px-3 py-2">Days Remaining</th>
-                                            <th className="px-3 py-2">Status</th>
+                                          <tr className="rounded-xl border-2 border-slate-700 bg-white shadow-sm transition-colors hover:bg-slate-50">
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Supply Room</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Item</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Item Number</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Lot Number</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Manufacturer</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Qty On Hand</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Expiration Date</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Days Remaining</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Status</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -7714,19 +7714,19 @@ export default function SupervisorPage() {
 
                                             return (
                                               <tr key={lot.id} className="border-t border-slate-100">
-                                                <td className="px-3 py-2 text-slate-700">{supplyRoomName}</td>
-                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{supplyRoomName}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{item.itemName}</td>
                                                 <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
-                                                <td className="px-3 py-2 text-slate-700">{lot.lotNumber || '—'}</td>
-                                                <td className="px-3 py-2 text-slate-700">{lot.manufacturer || '—'}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{lot.lotNumber || '—'}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{lot.manufacturer || '—'}</td>
                                                 <td className="px-3 py-2 font-bold text-slate-900">{lot.qtyOnHand}</td>
-                                                <td className="px-3 py-2">
+                                                <td className="border-y-2 border-slate-700 px-3 py-3">
                                                   <span className={getInventoryExpirationClass(lot.expirationDate)}>
                                                     {lot.expirationDate}
                                                   </span>
                                                 </td>
                                                 <td className="px-3 py-2 font-bold text-slate-900">{daysUntilExpiration}</td>
-                                                <td className="px-3 py-2">
+                                                <td className="border-y-2 border-slate-700 px-3 py-3">
                                                   <span className={statusClass}>{statusText}</span>
                                                 </td>
                                               </tr>
@@ -7748,25 +7748,25 @@ export default function SupervisorPage() {
                                   <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-100 text-slate-800">
                                       <tr>
-                                        <th className="px-3 py-2">Date</th>
-                                        <th className="px-3 py-2">Item</th>
-                                        <th className="px-3 py-2">Qty Removed</th>
-                                        <th className="px-3 py-2">Reason</th>
-                                        <th className="px-3 py-2">Source Room</th>
-                                        <th className="px-3 py-2">Created By</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Date</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Item</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Qty Removed</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Reason</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Source Room</th>
+                                        <th className="border-y-2 border-slate-700 px-3 py-3">Created By</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {inventoryUsageTransactions.map((transaction) => (
                                         <tr key={transaction.id} className="border-t border-slate-100">
-                                          <td className="px-3 py-2 text-slate-700">
+                                          <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">
                                             {transaction.createdAt ? new Date(transaction.createdAt).toLocaleString() : '—'}
                                           </td>
-                                          <td className="px-3 py-2 font-semibold text-slate-900">{getInventoryItemLabel(transaction.itemId)}</td>
+                                          <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{getInventoryItemLabel(transaction.itemId)}</td>
                                           <td className="px-3 py-2 font-bold text-slate-900">{transaction.quantity}</td>
-                                          <td className="px-3 py-2 text-slate-700">{transaction.reason || '—'}</td>
-                                          <td className="px-3 py-2 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
-                                          <td className="px-3 py-2 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
+                                          <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{transaction.reason || '—'}</td>
+                                          <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{getInventoryRoomLabel(transaction.sourceRoomId)}</td>
+                                          <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{getInventoryUserLabel(transaction.createdBy)}</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -7810,14 +7810,14 @@ export default function SupervisorPage() {
                                         <table className="w-full text-left text-xs">
                                           <thead className="bg-slate-100 text-slate-800">
                                             <tr>
-                                              <th className="px-3 py-2">Ordered</th>
-                                              <th className="px-3 py-2">Item Name</th>
-                                              <th className="px-3 py-2">Item Number</th>
-                                              <th className="px-3 py-2">Qty On Hand</th>
-                                              <th className="px-3 py-2">PAR</th>
-                                              <th className="px-3 py-2">Qty To Order</th>
-                                              <th className="px-3 py-2">Status</th>
-                                              <th className="px-3 py-2">Qty Ordered</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Ordered</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Item Name</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Item Number</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Qty On Hand</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">PAR</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Qty To Order</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Status</th>
+                                              <th className="border-y-2 border-slate-700 px-3 py-3">Qty Ordered</th>
                                               <th className="apollo-no-print px-3 py-2">Action</th>
                                             </tr>
                                           </thead>
@@ -7829,14 +7829,14 @@ export default function SupervisorPage() {
                                                     {item.orderStatus === 'ORDERED' || item.orderStatus === 'AWAITING_DELIVERY' || item.orderStatus === 'RECEIVED' ? '✓' : ''}
                                                   </span>
                                                 </td>
-                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                                <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.itemNumber || '—'}</td>
                                                 <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                                <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.par}</td>
                                                 <td className="px-3 py-2 font-bold text-red-700">
                                                   {item.par - item.qtyOnHand}
                                                 </td>
-                                                <td className="px-3 py-2">
+                                                <td className="border-y-2 border-slate-700 px-3 py-3">
                                                   <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${getInventoryOrderStatusClass(item.orderStatus)}`}>
                                                     {getInventoryOrderStatusLabel(item.orderStatus)}
                                                   </span>
@@ -7861,7 +7861,7 @@ export default function SupervisorPage() {
                                                     </div>
                                                   )}
                                                 </td>
-                                                <td className="px-3 py-2">
+                                                <td className="border-y-2 border-slate-700 px-3 py-3">
                                                   <div className="h-6 min-w-20 border-b border-slate-400"></div>
                                                 </td>
                                                 <td className="apollo-no-print px-3 py-2">
@@ -7982,18 +7982,18 @@ export default function SupervisorPage() {
                                           <table className="w-full text-left text-xs">
                                             <thead className="bg-slate-100 text-slate-800">
                                               <tr>
-                                                <th className="px-3 py-2">Supply Room</th>
-                                                <th className="px-3 py-2">Items</th>
-                                                <th className="px-3 py-2">Units</th>
-                                                <th className="px-3 py-2">Value</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Supply Room</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Items</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Units</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Value</th>
                                               </tr>
                                             </thead>
                                             <tbody>
                                               {valueBySupplyRoom.map((roomSummary) => (
                                                 <tr key={roomSummary.roomId} className="border-t border-slate-100">
-                                                  <td className="px-3 py-2 font-semibold text-slate-900">{roomSummary.roomName}</td>
-                                                  <td className="px-3 py-2 text-slate-700">{roomSummary.itemCount}</td>
-                                                  <td className="px-3 py-2 text-slate-700">{roomSummary.roomUnits}</td>
+                                                  <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{roomSummary.roomName}</td>
+                                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{roomSummary.itemCount}</td>
+                                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{roomSummary.roomUnits}</td>
                                                   <td className="px-3 py-2 font-bold text-emerald-700">${roomSummary.roomValue.toFixed(2)}</td>
                                                 </tr>
                                               ))}
@@ -8010,10 +8010,10 @@ export default function SupervisorPage() {
                                           <table className="w-full text-left text-xs">
                                             <thead className="bg-slate-100 text-slate-800">
                                               <tr>
-                                                <th className="px-3 py-2">Item</th>
-                                                <th className="px-3 py-2">Qty</th>
-                                                <th className="px-3 py-2">Unit Cost</th>
-                                                <th className="px-3 py-2">Value</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Item</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Qty</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Unit Cost</th>
+                                                <th className="border-y-2 border-slate-700 px-3 py-3">Value</th>
                                               </tr>
                                             </thead>
                                             <tbody>
@@ -8022,9 +8022,9 @@ export default function SupervisorPage() {
 
                                                 return (
                                                   <tr key={item.id} className="border-t border-slate-100">
-                                                    <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                                    <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
-                                                    <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                                    <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{item.itemName}</td>
+                                                    <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.qtyOnHand}</td>
+                                                    <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">${item.unitCost.toFixed(2)}</td>
                                                     <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
                                                   </tr>
                                                 );
@@ -8039,12 +8039,12 @@ export default function SupervisorPage() {
                                       <table className="w-full text-left text-xs">
                                         <thead className="bg-slate-100 text-slate-800">
                                           <tr>
-                                            <th className="px-3 py-2">Supply Room</th>
-                                            <th className="px-3 py-2">Item</th>
-                                            <th className="px-3 py-2">Item Number</th>
-                                            <th className="px-3 py-2">Qty On Hand</th>
-                                            <th className="px-3 py-2">Unit Cost</th>
-                                            <th className="px-3 py-2">Inventory Value</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Supply Room</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Item</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Item Number</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Qty On Hand</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Unit Cost</th>
+                                            <th className="border-y-2 border-slate-700 px-3 py-3">Inventory Value</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -8054,11 +8054,11 @@ export default function SupervisorPage() {
 
                                             return (
                                               <tr key={item.id} className="border-t border-slate-100">
-                                                <td className="px-3 py-2 text-slate-700">{supplyRoomName}</td>
-                                                <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{supplyRoomName}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{item.itemName}</td>
                                                 <td className="px-3 py-2 text-slate-600">{item.itemNumber || '—'}</td>
                                                 <td className="px-3 py-2 font-bold text-slate-900">{item.qtyOnHand}</td>
-                                                <td className="px-3 py-2 text-slate-700">${item.unitCost.toFixed(2)}</td>
+                                                <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">${item.unitCost.toFixed(2)}</td>
                                                 <td className="px-3 py-2 font-bold text-emerald-700">${inventoryValue.toFixed(2)}</td>
                                               </tr>
                                             );
@@ -8122,11 +8122,11 @@ export default function SupervisorPage() {
                             <table className="w-full text-left text-xs">
                               <thead className="bg-slate-100 text-slate-800">
                                 <tr>
-                                  <th className="px-3 py-2">Item</th>
-                                  <th className="px-3 py-2">Match</th>
-                                  <th className="px-3 py-2">Supply Room</th>
-                                  <th className="px-3 py-2">Qty</th>
-                                  <th className="px-3 py-2">PAR</th>
+                                  <th className="border-y-2 border-slate-700 px-3 py-3">Item</th>
+                                  <th className="border-y-2 border-slate-700 px-3 py-3">Match</th>
+                                  <th className="border-y-2 border-slate-700 px-3 py-3">Supply Room</th>
+                                  <th className="border-y-2 border-slate-700 px-3 py-3">Qty</th>
+                                  <th className="border-y-2 border-slate-700 px-3 py-3">PAR</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -8191,13 +8191,13 @@ export default function SupervisorPage() {
                                           setInventorySearch('');
                                         }}
                                       >
-                                        <td className="px-3 py-2 font-semibold text-slate-900">{item.itemName}</td>
-                                        <td className="px-3 py-2 text-slate-700">
+                                        <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">{item.itemName}</td>
+                                        <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">
                                           <span className="font-bold text-slate-900">{matchLabel}:</span> {matchValue || '—'}
                                         </td>
-                                        <td className="px-3 py-2 text-slate-700">{roomName}</td>
-                                        <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
-                                        <td className="px-3 py-2 text-slate-700">{item.par}</td>
+                                        <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{roomName}</td>
+                                        <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.qtyOnHand}</td>
+                                        <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.par}</td>
                                       </tr>
                                     );
                                   });
@@ -8377,21 +8377,21 @@ export default function SupervisorPage() {
                           </div>
 
                           <div className="overflow-x-auto rounded-xl border border-slate-200">
-                        <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <table className="min-w-full border-separate border-spacing-y-2 text-sm">
                         <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                           <tr>
-                            <th className="px-3 py-2">Item Name</th>
-                            <th className="px-3 py-2">Item Number</th>
-                            <th className="px-3 py-2">Qty on Hand</th>
-                            <th className="px-3 py-2">PAR</th>
-                            <th className="px-3 py-2">Lots</th>
-                            <th className="px-3 py-2">Nearest Expiration</th>
-                            <th className="px-3 py-2">Variance</th>
-                            <th className="px-3 py-2">Order Status</th>
-                            <th className="px-3 py-2">Actions</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Item Name</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Item Number</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Qty on Hand</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">PAR</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Lots</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Nearest Expiration</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Variance</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Order Status</th>
+                            <th className="border-y-2 border-slate-700 px-3 py-3">Actions</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody>
                           {(() => {
                             const visibleInventoryItems = inventoryItems.filter((item) => {
                               const search = roomInventorySearch.trim().toLowerCase();
@@ -8459,7 +8459,7 @@ export default function SupervisorPage() {
                               return (
                                 <React.Fragment key={item.id}>
                                 <tr>
-                                  <td className="px-3 py-2 font-semibold text-slate-900">
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 font-semibold text-slate-900">
                                     <button
                                       type="button"
                                       onClick={() => setExpandedInventoryItemId((current) => (current === item.id ? '' : item.id))}
@@ -8468,18 +8468,18 @@ export default function SupervisorPage() {
                                       {item.itemName}
                                     </button>
                                   </td>
-                                  <td className="px-3 py-2 text-slate-700">{item.itemNumber || '—'}</td>
-                                  <td className="px-3 py-2 text-slate-700">{item.qtyOnHand}</td>
-                                  <td className="px-3 py-2 text-slate-700">{item.par}</td>
-                                  <td className="px-3 py-2 text-slate-700">{item.lotCount}</td>
-                                  <td className="px-3 py-2">
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.itemNumber || '—'}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.qtyOnHand}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.par}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{item.lotCount}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3">
                                     <span className={getInventoryExpirationClass(item.nearestExpiration)}>
                                       {item.nearestExpiration || '—'}
                                     </span>
                                   </td>
-                                  <td className="px-3 py-2 text-slate-700">{variance}</td>
+                                  <td className="border-y-2 border-slate-700 px-3 py-3 text-slate-700">{variance}</td>
                                   <td
-                                    className={`px-3 py-2 font-semibold ${
+                                    className={`border-y-2 border-slate-700 px-3 py-3 font-semibold ${
                                       orderStatus === 'Order Now'
                                         ? 'text-red-700'
                                         : orderStatus === 'Order Soon'
@@ -8489,7 +8489,7 @@ export default function SupervisorPage() {
                                   >
                                     {orderStatus}
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="rounded-r-xl border-y-2 border-r-2 border-slate-700 px-3 py-3">
                                     <div className="flex flex-wrap gap-2">
                                       <button
                                         type="button"
