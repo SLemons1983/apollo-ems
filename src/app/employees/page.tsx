@@ -1591,93 +1591,7 @@ export default function EmployeeProfilesPage() {
     };
   }
 
-  function getEmployeeCertificationStatusChips(employee: EmployeeProfile): Array<{ label: string; className: string; title: string }> {
-    const certifications = normalizeCertificationRecord(employee.certifications);
 
-    const chipFields: Array<[CertificationField, string]> = [
-      ['driversLicense', 'DL'],
-      ['ahaBlsCpr', 'CPR'],
-      ['annualTbScreen', 'TB'],
-      ...(employee.scope === 'ALS'
-        ? ([
-            ['acls', 'ACLS'],
-            ['pals', 'PALS'],
-            ['californiaParamedicLicense', 'CA-P'],
-            ['ccemsaParamedicLicense', 'CC-P'],
-          ] as Array<[CertificationField, string]>)
-        : ([
-            ['californiaEmtLicense', 'CA-E'],
-            ['ccemsaEmtLicense', 'CC-E'],
-          ] as Array<[CertificationField, string]>)),
-      ['is100', 'IS100'],
-      ['is200', 'IS200'],
-      ['is700', 'IS700'],
-      ['is800', 'IS800'],
-    ];
-
-    return chipFields.map(([field, label]) => {
-      const documentKey = getCertificationDocumentKey(field);
-      const document = getCertificationDocument(certifications, field);
-      const hasDocument = !documentKey || Boolean(document?.path);
-      const hasDateValue = Boolean(certifications[field]);
-      const isDocumentOnly = field === 'is100' || field === 'is200' || field === 'is700' || field === 'is800';
-
-      if (isDocumentOnly) {
-        return hasDocument
-          ? {
-              label: `✓ ${label}`,
-              className: 'border-emerald-600 bg-emerald-50 text-emerald-800',
-              title: `${label} document uploaded`,
-            }
-          : {
-              label: `✕ ${label}`,
-              className: 'border-red-700 bg-red-700 text-white',
-              title: `${label} document missing`,
-            };
-      }
-
-      const status = getCertificationStatus(certifications[field]);
-      const alert = getCertificationDateAlert(certifications[field]);
-
-      if (!hasDocument) {
-        return {
-          label: `✕ ${label}`,
-          className: 'border-red-700 bg-red-700 text-white',
-          title: `${label} document missing`,
-        };
-      }
-
-      if (!hasDateValue || status === 'missing') {
-        return {
-          label: `✕ ${label}`,
-          className: 'border-red-700 bg-red-700 text-white',
-          title: `${label} expiration missing`,
-        };
-      }
-
-      if (status === 'expired') {
-        return {
-          label: `✕ ${label}`,
-          className: 'border-red-700 bg-red-700 text-white',
-          title: `${label} expired`,
-        };
-      }
-
-      if (alert.days !== null && alert.days <= 90) {
-        return {
-          label: `⚠ ${label}`,
-          className: 'border-yellow-300 bg-yellow-100 text-slate-900',
-          title: `${label} expires in ${alert.days} day${alert.days === 1 ? '' : 's'}`,
-        };
-      }
-
-      return {
-        label: `✓ ${label}`,
-        className: 'border-emerald-600 bg-emerald-50 text-emerald-800',
-        title: `${label} compliant`,
-      };
-    });
-  }
 
   function renderCertificationFields(
     certifications: CertificationRecord,
@@ -2314,7 +2228,6 @@ export default function EmployeeProfilesPage() {
               const editingEmployee = editingEmployees[employee.id] ?? employee;
               const certAlert = getEmployeeCertificationAlert(employee);
               const certBadge = getEmployeeCertificationSummaryBadge(employee);
-              const certChips = getEmployeeCertificationStatusChips(employee);
 
               return (
                 <div key={employee.id}>
@@ -2328,17 +2241,6 @@ export default function EmployeeProfilesPage() {
                       </div>
                       <div className="text-xs text-slate-500">{employee.seniorityLabel || 'Seniority Unassigned'}</div>
 
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {certChips.map((chip) => (
-                          <span
-                            key={chip.label}
-                            title={chip.title}
-                            className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${chip.className}`}
-                          >
-                            {chip.label}
-                          </span>
-                        ))}
-                      </div>
                     </div>
 
                     <div className="text-sm text-slate-700">
