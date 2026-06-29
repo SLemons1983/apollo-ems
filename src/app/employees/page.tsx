@@ -29,7 +29,18 @@ type CertificationField =
   | 'ccemsaEmtLicense'
   | 'ccemsaEmtLicenseNumber';
 
-type CertificationDocumentKey = 'driversLicenseDocument';
+type CertificationDocumentKey =
+  | 'driversLicenseDocument'
+  | 'ambulanceDriversLicenseDocument'
+  | 'ahaBlsCprDocument'
+  | 'medicalExaminerCertificateDocument'
+  | 'annualTbScreenDocument'
+  | 'californiaParamedicLicenseDocument'
+  | 'ccemsaParamedicLicenseDocument'
+  | 'aclsDocument'
+  | 'palsDocument'
+  | 'californiaEmtLicenseDocument'
+  | 'ccemsaEmtLicenseDocument';
 
 type CertificationRecord = Record<CertificationField, string> & Partial<Record<CertificationDocumentKey, CertificationDocument>>;
 
@@ -839,12 +850,35 @@ function normalizeCertificationRecord(value: Partial<CertificationRecord> | null
     ccemsaEmtLicense: value?.ccemsaEmtLicense || '',
     ccemsaEmtLicenseNumber: value?.ccemsaEmtLicenseNumber || '',
     driversLicenseDocument: normalizeCertificationDocument(value?.driversLicenseDocument),
+    ambulanceDriversLicenseDocument: normalizeCertificationDocument(value?.ambulanceDriversLicenseDocument),
+    ahaBlsCprDocument: normalizeCertificationDocument(value?.ahaBlsCprDocument),
+    medicalExaminerCertificateDocument: normalizeCertificationDocument(value?.medicalExaminerCertificateDocument),
+    annualTbScreenDocument: normalizeCertificationDocument(value?.annualTbScreenDocument),
+    californiaParamedicLicenseDocument: normalizeCertificationDocument(value?.californiaParamedicLicenseDocument),
+    ccemsaParamedicLicenseDocument: normalizeCertificationDocument(value?.ccemsaParamedicLicenseDocument),
+    aclsDocument: normalizeCertificationDocument(value?.aclsDocument),
+    palsDocument: normalizeCertificationDocument(value?.palsDocument),
+    californiaEmtLicenseDocument: normalizeCertificationDocument(value?.californiaEmtLicenseDocument),
+    ccemsaEmtLicenseDocument: normalizeCertificationDocument(value?.ccemsaEmtLicenseDocument),
   };
 }
 
 function getCertificationDocumentKey(field: CertificationField): CertificationDocumentKey | null {
-  if (field === 'driversLicense') return 'driversLicenseDocument';
-  return null;
+  const documentKeys: Partial<Record<CertificationField, CertificationDocumentKey>> = {
+    driversLicense: 'driversLicenseDocument',
+    ambulanceDriversLicense: 'ambulanceDriversLicenseDocument',
+    ahaBlsCpr: 'ahaBlsCprDocument',
+    medicalExaminerCertificate: 'medicalExaminerCertificateDocument',
+    annualTbScreen: 'annualTbScreenDocument',
+    californiaParamedicLicense: 'californiaParamedicLicenseDocument',
+    ccemsaParamedicLicense: 'ccemsaParamedicLicenseDocument',
+    acls: 'aclsDocument',
+    pals: 'palsDocument',
+    californiaEmtLicense: 'californiaEmtLicenseDocument',
+    ccemsaEmtLicense: 'ccemsaEmtLicenseDocument',
+  };
+
+  return documentKeys[field] ?? null;
 }
 
 function getCertificationDocument(certifications: CertificationRecord, field: CertificationField): CertificationDocument | undefined {
@@ -1500,6 +1534,7 @@ export default function EmployeeProfilesPage() {
                 const isLicenseNumber = licenseNumberFields.has(field);
                 const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
                 const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
+                const documentKey = getCertificationDocumentKey(field);
                 const document = getCertificationDocument(certifications, field);
                 const documentStatusKey = employeeId ? `${employeeId}-${field}` : '';
                 const isUploadingDocument = documentStatusKey ? certificationDocumentUploading[documentStatusKey] : false;
@@ -1528,7 +1563,7 @@ export default function EmployeeProfilesPage() {
                       </div>
                     )}
 
-                    {employeeId && field === 'driversLicense' && (
+                    {employeeId && documentKey && (
                       <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Document on File
@@ -1595,6 +1630,11 @@ export default function EmployeeProfilesPage() {
                 const isLicenseNumber = licenseNumberFields.has(field);
                 const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
                 const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
+                const documentKey = getCertificationDocumentKey(field);
+                const document = getCertificationDocument(certifications, field);
+                const documentStatusKey = employeeId ? `${employeeId}-${field}` : '';
+                const isUploadingDocument = documentStatusKey ? certificationDocumentUploading[documentStatusKey] : false;
+                const documentStatus = documentStatusKey ? certificationDocumentStatus[documentStatusKey] : '';
 
                 return (
                   <div key={field} className="rounded-xl border-2 border-slate-700 bg-white p-3 shadow-sm">
@@ -1616,6 +1656,58 @@ export default function EmployeeProfilesPage() {
                     {status !== 'valid' && (
                       <div className="mt-1 text-xs font-semibold text-red-700">
                         {status === 'missing' ? 'Missing expiration date' : 'Expired certification'}
+                      </div>
+                    )}
+
+                    {employeeId && documentKey && (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Document on File
+                        </div>
+
+                        <div className="mb-3 text-sm text-slate-700">
+                          {document ? document.filename : 'No document uploaded yet.'}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <label className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            isUploadingDocument
+                              ? 'border-slate-200 bg-slate-100 text-slate-400'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                          }`}>
+                            {document ? 'Replace Document' : 'Upload Document'}
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              className="hidden"
+                              disabled={isUploadingDocument}
+                              onChange={(event) => {
+                                const selectedFile = event.target.files?.[0] ?? null;
+                                void handleEmployeeCertificationDocumentUpload(employeeId, field, label, selectedFile);
+                                event.target.value = '';
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() => void handleEmployeeCertificationDocumentView(document)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            View Current
+                          </button>
+                        </div>
+
+                        {documentStatus && (
+                          <div className="mt-2 text-xs font-semibold text-slate-600">
+                            {documentStatus}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
