@@ -1506,7 +1506,7 @@ export default function EmployeeProfilesPage() {
                 const documentStatus = documentStatusKey ? certificationDocumentStatus[documentStatusKey] : '';
 
                 return (
-                  <div key={field}>
+                  <div key={field} className="rounded-xl border-2 border-slate-700 bg-white p-3 shadow-sm">
                     <label className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${status === 'valid' ? 'text-slate-500' : 'text-red-700'}`}>
                       {label}
                     </label>
@@ -1597,7 +1597,7 @@ export default function EmployeeProfilesPage() {
                 const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
 
                 return (
-                  <div key={field}>
+                  <div key={field} className="rounded-xl border-2 border-slate-700 bg-white p-3 shadow-sm">
                     <label className={`mb-1 block text-xs font-semibold uppercase tracking-wide ${status === 'valid' ? 'text-slate-500' : 'text-red-700'}`}>
                       {label}
                     </label>
