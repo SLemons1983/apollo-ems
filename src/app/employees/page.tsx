@@ -1513,6 +1513,84 @@ export default function EmployeeProfilesPage() {
     return { className: nameClass, title };
   }
 
+  function getEmployeeCertificationSummaryBadge(employee: EmployeeProfile): { label: string; className: string; title: string } {
+    const certifications = normalizeCertificationRecord(employee.certifications);
+
+    const expirationFields: Array<[CertificationField, string]> = [
+      ['driversLicense', "Driver's License"],
+      ['ambulanceDriversLicense', "Ambulance Driver's License"],
+      ['ahaBlsCpr', 'AHA BLS CPR'],
+      ['medicalExaminerCertificate', 'Medical Examiner Certificate'],
+      ['annualTbScreen', 'Annual TB Screen'],
+      employee.scope === 'ALS'
+        ? ['californiaParamedicLicense', 'California Paramedic License']
+        : ['californiaEmtLicense', 'California EMT License'],
+      employee.scope === 'ALS'
+        ? ['ccemsaParamedicLicense', 'CCEMSA Paramedic License']
+        : ['ccemsaEmtLicense', 'CCEMSA EMT License'],
+      ...(employee.scope === 'ALS'
+        ? ([['acls', 'ACLS'], ['pals', 'PALS']] as Array<[CertificationField, string]>)
+        : []),
+    ];
+
+    const requiredDocumentFields: Array<[CertificationField, string]> = [
+      ...expirationFields,
+      ...([
+        ['is100', 'IS-100'],
+        ['is200', 'IS-200'],
+        ['is700', 'IS-700'],
+        ['is800', 'IS-800'],
+      ] as Array<[CertificationField, string]>),
+    ].filter(([field]) => Boolean(getCertificationDocumentKey(field)));
+
+    const issues: string[] = [];
+
+    expirationFields.forEach(([field, label]) => {
+      const status = getCertificationStatus(certifications[field]);
+      if (status === 'missing') {
+        issues.push(`${label} expiration missing`);
+      } else if (status === 'expired') {
+        issues.push(`${label} expired`);
+      }
+    });
+
+    requiredDocumentFields.forEach(([field, label]) => {
+      const document = getCertificationDocument(certifications, field);
+      if (!document?.path) {
+        issues.push(`${label} document missing`);
+      }
+    });
+
+    if (issues.length > 0) {
+      return {
+        label: `🔴 ${issues.length} Issue${issues.length === 1 ? '' : 's'}`,
+        className: 'border-red-700 bg-red-700 text-white',
+        title: issues.join('\n'),
+      };
+    }
+
+    const expiringSoon = expirationFields
+      .map(([field, label]) => ({ label, ...getCertificationDateAlert(certifications[field]) }))
+      .filter((item): item is { label: string; className: string; days: number } => item.days !== null && item.days <= 90)
+      .sort((a, b) => a.days - b.days);
+
+    if (expiringSoon.length > 0) {
+      const nearest = expiringSoon[0];
+
+      return {
+        label: `🟡 ${expiringSoon.length} Expiring`,
+        className: 'border-yellow-300 bg-yellow-100 text-slate-900',
+        title: `${nearest.label} expires in ${nearest.days} day${nearest.days === 1 ? '' : 's'}`,
+      };
+    }
+
+    return {
+      label: '🟢 Compliant',
+      className: 'border-emerald-600 bg-emerald-50 text-emerald-800',
+      title: 'All required certifications and documents are compliant.',
+    };
+  }
+
   function renderCertificationFields(
     certifications: CertificationRecord,
     onChange: (field: CertificationField, value: string) => void,
@@ -2147,6 +2225,7 @@ export default function EmployeeProfilesPage() {
               const expanded = expandedEmployeeId === employee.id;
               const editingEmployee = editingEmployees[employee.id] ?? employee;
               const certAlert = getEmployeeCertificationAlert(employee);
+              const certBadge = getEmployeeCertificationSummaryBadge(employee);
 
               return (
                 <div key={employee.id}>
@@ -2176,7 +2255,14 @@ export default function EmployeeProfilesPage() {
                       <div className="text-xs text-slate-500">{employee.employeeType || '—'}</div>
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex flex-col items-end gap-2">
+                      <div
+                        title={certBadge.title}
+                        className={`rounded-full border px-3 py-1 text-xs font-bold ${certBadge.className}`}
+                      >
+                        {certBadge.label}
+                      </div>
+
                       <button
                         type="button"
                         onClick={() => openEmployeeProfile(employee)}
