@@ -3,23 +3,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-type CertificationRecord = {
-  driversLicense: string;
-  ambulanceDriversLicense: string;
-  ahaBlsCpr: string;
-  medicalExaminerCertificate: string;
-  annualTbScreen: string;
-  californiaParamedicLicense: string;
-  californiaParamedicLicenseNumber: string;
-  ccemsaParamedicLicense: string;
-  ccemsaParamedicLicenseNumber: string;
-  acls: string;
-  pals: string;
-  californiaEmtLicense: string;
-  californiaEmtLicenseNumber: string;
-  ccemsaEmtLicense: string;
-  ccemsaEmtLicenseNumber: string;
+type CertificationDocument = {
+  path: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  label: string;
 };
+
+type CertificationField =
+  | 'driversLicense'
+  | 'ambulanceDriversLicense'
+  | 'ahaBlsCpr'
+  | 'medicalExaminerCertificate'
+  | 'annualTbScreen'
+  | 'californiaParamedicLicense'
+  | 'californiaParamedicLicenseNumber'
+  | 'ccemsaParamedicLicense'
+  | 'ccemsaParamedicLicenseNumber'
+  | 'acls'
+  | 'pals'
+  | 'californiaEmtLicense'
+  | 'californiaEmtLicenseNumber'
+  | 'ccemsaEmtLicense'
+  | 'ccemsaEmtLicenseNumber';
+
+type CertificationDocumentKey = 'driversLicenseDocument';
+
+type CertificationRecord = Record<CertificationField, string> & Partial<Record<CertificationDocumentKey, CertificationDocument>>;
 
 type EmployeeProfile = {
   id: string;
@@ -792,7 +804,24 @@ function normalizeSeniorityLabel(value: string): string {
   return trimmed || 'Seniority Unassigned';
 }
 
-function normalizeCertificationRecord(value: CertificationRecord | undefined): CertificationRecord {
+function normalizeCertificationDocument(value: unknown): CertificationDocument | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+
+  const document = value as Partial<CertificationDocument>;
+
+  if (!document.path || !document.filename) return undefined;
+
+  return {
+    path: String(document.path),
+    filename: String(document.filename),
+    contentType: String(document.contentType || ''),
+    sizeBytes: Number(document.sizeBytes || 0),
+    uploadedAt: String(document.uploadedAt || ''),
+    label: String(document.label || ''),
+  };
+}
+
+function normalizeCertificationRecord(value: Partial<CertificationRecord> | null | undefined): CertificationRecord {
   return {
     driversLicense: value?.driversLicense || '',
     ambulanceDriversLicense: value?.ambulanceDriversLicense || '',
@@ -809,7 +838,18 @@ function normalizeCertificationRecord(value: CertificationRecord | undefined): C
     californiaEmtLicenseNumber: value?.californiaEmtLicenseNumber || '',
     ccemsaEmtLicense: value?.ccemsaEmtLicense || '',
     ccemsaEmtLicenseNumber: value?.ccemsaEmtLicenseNumber || '',
+    driversLicenseDocument: normalizeCertificationDocument(value?.driversLicenseDocument),
   };
+}
+
+function getCertificationDocumentKey(field: CertificationField): CertificationDocumentKey | null {
+  if (field === 'driversLicense') return 'driversLicenseDocument';
+  return null;
+}
+
+function getCertificationDocument(certifications: CertificationRecord, field: CertificationField): CertificationDocument | undefined {
+  const documentKey = getCertificationDocumentKey(field);
+  return documentKey ? certifications[documentKey] : undefined;
 }
 
 function normalizeEmployee(employee: EmployeeProfile): EmployeeProfile {
@@ -907,6 +947,8 @@ export default function EmployeeProfilesPage() {
   const [showCertifications, setShowCertifications] = useState(true);
   const [editingEmployees, setEditingEmployees] = useState<Record<string, EmployeeProfile>>({});
   const [employeeSaveStatus, setEmployeeSaveStatus] = useState<Record<string, string>>({});
+  const [certificationDocumentStatus, setCertificationDocumentStatus] = useState<Record<string, string>>({});
+  const [certificationDocumentUploading, setCertificationDocumentUploading] = useState<Record<string, boolean>>({});
   const [newEmployee, setNewEmployee] = useState<EmployeeFormState>(EMPTY_EMPLOYEE);
 
   useEffect(() => {
@@ -1124,7 +1166,7 @@ export default function EmployeeProfilesPage() {
 
   const handleEmployeeCertificationChange = (
     employeeId: string,
-    field: keyof CertificationRecord,
+    field: CertificationField,
     value: string,
   ) => {
     setEditingEmployees((current) => {
@@ -1148,6 +1190,131 @@ export default function EmployeeProfilesPage() {
       [employeeId]: 'Unsaved changes.',
     }));
   };
+
+  async function handleEmployeeCertificationDocumentUpload(
+    employeeId: string,
+    field: CertificationField,
+    label: string,
+    file: File | null,
+  ) {
+    const documentKey = getCertificationDocumentKey(field);
+    if (!documentKey || !file) return;
+
+    const statusKey = `${employeeId}-${field}`;
+
+    setCertificationDocumentUploading((current) => ({
+      ...current,
+      [statusKey]: true,
+    }));
+
+    setCertificationDocumentStatus((current) => ({
+      ...current,
+      [statusKey]: 'Uploading document...',
+    }));
+
+    try {
+      const formData = new FormData();
+      formData.append('employeeId', employeeId);
+      formData.append('certificationField', field);
+      formData.append('certificationLabel', label);
+      formData.append('certificationFile', file);
+
+      const response = await fetch('/api/employee-certifications/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Certification upload failed.');
+      }
+
+      const uploadedDocument = result.document as CertificationDocument;
+
+      setEditingEmployees((current) => {
+        const existing = current[employeeId] ?? employees.find((employee) => employee.id === employeeId);
+        if (!existing) return current;
+
+        return {
+          ...current,
+          [employeeId]: normalizeEmployee({
+            ...existing,
+            certifications: {
+              ...normalizeCertificationRecord(existing.certifications),
+              [documentKey]: uploadedDocument,
+            },
+          }),
+        };
+      });
+
+      setEmployees((current) =>
+        current.map((employee) =>
+          employee.id === employeeId
+            ? normalizeEmployee({
+                ...employee,
+                certifications: {
+                  ...normalizeCertificationRecord(employee.certifications),
+                  [documentKey]: uploadedDocument,
+                },
+              })
+            : employee,
+        ),
+      );
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]: 'Certification document uploaded.',
+      }));
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: `Uploaded ${uploadedDocument.filename}.`,
+      }));
+    } catch (error) {
+      console.error('Employee certification document upload failed:', error);
+      const message = error instanceof Error ? error.message : 'Certification upload failed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+    } finally {
+      setCertificationDocumentUploading((current) => ({
+        ...current,
+        [statusKey]: false,
+      }));
+    }
+  }
+
+  async function handleEmployeeCertificationDocumentView(document: CertificationDocument | undefined) {
+    if (!document?.path) {
+      window.alert('No certification document is currently on file.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/employee-certifications/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentPath: document.path }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.signedUrl) {
+        throw new Error(result.error || 'Unable to open certification document.');
+      }
+
+      window.open(result.signedUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Employee certification document view failed:', error);
+      window.alert(error instanceof Error ? error.message : 'Unable to open certification document.');
+    }
+  }
+
 
   async function saveEmployeeChanges(employeeId: string) {
     const draft = editingEmployees[employeeId];
@@ -1183,7 +1350,7 @@ export default function EmployeeProfilesPage() {
     }));
   }
 
-  const handleNewEmployeeCertificationChange = (field: keyof CertificationRecord, value: string) => {
+  const handleNewEmployeeCertificationChange = (field: CertificationField, value: string) => {
     setNewEmployee((current) => ({
       ...current,
       certifications: {
@@ -1244,7 +1411,7 @@ export default function EmployeeProfilesPage() {
     ];
 
     const nearest = expirationFields
-      .map(([field, label]) => ({ label, ...getCertificationDateAlert(certifications[field]) }))
+      .map(([field, label]) => ({ label, ...getCertificationDateAlert(String(certifications[field] || '')) }))
       .filter((item): item is { label: string; className: string; days: number } => item.days !== null)
       .sort((a, b) => a.days - b.days)[0];
 
@@ -1267,10 +1434,11 @@ export default function EmployeeProfilesPage() {
 
   function renderCertificationFields(
     certifications: CertificationRecord,
-    onChange: (field: keyof CertificationRecord, value: string) => void,
+    onChange: (field: CertificationField, value: string) => void,
     scope: string,
+    employeeId?: string,
   ) {
-    const commonFields: Array<[keyof CertificationRecord, string]> = [
+    const commonFields: Array<[CertificationField, string]> = [
       ['driversLicense', "Driver's License Expiration Date"],
       ['ambulanceDriversLicense', "Ambulance Driver's License Expiration Date"],
       ['ahaBlsCpr', 'AHA BLS CPR Expiration Date'],
@@ -1278,7 +1446,7 @@ export default function EmployeeProfilesPage() {
       ['annualTbScreen', 'Annual TB Screen Expiration Date'],
     ];
 
-    const alsFields: Array<[keyof CertificationRecord, string]> = [
+    const alsFields: Array<[CertificationField, string]> = [
       ['californiaParamedicLicenseNumber', 'California Paramedic License Number'],
       ['californiaParamedicLicense', 'California Paramedic License Expiration Date'],
       ['ccemsaParamedicLicenseNumber', 'CCEMSA Paramedic License Number'],
@@ -1287,14 +1455,14 @@ export default function EmployeeProfilesPage() {
       ['pals', 'PALS Expiration Date'],
     ];
 
-    const blsFields: Array<[keyof CertificationRecord, string]> = [
+    const blsFields: Array<[CertificationField, string]> = [
       ['californiaEmtLicenseNumber', 'California EMT License Number'],
       ['californiaEmtLicense', 'California EMT License Expiration Date'],
       ['ccemsaEmtLicenseNumber', 'CCEMSA EMT License Number'],
       ['ccemsaEmtLicense', 'CCEMSA EMT License Expiration Date'],
     ];
 
-    const licenseNumberFields = new Set<keyof CertificationRecord>([
+    const licenseNumberFields = new Set<CertificationField>([
       'californiaParamedicLicenseNumber',
       'ccemsaParamedicLicenseNumber',
       'californiaEmtLicenseNumber',
@@ -1332,6 +1500,10 @@ export default function EmployeeProfilesPage() {
                 const isLicenseNumber = licenseNumberFields.has(field);
                 const status = isLicenseNumber ? 'valid' : getCertificationStatus(certifications[field]);
                 const dateAlert = isLicenseNumber ? { className: '' } : getCertificationDateAlert(certifications[field]);
+                const document = getCertificationDocument(certifications, field);
+                const documentStatusKey = employeeId ? `${employeeId}-${field}` : '';
+                const isUploadingDocument = documentStatusKey ? certificationDocumentUploading[documentStatusKey] : false;
+                const documentStatus = documentStatusKey ? certificationDocumentStatus[documentStatusKey] : '';
 
                 return (
                   <div key={field}>
@@ -1353,6 +1525,58 @@ export default function EmployeeProfilesPage() {
                     {status !== 'valid' && (
                       <div className="mt-1 text-xs font-semibold text-red-700">
                         {status === 'missing' ? 'Missing expiration date' : 'Expired certification'}
+                      </div>
+                    )}
+
+                    {employeeId && field === 'driversLicense' && (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Document on File
+                        </div>
+
+                        <div className="mb-3 text-sm text-slate-700">
+                          {document ? document.filename : 'No document uploaded yet.'}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <label className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            isUploadingDocument
+                              ? 'border-slate-200 bg-slate-100 text-slate-400'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                          }`}>
+                            {document ? 'Replace Document' : 'Upload Document'}
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              className="hidden"
+                              disabled={isUploadingDocument}
+                              onChange={(event) => {
+                                const selectedFile = event.target.files?.[0] ?? null;
+                                void handleEmployeeCertificationDocumentUpload(employeeId, field, label, selectedFile);
+                                event.target.value = '';
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() => void handleEmployeeCertificationDocumentView(document)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            View Current
+                          </button>
+                        </div>
+
+                        {documentStatus && (
+                          <div className="mt-2 text-xs font-semibold text-slate-600">
+                            {documentStatus}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1873,6 +2097,7 @@ export default function EmployeeProfilesPage() {
                           normalizeCertificationRecord(editingEmployee.certifications),
                           (field, value) => handleEmployeeCertificationChange(employee.id, field, value),
                           editingEmployee.scope,
+                          employee.id,
                         )}
 
                         <div className="md:col-span-2 xl:col-span-4">
