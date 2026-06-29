@@ -9,7 +9,10 @@ async function syncEmployeeAuthProfile(user: {
   email?: string | null;
   user_metadata?: Record<string, unknown>;
   app_metadata?: Record<string, unknown>;
-  identities?: Array<{ provider?: string | null }> | null;
+  identities?: Array<{
+    provider?: string | null;
+    identity_data?: Record<string, unknown>;
+  }> | null;
 }) {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const email = String(user.email ?? '').trim();
@@ -20,7 +23,16 @@ async function syncEmployeeAuthProfile(user: {
 
   const metadata = user.user_metadata ?? {};
   const appMetadata = user.app_metadata ?? {};
-  const photoUrl = String(metadata.avatar_url ?? metadata.picture ?? '').trim();
+  const identityData = user.identities?.[0]?.identity_data ?? {};
+  const photoUrl = String(
+    metadata.avatar_url ??
+    metadata.picture ??
+    metadata.picture_url ??
+    identityData.avatar_url ??
+    identityData.picture ??
+    identityData.picture_url ??
+    '',
+  ).trim();
   const authProvider = String(appMetadata.provider ?? user.identities?.[0]?.provider ?? 'google').trim();
 
   const supabaseAdmin = createClient(SUPABASE_URL, serviceRoleKey);
