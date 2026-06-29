@@ -2142,7 +2142,7 @@ export default function EmployeeProfilesPage() {
             <div className="text-right">Actions</div>
           </div>
 
-          <div className="divide-y divide-slate-200">
+          <div className="space-y-3 bg-slate-100 p-3">
             {filteredEmployees.map((employee) => {
               const expanded = expandedEmployeeId === employee.id;
               const editingEmployee = editingEmployees[employee.id] ?? employee;
@@ -2150,7 +2150,7 @@ export default function EmployeeProfilesPage() {
 
               return (
                 <div key={employee.id}>
-                  <div className="grid grid-cols-[minmax(300px,1.3fr)_minmax(180px,1fr)_minmax(180px,0.9fr)_minmax(150px,0.8fr)_140px] items-center px-4 py-3 hover:bg-slate-50">
+                  <div className="grid grid-cols-[minmax(300px,1.3fr)_minmax(180px,1fr)_minmax(180px,0.9fr)_minmax(150px,0.8fr)_140px] items-center rounded-2xl border-2 border-slate-700 bg-white px-5 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                     <div>
                       <div
                         title={certAlert.title}
