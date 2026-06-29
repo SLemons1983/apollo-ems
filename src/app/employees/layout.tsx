@@ -37,6 +37,13 @@ export default function SupervisorProtectedLayout({ children }: { children: Reac
         return;
       }
 
+      console.log('Apollo auth user metadata:', {
+        email: activeUser.email,
+        user_metadata: activeUser.user_metadata,
+        app_metadata: activeUser.app_metadata,
+        identities: activeUser.identities,
+      });
+
       const { data: employee, error } = await supabase
         .from('employees')
         .select('id,email,role,job_title,status')
