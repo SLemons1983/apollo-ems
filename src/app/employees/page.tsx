@@ -18,6 +18,10 @@ type CertificationField =
   | 'ahaBlsCpr'
   | 'medicalExaminerCertificate'
   | 'annualTbScreen'
+  | 'is100'
+  | 'is200'
+  | 'is700'
+  | 'is800'
   | 'californiaParamedicLicense'
   | 'californiaParamedicLicenseNumber'
   | 'ccemsaParamedicLicense'
@@ -35,6 +39,10 @@ type CertificationDocumentKey =
   | 'ahaBlsCprDocument'
   | 'medicalExaminerCertificateDocument'
   | 'annualTbScreenDocument'
+  | 'is100Document'
+  | 'is200Document'
+  | 'is700Document'
+  | 'is800Document'
   | 'californiaParamedicLicenseDocument'
   | 'ccemsaParamedicLicenseDocument'
   | 'aclsDocument'
@@ -104,6 +112,10 @@ const EMPTY_CERTIFICATIONS: CertificationRecord = {
   ahaBlsCpr: '',
   medicalExaminerCertificate: '',
   annualTbScreen: '',
+  is100: '',
+  is200: '',
+  is700: '',
+  is800: '',
   californiaParamedicLicense: '',
   californiaParamedicLicenseNumber: '',
   ccemsaParamedicLicense: '',
@@ -839,6 +851,10 @@ function normalizeCertificationRecord(value: Partial<CertificationRecord> | null
     ahaBlsCpr: value?.ahaBlsCpr || '',
     medicalExaminerCertificate: value?.medicalExaminerCertificate || '',
     annualTbScreen: value?.annualTbScreen || '',
+    is100: value?.is100 || '',
+    is200: value?.is200 || '',
+    is700: value?.is700 || '',
+    is800: value?.is800 || '',
     californiaParamedicLicense: value?.californiaParamedicLicense || '',
     californiaParamedicLicenseNumber: value?.californiaParamedicLicenseNumber || '',
     ccemsaParamedicLicense: value?.ccemsaParamedicLicense || '',
@@ -854,6 +870,10 @@ function normalizeCertificationRecord(value: Partial<CertificationRecord> | null
     ahaBlsCprDocument: normalizeCertificationDocument(value?.ahaBlsCprDocument),
     medicalExaminerCertificateDocument: normalizeCertificationDocument(value?.medicalExaminerCertificateDocument),
     annualTbScreenDocument: normalizeCertificationDocument(value?.annualTbScreenDocument),
+    is100Document: normalizeCertificationDocument(value?.is100Document),
+    is200Document: normalizeCertificationDocument(value?.is200Document),
+    is700Document: normalizeCertificationDocument(value?.is700Document),
+    is800Document: normalizeCertificationDocument(value?.is800Document),
     californiaParamedicLicenseDocument: normalizeCertificationDocument(value?.californiaParamedicLicenseDocument),
     ccemsaParamedicLicenseDocument: normalizeCertificationDocument(value?.ccemsaParamedicLicenseDocument),
     aclsDocument: normalizeCertificationDocument(value?.aclsDocument),
@@ -1427,7 +1447,8 @@ export default function EmployeeProfilesPage() {
 
   function getEmployeeCertificationAlert(employee: EmployeeProfile): { className: string; title: string } {
     const certifications = normalizeCertificationRecord(employee.certifications);
-    const expirationFields: Array<[keyof CertificationRecord, string]> = [
+
+    const expirationFields: Array<[CertificationField, string]> = [
       ['driversLicense', "Driver's License"],
       ['ambulanceDriversLicense', "Ambulance Driver's License"],
       ['ahaBlsCpr', 'AHA BLS CPR'],
@@ -1440,12 +1461,34 @@ export default function EmployeeProfilesPage() {
         ? ['ccemsaParamedicLicense', 'CCEMSA Paramedic License']
         : ['ccemsaEmtLicense', 'CCEMSA EMT License'],
       ...(employee.scope === 'ALS'
-        ? ([['acls', 'ACLS'], ['pals', 'PALS']] as Array<[keyof CertificationRecord, string]>)
+        ? ([['acls', 'ACLS'], ['pals', 'PALS']] as Array<[CertificationField, string]>)
         : []),
     ];
 
+    const requiredDocumentFields: Array<[CertificationField, string]> = [
+      ...expirationFields,
+      ...([
+        ['is100', 'IS-100'],
+        ['is200', 'IS-200'],
+        ['is700', 'IS-700'],
+        ['is800', 'IS-800'],
+      ] as Array<[CertificationField, string]>),
+    ].filter(([field]) => Boolean(getCertificationDocumentKey(field)));
+
+    const missingDocument = requiredDocumentFields.find(([field]) => {
+      const document = getCertificationDocument(certifications, field);
+      return !document?.path;
+    });
+
+    if (missingDocument) {
+      return {
+        className: 'rounded-md bg-red-700 px-2 py-1 text-white',
+        title: `${missingDocument[1]} document missing`,
+      };
+    }
+
     const nearest = expirationFields
-      .map(([field, label]) => ({ label, ...getCertificationDateAlert(String(certifications[field] || '')) }))
+      .map(([field, label]) => ({ label, ...getCertificationDateAlert(certifications[field]) }))
       .filter((item): item is { label: string; className: string; days: number } => item.days !== null)
       .sort((a, b) => a.days - b.days)[0];
 
@@ -1478,6 +1521,13 @@ export default function EmployeeProfilesPage() {
       ['ahaBlsCpr', 'AHA BLS CPR Expiration Date'],
       ['medicalExaminerCertificate', 'Medical Examiner Certificate Expiration Date'],
       ['annualTbScreen', 'Annual TB Screen Expiration Date'],
+    ];
+
+    const documentOnlyCommonFields: Array<[CertificationField, string]> = [
+      ['is100', 'IS-100 Certificate'],
+      ['is200', 'IS-200 Certificate'],
+      ['is700', 'IS-700 Certificate'],
+      ['is800', 'IS-800 Certificate'],
     ];
 
     const alsFields: Array<[CertificationField, string]> = [
@@ -1612,6 +1662,93 @@ export default function EmployeeProfilesPage() {
                             {documentStatus}
                           </div>
                         )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {documentOnlyCommonFields.map(([field, label]) => {
+                const documentKey = getCertificationDocumentKey(field);
+                const document = getCertificationDocument(certifications, field);
+                const documentStatusKey = employeeId ? `${employeeId}-${field}` : '';
+                const isUploadingDocument = documentStatusKey ? certificationDocumentUploading[documentStatusKey] : false;
+                const documentStatus = documentStatusKey ? certificationDocumentStatus[documentStatusKey] : '';
+
+                return (
+                  <div
+                    key={field}
+                    className={`rounded-xl border-2 bg-white p-3 shadow-sm ${
+                      document ? 'border-slate-700' : 'border-red-700'
+                    }`}
+                  >
+                    <div className={`mb-1 text-xs font-semibold uppercase tracking-wide ${
+                      document ? 'text-slate-500' : 'text-red-700'
+                    }`}>
+                      {label}
+                    </div>
+
+                    <div className={`mb-2 text-sm font-semibold ${
+                      document ? 'text-emerald-700' : 'text-red-700'
+                    }`}>
+                      {document ? 'Uploaded / Compliant' : 'Missing required document'}
+                    </div>
+
+                    {employeeId && documentKey && (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Document on File
+                        </div>
+
+                        <div className="mb-3 text-sm text-slate-700">
+                          {document ? document.filename : 'No document uploaded yet.'}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <label className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                            isUploadingDocument
+                              ? 'border-slate-200 bg-slate-100 text-slate-400'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                          }`}>
+                            {document ? 'Replace Document' : 'Upload Document'}
+                            <input
+                              type="file"
+                              accept="application/pdf,image/jpeg,image/png"
+                              className="hidden"
+                              disabled={isUploadingDocument}
+                              onChange={(event) => {
+                                const selectedFile = event.target.files?.[0] ?? null;
+                                void handleEmployeeCertificationDocumentUpload(employeeId, field, label, selectedFile);
+                                event.target.value = '';
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() => void handleEmployeeCertificationDocumentView(document)}
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            View Current
+                          </button>
+                        </div>
+
+                        {documentStatus && (
+                          <div className="mt-2 text-xs font-semibold text-slate-600">
+                            {documentStatus}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!employeeId && (
+                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-500">
+                        Save the employee before uploading this required document.
                       </div>
                     )}
                   </div>
