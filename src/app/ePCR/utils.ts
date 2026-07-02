@@ -35,7 +35,7 @@ export function createDefaultCallForm(): CallForm {
     otherAgenciesOnScene: '',
     hazardousHealthExposures: '',
     hazardousHealthExposuresOther: '',
-    personalProtectiveEquipmentUsed: '',
+    personalProtectiveEquipmentUsed: [],
     personalProtectiveEquipmentOther: '',
     callReceived: '',
     callDispatched: '',
@@ -75,8 +75,8 @@ export function getCallRequiredFields(callForm: CallForm) {
     ...(callForm.hazardousHealthExposures === 'Other Exposure'
       ? [callForm.hazardousHealthExposuresOther]
       : []),
-    callForm.personalProtectiveEquipmentUsed,
-    ...(callForm.personalProtectiveEquipmentUsed === 'Other'
+    callForm.personalProtectiveEquipmentUsed.length > 0 ? 'selected' : '',
+    ...(callForm.personalProtectiveEquipmentUsed.includes('Other')
       ? [callForm.personalProtectiveEquipmentOther]
       : []),
     callForm.callReceived,

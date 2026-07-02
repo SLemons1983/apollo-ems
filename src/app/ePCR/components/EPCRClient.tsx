@@ -40,7 +40,7 @@ export default function EPCRClient() {
     (callCompletedRequiredFields / callTotalRequiredFields) * 100,
   );
 
-  function updateCallForm(field: keyof CallForm, value: string) {
+  function updateCallForm(field: keyof CallForm, value: string | string[]) {
     setCallForm((current) => ({
       ...current,
       [field]: value,
@@ -93,8 +93,8 @@ export default function EPCRClient() {
         ...(callForm.hazardousHealthExposures === 'Other Exposure'
           ? [callForm.hazardousHealthExposuresOther]
           : []),
-        callForm.personalProtectiveEquipmentUsed,
-        ...(callForm.personalProtectiveEquipmentUsed === 'Other'
+        callForm.personalProtectiveEquipmentUsed.length > 0 ? 'selected' : '',
+        ...(callForm.personalProtectiveEquipmentUsed.includes('Other')
           ? [callForm.personalProtectiveEquipmentOther]
           : []),
       ].filter(Boolean).length,
@@ -103,7 +103,7 @@ export default function EPCRClient() {
         (callForm.incidentLocationType === 'Other' ? 1 : 0) +
         (callForm.otherAgenciesMode === 'Add' ? 1 : 0) +
         (callForm.hazardousHealthExposures === 'Other Exposure' ? 1 : 0) +
-        (callForm.personalProtectiveEquipmentUsed === 'Other' ? 1 : 0),
+        (callForm.personalProtectiveEquipmentUsed.includes('Other') ? 1 : 0),
     },
     {
       title: 'Times',
@@ -193,7 +193,16 @@ export default function EPCRClient() {
         throw new Error('Invalid ApolloEMS ePCR file.');
       }
 
-      setCallForm(uploadedCallForm);
+      setCallForm({
+        ...uploadedCallForm,
+        personalProtectiveEquipmentUsed: Array.isArray(
+          uploadedCallForm.personalProtectiveEquipmentUsed,
+        )
+          ? uploadedCallForm.personalProtectiveEquipmentUsed
+          : uploadedCallForm.personalProtectiveEquipmentUsed
+            ? [uploadedCallForm.personalProtectiveEquipmentUsed]
+            : [],
+      });
       setExpandedSection(parsed.expandedSection || 'Call');
       setFileStatus('PCR uploaded successfully.');
     } catch (error) {

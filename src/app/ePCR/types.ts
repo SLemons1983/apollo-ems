@@ -19,7 +19,7 @@ export type CallForm = {
   otherAgenciesOnScene: string;
   hazardousHealthExposures: string;
   hazardousHealthExposuresOther: string;
-  personalProtectiveEquipmentUsed: string;
+  personalProtectiveEquipmentUsed: string[];
   personalProtectiveEquipmentOther: string;
   callReceived: string;
   callDispatched: string;

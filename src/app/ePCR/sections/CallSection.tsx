@@ -62,7 +62,7 @@ const ppeOptions = [
 type CallSectionProps = {
   callForm: CallForm;
   setCallForm: Dispatch<SetStateAction<CallForm>>;
-  updateCallForm: (field: keyof CallForm, value: string) => void;
+  updateCallForm: (field: keyof CallForm, value: string | string[]) => void;
 };
 
 function normalizeTimeInput(value: string) {
@@ -73,6 +73,18 @@ function normalizeTimeInput(value: string) {
   }
 
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function togglePpeSelection(
+  selectedPpe: string[],
+  value: string,
+  updateCallForm: (field: keyof CallForm, value: string[]) => void,
+) {
+  const nextSelection = selectedPpe.includes(value)
+    ? selectedPpe.filter((item) => item !== value)
+    : [...selectedPpe, value];
+
+  updateCallForm('personalProtectiveEquipmentUsed', nextSelection);
 }
 
 export default function CallSection({
@@ -120,8 +132,8 @@ export default function CallSection({
     ...(callForm.hazardousHealthExposures === 'Other Exposure'
       ? [callForm.hazardousHealthExposuresOther]
       : []),
-    callForm.personalProtectiveEquipmentUsed,
-    ...(callForm.personalProtectiveEquipmentUsed === 'Other'
+    callForm.personalProtectiveEquipmentUsed.length > 0 ? 'selected' : '',
+    ...(callForm.personalProtectiveEquipmentUsed.includes('Other')
       ? [callForm.personalProtectiveEquipmentOther]
       : []),
   ];
@@ -586,30 +598,42 @@ export default function CallSection({
                               </label>
                             )}
 
-                            <label className="block">
-                              <span className="mb-1 block text-sm font-semibold text-slate-700">
+                            <div className="block md:col-span-2">
+                              <span className="mb-2 block text-sm font-semibold text-slate-700">
                                 Personal Protective Equipment Used
                               </span>
-                              <select
-                                value={callForm.personalProtectiveEquipmentUsed}
-                                onChange={(event) =>
-                                  updateCallForm(
-                                    'personalProtectiveEquipmentUsed',
-                                    event.target.value,
-                                  )
-                                }
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
-                              >
-                                <option value=""></option>
-                                {ppeOptions.map((ppe) => (
-                                  <option key={ppe} value={ppe}>
-                                    {ppe}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
+                              <div className="flex flex-wrap gap-2">
+                                {ppeOptions.map((ppe) => {
+                                  const selected =
+                                    callForm.personalProtectiveEquipmentUsed.includes(
+                                      ppe,
+                                    );
 
-                            {callForm.personalProtectiveEquipmentUsed === 'Other' && (
+                                  return (
+                                    <button
+                                      key={ppe}
+                                      type="button"
+                                      onClick={() =>
+                                        togglePpeSelection(
+                                          callForm.personalProtectiveEquipmentUsed,
+                                          ppe,
+                                          updateCallForm,
+                                        )
+                                      }
+                                      className={`rounded-lg border px-4 py-2 text-sm font-semibold ${
+                                        selected
+                                          ? 'border-slate-900 bg-slate-900 text-white'
+                                          : 'border-slate-300 bg-white text-slate-700'
+                                      }`}
+                                    >
+                                      {selected ? `✓ ${ppe}` : ppe}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {callForm.personalProtectiveEquipmentUsed.includes('Other') && (
                               <label className="block">
                                 <span className="mb-1 block text-sm font-semibold text-slate-700">
                                   Other PPE Explanation
