@@ -19,6 +19,22 @@ export default function PCRCard({
   const percentage =
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
+  const remainingFields = Math.max(totalFields - completedFields, 0);
+
+  const statusText =
+    completedFields === 0
+      ? 'Not Started'
+      : complete
+        ? 'Complete'
+        : `${remainingFields} Required Field${remainingFields === 1 ? '' : 's'} Remaining`;
+
+  const statusColor =
+    completedFields === 0
+      ? 'bg-slate-200 text-slate-700'
+      : complete
+        ? 'bg-emerald-100 text-emerald-800'
+        : 'bg-amber-100 text-amber-800';
+
   return (
     <div className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50 shadow-sm">
       <button
@@ -28,8 +44,12 @@ export default function PCRCard({
       >
         <div>
           <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-          <p className="text-sm text-slate-500">
-            {completedFields} / {totalFields} required fields complete
+          <p className="text-sm font-medium text-slate-600">
+            {statusText}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {completedFields} of {totalFields} required fields completed
           </p>
           <div className="mt-2 h-2 w-56 overflow-hidden rounded-full bg-slate-200">
             <div
@@ -43,13 +63,9 @@ export default function PCRCard({
 
         <div className="flex items-center gap-3">
           <span
-            className={`rounded-full px-3 py-1 text-xs font-bold ${
-              complete
-                ? 'bg-emerald-100 text-emerald-800'
-                : 'bg-red-100 text-red-800'
-            }`}
+            className={`rounded-full px-3 py-1 text-xs font-bold ${statusColor}`}
           >
-            {complete ? 'Complete' : 'Incomplete'}
+            {statusText}
           </span>
 
           <span className="text-2xl text-slate-700">
