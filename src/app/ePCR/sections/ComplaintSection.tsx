@@ -49,27 +49,6 @@ type ComplaintSectionProps = {
   ) => void;
 };
 
-function normalizeDateTimeInput(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 12);
-
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  if (digits.length <= 8) {
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-  }
-  if (digits.length <= 10) {
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(
-      4,
-      8,
-    )} ${digits.slice(8)}`;
-  }
-
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(
-    4,
-    8,
-  )} ${digits.slice(8, 10)}:${digits.slice(10)}`;
-}
-
 function toggleStringSelection(current: string[], value: string) {
   return current.includes(value)
     ? current.filter((item) => item !== value)
@@ -225,16 +204,14 @@ export default function ComplaintSection({
               Date and Time Symptoms Began
             </span>
             <input
-              type="text"
-              inputMode="numeric"
+              type="datetime-local"
               value={complaintForm.symptomsBeganDateTime}
               onChange={(event) =>
                 updateComplaintForm(
                   'symptomsBeganDateTime',
-                  normalizeDateTimeInput(event.target.value),
+                  event.target.value,
                 )
               }
-              maxLength={16}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
             />
           </label>
@@ -244,16 +221,14 @@ export default function ComplaintSection({
               Date and Time Patient Last Seen Normal
             </span>
             <input
-              type="text"
-              inputMode="numeric"
+              type="datetime-local"
               value={complaintForm.lastSeenNormalDateTime}
               onChange={(event) =>
                 updateComplaintForm(
                   'lastSeenNormalDateTime',
-                  normalizeDateTimeInput(event.target.value),
+                  event.target.value,
                 )
               }
-              maxLength={16}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
             />
           </label>
