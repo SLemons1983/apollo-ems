@@ -1,12 +1,25 @@
-type PCRProgressSection = {
+type PCRProgressTask = {
   title: string;
   completedFields: number;
   totalFields: number;
 };
 
+type PCRProgressSection = {
+  title: string;
+  completedFields: number;
+  totalFields: number;
+  tasks?: PCRProgressTask[];
+};
+
 type PCRProgressProps = {
   sections: PCRProgressSection[];
 };
+
+function getStatus(completedFields: number, totalFields: number) {
+  if (completedFields === 0) return '○';
+  if (completedFields === totalFields) return '✓';
+  return '⚠';
+}
 
 export default function PCRProgress({ sections }: PCRProgressProps) {
   const totalFields = sections.reduce(
@@ -63,6 +76,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-sm font-semibold text-slate-800">
+                  {getStatus(section.completedFields, section.totalFields)}{' '}
                   {section.title}
                 </span>
                 <span
@@ -82,6 +96,25 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
                   style={{ width: `${sectionPercentage}%` }}
                 />
               </div>
+
+              {section.tasks && section.tasks.length > 0 && (
+                <div className="mt-3 space-y-1 border-t border-slate-200 pt-3">
+                  {section.tasks.map((task) => (
+                    <div
+                      key={task.title}
+                      className="flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="font-medium text-slate-700">
+                        {getStatus(task.completedFields, task.totalFields)}{' '}
+                        {task.title}
+                      </span>
+                      <span className="text-slate-500">
+                        {task.completedFields}/{task.totalFields}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

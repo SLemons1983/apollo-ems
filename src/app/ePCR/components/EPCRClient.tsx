@@ -47,11 +47,82 @@ export default function EPCRClient() {
     }));
   }
 
+  const callProgressTasks = [
+    {
+      title: 'Dispatch Information',
+      completedFields: [
+        callForm.emsResponseNumber,
+        callForm.dispatchedPriority,
+      ].filter(Boolean).length,
+      totalFields: 2,
+    },
+    {
+      title: 'Crew Information',
+      completedFields: [
+        callForm.respondingUnitNumber,
+        callForm.pcrDocumentedBy,
+        callForm.respondingCrew,
+      ].filter(Boolean).length,
+      totalFields: 3,
+    },
+    {
+      title: 'Response Information',
+      completedFields: [
+        callForm.dispatchedNatureOfCall,
+        callForm.typeOfServiceRequested,
+        callForm.responseModeToScene,
+      ].filter(Boolean).length,
+      totalFields: 3,
+    },
+    {
+      title: 'Location Information',
+      completedFields: [
+        callForm.incidentLocationType,
+        callForm.incidentLocationType === 'Other'
+          ? callForm.incidentLocationTypeOther
+          : 'not-required',
+        callForm.incidentStreet,
+        callForm.incidentCity,
+        callForm.incidentZip,
+        callForm.numberOfPatientsAtScene,
+        callForm.firstEmsUnitOnScene,
+        callForm.otherAgenciesMode === 'Add'
+          ? callForm.otherAgenciesOnScene
+          : 'not-required',
+        callForm.hazardousHealthExposures,
+        callForm.hazardousHealthExposures === 'Other Exposure'
+          ? callForm.hazardousHealthExposuresOther
+          : 'not-required',
+        callForm.personalProtectiveEquipmentUsed,
+        callForm.personalProtectiveEquipmentUsed === 'Other'
+          ? callForm.personalProtectiveEquipmentOther
+          : 'not-required',
+      ].filter(Boolean).length,
+      totalFields: 12,
+    },
+    {
+      title: 'Times',
+      completedFields: [
+        callForm.callReceived,
+        callForm.callDispatched,
+        callForm.unitEnRoute,
+        callForm.unitOnScene,
+        callForm.patientContact,
+        callForm.departScene,
+        callForm.arrivedAtDestination,
+        callForm.transferOfCare,
+        callForm.unitBackInService,
+      ].filter(Boolean).length,
+      totalFields: 9,
+    },
+  ];
+
   const progressSections = [
     {
       title: 'Call',
       completedFields: callCompletedRequiredFields,
       totalFields: callTotalRequiredFields,
+      tasks: callProgressTasks,
     },
     ...sections
       .filter((section) => section !== 'Call')
