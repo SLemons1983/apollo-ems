@@ -74,19 +74,22 @@ export default function EPCRPage() {
     responseModeToScene: '',
   }));
 
-  const callComplete = useMemo(
-    () =>
-      Boolean(
-        callForm.emsResponseNumber &&
-          callForm.dispatchedPriority &&
-          callForm.respondingUnitNumber &&
-          callForm.respondingCrew &&
-          callForm.pcrDocumentedBy &&
-          callForm.dispatchedNatureOfCall &&
-          callForm.typeOfServiceRequested &&
-          callForm.responseModeToScene,
-      ),
-    [callForm],
+  const callRequiredFields = [
+    callForm.emsResponseNumber,
+    callForm.dispatchedPriority,
+    callForm.respondingUnitNumber,
+    callForm.respondingCrew,
+    callForm.pcrDocumentedBy,
+    callForm.dispatchedNatureOfCall,
+    callForm.typeOfServiceRequested,
+    callForm.responseModeToScene,
+  ];
+
+  const callCompletedRequiredFields = callRequiredFields.filter(Boolean).length;
+  const callTotalRequiredFields = callRequiredFields.length;
+  const callComplete = callCompletedRequiredFields === callTotalRequiredFields;
+  const callCompletionPercentage = Math.round(
+    (callCompletedRequiredFields / callTotalRequiredFields) * 100,
   );
 
   function updateCallForm(field: keyof CallForm, value: string) {
@@ -143,10 +146,23 @@ export default function EPCRPage() {
                     </h2>
 
                     <p className="text-sm text-slate-500">
-                      {complete
-                        ? 'Complete'
-                        : 'Required information missing'}
+                      {section === 'Call'
+                        ? `${callCompletedRequiredFields} / ${callTotalRequiredFields} Required Fields Complete`
+                        : complete
+                          ? 'Complete'
+                          : 'Required information missing'}
                     </p>
+
+                    {section === 'Call' && (
+                      <div className="mt-2 h-2 w-64 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className={`h-full rounded-full ${
+                            callComplete ? 'bg-emerald-600' : 'bg-red-600'
+                          }`}
+                          style={{ width: `${callCompletionPercentage}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <span className="text-2xl text-slate-700">
@@ -157,7 +173,18 @@ export default function EPCRPage() {
                 {expandedSection === section && (
                   <div className="border-t bg-white p-6">
                     {section === 'Call' ? (
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-6">
+                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
+                          <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900">
+                              Dispatch Information
+                            </h3>
+                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                              Required
+                            </span>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-slate-700">
                             EMS Response Number
@@ -193,6 +220,20 @@ export default function EPCRPage() {
                           </select>
                         </label>
 
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
+                          <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900">
+                              Crew Information
+                            </h3>
+                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                              Required
+                            </span>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-slate-700">
                             Responding Unit Number
@@ -253,6 +294,20 @@ export default function EPCRPage() {
                           />
                         </label>
 
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
+                          <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900">
+                              Response Information
+                            </h3>
+                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                              Required
+                            </span>
+                          </div>
+
+                          <div className="grid gap-4 md:grid-cols-2">
                         <label className="block md:col-span-2">
                           <span className="mb-1 block text-sm font-semibold text-slate-700">
                             Dispatched Nature of Call
@@ -316,6 +371,8 @@ export default function EPCRPage() {
                             ))}
                           </select>
                         </label>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
