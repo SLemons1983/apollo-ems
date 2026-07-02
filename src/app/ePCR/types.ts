@@ -31,3 +31,37 @@ export type CallForm = {
   transferOfCare: string;
   unitBackInService: string;
 };
+
+export type PatientForm = {
+  firstName: string;
+  middleInitial: string;
+  lastName: string;
+  unablePatientName: boolean;
+  dateOfBirth: string;
+  unableDateOfBirth: boolean;
+  unableAge: boolean;
+  patientStreet: string;
+  patientApartment: string;
+  patientCity: string;
+  patientZip: string;
+  unablePatientAddress: boolean;
+  gender: string;
+  unableGender: boolean;
+  phoneNumber: string;
+  unablePhoneNumber: boolean;
+  socialSecurityNumber: string;
+  unableSocialSecurityNumber: boolean;
+  race: string;
+  unableRace: boolean;
+  medicalHistory: string;
+  surgicalHistory: string;
+  currentMedications: string;
+  lastOralIntake: string;
+  medicationAllergies: string;
+  environmentalAllergies: string;
+  patientEffects: string;
+  patientEffectsLeftWith: string;
+  patientEffectsLeftWithOther: string;
+  disposition: string;
+  dispositionExplanation: string;
+};
