@@ -175,7 +175,7 @@ export default function CallSection({
                             }
                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                           >
-                            <option value="">Select priority...</option>
+                            <option value=""></option>
                             {dispatchedPriorities.map((priority) => (
                               <option key={priority} value={priority}>
                                 {priority}
@@ -300,7 +300,7 @@ export default function CallSection({
                             }
                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                           >
-                            <option value="">Select service type...</option>
+                            <option value=""></option>
                             {serviceTypes.map((serviceType) => (
                               <option key={serviceType} value={serviceType}>
                                 {serviceType}
@@ -323,7 +323,7 @@ export default function CallSection({
                             }
                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                           >
-                            <option value="">Select response mode...</option>
+                            <option value=""></option>
                             {responseModes.map((mode) => (
                               <option key={mode} value={mode}>
                                 {mode}
@@ -357,7 +357,7 @@ export default function CallSection({
                                 }
                                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                               >
-                                <option value="">Select location type...</option>
+                                <option value=""></option>
                                 {incidentLocationTypes.map((locationType) => (
                                   <option key={locationType} value={locationType}>
                                     {locationType}
@@ -482,7 +482,7 @@ export default function CallSection({
                                 }
                                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                               >
-                                <option value="">Select...</option>
+                                <option value=""></option>
                                 {yesNoOptions.map((option) => (
                                   <option key={option} value={option}>
                                     {option}
@@ -557,7 +557,7 @@ export default function CallSection({
                                 }
                                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                               >
-                                <option value="">Select exposure...</option>
+                                <option value=""></option>
                                 {exposureTypes.map((exposure) => (
                                   <option key={exposure} value={exposure}>
                                     {exposure}
@@ -600,7 +600,7 @@ export default function CallSection({
                                 }
                                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                               >
-                                <option value="">Select PPE...</option>
+                                <option value=""></option>
                                 {ppeOptions.map((ppe) => (
                                   <option key={ppe} value={ppe}>
                                     {ppe}
