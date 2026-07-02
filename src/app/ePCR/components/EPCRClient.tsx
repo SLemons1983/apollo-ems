@@ -21,7 +21,7 @@ const sections = [
 
 export default function EPCRClient() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string>('Call');
+  const [expandedSection, setExpandedSection] = useState<string>('');
   const [fileStatus, setFileStatus] = useState('');
 
   const [callForm, setCallForm] = useState<CallForm>(() =>

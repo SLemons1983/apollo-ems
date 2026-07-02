@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 type PCRProgressTask = {
   title: string;
   completedFields: number;
@@ -22,6 +26,8 @@ function getStatus(completedFields: number, totalFields: number) {
 }
 
 export default function PCRProgress({ sections }: PCRProgressProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const totalFields = sections.reduce(
     (total, section) => total + section.totalFields,
     0,
@@ -35,7 +41,11 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
 
   return (
     <div className="mb-6 rounded-xl border bg-white p-5 shadow">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="mb-3 flex w-full flex-wrap items-center justify-between gap-3 text-left"
+      >
         <div>
           <h2 className="text-xl font-bold text-slate-900">
             Overall PCR Progress
@@ -45,17 +55,24 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
           </p>
         </div>
 
-        <span className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white">
-          {percentage}%
-        </span>
-      </div>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+            {percentage}%
+          </span>
+          <span className="text-2xl text-slate-700">
+            {expanded ? '−' : '+'}
+          </span>
+        </div>
+      </button>
 
-      <div className="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
-        <div
-          className="h-full rounded-full bg-slate-900"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      {expanded && (
+        <>
+          <div className="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-slate-900"
+              style={{ width: `${percentage}%` }}
+            />
+          </div>
 
       <div className="grid gap-3 md:grid-cols-3">
         {sections.map((section) => {
@@ -119,6 +136,8 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 }
