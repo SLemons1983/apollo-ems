@@ -1,6 +1,8 @@
 'use client';
 
 import { ChangeEvent, useMemo, useRef, useState } from 'react';
+import PCRProgress from './PCRProgress';
+import PCRSection from './PCRSection';
 import CallSection from '../sections/CallSection';
 import type { CallForm } from '../types';
 import { createDefaultCallForm, getCallRequiredFields } from '../utils';
@@ -45,13 +47,20 @@ export default function EPCRClient() {
     }));
   }
 
-  function getSectionComplete(section: string) {
-    if (section === 'Call') {
-      return callComplete;
-    }
-
-    return false;
-  }
+  const progressSections = [
+    {
+      title: 'Call',
+      completedFields: callCompletedRequiredFields,
+      totalFields: callTotalRequiredFields,
+    },
+    ...sections
+      .filter((section) => section !== 'Call')
+      .map((section) => ({
+        title: section,
+        completedFields: 0,
+        totalFields: 1,
+      })),
+  ];
 
   function savePCRToFile() {
     const savedPCR = {
@@ -166,77 +175,45 @@ export default function EPCRClient() {
           </div>
         )}
 
+        <PCRProgress sections={progressSections} />
+
         <div className="space-y-4">
           {sections.map((section) => {
-            const complete = getSectionComplete(section);
+            const sectionProgress = progressSections.find(
+              (progressSection) => progressSection.title === section,
+            ) ?? {
+              title: section,
+              completedFields: 0,
+              totalFields: 1,
+            };
 
             return (
-              <section
+              <PCRSection
                 key={section}
-                className="overflow-hidden rounded-xl border bg-white shadow"
+                title={section}
+                completedFields={sectionProgress.completedFields}
+                totalFields={sectionProgress.totalFields}
+                expanded={expandedSection === section}
+                onToggle={() =>
+                  setExpandedSection(
+                    expandedSection === section ? '' : section,
+                  )
+                }
               >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setExpandedSection(
-                      expandedSection === section ? '' : section,
-                    )
-                  }
-                  className={`flex w-full items-center justify-between px-6 py-5 text-left transition ${
-                    complete
-                      ? 'border-l-8 border-emerald-600'
-                      : 'border-l-8 border-red-600 bg-red-50'
-                  }`}
-                >
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">
-                      {section}
-                    </h2>
-
-                    <p className="text-sm text-slate-500">
-                      {section === 'Call'
-                        ? `${callCompletedRequiredFields} / ${callTotalRequiredFields} Required Fields Complete`
-                        : complete
-                          ? 'Complete'
-                          : 'Required information missing'}
-                    </p>
-
-                    {section === 'Call' && (
-                      <div className="mt-2 h-2 w-64 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className={`h-full rounded-full ${
-                            callComplete ? 'bg-emerald-600' : 'bg-red-600'
-                          }`}
-                          style={{ width: `${callCompletionPercentage}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <span className="text-2xl text-slate-700">
-                    {expandedSection === section ? '−' : '+'}
-                  </span>
-                </button>
-
-                {expandedSection === section && (
-                  <div className="border-t bg-white p-6">
-                    {section === 'Call' ? (
-                      <CallSection
-                        callForm={callForm}
-                        setCallForm={setCallForm}
-                        updateCallForm={updateCallForm}
-                      />
-                    ) : (
-                      <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
-                        {section} cards will be added here.
-                      </div>
-                    )}
+                {section === 'Call' ? (
+                  <CallSection
+                    callForm={callForm}
+                    setCallForm={setCallForm}
+                    updateCallForm={updateCallForm}
+                  />
+                ) : (
+                  <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+                    {section} cards will be added here.
                   </div>
                 )}
-              </section>
+              </PCRSection>
             );
-          })}
-        </div>
+          })}        </div>
       </div>
     </main>
   );
