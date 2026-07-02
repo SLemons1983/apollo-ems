@@ -60,25 +60,25 @@ export function getCallRequiredFields(callForm: CallForm) {
     callForm.typeOfServiceRequested,
     callForm.responseModeToScene,
     callForm.incidentLocationType,
-    callForm.incidentLocationType === 'Other'
-      ? callForm.incidentLocationTypeOther
-      : 'not-required',
+    ...(callForm.incidentLocationType === 'Other'
+      ? [callForm.incidentLocationTypeOther]
+      : []),
     callForm.incidentStreet,
     callForm.incidentCity,
     callForm.incidentZip,
     callForm.numberOfPatientsAtScene,
     callForm.firstEmsUnitOnScene,
-    callForm.otherAgenciesMode === 'Add'
-      ? callForm.otherAgenciesOnScene
-      : 'not-required',
+    ...(callForm.otherAgenciesMode === 'Add'
+      ? [callForm.otherAgenciesOnScene]
+      : []),
     callForm.hazardousHealthExposures,
-    callForm.hazardousHealthExposures === 'Other Exposure'
-      ? callForm.hazardousHealthExposuresOther
-      : 'not-required',
+    ...(callForm.hazardousHealthExposures === 'Other Exposure'
+      ? [callForm.hazardousHealthExposuresOther]
+      : []),
     callForm.personalProtectiveEquipmentUsed,
-    callForm.personalProtectiveEquipmentUsed === 'Other'
-      ? callForm.personalProtectiveEquipmentOther
-      : 'not-required',
+    ...(callForm.personalProtectiveEquipmentUsed === 'Other'
+      ? [callForm.personalProtectiveEquipmentOther]
+      : []),
     callForm.callReceived,
     callForm.callDispatched,
     callForm.unitEnRoute,

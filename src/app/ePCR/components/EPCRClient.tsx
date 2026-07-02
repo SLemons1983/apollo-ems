@@ -78,27 +78,32 @@ export default function EPCRClient() {
       title: 'Location Information',
       completedFields: [
         callForm.incidentLocationType,
-        callForm.incidentLocationType === 'Other'
-          ? callForm.incidentLocationTypeOther
-          : 'not-required',
+        ...(callForm.incidentLocationType === 'Other'
+          ? [callForm.incidentLocationTypeOther]
+          : []),
         callForm.incidentStreet,
         callForm.incidentCity,
         callForm.incidentZip,
         callForm.numberOfPatientsAtScene,
         callForm.firstEmsUnitOnScene,
-        callForm.otherAgenciesMode === 'Add'
-          ? callForm.otherAgenciesOnScene
-          : 'not-required',
+        ...(callForm.otherAgenciesMode === 'Add'
+          ? [callForm.otherAgenciesOnScene]
+          : []),
         callForm.hazardousHealthExposures,
-        callForm.hazardousHealthExposures === 'Other Exposure'
-          ? callForm.hazardousHealthExposuresOther
-          : 'not-required',
+        ...(callForm.hazardousHealthExposures === 'Other Exposure'
+          ? [callForm.hazardousHealthExposuresOther]
+          : []),
         callForm.personalProtectiveEquipmentUsed,
-        callForm.personalProtectiveEquipmentUsed === 'Other'
-          ? callForm.personalProtectiveEquipmentOther
-          : 'not-required',
+        ...(callForm.personalProtectiveEquipmentUsed === 'Other'
+          ? [callForm.personalProtectiveEquipmentOther]
+          : []),
       ].filter(Boolean).length,
-      totalFields: 12,
+      totalFields:
+        8 +
+        (callForm.incidentLocationType === 'Other' ? 1 : 0) +
+        (callForm.otherAgenciesMode === 'Add' ? 1 : 0) +
+        (callForm.hazardousHealthExposures === 'Other Exposure' ? 1 : 0) +
+        (callForm.personalProtectiveEquipmentUsed === 'Other' ? 1 : 0),
     },
     {
       title: 'Times',
