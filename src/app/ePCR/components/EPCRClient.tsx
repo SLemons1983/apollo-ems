@@ -4,12 +4,15 @@ import { ChangeEvent, useMemo, useRef, useState } from 'react';
 import PCRProgress from './PCRProgress';
 import PCRSection from './PCRSection';
 import CallSection from '../sections/CallSection';
+import ComplaintSection from '../sections/ComplaintSection';
 import PatientSection from '../sections/PatientSection';
-import type { CallForm, PatientForm } from '../types';
+import type { CallForm, ComplaintForm, PatientForm } from '../types';
 import {
   createDefaultCallForm,
+  createDefaultComplaintForm,
   createDefaultPatientForm,
   getCallRequiredFields,
+  getComplaintRequiredFields,
   getPatientRequiredFields,
 } from '../utils';
 
@@ -36,6 +39,9 @@ export default function EPCRClient() {
   const [patientForm, setPatientForm] = useState<PatientForm>(() =>
     createDefaultPatientForm(),
   );
+  const [complaintForm, setComplaintForm] = useState<ComplaintForm>(() =>
+    createDefaultComplaintForm(),
+  );
 
   const callRequiredFields = useMemo(
     () => getCallRequiredFields(callForm),
@@ -53,6 +59,14 @@ export default function EPCRClient() {
     patientRequiredFields.filter(Boolean).length;
   const patientTotalRequiredFields = patientRequiredFields.length;
 
+  const complaintRequiredFields = useMemo(
+    () => getComplaintRequiredFields(complaintForm),
+    [complaintForm],
+  );
+  const complaintCompletedRequiredFields =
+    complaintRequiredFields.filter(Boolean).length;
+  const complaintTotalRequiredFields = complaintRequiredFields.length;
+
   function updateCallForm(field: keyof CallForm, value: string | string[]) {
     setCallForm((current) => ({
       ...current,
@@ -68,6 +82,36 @@ export default function EPCRClient() {
       ...current,
       [field]: value,
     }));
+  }
+
+  function updateComplaintForm(
+    field: keyof ComplaintForm,
+    value:
+      | string
+      | string[]
+      | ComplaintForm['primaryImpression']
+      | ComplaintForm['otherAssociatedSymptoms'],
+  ) {
+    setComplaintForm((current) => {
+      const next = {
+        ...current,
+        [field]: value,
+      };
+
+      if (field === 'patientAcuity') {
+        const acuity = value as string;
+        const isTrauma =
+          acuity === 'Non STAT Trauma' || acuity === 'STAT Trauma';
+        const isCardiacArrest = acuity === 'Cardiac Arrest';
+
+        next.possibleInjuryTrauma = isTrauma ? 'Yes' : '';
+        next.cardiacArrest = isCardiacArrest
+          ? 'Yes, Prior to EMS Contact'
+          : '';
+      }
+
+      return next;
+    });
   }
 
   const patientProgressTasks = [
@@ -219,6 +263,58 @@ export default function EPCRClient() {
     },
   ];
 
+  const complaintProgressTasks = [
+    {
+      title: 'Complaint',
+      completedFields: [
+        complaintForm.primaryImpression,
+        complaintForm.secondaryImpression,
+        complaintForm.emsConditionCode,
+        complaintForm.primarySymptom,
+        complaintForm.otherAssociatedSymptoms.length > 0 ? 'selected' : '',
+        complaintForm.symptomsBeganDateTime,
+        complaintForm.lastSeenNormalDateTime,
+      ].filter(Boolean).length,
+      totalFields: 7,
+    },
+    {
+      title: 'Circumstances',
+      completedFields: [
+        complaintForm.patientAcuity,
+        complaintForm.possibleInjuryTrauma,
+        complaintForm.cardiacArrest,
+        complaintForm.suspectedStrokeCva,
+        ...(complaintForm.suspectedStrokeCva === 'Yes'
+          ? [complaintForm.strokeCvaSymptomsResolved]
+          : []),
+        complaintForm.patientPlacedOn5150Hold,
+        complaintForm.possibleDrugAlcoholUse,
+        ...(complaintForm.possibleDrugAlcoholUse === 'Yes'
+          ? [
+              complaintForm.drugAlcoholIndications.length > 0
+                ? 'selected'
+                : '',
+            ]
+          : []),
+        ...(complaintForm.drugAlcoholIndications.some((item) =>
+          item.toLowerCase().includes('drug'),
+        )
+          ? [complaintForm.suspectedDrug]
+          : []),
+        complaintForm.workRelatedIllnessInjury,
+      ].filter(Boolean).length,
+      totalFields:
+        7 +
+        (complaintForm.suspectedStrokeCva === 'Yes' ? 1 : 0) +
+        (complaintForm.possibleDrugAlcoholUse === 'Yes' ? 1 : 0) +
+        (complaintForm.drugAlcoholIndications.some((item) =>
+          item.toLowerCase().includes('drug'),
+        )
+          ? 1
+          : 0),
+    },
+  ];
+
   const progressSections = [
     {
       title: 'Call',
@@ -232,8 +328,19 @@ export default function EPCRClient() {
       totalFields: patientTotalRequiredFields,
       tasks: patientProgressTasks,
     },
+    {
+      title: 'Complaint',
+      completedFields: complaintCompletedRequiredFields,
+      totalFields: complaintTotalRequiredFields,
+      tasks: complaintProgressTasks,
+    },
     ...sections
-      .filter((section) => section !== 'Call' && section !== 'Patient')
+      .filter(
+        (section) =>
+          section !== 'Call' &&
+          section !== 'Patient' &&
+          section !== 'Complaint',
+      )
       .map((section) => ({
         title: section,
         completedFields: 0,
@@ -250,6 +357,7 @@ export default function EPCRClient() {
       chart: {
         call: callForm,
         patient: patientForm,
+        complaint: complaintForm,
       },
     };
 
@@ -284,14 +392,20 @@ export default function EPCRClient() {
         chart?: {
           call?: CallForm;
           patient?: PatientForm;
+          complaint?: ComplaintForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
+        complaintForm?: ComplaintForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
       const uploadedPatientForm =
         parsed.chart?.patient ?? parsed.patientForm ?? createDefaultPatientForm();
+      const uploadedComplaintForm =
+        parsed.chart?.complaint ??
+        parsed.complaintForm ??
+        createDefaultComplaintForm();
 
       if (
         parsed.fileType !== 'ApolloEMS Mock ePCR' ||
@@ -314,6 +428,10 @@ export default function EPCRClient() {
       setPatientForm({
         ...createDefaultPatientForm(),
         ...uploadedPatientForm,
+      });
+      setComplaintForm({
+        ...createDefaultComplaintForm(),
+        ...uploadedComplaintForm,
       });
       setExpandedSection(parsed.expandedSection || 'Call');
       setFileStatus('PCR uploaded successfully.');
@@ -409,6 +527,11 @@ export default function EPCRClient() {
                     callForm={callForm}
                     setPatientForm={setPatientForm}
                     updatePatientForm={updatePatientForm}
+                  />
+                ) : section === 'Complaint' ? (
+                  <ComplaintSection
+                    complaintForm={complaintForm}
+                    updateComplaintForm={updateComplaintForm}
                   />
                 ) : (
                   <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">

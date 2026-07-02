@@ -1,4 +1,4 @@
-import type { CallForm, PatientForm } from './types';
+import type { CallForm, ComplaintForm, PatientForm } from './types';
 
 export function createEmsResponseNumber() {
   const now = new Date();
@@ -205,5 +205,58 @@ export function getPatientRequiredFields(patientForm: PatientForm) {
     patientForm.disposition === 'Canceled by Other Agency at Scene'
       ? [patientForm.dispositionExplanation]
       : []),
+  ];
+}
+
+
+export function createDefaultComplaintForm(): ComplaintForm {
+  return {
+    primaryImpression: null,
+    secondaryImpression: null,
+    emsConditionCode: null,
+    primarySymptom: null,
+    otherAssociatedSymptoms: [],
+    symptomsBeganDateTime: '',
+    lastSeenNormalDateTime: '',
+    patientAcuity: '',
+    possibleInjuryTrauma: '',
+    cardiacArrest: '',
+    suspectedStrokeCva: '',
+    strokeCvaSymptomsResolved: '',
+    patientPlacedOn5150Hold: '',
+    possibleDrugAlcoholUse: '',
+    drugAlcoholIndications: [],
+    suspectedDrug: '',
+    workRelatedIllnessInjury: '',
+  };
+}
+
+export function getComplaintRequiredFields(complaintForm: ComplaintForm) {
+  return [
+    complaintForm.primaryImpression,
+    complaintForm.secondaryImpression,
+    complaintForm.emsConditionCode,
+    complaintForm.primarySymptom,
+    complaintForm.otherAssociatedSymptoms.length > 0 ? 'selected' : '',
+    complaintForm.symptomsBeganDateTime,
+    complaintForm.lastSeenNormalDateTime,
+    complaintForm.patientAcuity,
+    complaintForm.possibleInjuryTrauma,
+    complaintForm.cardiacArrest,
+    complaintForm.suspectedStrokeCva,
+    ...(complaintForm.suspectedStrokeCva === 'Yes'
+      ? [complaintForm.strokeCvaSymptomsResolved]
+      : []),
+    complaintForm.patientPlacedOn5150Hold,
+    complaintForm.possibleDrugAlcoholUse,
+    ...(complaintForm.possibleDrugAlcoholUse === 'Yes'
+      ? [complaintForm.drugAlcoholIndications.length > 0 ? 'selected' : '']
+      : []),
+    ...(complaintForm.drugAlcoholIndications.some((item) =>
+      item.toLowerCase().includes('drug'),
+    )
+      ? [complaintForm.suspectedDrug]
+      : []),
+    complaintForm.workRelatedIllnessInjury,
   ];
 }

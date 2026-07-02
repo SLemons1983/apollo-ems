@@ -65,3 +65,28 @@ export type PatientForm = {
   disposition: string;
   dispositionExplanation: string;
 };
+
+export type CodedSelection = {
+  code: string;
+  description: string;
+};
+
+export type ComplaintForm = {
+  primaryImpression: CodedSelection | null;
+  secondaryImpression: CodedSelection | null;
+  emsConditionCode: CodedSelection | null;
+  primarySymptom: CodedSelection | null;
+  otherAssociatedSymptoms: CodedSelection[];
+  symptomsBeganDateTime: string;
+  lastSeenNormalDateTime: string;
+  patientAcuity: string;
+  possibleInjuryTrauma: string;
+  cardiacArrest: string;
+  suspectedStrokeCva: string;
+  strokeCvaSymptomsResolved: string;
+  patientPlacedOn5150Hold: string;
+  possibleDrugAlcoholUse: string;
+  drugAlcoholIndications: string[];
+  suspectedDrug: string;
+  workRelatedIllnessInjury: string;
+};
