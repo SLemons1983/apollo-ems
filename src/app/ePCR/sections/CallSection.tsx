@@ -1,6 +1,7 @@
 'use client';
 
-import { Dispatch, SetStateAction } from 'react';
+import { Dispatch, SetStateAction, useState } from 'react';
+import PCRCard from '../components/PCRCard';
 import type { CallForm } from '../types';
 
 const dispatchedPriorities = [
@@ -79,17 +80,73 @@ export default function CallSection({
   setCallForm,
   updateCallForm,
 }: CallSectionProps) {
+  const [expandedCard, setExpandedCard] = useState('Dispatch Information');
+
+  function toggleCard(cardTitle: string) {
+    setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
+  }
+
+  const dispatchCompletedFields = [
+    callForm.emsResponseNumber,
+    callForm.dispatchedPriority,
+  ].filter(Boolean).length;
+
+  const crewCompletedFields = [
+    callForm.respondingUnitNumber,
+    callForm.pcrDocumentedBy,
+    callForm.respondingCrew,
+  ].filter(Boolean).length;
+
+  const responseCompletedFields = [
+    callForm.dispatchedNatureOfCall,
+    callForm.typeOfServiceRequested,
+    callForm.responseModeToScene,
+  ].filter(Boolean).length;
+
+  const locationRequiredFields = [
+    callForm.incidentLocationType,
+    callForm.incidentLocationType === 'Other'
+      ? callForm.incidentLocationTypeOther
+      : 'not-required',
+    callForm.incidentStreet,
+    callForm.incidentCity,
+    callForm.incidentZip,
+    callForm.numberOfPatientsAtScene,
+    callForm.firstEmsUnitOnScene,
+    callForm.otherAgenciesMode === 'Add'
+      ? callForm.otherAgenciesOnScene
+      : 'not-required',
+    callForm.hazardousHealthExposures,
+    callForm.hazardousHealthExposures === 'Other Exposure'
+      ? callForm.hazardousHealthExposuresOther
+      : 'not-required',
+    callForm.personalProtectiveEquipmentUsed,
+    callForm.personalProtectiveEquipmentUsed === 'Other'
+      ? callForm.personalProtectiveEquipmentOther
+      : 'not-required',
+  ];
+
+  const timesRequiredFields = [
+    callForm.callReceived,
+    callForm.callDispatched,
+    callForm.unitEnRoute,
+    callForm.unitOnScene,
+    callForm.patientContact,
+    callForm.departScene,
+    callForm.arrivedAtDestination,
+    callForm.transferOfCare,
+    callForm.unitBackInService,
+  ];
+
   return (
-                      <div className="space-y-6">
-                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900">
-                              Dispatch Information
-                            </h3>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                              Required
-                            </span>
-                          </div>
+                      <div className="space-y-4">
+                        <PCRCard
+                          title="Dispatch Information"
+                          completedFields={dispatchCompletedFields}
+                          totalFields={2}
+                          expanded={expandedCard === 'Dispatch Information'}
+                          onToggle={() => toggleCard('Dispatch Information')}
+                        >
 
                           <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
@@ -128,17 +185,15 @@ export default function CallSection({
                         </label>
 
                           </div>
-                        </div>
+                        </PCRCard>
 
-                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900">
-                              Crew Information
-                            </h3>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                              Required
-                            </span>
-                          </div>
+                        <PCRCard
+                          title="Crew Information"
+                          completedFields={crewCompletedFields}
+                          totalFields={3}
+                          expanded={expandedCard === 'Crew Information'}
+                          onToggle={() => toggleCard('Crew Information')}
+                        >
 
                           <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
@@ -202,17 +257,15 @@ export default function CallSection({
                         </label>
 
                           </div>
-                        </div>
+                        </PCRCard>
 
-                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900">
-                              Response Information
-                            </h3>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                              Required
-                            </span>
-                          </div>
+                        <PCRCard
+                          title="Response Information"
+                          completedFields={responseCompletedFields}
+                          totalFields={3}
+                          expanded={expandedCard === 'Response Information'}
+                          onToggle={() => toggleCard('Response Information')}
+                        >
 
                           <div className="grid gap-4 md:grid-cols-2">
                         <label className="block md:col-span-2">
@@ -279,17 +332,15 @@ export default function CallSection({
                           </select>
                         </label>
                           </div>
-                        </div>
+                        </PCRCard>
 
-                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900">
-                              Location Information
-                            </h3>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                              Required
-                            </span>
-                          </div>
+                        <PCRCard
+                          title="Location Information"
+                          completedFields={locationRequiredFields.filter(Boolean).length}
+                          totalFields={locationRequiredFields.length}
+                          expanded={expandedCard === 'Location Information'}
+                          onToggle={() => toggleCard('Location Information')}
+                        >
 
                           <div className="grid gap-4 md:grid-cols-2">
                             <label className="block">
@@ -577,17 +628,15 @@ export default function CallSection({
                               </label>
                             )}
                           </div>
-                        </div>
+                        </PCRCard>
 
-                        <div className="rounded-xl border border-slate-300 bg-slate-50 p-5 shadow-sm">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900">
-                              Times
-                            </h3>
-                            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                              Required
-                            </span>
-                          </div>
+                        <PCRCard
+                          title="Times"
+                          completedFields={timesRequiredFields.filter(Boolean).length}
+                          totalFields={timesRequiredFields.length}
+                          expanded={expandedCard === 'Times'}
+                          onToggle={() => toggleCard('Times')}
+                        >
 
                           <div className="grid gap-4 md:grid-cols-3">
                             {[
@@ -622,7 +671,7 @@ export default function CallSection({
                               </label>
                             ))}
                           </div>
-                        </div>
+                        </PCRCard>
                       </div>
   );
 }
