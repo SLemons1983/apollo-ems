@@ -214,7 +214,7 @@ export default function CallSection({
                                   event.target.value.replace(/\D/g, ''),
                                 )
                               }
-                              placeholder="310"
+                              
                               className="w-full rounded-r-lg border border-slate-300 px-3 py-2 text-slate-900"
                             />
                           </div>
@@ -233,7 +233,7 @@ export default function CallSection({
                                 event.target.value,
                               )
                             }
-                            placeholder="Report author name"
+                            
                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                           />
                         </label>
@@ -251,7 +251,7 @@ export default function CallSection({
                                 event.target.value,
                               )
                             }
-                            placeholder="Crew names"
+                            
                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                           />
                         </label>
@@ -281,7 +281,7 @@ export default function CallSection({
                                 event.target.value,
                               )
                             }
-                            placeholder="Dispatched complaint or call nature"
+                            
                             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                           />
                         </label>
@@ -395,7 +395,7 @@ export default function CallSection({
                                 onChange={(event) =>
                                   updateCallForm('incidentStreet', event.target.value)
                                 }
-                                placeholder="123 Main Street"
+                                
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                               />
                             </label>
@@ -413,7 +413,7 @@ export default function CallSection({
                                     event.target.value,
                                   )
                                 }
-                                placeholder="Optional"
+                                
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                               />
                             </label>
@@ -537,7 +537,7 @@ export default function CallSection({
                                       event.target.value,
                                     )
                                   }
-                                  placeholder="Enter agency names..."
+                                  
                                   className="mt-3 min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                                 />
                               )}
@@ -664,7 +664,7 @@ export default function CallSection({
                                       normalizeTimeInput(event.target.value),
                                     )
                                   }
-                                  placeholder="HH:MM"
+                                  
                                   maxLength={5}
                                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
                                 />
