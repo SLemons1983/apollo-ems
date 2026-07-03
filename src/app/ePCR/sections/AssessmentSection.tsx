@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
+import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
 import {
   determineAssessmentMode,
   getAssessmentTasksForContext,
+  type AssessmentStatus,
 } from '../clinical/engine/assessment';
 
 type AssessmentSectionProps = {
@@ -30,6 +33,19 @@ export default function AssessmentSection({
 
   const mode = determineAssessmentMode(context);
   const tasks = getAssessmentTasksForContext(context);
+  const [selectedTaskId, setSelectedTaskId] = useState(
+    tasks[0]?.id ?? '',
+  );
+
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+
+  function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === selectedTaskId) {
+      return 'in-progress';
+    }
+
+    return 'not-started';
+  }
 
   return (
     <div className="space-y-6">
@@ -59,26 +75,48 @@ export default function AssessmentSection({
         </div>
       </div>
 
-      <div className="rounded-xl border bg-white">
-        <div className="border-b px-5 py-4">
-          <h3 className="text-lg font-bold text-slate-900">
-            Assessment Workflow
-          </h3>
+      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <div className="overflow-hidden rounded-xl border bg-white">
+          <div className="border-b px-5 py-4">
+            <h3 className="text-lg font-bold text-slate-900">
+              Assessment Workflow
+            </h3>
+          </div>
+
+          <div className="divide-y">
+            {tasks.map((task) => (
+              <AssessmentWorkflowCard
+                key={task.id}
+                title={task.title}
+                status={getTaskStatus(task.id)}
+                selected={selectedTaskId === task.id}
+                onClick={() => setSelectedTaskId(task.id)}
+              />
+            ))}
+          </div>
         </div>
 
-        <div className="divide-y">
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="flex items-center justify-between gap-4 px-5 py-4"
-            >
-              <span className="font-medium text-slate-800">{task.title}</span>
+        <div className="rounded-xl border bg-white p-5">
+          {selectedTask ? (
+            <>
+              <div className="mb-4">
+                <h3 className="text-xl font-bold text-slate-900">
+                  {selectedTask.title}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Assessment card will be built here.
+                </p>
+              </div>
 
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                Pending
-              </span>
+              <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+                {selectedTask.title} workflow coming next.
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+              Select an assessment workflow to begin.
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
