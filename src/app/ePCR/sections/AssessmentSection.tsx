@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
+import GcsAssessmentCard, {
+  type GcsAssessmentForm,
+} from '../clinical/components/assessment/cards/GcsAssessmentCard';
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
@@ -47,6 +50,11 @@ export default function AssessmentSection({
       lifeThreats: '',
       transportPriority: '',
     });
+  const [gcsAssessment, setGcsAssessment] = useState<GcsAssessmentForm>({
+    eyes: '',
+    verbal: '',
+    motor: '',
+  });
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
@@ -55,6 +63,18 @@ export default function AssessmentSection({
       const completedFields = Object.values(primaryAssessment).filter(Boolean).length;
 
       if (completedFields === Object.keys(primaryAssessment).length) {
+        return 'complete';
+      }
+
+      if (completedFields > 0) {
+        return 'in-progress';
+      }
+    }
+
+    if (taskId === 'neurological-assessment') {
+      const completedFields = Object.values(gcsAssessment).filter(Boolean).length;
+
+      if (completedFields === Object.keys(gcsAssessment).length) {
         return 'complete';
       }
 
@@ -75,6 +95,16 @@ export default function AssessmentSection({
     fieldValue: string,
   ) {
     setPrimaryAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
+  function updateGcsAssessment(
+    field: keyof GcsAssessmentForm,
+    fieldValue: string,
+  ) {
+    setGcsAssessment((current) => ({
       ...current,
       [field]: fieldValue,
     }));
@@ -145,6 +175,11 @@ export default function AssessmentSection({
                 <PrimaryAssessmentCard
                   value={primaryAssessment}
                   onChange={updatePrimaryAssessment}
+                />
+              ) : selectedTask.id === 'neurological-assessment' ? (
+                <GcsAssessmentCard
+                  value={gcsAssessment}
+                  onChange={updateGcsAssessment}
                 />
               ) : (
                 <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
