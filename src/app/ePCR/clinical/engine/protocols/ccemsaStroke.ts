@@ -1,84 +1,57 @@
-import type { AssessmentResult } from './types';
-
-export type StrokeAssessmentInput = {
-  glucose?: number;
-  gaze: boolean;
-  face: boolean;
-  arm: boolean;
-  speech: boolean;
-  lastKnownNormal?: string;
+export type CcemsaGfastInput = {
+  gaze: string;
+  face: string;
+  arms: string;
+  speech: string;
+  lastKnownNormal: string;
+  bloodGlucose: string;
 };
 
-export function evaluateCCEMSAStrokeAssessment(
-  input: StrokeAssessmentInput,
-): AssessmentResult {
+export function calculateCcemsaGfastScore(input: CcemsaGfastInput) {
+  return [
+    input.gaze === 'Abnormal',
+    input.face === 'Abnormal',
+    input.arms === 'Abnormal',
+    input.speech === 'Abnormal',
+  ].filter(Boolean).length;
+}
 
-  const score =
-    Number(input.gaze) +
-    Number(input.face) +
-    Number(input.arm) +
-    Number(input.speech);
+export function getCcemsaGfastConsiderations(input: CcemsaGfastInput) {
+  const score = calculateCcemsaGfastScore(input);
+  const glucose = Number(input.bloodGlucose);
+  const considerations: string[] = [];
 
-  const result: AssessmentResult = {
-    findings: [
-      {
-        id: 'gfast-score',
-        category: 'Stroke',
-        label: 'GFAST Score',
-        value: score,
-      },
-    ],
-    considerations: [],
-    recommendations: [],
-  };
-
-  if (
-    typeof input.glucose === 'number' &&
-    input.glucose < 80
-  ) {
-    result.considerations.push({
-      id: 'glucose',
-      severity: 'warning',
-      title: 'Hypoglycemia Consideration',
-      description:
-        'CCEMSA recommends correcting hypoglycemia and reassessing before relying on the GFAST assessment.',
-    });
+  if (!input.bloodGlucose) {
+    considerations.push(
+      'Blood glucose should be documented before relying on GFAST interpretation.',
+    );
+  } else if (!Number.isNaN(glucose) && glucose < 80) {
+    considerations.push(
+      'Blood glucose is below 80. CCEMSA Policy 547 notes glucose should be corrected and the patient reassessed before relying on GFAST.',
+    );
   }
 
-  if (score > 0) {
-    result.considerations.push({
-      id: 'possible-stroke',
-      severity: 'critical',
-      title: 'Possible Acute Stroke',
-      description:
-        'Positive GFAST assessment. Continue stroke evaluation.',
-    });
+  if (!input.lastKnownNormal) {
+    considerations.push('Document time last seen normal / last known well.');
   }
 
-  if (score <= 3) {
-    result.recommendations.push({
-      id: 'destination-primary',
-      protocol: 'CCEMSA Policy 547',
-      recommendation:
-        'Consider transport to the closest Primary Stroke Center.',
-    });
+  if (score === 0) {
+    considerations.push(
+      'GFAST score is 0. If clinical suspicion remains, transport should still follow provider assessment and protocol.',
+    );
+  } else if (score <= 3) {
+    considerations.push(
+      'GFAST score is 1–3. CCEMSA Policy 547 indicates transport to the closest stroke center.',
+    );
+  } else {
+    considerations.push(
+      'GFAST score is 4. CCEMSA Policy 547 indicates considering a Comprehensive Stroke Center if within 45 minutes and last known normal is under 24 hours.',
+    );
   }
 
-  if (score === 4) {
-    result.recommendations.push({
-      id: 'destination-comprehensive',
-      protocol: 'CCEMSA Policy 547',
-      recommendation:
-        'Consider Comprehensive Stroke Center if within 45 minutes and clinically appropriate.',
-    });
-  }
+  considerations.push(
+    'Contact Base Hospital / Medical Control if destination, protocol interpretation, or clinical guidance is uncertain.',
+  );
 
-  result.recommendations.push({
-    id: 'base-contact',
-    protocol: 'Apollo Clinical Intelligence',
-    recommendation:
-      'Contact Base Hospital whenever clinical guidance or destination clarification is needed.',
-  });
-
-  return result;
+  return considerations;
 }

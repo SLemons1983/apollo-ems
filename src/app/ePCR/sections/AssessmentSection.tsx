@@ -64,6 +64,7 @@ export default function AssessmentSection({
     arms: '',
     speech: '',
     time: '',
+    bloodGlucose: '',
   });
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
