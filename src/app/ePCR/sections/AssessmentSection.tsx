@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
+import PrimaryAssessmentCard, {
+  type PrimaryAssessmentForm,
+} from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
 import {
   determineAssessmentMode,
   getAssessmentTasksForContext,
@@ -33,18 +36,48 @@ export default function AssessmentSection({
 
   const mode = determineAssessmentMode(context);
   const tasks = getAssessmentTasksForContext(context);
-  const [selectedTaskId, setSelectedTaskId] = useState(
-    tasks[0]?.id ?? '',
-  );
+  const [selectedTaskId, setSelectedTaskId] = useState(tasks[0]?.id ?? '');
+  const [primaryAssessment, setPrimaryAssessment] =
+    useState<PrimaryAssessmentForm>({
+      generalImpression: '',
+      levelOfConsciousness: '',
+      airway: '',
+      breathing: '',
+      circulation: '',
+      lifeThreats: '',
+      transportPriority: '',
+    });
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === 'primary-assessment') {
+      const completedFields = Object.values(primaryAssessment).filter(Boolean).length;
+
+      if (completedFields === Object.keys(primaryAssessment).length) {
+        return 'complete';
+      }
+
+      if (completedFields > 0) {
+        return 'in-progress';
+      }
+    }
+
     if (taskId === selectedTaskId) {
       return 'in-progress';
     }
 
     return 'not-started';
+  }
+
+  function updatePrimaryAssessment(
+    field: keyof PrimaryAssessmentForm,
+    fieldValue: string,
+  ) {
+    setPrimaryAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
   }
 
   return (
@@ -108,9 +141,16 @@ export default function AssessmentSection({
                 </p>
               </div>
 
-              <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
-                {selectedTask.title} workflow coming next.
-              </div>
+              {selectedTask.id === 'primary-assessment' ? (
+                <PrimaryAssessmentCard
+                  value={primaryAssessment}
+                  onChange={updatePrimaryAssessment}
+                />
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+                  {selectedTask.title} workflow coming next.
+                </div>
+              )}
             </>
           ) : (
             <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
