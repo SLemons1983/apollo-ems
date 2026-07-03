@@ -267,6 +267,7 @@ export default function EPCRClient() {
     {
       title: 'Complaint',
       completedFields: [
+        complaintForm.clinicalCategory,
         complaintForm.primaryImpression,
         complaintForm.secondaryImpression,
         complaintForm.emsConditionCode,
@@ -275,7 +276,7 @@ export default function EPCRClient() {
         complaintForm.symptomsBeganDateTime,
         complaintForm.lastSeenNormalDateTime,
       ].filter(Boolean).length,
-      totalFields: 7,
+      totalFields: 8,
     },
     {
       title: 'Circumstances',

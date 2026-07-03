@@ -211,6 +211,7 @@ export function getPatientRequiredFields(patientForm: PatientForm) {
 
 export function createDefaultComplaintForm(): ComplaintForm {
   return {
+    clinicalCategory: '',
     primaryImpression: null,
     secondaryImpression: null,
     emsConditionCode: null,
@@ -233,6 +234,7 @@ export function createDefaultComplaintForm(): ComplaintForm {
 
 export function getComplaintRequiredFields(complaintForm: ComplaintForm) {
   return [
+    complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
     complaintForm.emsConditionCode,

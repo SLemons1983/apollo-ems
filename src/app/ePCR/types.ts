@@ -72,6 +72,7 @@ export type CodedSelection = {
 };
 
 export type ComplaintForm = {
+  clinicalCategory: string;
   primaryImpression: CodedSelection | null;
   secondaryImpression: CodedSelection | null;
   emsConditionCode: CodedSelection | null;

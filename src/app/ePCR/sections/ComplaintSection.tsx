@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import CodedSearchPicker from '../components/CodedSearchPicker';
 import PCRCard from '../components/PCRCard';
+import ClinicalCategoryPicker from '../clinical/components/ClinicalCategoryPicker';
+import ClinicalCombobox from '../clinical/components/ClinicalCombobox';
 import type { CodedSelection, ComplaintForm } from '../types';
 import { commonDrugOptions } from '../reference/drugs';
-import { emsIcd10Options } from '../reference/icd10';
 
 const acuityOptions = [
   'Non STAT Medical',
@@ -72,6 +72,7 @@ export default function ComplaintSection({
   }
 
   const complaintFields = [
+    complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
     complaintForm.emsConditionCode,
@@ -128,42 +129,61 @@ export default function ComplaintSection({
         onToggle={() => toggleCard('Complaint')}
       >
         <div className="grid gap-5 md:grid-cols-2">
-          <CodedSearchPicker
-            label="Primary Impression"
-            value={complaintForm.primaryImpression}
-            options={emsIcd10Options}
-            onSelect={(value) => updateComplaintForm('primaryImpression', value)}
+          <ClinicalCategoryPicker
+            label="Clinical Category"
+            listType="impression"
+            value={complaintForm.clinicalCategory}
+            onChange={(value) => {
+              updateComplaintForm('clinicalCategory', value);
+              updateComplaintForm('primaryImpression', null);
+              updateComplaintForm('secondaryImpression', null);
+              updateComplaintForm('emsConditionCode', null);
+              updateComplaintForm('primarySymptom', null);
+              updateComplaintForm('otherAssociatedSymptoms', []);
+            }}
           />
 
-          <CodedSearchPicker
+          <ClinicalCombobox
+            label="Primary Impression"
+            listType="impression"
+            category={complaintForm.clinicalCategory}
+            value={complaintForm.primaryImpression}
+            onChange={(value) => updateComplaintForm('primaryImpression', value)}
+          />
+
+          <ClinicalCombobox
             label="Secondary Impression"
+            listType="impression"
+            category={complaintForm.clinicalCategory}
             value={complaintForm.secondaryImpression}
-            options={emsIcd10Options}
-            onSelect={(value) =>
+            onChange={(value) =>
               updateComplaintForm('secondaryImpression', value)
             }
           />
 
-          <CodedSearchPicker
+          <ClinicalCombobox
             label="EMS Condition Code"
+            listType="conditionCode"
+            category={complaintForm.clinicalCategory}
             value={complaintForm.emsConditionCode}
-            options={emsIcd10Options}
-            onSelect={(value) => updateComplaintForm('emsConditionCode', value)}
+            onChange={(value) => updateComplaintForm('emsConditionCode', value)}
           />
 
-          <CodedSearchPicker
+          <ClinicalCombobox
             label="Primary Symptom"
+            listType="symptom"
+            category={complaintForm.clinicalCategory}
             value={complaintForm.primarySymptom}
-            options={emsIcd10Options}
-            onSelect={(value) => updateComplaintForm('primarySymptom', value)}
+            onChange={(value) => updateComplaintForm('primarySymptom', value)}
           />
 
           <div className="md:col-span-2">
-            <CodedSearchPicker
+            <ClinicalCombobox
               label="Other Associated Symptoms"
+              listType="symptom"
+              category={complaintForm.clinicalCategory}
               value={null}
-              options={emsIcd10Options}
-              onSelect={(value) => {
+              onChange={(value) => {
                 if (!value) return;
                 updateComplaintForm(
                   'otherAssociatedSymptoms',
