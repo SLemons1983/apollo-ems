@@ -33,9 +33,17 @@ export const assessmentTasks: AssessmentTask[] = [
   },
   {
     id: 'neurological-assessment',
-    title: 'Neurological Assessment',
-    mode: ['medical', 'stroke', 'trauma'],
-    triggeredBy: { categories: ['Neurological'], suspectedStroke: true },
+    title: 'Neurological Assessment / GCS',
+    mode: [
+      'medical',
+      'trauma',
+      'stroke',
+      'cardiac-arrest',
+      'behavioral',
+      'ob',
+      'pediatric',
+    ],
+    alwaysShow: true,
   },
   {
     id: 'gfast-stroke-assessment',
