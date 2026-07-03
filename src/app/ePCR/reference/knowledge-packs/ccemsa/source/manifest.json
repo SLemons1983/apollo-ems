@@ -1,0 +1,14 @@
+{
+  "downloadedAt": "2026-07-03T23:13:24.703Z",
+  "count": 1,
+  "files": [
+    {
+      "id": "547",
+      "title": "Patient Destination",
+      "fileName": "547-patient-destination.pdf",
+      "url": "https://www.fresnocountyca.gov/files/assets/county/v/2/public-health/emergency-services/ccems-policies-and-procedures/541-599-operations/547-h.pdf",
+      "localPdf": "src/app/ePCR/reference/knowledge-packs/ccemsa/source/547-patient-destination.pdf",
+      "sizeBytes": 688994
+    }
+  ]
+}
