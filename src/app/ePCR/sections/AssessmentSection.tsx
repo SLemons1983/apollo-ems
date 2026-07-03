@@ -5,6 +5,9 @@ import AssessmentWorkflowCard from '../clinical/components/assessment/Assessment
 import GcsAssessmentCard, {
   type GcsAssessmentForm,
 } from '../clinical/components/assessment/cards/GcsAssessmentCard';
+import GfastAssessmentCard, {
+  type GfastAssessmentForm,
+} from '../clinical/components/assessment/cards/GfastAssessmentCard';
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
@@ -55,6 +58,13 @@ export default function AssessmentSection({
     verbal: '',
     motor: '',
   });
+  const [gfastAssessment, setGfastAssessment] = useState<GfastAssessmentForm>({
+    gaze: '',
+    face: '',
+    arms: '',
+    speech: '',
+    time: '',
+  });
 
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
@@ -75,6 +85,18 @@ export default function AssessmentSection({
       const completedFields = Object.values(gcsAssessment).filter(Boolean).length;
 
       if (completedFields === Object.keys(gcsAssessment).length) {
+        return 'complete';
+      }
+
+      if (completedFields > 0) {
+        return 'in-progress';
+      }
+    }
+
+    if (taskId === 'gfast-stroke-assessment') {
+      const completedFields = Object.values(gfastAssessment).filter(Boolean).length;
+
+      if (completedFields === Object.keys(gfastAssessment).length) {
         return 'complete';
       }
 
@@ -105,6 +127,16 @@ export default function AssessmentSection({
     fieldValue: string,
   ) {
     setGcsAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
+  function updateGfastAssessment(
+    field: keyof GfastAssessmentForm,
+    fieldValue: string,
+  ) {
+    setGfastAssessment((current) => ({
       ...current,
       [field]: fieldValue,
     }));
@@ -180,6 +212,11 @@ export default function AssessmentSection({
                 <GcsAssessmentCard
                   value={gcsAssessment}
                   onChange={updateGcsAssessment}
+                />
+              ) : selectedTask.id === 'gfast-stroke-assessment' ? (
+                <GfastAssessmentCard
+                  value={gfastAssessment}
+                  onChange={updateGfastAssessment}
                 />
               ) : (
                 <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
