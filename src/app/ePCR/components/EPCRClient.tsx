@@ -3,6 +3,7 @@
 import { ChangeEvent, useMemo, useRef, useState } from 'react';
 import PCRProgress from './PCRProgress';
 import PCRSection from './PCRSection';
+import AssessmentSection from '../sections/AssessmentSection';
 import CallSection from '../sections/CallSection';
 import ComplaintSection from '../sections/ComplaintSection';
 import PatientSection from '../sections/PatientSection';
@@ -153,7 +154,7 @@ export default function EPCRClient() {
         patientForm.medicationAllergies,
         patientForm.environmentalAllergies,
       ].filter(Boolean).length,
-      totalFields: 2,
+      totalFields: 3,
     },
     {
       title: 'Patient Belongings',
@@ -193,9 +194,10 @@ export default function EPCRClient() {
       title: 'Dispatch Information',
       completedFields: [
         callForm.emsResponseNumber,
+        callForm.emsIncidentNumber,
         callForm.dispatchedPriority,
       ].filter(Boolean).length,
-      totalFields: 2,
+      totalFields: 3,
     },
     {
       title: 'Crew Information',
@@ -533,6 +535,19 @@ export default function EPCRClient() {
                   <ComplaintSection
                     complaintForm={complaintForm}
                     updateComplaintForm={updateComplaintForm}
+                  />
+                ) : section === 'Assessment' ? (
+                  <AssessmentSection
+                    clinicalCategory={complaintForm.clinicalCategory}
+                    suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
+                    possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
+                    behavioralHold={
+                      complaintForm.patientPlacedOn5150Hold === 'Yes'
+                    }
+                    cardiacArrest={
+                      complaintForm.cardiacArrest !== '' &&
+                      complaintForm.cardiacArrest !== 'No'
+                    }
                   />
                 ) : (
                   <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
