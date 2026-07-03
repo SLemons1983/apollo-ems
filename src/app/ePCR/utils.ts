@@ -16,6 +16,7 @@ export function createEmsResponseNumber() {
 export function createDefaultCallForm(): CallForm {
   return {
     emsResponseNumber: createEmsResponseNumber(),
+    emsIncidentNumber: '',
     dispatchedPriority: '',
     respondingUnitNumber: '',
     respondingCrew: '',
@@ -52,6 +53,7 @@ export function createDefaultCallForm(): CallForm {
 export function getCallRequiredFields(callForm: CallForm) {
   return [
     callForm.emsResponseNumber,
+    callForm.emsIncidentNumber,
     callForm.dispatchedPriority,
     callForm.respondingUnitNumber,
     callForm.respondingCrew,

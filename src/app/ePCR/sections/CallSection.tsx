@@ -100,6 +100,7 @@ export default function CallSection({
 
   const dispatchCompletedFields = [
     callForm.emsResponseNumber,
+    callForm.emsIncidentNumber,
     callForm.dispatchedPriority,
   ].filter(Boolean).length;
 
@@ -155,7 +156,7 @@ export default function CallSection({
                         <PCRCard
                           title="Dispatch Information"
                           completedFields={dispatchCompletedFields}
-                          totalFields={2}
+                          totalFields={3}
                           expanded={expandedCard === 'Dispatch Information'}
                           onToggle={() => toggleCard('Dispatch Information')}
                         >
@@ -163,13 +164,30 @@ export default function CallSection({
                           <div className="grid gap-4 md:grid-cols-2">
                         <label className="block">
                           <span className="mb-1 block text-sm font-semibold text-slate-700">
-                            EMS Response Number
+                            ApolloEMS Reference Number
                           </span>
                           <input
                             type="text"
                             value={callForm.emsResponseNumber}
                             readOnly
                             className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 shadow-sm"
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-slate-700">
+                            EMS Incident Number
+                          </span>
+                          <input
+                            type="text"
+                            value={callForm.emsIncidentNumber}
+                            onChange={(event) =>
+                              updateCallForm(
+                                'emsIncidentNumber',
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
                           />
                         </label>
 

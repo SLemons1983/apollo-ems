@@ -1,5 +1,6 @@
 export type CallForm = {
   emsResponseNumber: string;
+  emsIncidentNumber: string;
   dispatchedPriority: string;
   respondingUnitNumber: string;
   respondingCrew: string;
