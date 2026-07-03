@@ -36,7 +36,7 @@ export default function PCRCard({
         : 'bg-amber-100 text-amber-800';
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50 shadow-sm">
+    <div className="overflow-visible rounded-xl border border-slate-300 bg-slate-50 shadow-sm">
       <button
         type="button"
         onClick={onToggle}
@@ -74,7 +74,7 @@ export default function PCRCard({
         </div>
       </button>
 
-      {expanded && <div className="border-t p-5">{children}</div>}
+      {expanded && <div className="border-t p-5 overflow-visible">{children}</div>}
     </div>
   );
 }
