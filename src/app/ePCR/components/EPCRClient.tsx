@@ -538,6 +538,7 @@ export default function EPCRClient() {
                   />
                 ) : section === 'Assessment' ? (
                   <AssessmentSection
+                    patientForm={patientForm}
                     clinicalCategory={complaintForm.clinicalCategory}
                     suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
                     possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}

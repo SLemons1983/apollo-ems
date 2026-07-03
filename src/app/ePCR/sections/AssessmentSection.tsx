@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
+import ClinicalHistoryCard, {
+  type ClinicalHistoryForm,
+} from '../clinical/components/assessment/cards/ClinicalHistoryCard';
 import GcsAssessmentCard, {
   type GcsAssessmentForm,
 } from '../clinical/components/assessment/cards/GcsAssessmentCard';
@@ -17,7 +20,10 @@ import {
   type AssessmentStatus,
 } from '../clinical/engine/assessment';
 
+import type { PatientForm } from '../types';
+
 type AssessmentSectionProps = {
+  patientForm: PatientForm;
   clinicalCategory: string;
   suspectedStroke: boolean;
   possibleTrauma: boolean;
@@ -26,6 +32,7 @@ type AssessmentSectionProps = {
 };
 
 export default function AssessmentSection({
+  patientForm,
   clinicalCategory,
   suspectedStroke,
   possibleTrauma,
@@ -43,6 +50,16 @@ export default function AssessmentSection({
   const mode = determineAssessmentMode(context);
   const tasks = getAssessmentTasksForContext(context);
   const [selectedTaskId, setSelectedTaskId] = useState(tasks[0]?.id ?? '');
+  const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistoryForm>({
+    onset: '',
+    provocation: '',
+    quality: '',
+    radiation: '',
+    severity: '',
+    time: '',
+    associatedSymptoms: '',
+  });
+
   const [primaryAssessment, setPrimaryAssessment] =
     useState<PrimaryAssessmentForm>({
       generalImpression: '',
@@ -70,6 +87,18 @@ export default function AssessmentSection({
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === 'history-taking') {
+      const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
+
+      if (completedFields === Object.keys(clinicalHistory).length) {
+        return 'complete';
+      }
+
+      if (completedFields > 0) {
+        return 'in-progress';
+      }
+    }
+
     if (taskId === 'primary-assessment') {
       const completedFields = Object.values(primaryAssessment).filter(Boolean).length;
 
@@ -111,6 +140,16 @@ export default function AssessmentSection({
     }
 
     return 'not-started';
+  }
+
+  function updateClinicalHistory(
+    field: keyof ClinicalHistoryForm,
+    fieldValue: string,
+  ) {
+    setClinicalHistory((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
   }
 
   function updatePrimaryAssessment(
@@ -204,7 +243,13 @@ export default function AssessmentSection({
                 </p>
               </div>
 
-              {selectedTask.id === 'primary-assessment' ? (
+              {selectedTask.id === 'history-taking' ? (
+                <ClinicalHistoryCard
+                  value={clinicalHistory}
+                  patientForm={patientForm}
+                  onChange={updateClinicalHistory}
+                />
+              ) : selectedTask.id === 'primary-assessment' ? (
                 <PrimaryAssessmentCard
                   value={primaryAssessment}
                   onChange={updatePrimaryAssessment}
