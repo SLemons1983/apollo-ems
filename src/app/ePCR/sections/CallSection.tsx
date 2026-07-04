@@ -2,7 +2,7 @@
 
 import { Dispatch, SetStateAction, useState } from 'react';
 import PCRCard from '../components/PCRCard';
-import type { CallForm } from '../types';
+import type { CallForm, CrewMember } from '../types';
 
 const dispatchedPriorities = [
   '1 - Immediate Response - Life Threatening',
@@ -59,6 +59,18 @@ const ppeOptions = [
   'Other',
 ];
 
+const crewCertificationOptions: CrewMember['certification'][] = [
+  'EMT',
+  'Paramedic',
+  'Trainee/Student',
+];
+
+const crewRoleOptions: CrewMember['role'][] = [
+  'Primary Care Giver',
+  'Secondary Care Giver',
+  'Observer-Non Care Giver',
+];
+
 type CallSectionProps = {
   callForm: CallForm;
   setCallForm: Dispatch<SetStateAction<CallForm>>;
@@ -87,6 +99,16 @@ function togglePpeSelection(
   updateCallForm('personalProtectiveEquipmentUsed', nextSelection);
 }
 
+function createCrewMember(): CrewMember {
+  return {
+    id: globalThis.crypto?.randomUUID?.() ?? `crew-${Date.now()}`,
+    name: '',
+    certification: 'EMT',
+    role: 'Secondary Care Giver',
+    isDocumentingPcr: false,
+  };
+}
+
 export default function CallSection({
   callForm,
   setCallForm,
@@ -98,6 +120,94 @@ export default function CallSection({
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
   }
 
+  function syncLegacyCrewFields(crewMembers: CrewMember[]) {
+    const documentingMember =
+      crewMembers.find((member) => member.isDocumentingPcr) ?? crewMembers[0];
+
+    return {
+      pcrDocumentedBy: documentingMember?.name ?? '',
+      respondingCrew: crewMembers
+        .map((member) => member.name)
+        .filter(Boolean)
+        .join(', '),
+    };
+  }
+
+  function updateCrewMember(
+    memberId: string,
+    updates: Partial<Omit<CrewMember, 'id' | 'isDocumentingPcr'>>,
+  ) {
+    setCallForm((currentForm) => {
+      const crewMembers = currentForm.crewMembers.map((member) =>
+        member.id === memberId ? { ...member, ...updates } : member,
+      );
+
+      return {
+        ...currentForm,
+        ...syncLegacyCrewFields(crewMembers),
+        crewMembers,
+      };
+    });
+  }
+
+  function setDocumentingCrewMember(memberId: string) {
+    setCallForm((currentForm) => {
+      const crewMembers = currentForm.crewMembers.map((member) => ({
+        ...member,
+        isDocumentingPcr: member.id === memberId,
+      }));
+
+      return {
+        ...currentForm,
+        ...syncLegacyCrewFields(crewMembers),
+        crewMembers,
+      };
+    });
+  }
+
+  function addCrewMember() {
+    setCallForm((currentForm) => {
+      const crewMembers = [...currentForm.crewMembers, createCrewMember()];
+
+      return {
+        ...currentForm,
+        ...syncLegacyCrewFields(crewMembers),
+        crewMembers,
+      };
+    });
+  }
+
+  function removeCrewMember(memberId: string) {
+    setCallForm((currentForm) => {
+      const remainingCrewMembers = currentForm.crewMembers.filter(
+        (member) => member.id !== memberId,
+      );
+      const crewMembers: CrewMember[] =
+        remainingCrewMembers.length > 0
+          ? remainingCrewMembers
+          : [
+              {
+                ...createCrewMember(),
+                role: 'Primary Care Giver',
+              },
+            ];
+      const normalizedCrewMembers = crewMembers.some(
+        (member) => member.isDocumentingPcr,
+      )
+        ? crewMembers
+        : crewMembers.map((member, index) => ({
+            ...member,
+            isDocumentingPcr: index === 0,
+          }));
+
+      return {
+        ...currentForm,
+        ...syncLegacyCrewFields(normalizedCrewMembers),
+        crewMembers: normalizedCrewMembers,
+      };
+    });
+  }
+
   const dispatchCompletedFields = [
     callForm.emsResponseNumber,
     callForm.emsIncidentNumber,
@@ -106,8 +216,15 @@ export default function CallSection({
 
   const crewCompletedFields = [
     callForm.respondingUnitNumber,
-    callForm.pcrDocumentedBy,
-    callForm.respondingCrew,
+    callForm.crewMembers.length > 0 &&
+    callForm.crewMembers.every(
+      (member) => member.name && member.certification && member.role,
+    )
+      ? 'crew-complete'
+      : '',
+    callForm.crewMembers.some((member) => member.isDocumentingPcr)
+      ? 'documentor-selected'
+      : '',
   ].filter(Boolean).length;
 
   const responseCompletedFields = [
@@ -250,41 +367,118 @@ export default function CallSection({
                           </div>
                         </label>
 
-                        <label className="block">
-                          <span className="mb-1 block text-sm font-semibold text-slate-700">
-                            PCR Documented By
-                          </span>
-                          <input
-                            type="text"
-                            value={callForm.pcrDocumentedBy}
-                            onChange={(event) =>
-                              updateCallForm(
-                                'pcrDocumentedBy',
-                                event.target.value,
-                              )
-                            }
-                            
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-                          />
-                        </label>
+                        <div className="block md:col-span-2">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <span className="block text-sm font-semibold text-slate-700">
+                              Crew Members
+                            </span>
+                            <button
+                              type="button"
+                              onClick={addCrewMember}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                            >
+                              Add Crew Member
+                            </button>
+                          </div>
 
-                        <label className="block md:col-span-2">
-                          <span className="mb-1 block text-sm font-semibold text-slate-700">
-                            Responding Crew
-                          </span>
-                          <input
-                            type="text"
-                            value={callForm.respondingCrew}
-                            onChange={(event) =>
-                              updateCallForm(
-                                'respondingCrew',
-                                event.target.value,
-                              )
-                            }
-                            
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-                          />
-                        </label>
+                          <div className="space-y-4">
+                            {callForm.crewMembers.map((member, index) => (
+                              <div
+                                key={member.id}
+                                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                              >
+                                <div className="mb-3 flex items-center justify-between gap-3">
+                                  <div className="text-sm font-bold text-slate-800">
+                                    Crew Member {index + 1}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCrewMember(member.id)}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-100"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+
+                                <div className="grid gap-4 md:grid-cols-3">
+                                  <label className="block md:col-span-3">
+                                    <span className="mb-1 block text-sm font-semibold text-slate-700">
+                                      Name
+                                    </span>
+                                    <input
+                                      type="text"
+                                      value={member.name}
+                                      onChange={(event) =>
+                                        updateCrewMember(member.id, {
+                                          name: event.target.value,
+                                        })
+                                      }
+                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+                                    />
+                                  </label>
+
+                                  <label className="block">
+                                    <span className="mb-1 block text-sm font-semibold text-slate-700">
+                                      Certification
+                                    </span>
+                                    <select
+                                      value={member.certification}
+                                      onChange={(event) =>
+                                        updateCrewMember(member.id, {
+                                          certification: event.target
+                                            .value as CrewMember['certification'],
+                                        })
+                                      }
+                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+                                    >
+                                      {crewCertificationOptions.map((option) => (
+                                        <option key={option} value={option}>
+                                          {option}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <label className="block md:col-span-2">
+                                    <span className="mb-1 block text-sm font-semibold text-slate-700">
+                                      Role
+                                    </span>
+                                    <select
+                                      value={member.role}
+                                      onChange={(event) =>
+                                        updateCrewMember(member.id, {
+                                          role: event.target
+                                            .value as CrewMember['role'],
+                                        })
+                                      }
+                                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+                                    >
+                                      {crewRoleOptions.map((option) => (
+                                        <option key={option} value={option}>
+                                          {option}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+
+                                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 md:col-span-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={member.isDocumentingPcr}
+                                      onChange={() =>
+                                        setDocumentingCrewMember(member.id)
+                                      }
+                                      className="h-4 w-4 rounded border-slate-300"
+                                    />
+                                    <span className="text-sm font-semibold text-slate-700">
+                                      Documenting PCR
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
                           </div>
                         </PCRCard>
