@@ -23,9 +23,16 @@ type TraumaFindingKey =
   | 'lacerations'
   | 'swelling';
 
+type TraumaCmsAssessment = {
+  circulation: string;
+  motor: string;
+  sensation: string;
+};
+
 type TraumaRegionAssessment = {
   selected: boolean;
   findings: Record<TraumaFindingKey, boolean>;
+  cms: TraumaCmsAssessment;
 };
 
 type TraumaAssessmentForm = {
@@ -39,6 +46,11 @@ type TraumaAssessmentCardProps = {
     region: TraumaRegionKey,
     finding: TraumaFindingKey,
     value: boolean,
+  ) => void;
+  onCmsChange: (
+    region: TraumaRegionKey,
+    field: keyof TraumaCmsAssessment,
+    value: string,
   ) => void;
 };
 
@@ -67,14 +79,48 @@ const traumaFindings: { field: TraumaFindingKey; label: string }[] = [
   { field: 'swelling', label: 'Swelling' },
 ];
 
+const extremityRegions: TraumaRegionKey[] = [
+  'rightArm',
+  'leftArm',
+  'rightLeg',
+  'leftLeg',
+];
+
+const cmsGroups: {
+  field: keyof TraumaCmsAssessment;
+  label: string;
+  options: string[];
+}[] = [
+  {
+    field: 'circulation',
+    label: 'Circulation',
+    options: ['Normal', 'Decreased', 'Absent'],
+  },
+  {
+    field: 'motor',
+    label: 'Motor',
+    options: ['Normal', 'Weak', 'Absent'],
+  },
+  {
+    field: 'sensation',
+    label: 'Sensation',
+    options: ['Intact', 'Decreased', 'Absent'],
+  },
+];
+
 function getRegionFindingCount(region: TraumaRegionAssessment) {
   return Object.values(region.findings).filter(Boolean).length;
+}
+
+function getRegionCmsCount(region: TraumaRegionAssessment) {
+  return Object.values(region.cms).filter(Boolean).length;
 }
 
 export default function TraumaAssessmentCard({
   value,
   onRegionChange,
   onFindingChange,
+  onCmsChange,
 }: TraumaAssessmentCardProps) {
   const selectedRegions = traumaRegions.filter(
     (region) => value.regions[region.field].selected,
@@ -82,6 +128,11 @@ export default function TraumaAssessmentCard({
 
   const totalFindings = selectedRegions.reduce(
     (total, region) => total + getRegionFindingCount(value.regions[region.field]),
+    0,
+  );
+
+  const totalCmsFields = selectedRegions.reduce(
+    (total, region) => total + getRegionCmsCount(value.regions[region.field]),
     0,
   );
 
@@ -106,6 +157,7 @@ export default function TraumaAssessmentCard({
           {traumaRegions.map((region) => {
             const selected = value.regions[region.field].selected;
             const findingCount = getRegionFindingCount(value.regions[region.field]);
+            const cmsCount = getRegionCmsCount(value.regions[region.field]);
 
             return (
               <button
@@ -121,9 +173,10 @@ export default function TraumaAssessmentCard({
                 <span className="block">
                   {selected ? `✓ ${region.label}` : region.label}
                 </span>
-                {findingCount > 0 && (
+                {(findingCount > 0 || cmsCount > 0) && (
                   <span className="mt-1 block text-xs opacity-80">
-                    {findingCount} finding{findingCount === 1 ? '' : 's'}
+                    {findingCount} finding{findingCount === 1 ? '' : 's'} ·{' '}
+                    {cmsCount} CMS
                   </span>
                 )}
               </button>
@@ -177,6 +230,57 @@ export default function TraumaAssessmentCard({
                     );
                   })}
                 </div>
+
+                {extremityRegions.includes(region.field) && (
+                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3">
+                      <h5 className="text-sm font-black uppercase tracking-wide text-slate-700">
+                        Extremity CMS
+                      </h5>
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        Document circulation, motor, and sensation for this
+                        extremity when clinically appropriate.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      {cmsGroups.map((group) => (
+                        <div key={group.field}>
+                          <h6 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+                            {group.label}
+                          </h6>
+
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            {group.options.map((option) => {
+                              const selected = regionValue.cms[group.field] === option;
+
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() =>
+                                    onCmsChange(
+                                      region.field,
+                                      group.field,
+                                      selected ? '' : option,
+                                    )
+                                  }
+                                  className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                                    selected
+                                      ? 'border-slate-900 bg-slate-900 text-white'
+                                      : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {selected ? `✓ ${option}` : option}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -189,7 +293,7 @@ export default function TraumaAssessmentCard({
 
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
         Regions selected: {selectedRegions.length} · Findings documented:{' '}
-        {totalFindings}
+        {totalFindings} · CMS fields documented: {totalCmsFields}
       </div>
     </div>
   );
@@ -197,6 +301,7 @@ export default function TraumaAssessmentCard({
 
 export type {
   TraumaAssessmentForm,
+  TraumaCmsAssessment,
   TraumaFindingKey,
   TraumaRegionAssessment,
   TraumaRegionKey,

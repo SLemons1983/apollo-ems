@@ -27,6 +27,7 @@ import PrimaryAssessmentCard, {
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
 import TraumaAssessmentCard, {
   type TraumaAssessmentForm,
+  type TraumaCmsAssessment,
   type TraumaFindingKey,
   type TraumaRegionKey,
 } from '../clinical/components/assessment/cards/TraumaAssessmentCard';
@@ -132,151 +133,80 @@ export default function AssessmentSection({
     bloodGlucose: '',
   });
 
+  const emptyTraumaFindings = {
+    deformity: false,
+    contusions: false,
+    abrasions: false,
+    puncturesPenetrations: false,
+    burns: false,
+    tenderness: false,
+    lacerations: false,
+    swelling: false,
+  };
+
+  const emptyTraumaCms: TraumaCmsAssessment = {
+    circulation: '',
+    motor: '',
+    sensation: '',
+  };
+
   const [traumaAssessment, setTraumaAssessment] =
     useState<TraumaAssessmentForm>({
       regions: {
         head: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         face: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         neck: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         chest: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         abdomen: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         pelvis: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         back: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         rightArm: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         leftArm: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         rightLeg: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
         leftLeg: {
           selected: false,
-          findings: {
-            deformity: false,
-            contusions: false,
-            abrasions: false,
-            puncturesPenetrations: false,
-            burns: false,
-            tenderness: false,
-            lacerations: false,
-            swelling: false,
-          },
+          findings: { ...emptyTraumaFindings },
+          cms: { ...emptyTraumaCms },
         },
       },
     });
@@ -340,9 +270,14 @@ export default function AssessmentSection({
           total + Object.values(region.findings).filter(Boolean).length,
         0,
       );
+      const completedCms = selectedRegions.reduce(
+        (total, region) =>
+          total + Object.values(region.cms).filter(Boolean).length,
+        0,
+      );
 
       return {
-        completed: selectedRegions.length + completedFindings,
+        completed: selectedRegions.length + completedFindings + completedCms,
         total: Object.keys(traumaAssessment.regions).length,
       };
     }
@@ -450,6 +385,26 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateTraumaCms(
+    region: TraumaRegionKey,
+    field: keyof TraumaCmsAssessment,
+    fieldValue: string,
+  ) {
+    setTraumaAssessment((current) => ({
+      ...current,
+      regions: {
+        ...current.regions,
+        [region]: {
+          ...current.regions[region],
+          cms: {
+            ...current.regions[region].cms,
+            [field]: fieldValue,
+          },
+        },
+      },
+    }));
+  }
+
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
       const progress = getTaskProgress(task.id);
@@ -542,6 +497,7 @@ export default function AssessmentSection({
           value={traumaAssessment}
           onRegionChange={updateTraumaRegion}
           onFindingChange={updateTraumaFinding}
+          onCmsChange={updateTraumaCms}
         />
       );
     }
