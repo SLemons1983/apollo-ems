@@ -681,7 +681,7 @@ export default function CallSection({
                         >
 
                           <div className="grid gap-4 md:grid-cols-3">
-                            {[
+                            {([
                               ['callReceived', 'Call Received'],
                               ['callDispatched', 'Call Dispatched'],
                               ['unitEnRoute', 'Unit En Route'],
@@ -691,7 +691,7 @@ export default function CallSection({
                               ['arrivedAtDestination', 'Arrived at Destination'],
                               ['transferOfCare', 'Transfer of Care'],
                               ['unitBackInService', 'Unit Back in Service'],
-                            ].map(([field, label]) => (
+                            ] satisfies [keyof Pick<CallForm, 'callReceived' | 'callDispatched' | 'unitEnRoute' | 'unitOnScene' | 'patientContact' | 'departScene' | 'arrivedAtDestination' | 'transferOfCare' | 'unitBackInService'>, string][]).map(([field, label]) => (
                               <label key={field} className="block">
                                 <span className="mb-1 block text-sm font-semibold text-slate-700">
                                   {label}
@@ -699,10 +699,10 @@ export default function CallSection({
                                 <input
                                   type="text"
                                   inputMode="numeric"
-                                  value={callForm[field as keyof CallForm]}
+                                  value={callForm[field]}
                                   onChange={(event) =>
                                     updateCallForm(
-                                      field as keyof CallForm,
+                                      field,
                                       normalizeTimeInput(event.target.value),
                                     )
                                   }
