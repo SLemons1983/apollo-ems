@@ -147,6 +147,25 @@ export default function TraumaAssessmentCard({
     0,
   );
 
+  const bodyMapRegionStatuses = traumaRegions.reduce(
+    (statuses, region) => {
+      const findingCount = getRegionFindingCount(value.regions[region.field]);
+      const cmsCount = getRegionCmsCount(value.regions[region.field]);
+
+      return {
+        ...statuses,
+        [region.field]: {
+          findingCount: findingCount + cmsCount,
+          note:
+            findingCount > 0 || cmsCount > 0
+              ? `${findingCount} finding${findingCount === 1 ? '' : 's'} · ${cmsCount} CMS`
+              : '',
+        },
+      };
+    },
+    {} as Record<ApolloBodyRegionKey, { findingCount: number; note: string }>,
+  );
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
@@ -162,6 +181,7 @@ export default function TraumaAssessmentCard({
       <ApolloBodyMap
         mode="trauma"
         selectedRegions={selectedBodyMapRegions}
+        regionStatuses={bodyMapRegionStatuses}
         onRegionClick={(region) =>
           onRegionChange(region, !value.regions[region].selected)
         }
