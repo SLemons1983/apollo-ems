@@ -64,6 +64,11 @@ export default function ConsciousnessAssessmentCard({
         <h4 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
           Orientation
         </h4>
+        <p className="mb-3 text-sm text-slate-600">
+          Orientation documents whether the patient understands person, place,
+          time, and event. Oriented x4 means the patient knows who they are,
+          where they are, the approximate date/time, and what happened.
+        </p>
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {orientationOptions.map((option) => {

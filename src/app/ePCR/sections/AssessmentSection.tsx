@@ -1,13 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import PCRCard from '../components/PCRCard';
+import {
+  determineAssessmentMode,
+  getAdditionalAssessmentTasksForContext,
+  getAssessmentTasksForContext,
+} from '../clinical/engine/assessment';
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
 } from '../clinical/components/assessment/cards/ClinicalHistoryCard';
 import ConsciousnessAssessmentCard, {
   type ConsciousnessAssessmentForm,
 } from '../clinical/components/assessment/cards/ConsciousnessAssessmentCard';
-import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
 import GcsAssessmentCard, {
   type GcsAssessmentForm,
 } from '../clinical/components/assessment/cards/GcsAssessmentCard';
@@ -20,13 +25,6 @@ import PainAssessmentCard, {
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
-import {
-  determineAssessmentMode,
-  getAdditionalAssessmentTasksForContext,
-  getAssessmentTasksForContext,
-  type AssessmentStatus,
-} from '../clinical/engine/assessment';
-
 import type { PatientForm } from '../types';
 
 type AssessmentSectionProps = {
@@ -57,10 +55,8 @@ export default function AssessmentSection({
   const mode = determineAssessmentMode(context);
   const suggestedTasks = getAssessmentTasksForContext(context);
   const additionalTasks = getAdditionalAssessmentTasksForContext(context);
-  const tasks = [...suggestedTasks, ...additionalTasks];
-  const [selectedTaskId, setSelectedTaskId] = useState(
-    suggestedTasks[0]?.id ?? tasks[0]?.id ?? '',
-  );
+  const [expandedTaskId, setExpandedTaskId] = useState('');
+
   const [consciousnessAssessment, setConsciousnessAssessment] =
     useState<ConsciousnessAssessmentForm>({
       avpu: '',
@@ -94,11 +90,13 @@ export default function AssessmentSection({
       lifeThreats: '',
       transportPriority: '',
     });
+
   const [gcsAssessment, setGcsAssessment] = useState<GcsAssessmentForm>({
     eyes: '',
     verbal: '',
     motor: '',
   });
+
   const [gfastAssessment, setGfastAssessment] = useState<GfastAssessmentForm>({
     gaze: '',
     face: '',
@@ -108,21 +106,20 @@ export default function AssessmentSection({
     bloodGlucose: '',
   });
 
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId);
+  function getTaskProgress(taskId: string) {
+    if (taskId === 'primary-assessment') {
+      const completed = Object.values(primaryAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(primaryAssessment).length };
+    }
 
-  function getTaskStatus(taskId: string): AssessmentStatus {
     if (taskId === 'consciousness-assessment') {
-      const completedFields = Object.values(consciousnessAssessment).filter(Boolean).length;
-
-      if (completedFields === Object.keys(consciousnessAssessment).length) return 'complete';
-      if (completedFields > 0) return 'in-progress';
+      const completed = Object.values(consciousnessAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(consciousnessAssessment).length };
     }
 
     if (taskId === 'history-taking') {
-      const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
-
-      if (completedFields === Object.keys(clinicalHistory).length) return 'complete';
-      if (completedFields > 0) return 'in-progress';
+      const completed = Object.values(clinicalHistory).filter(Boolean).length;
+      return { completed, total: Object.keys(clinicalHistory).length };
     }
 
     if (taskId === 'pain-assessment') {
@@ -143,70 +140,23 @@ export default function AssessmentSection({
           : []),
       ];
 
-      const completedFields = requiredFields.filter(Boolean).length;
-
-      if (completedFields === requiredFields.length) {
-        return 'complete';
-      }
-
-      if (completedFields > 0) {
-        return 'in-progress';
-      }
-    }
-
-    if (taskId === 'history-taking') {
-      const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
-
-      if (completedFields === Object.keys(clinicalHistory).length) {
-        return 'complete';
-      }
-
-      if (completedFields > 0) {
-        return 'in-progress';
-      }
-    }
-
-    if (taskId === 'primary-assessment') {
-      const completedFields = Object.values(primaryAssessment).filter(Boolean).length;
-
-      if (completedFields === Object.keys(primaryAssessment).length) {
-        return 'complete';
-      }
-
-      if (completedFields > 0) {
-        return 'in-progress';
-      }
+      return {
+        completed: requiredFields.filter(Boolean).length,
+        total: requiredFields.length,
+      };
     }
 
     if (taskId === 'neurological-assessment') {
-      const completedFields = Object.values(gcsAssessment).filter(Boolean).length;
-
-      if (completedFields === Object.keys(gcsAssessment).length) {
-        return 'complete';
-      }
-
-      if (completedFields > 0) {
-        return 'in-progress';
-      }
+      const completed = Object.values(gcsAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(gcsAssessment).length };
     }
 
     if (taskId === 'gfast-stroke-assessment') {
-      const completedFields = Object.values(gfastAssessment).filter(Boolean).length;
-
-      if (completedFields === Object.keys(gfastAssessment).length) {
-        return 'complete';
-      }
-
-      if (completedFields > 0) {
-        return 'in-progress';
-      }
+      const completed = Object.values(gfastAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(gfastAssessment).length };
     }
 
-    if (taskId === selectedTaskId) {
-      return 'in-progress';
-    }
-
-    return 'not-started';
+    return { completed: 0, total: 1 };
   }
 
   function updateConsciousnessAssessment(
@@ -269,6 +219,66 @@ export default function AssessmentSection({
     }));
   }
 
+  function renderTaskContent(taskId: string, title: string) {
+    if (taskId === 'primary-assessment') {
+      return (
+        <PrimaryAssessmentCard
+          value={primaryAssessment}
+          onChange={updatePrimaryAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'consciousness-assessment') {
+      return (
+        <ConsciousnessAssessmentCard
+          value={consciousnessAssessment}
+          onChange={updateConsciousnessAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'history-taking') {
+      return (
+        <ClinicalHistoryCard
+          value={clinicalHistory}
+          patientForm={patientForm}
+          onChange={updateClinicalHistory}
+        />
+      );
+    }
+
+    if (taskId === 'pain-assessment') {
+      return (
+        <PainAssessmentCard
+          value={painAssessment}
+          onChange={updatePainAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'neurological-assessment') {
+      return (
+        <GcsAssessmentCard value={gcsAssessment} onChange={updateGcsAssessment} />
+      );
+    }
+
+    if (taskId === 'gfast-stroke-assessment') {
+      return (
+        <GfastAssessmentCard
+          value={gfastAssessment}
+          onChange={updateGfastAssessment}
+        />
+      );
+    }
+
+    return (
+      <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+        {title} workflow coming next.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-slate-50 p-5">
@@ -297,109 +307,57 @@ export default function AssessmentSection({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        <div className="overflow-hidden rounded-xl border bg-white">
-          <div className="border-b px-5 py-4">
-            <h3 className="text-lg font-bold text-slate-900">
-              Assessment Workflow
-            </h3>
-          </div>
-
-          <div>
-            <div className="bg-emerald-50 px-5 py-2 text-xs font-bold uppercase tracking-wide text-emerald-800">
-              Suggested for This Patient
-            </div>
-
-            <div className="divide-y">
-              {suggestedTasks.map((task) => (
-                <AssessmentWorkflowCard
-                  key={task.id}
-                  title={task.title}
-                  status={getTaskStatus(task.id)}
-                  selected={selectedTaskId === task.id}
-                  onClick={() => setSelectedTaskId(task.id)}
-                />
-              ))}
-            </div>
-
-            <div className="bg-slate-100 px-5 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
-              Additional Assessments
-            </div>
-
-            <div className="divide-y">
-              {additionalTasks.map((task) => (
-                <AssessmentWorkflowCard
-                  key={task.id}
-                  title={task.title}
-                  status={getTaskStatus(task.id)}
-                  selected={selectedTaskId === task.id}
-                  onClick={() => setSelectedTaskId(task.id)}
-                />
-              ))}
-            </div>
-          </div>
+      <div>
+        <div className="mb-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
+          Suggested for This Patient
         </div>
 
-        <div className="rounded-xl border bg-white p-5">
-          {selectedTask ? (
-            <>
-              <div className="mb-4">
-                <h3 className="text-xl font-bold text-slate-900">
-                  {selectedTask.title}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Assessment card will be built here.
-                </p>
-              </div>
+        <div className="space-y-4">
+          {suggestedTasks.map((task) => {
+            const progress = getTaskProgress(task.id);
 
-              {selectedTask.id === 'consciousness-assessment' ? (
-                <ConsciousnessAssessmentCard
-                  value={consciousnessAssessment}
-                  onChange={updateConsciousnessAssessment}
-                />
-              ) : selectedTask.id === 'history-taking' ? (
-                <ClinicalHistoryCard
-                  value={clinicalHistory}
-                  patientForm={patientForm}
-                  onChange={updateClinicalHistory}
-                />
-              ) : selectedTask.id === 'pain-assessment' ? (
-                <PainAssessmentCard
-                  value={painAssessment}
-                  onChange={updatePainAssessment}
-                />
-              ) : selectedTask.id === 'history-taking' ? (
-                <ClinicalHistoryCard
-                  value={clinicalHistory}
-                  patientForm={patientForm}
-                  onChange={updateClinicalHistory}
-                />
-              ) : selectedTask.id === 'primary-assessment' ? (
-                <PrimaryAssessmentCard
-                  value={primaryAssessment}
-                  onChange={updatePrimaryAssessment}
-                />
-              ) : selectedTask.id === 'neurological-assessment' ? (
-                <GcsAssessmentCard
-                  value={gcsAssessment}
-                  onChange={updateGcsAssessment}
-                />
-              ) : selectedTask.id === 'gfast-stroke-assessment' ? (
-                <GfastAssessmentCard
-                  value={gfastAssessment}
-                  onChange={updateGfastAssessment}
-                />
-              ) : (
-                <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
-                  {selectedTask.title} workflow coming next.
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
-              Select an assessment workflow to begin.
-            </div>
-          )}
+            return (
+              <PCRCard
+                key={task.id}
+                title={task.title}
+                completedFields={progress.completed}
+                totalFields={progress.total}
+                expanded={expandedTaskId === task.id}
+                onToggle={() =>
+                  setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
+                }
+              >
+                {renderTaskContent(task.id, task.title)}
+              </PCRCard>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-3 rounded-lg bg-slate-200 px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+          Additional Assessments
+        </div>
+
+        <div className="space-y-4">
+          {additionalTasks.map((task) => {
+            const progress = getTaskProgress(task.id);
+
+            return (
+              <PCRCard
+                key={task.id}
+                title={task.title}
+                completedFields={progress.completed}
+                totalFields={progress.total}
+                expanded={expandedTaskId === task.id}
+                onToggle={() =>
+                  setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
+                }
+              >
+                {renderTaskContent(task.id, task.title)}
+              </PCRCard>
+            );
+          })}
         </div>
       </div>
     </div>
