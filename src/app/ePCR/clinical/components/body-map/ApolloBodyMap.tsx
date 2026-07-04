@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import ApolloBodyFigure from './ApolloBodyFigure';
-import { apolloBodyRegions } from './bodyMapData';
 import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
+import { apolloBodyRegions, type ApolloBodyRegionDefinition } from './bodyMapData';
 import type {
   ApolloBodyMapMode,
   ApolloBodyRegionKey,
@@ -17,6 +17,34 @@ type ApolloBodyMapProps = {
   mode?: ApolloBodyMapMode;
   regionStatuses?: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
 };
+
+const clinicalGroupLabels: Record<ApolloBodyRegionDefinition['clinicalGroup'], string> = {
+  'head-neck': 'Head / Neck',
+  torso: 'Torso',
+  'abdomen-pelvis': 'Abdomen / Pelvis',
+  'upper-extremity': 'Upper Extremities',
+  'lower-extremity': 'Lower Extremities',
+  posterior: 'Posterior',
+};
+
+const clinicalGroupOrder: ApolloBodyRegionDefinition['clinicalGroup'][] = [
+  'head-neck',
+  'torso',
+  'abdomen-pelvis',
+  'upper-extremity',
+  'lower-extremity',
+  'posterior',
+];
+
+function getGroupedRegions(regions: ApolloBodyRegionDefinition[]) {
+  return clinicalGroupOrder
+    .map((group) => ({
+      group,
+      label: clinicalGroupLabels[group],
+      regions: regions.filter((region) => region.clinicalGroup === group),
+    }))
+    .filter((group) => group.regions.length > 0);
+}
 
 export default function ApolloBodyMap({
   selectedRegions,
@@ -33,16 +61,13 @@ export default function ApolloBodyMap({
     (region) => selectedRegions[region.field],
   );
 
+  const groupedSelectedRegions = getGroupedRegions(selectedRegionList);
+
   const activeRegionDefinition = activeRegion
     ? apolloBodyRegions.find((region) => region.field === activeRegion)
     : null;
 
   const activeStatus = activeRegion ? regionStatuses[activeRegion] : undefined;
-
-  const clinicalGroupLabel = activeRegionDefinition?.clinicalGroup
-    .split('-')
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(' ');
 
   return (
     <div className="rounded-xl border border-slate-300 bg-white p-4">
@@ -74,7 +99,7 @@ export default function ApolloBodyMap({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_260px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
         <ApolloBodyFigure
           view={view}
           selectedRegions={selectedRegions}
@@ -85,7 +110,7 @@ export default function ApolloBodyMap({
           onBlurRegion={() => setActiveRegion(null)}
         />
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
           <div className="rounded-lg border border-slate-200 bg-white p-3">
             <div className="text-xs font-black uppercase tracking-wide text-slate-500">
               Current Focus
@@ -93,10 +118,11 @@ export default function ApolloBodyMap({
             <div className="mt-1 text-sm font-black text-slate-900">
               {activeRegionDefinition?.label || 'None'}
             </div>
+
             {activeRegionDefinition && (
               <div className="mt-2 grid gap-2 text-xs font-bold text-slate-600">
                 <div className="rounded-lg bg-slate-50 px-2 py-1">
-                  Group: {clinicalGroupLabel}
+                  Group: {clinicalGroupLabels[activeRegionDefinition.clinicalGroup]}
                 </div>
                 <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
                   Laterality: {activeRegionDefinition.laterality}
@@ -125,63 +151,84 @@ export default function ApolloBodyMap({
             )}
           </div>
 
-          <div className="mt-4 text-sm font-black text-slate-900">
-            Selected Regions ({selectedRegionList.length})
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-black text-slate-900">
+                Selected Regions
+              </div>
+              <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">
+                {selectedRegionList.length}
+              </div>
+            </div>
+
+            {groupedSelectedRegions.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {groupedSelectedRegions.map((group) => (
+                  <div
+                    key={group.group}
+                    className="rounded-xl border border-slate-200 bg-white p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
+                      <span>{group.label}</span>
+                      <span>{group.regions.length}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {group.regions.map((region) => {
+                        const status = regionStatuses[region.field];
+                        const findingCount = status?.findingCount ?? 0;
+
+                        return (
+                          <button
+                            key={region.field}
+                            type="button"
+                            onMouseEnter={() => setActiveRegion(region.field)}
+                            onMouseLeave={() => setActiveRegion(null)}
+                            onFocus={() => setActiveRegion(region.field)}
+                            onBlur={() => setActiveRegion(null)}
+                            onClick={() => onRegionClick(region.field)}
+                            className={`w-full rounded-lg border bg-white px-3 py-2 text-left text-sm font-semibold hover:bg-blue-50 ${
+                              findingCount > 0
+                                ? 'border-amber-300 text-amber-950'
+                                : 'border-blue-200 text-blue-950'
+                            }`}
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span>{region.label}</span>
+                              <span>✓</span>
+                            </span>
+
+                            {status?.note && (
+                              <span className="mt-1 block text-xs font-bold text-slate-600">
+                                {status.note}
+                              </span>
+                            )}
+
+                            {status?.overlays && status.overlays.length > 0 && (
+                              <span className="mt-2 flex flex-wrap gap-1">
+                                {status.overlays.map((overlay) => (
+                                  <ApolloBodyOverlayBadge
+                                    key={`${region.field}-${overlay.type}-${overlay.label}`}
+                                    overlay={overlay}
+                                  />
+                                ))}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm font-semibold text-slate-500">
+                No regions selected yet.
+              </div>
+            )}
           </div>
 
-          {selectedRegionList.length > 0 ? (
-            <div className="mt-3 space-y-2">
-              {selectedRegionList.map((region) => {
-                const status = regionStatuses[region.field];
-                const findingCount = status?.findingCount ?? 0;
-
-                return (
-                  <button
-                    key={region.field}
-                    type="button"
-                    onMouseEnter={() => setActiveRegion(region.field)}
-                    onMouseLeave={() => setActiveRegion(null)}
-                    onFocus={() => setActiveRegion(region.field)}
-                    onBlur={() => setActiveRegion(null)}
-                    onClick={() => onRegionClick(region.field)}
-                    className={`w-full rounded-lg border bg-white px-3 py-2 text-left text-sm font-semibold hover:bg-blue-50 ${
-                      findingCount > 0
-                        ? 'border-amber-300 text-amber-950'
-                        : 'border-blue-200 text-blue-950'
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span>{region.label}</span>
-                      <span>✓</span>
-                    </span>
-
-                    {status?.note && (
-                      <span className="mt-1 block text-xs font-bold text-slate-600">
-                        {status.note}
-                      </span>
-                    )}
-
-                    {status?.overlays && status.overlays.length > 0 && (
-                      <span className="mt-2 flex flex-wrap gap-1">
-                        {status.overlays.map((overlay) => (
-                          <ApolloBodyOverlayBadge
-                            key={`${region.field}-${overlay.type}-${overlay.label}`}
-                            overlay={overlay}
-                          />
-                        ))}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm font-semibold text-slate-500">
-              No regions selected yet.
-            </div>
-          )}
-
-          <div className="mt-5 border-t border-slate-200 pt-4">
+          <div className="border-t border-slate-200 pt-4">
             <div className="text-xs font-black uppercase tracking-wide text-slate-600">
               Mode
             </div>
@@ -190,7 +237,7 @@ export default function ApolloBodyMap({
             </div>
           </div>
 
-          <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
+          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full border border-blue-500 bg-blue-100" />
               <span>Blue = selected / examined region</span>
