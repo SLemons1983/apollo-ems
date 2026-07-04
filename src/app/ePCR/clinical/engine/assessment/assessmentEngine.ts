@@ -100,5 +100,33 @@ export function getAdditionalAssessmentTasksForContext(
     getAssessmentTasksForContext(context).map((task) => task.id),
   );
 
-  return assessmentTasks.filter((task) => !suggestedTaskIds.has(task.id));
+  const additionalTasks = assessmentTasks.filter(
+    (task) => !suggestedTaskIds.has(task.id),
+  );
+
+  return additionalTasks.sort((firstTask, secondTask) => {
+    const priorityOrder = [
+      'trauma-assessment',
+      'pain-assessment',
+      'gfast-stroke-assessment',
+      'reassessment',
+    ];
+
+    const firstPriority = priorityOrder.indexOf(firstTask.id);
+    const secondPriority = priorityOrder.indexOf(secondTask.id);
+
+    if (firstPriority === -1 && secondPriority === -1) {
+      return 0;
+    }
+
+    if (firstPriority === -1) {
+      return 1;
+    }
+
+    if (secondPriority === -1) {
+      return -1;
+    }
+
+    return firstPriority - secondPriority;
+  });
 }
