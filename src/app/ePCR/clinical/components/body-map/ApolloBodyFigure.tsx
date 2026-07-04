@@ -12,7 +12,10 @@ type ApolloBodyFigureProps = {
   view: ApolloBodyView;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   regionStatuses: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
+  activeRegion: ApolloBodyRegionKey | null;
   onRegionClick: (region: ApolloBodyRegionKey) => void;
+  onFocusRegion: (region: ApolloBodyRegionKey) => void;
+  onBlurRegion: () => void;
 };
 
 const regionPositionClasses: Record<ApolloBodyRegionKey, string> = {
@@ -29,7 +32,10 @@ const regionPositionClasses: Record<ApolloBodyRegionKey, string> = {
   rightLeg: 'left-[53%] top-[66%] h-[31%] w-[16%] rounded-full',
 };
 
-function shouldShowRegion(regionView: 'front' | 'back' | 'both', activeView: ApolloBodyView) {
+function shouldShowRegion(
+  regionView: 'front' | 'back' | 'both',
+  activeView: ApolloBodyView,
+) {
   return regionView === activeView || regionView === 'both';
 }
 
@@ -37,7 +43,10 @@ export default function ApolloBodyFigure({
   view,
   selectedRegions,
   regionStatuses,
+  activeRegion,
   onRegionClick,
+  onFocusRegion,
+  onBlurRegion,
 }: ApolloBodyFigureProps) {
   const visibleRegions = apolloBodyRegions.filter((region) =>
     shouldShowRegion(region.view, view),
@@ -78,7 +87,10 @@ export default function ApolloBodyFigure({
             ...regionStatuses[region.field],
             selected: selectedRegions[region.field],
           }}
+          active={activeRegion === region.field}
           onClick={onRegionClick}
+          onFocusRegion={onFocusRegion}
+          onBlurRegion={onBlurRegion}
         />
       ))}
     </div>

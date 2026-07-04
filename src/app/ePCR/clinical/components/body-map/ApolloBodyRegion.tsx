@@ -7,6 +7,9 @@ type ApolloBodyRegionProps = {
   label: string;
   status: ApolloBodyRegionStatus;
   onClick: (region: ApolloBodyRegionKey) => void;
+  onFocusRegion?: (region: ApolloBodyRegionKey) => void;
+  onBlurRegion?: () => void;
+  active?: boolean;
   gridClass?: string;
   layoutClass?: string;
 };
@@ -16,6 +19,9 @@ export default function ApolloBodyRegion({
   label,
   status,
   onClick,
+  onFocusRegion,
+  onBlurRegion,
+  active = false,
   gridClass = '',
   layoutClass = '',
 }: ApolloBodyRegionProps) {
@@ -30,7 +36,14 @@ export default function ApolloBodyRegion({
       type="button"
       disabled={disabled}
       onClick={() => onClick(region)}
+      onMouseEnter={() => onFocusRegion?.(region)}
+      onMouseLeave={() => onBlurRegion?.()}
+      onFocus={() => onFocusRegion?.(region)}
+      onBlur={() => onBlurRegion?.()}
       aria-pressed={selected}
+      aria-label={`${label}${selected ? ', selected' : ''}${
+        hasClinicalData ? ', has documented clinical data' : ''
+      }`}
       className={`${placementClass} ${
         layoutClass ? 'absolute flex items-center justify-center' : ''
       } border px-3 py-3 text-center text-[11px] font-black uppercase tracking-wide transition ${
@@ -41,6 +54,8 @@ export default function ApolloBodyRegion({
           : hasClinicalData
             ? 'border-amber-300 bg-amber-50/90 text-amber-950 hover:bg-amber-100'
             : 'border-blue-300 bg-white/70 text-blue-900 hover:bg-blue-50'
+      } ${
+        active ? 'scale-[1.03] ring-4 ring-slate-300' : ''
       } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
     >
       <span className="block leading-tight">{selected ? `✓ ${label}` : label}</span>

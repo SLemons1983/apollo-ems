@@ -24,10 +24,19 @@ export default function ApolloBodyMap({
   regionStatuses = {},
 }: ApolloBodyMapProps) {
   const [view, setView] = useState<ApolloBodyView>('front');
+  const [activeRegion, setActiveRegion] = useState<ApolloBodyRegionKey | null>(
+    null,
+  );
 
   const selectedRegionList = apolloBodyRegions.filter(
     (region) => selectedRegions[region.field],
   );
+
+  const activeRegionDefinition = activeRegion
+    ? apolloBodyRegions.find((region) => region.field === activeRegion)
+    : null;
+
+  const activeStatus = activeRegion ? regionStatuses[activeRegion] : undefined;
 
   return (
     <div className="rounded-xl border border-slate-300 bg-white p-4">
@@ -64,11 +73,28 @@ export default function ApolloBodyMap({
           view={view}
           selectedRegions={selectedRegions}
           regionStatuses={regionStatuses}
+          activeRegion={activeRegion}
           onRegionClick={onRegionClick}
+          onFocusRegion={setActiveRegion}
+          onBlurRegion={() => setActiveRegion(null)}
         />
 
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-sm font-black text-slate-900">
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+              Current Focus
+            </div>
+            <div className="mt-1 text-sm font-black text-slate-900">
+              {activeRegionDefinition?.label || 'None'}
+            </div>
+            {activeStatus?.note && (
+              <div className="mt-1 text-xs font-bold text-amber-700">
+                {activeStatus.note}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 text-sm font-black text-slate-900">
             Selected Regions ({selectedRegionList.length})
           </div>
 
@@ -82,6 +108,10 @@ export default function ApolloBodyMap({
                   <button
                     key={region.field}
                     type="button"
+                    onMouseEnter={() => setActiveRegion(region.field)}
+                    onMouseLeave={() => setActiveRegion(null)}
+                    onFocus={() => setActiveRegion(region.field)}
+                    onBlur={() => setActiveRegion(null)}
                     onClick={() => onRegionClick(region.field)}
                     className={`w-full rounded-lg border bg-white px-3 py-2 text-left text-sm font-semibold hover:bg-blue-50 ${
                       findingCount > 0
