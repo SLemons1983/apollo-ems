@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
 } from '../clinical/components/assessment/cards/ClinicalHistoryCard';
+import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
 import GcsAssessmentCard, {
   type GcsAssessmentForm,
 } from '../clinical/components/assessment/cards/GcsAssessmentCard';
@@ -59,13 +59,8 @@ export default function AssessmentSection({
     suggestedTasks[0]?.id ?? tasks[0]?.id ?? '',
   );
   const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistoryForm>({
-    onset: '',
-    provocation: '',
-    quality: '',
-    radiation: '',
-    severity: '',
-    time: '',
-    associatedSymptoms: '',
+    eventsLeadingToIllness: '',
+    additionalHistoryNotes: '',
   });
 
   const [painAssessment, setPainAssessment] = useState<PainAssessmentForm>({
@@ -107,6 +102,13 @@ export default function AssessmentSection({
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === 'history-taking') {
+      const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
+
+      if (completedFields === Object.keys(clinicalHistory).length) return 'complete';
+      if (completedFields > 0) return 'in-progress';
+    }
+
     if (taskId === 'pain-assessment') {
       const requiredFields = [
         painAssessment.painPresent,
@@ -191,21 +193,21 @@ export default function AssessmentSection({
     return 'not-started';
   }
 
-  function updatePainAssessment(
-    field: keyof PainAssessmentForm,
-    fieldValue: string,
-  ) {
-    setPainAssessment((current) => ({
-      ...current,
-      [field]: fieldValue,
-    }));
-  }
-
   function updateClinicalHistory(
     field: keyof ClinicalHistoryForm,
     fieldValue: string,
   ) {
     setClinicalHistory((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
+  function updatePainAssessment(
+    field: keyof PainAssessmentForm,
+    fieldValue: string,
+  ) {
+    setPainAssessment((current) => ({
       ...current,
       [field]: fieldValue,
     }));
@@ -324,7 +326,13 @@ export default function AssessmentSection({
                 </p>
               </div>
 
-              {selectedTask.id === 'pain-assessment' ? (
+              {selectedTask.id === 'history-taking' ? (
+                <ClinicalHistoryCard
+                  value={clinicalHistory}
+                  patientForm={patientForm}
+                  onChange={updateClinicalHistory}
+                />
+              ) : selectedTask.id === 'pain-assessment' ? (
                 <PainAssessmentCard
                   value={painAssessment}
                   onChange={updatePainAssessment}
