@@ -6,6 +6,8 @@ type PrimaryAssessmentForm = {
   airway: string;
   breathing: string;
   circulation: string;
+  disability: string;
+  exposure: string;
   lifeThreats: string;
   transportPriority: string;
 };
@@ -32,18 +34,28 @@ const groups: {
   },
   {
     field: 'airway',
-    label: 'Airway',
+    label: 'A - Airway',
     options: ['Patent', 'Maintained', 'Obstructed', 'Advanced Airway'],
   },
   {
     field: 'breathing',
-    label: 'Breathing',
+    label: 'B - Breathing',
     options: ['Normal', 'Labored', 'Assisted', 'Apneic'],
   },
   {
     field: 'circulation',
-    label: 'Circulation',
+    label: 'C - Circulation',
     options: ['Adequate', 'Major Bleeding', 'Shock Signs', 'Cardiac Arrest'],
+  },
+  {
+    field: 'disability',
+    label: 'D - Disability',
+    options: ['No Deficit Noted', 'Altered LOC', 'Focal Deficit', 'Seizure Activity'],
+  },
+  {
+    field: 'exposure',
+    label: 'E - Exposure',
+    options: ['No Major Findings', 'Fully Assessed', 'Limited Assessment', 'Environmental Concern'],
   },
   {
     field: 'lifeThreats',

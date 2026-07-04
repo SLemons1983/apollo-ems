@@ -87,6 +87,8 @@ export default function AssessmentSection({
       airway: '',
       breathing: '',
       circulation: '',
+      disability: '',
+      exposure: '',
       lifeThreats: '',
       transportPriority: '',
     });

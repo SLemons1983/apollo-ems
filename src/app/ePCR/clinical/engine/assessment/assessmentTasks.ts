@@ -8,12 +8,6 @@ export const assessmentTasks: AssessmentTask[] = [
     alwaysShow: true,
   },
   {
-    id: 'abcde-assessment',
-    title: 'ABCDE',
-    mode: ['medical', 'trauma', 'cardiac-arrest', 'stroke', 'behavioral', 'ob', 'pediatric'],
-    alwaysShow: true,
-  },
-  {
     id: 'consciousness-assessment',
     title: 'Consciousness Assessment / AVPU',
     mode: ['medical', 'trauma', 'cardiac-arrest', 'stroke', 'behavioral', 'ob', 'pediatric'],
