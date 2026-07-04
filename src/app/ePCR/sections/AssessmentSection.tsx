@@ -25,6 +25,10 @@ import PainAssessmentCard, {
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
+import TraumaAssessmentCard, {
+  type TraumaAssessmentForm,
+  type TraumaRegionKey,
+} from '../clinical/components/assessment/cards/TraumaAssessmentCard';
 import type { PatientForm } from '../types';
 
 type AssessmentSectionProps = {
@@ -127,6 +131,23 @@ export default function AssessmentSection({
     bloodGlucose: '',
   });
 
+  const [traumaAssessment, setTraumaAssessment] =
+    useState<TraumaAssessmentForm>({
+      regions: {
+        head: false,
+        face: false,
+        neck: false,
+        chest: false,
+        abdomen: false,
+        pelvis: false,
+        back: false,
+        rightArm: false,
+        leftArm: false,
+        rightLeg: false,
+        leftLeg: false,
+      },
+    });
+
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
       const completed = Object.values(primaryAssessment).filter(Boolean).length;
@@ -175,6 +196,11 @@ export default function AssessmentSection({
     if (taskId === 'gfast-stroke-assessment') {
       const completed = Object.values(gfastAssessment).filter(Boolean).length;
       return { completed, total: Object.keys(gfastAssessment).length };
+    }
+
+    if (taskId === 'trauma-assessment') {
+      const completed = Object.values(traumaAssessment.regions).filter(Boolean).length;
+      return { completed, total: Object.keys(traumaAssessment.regions).length };
     }
 
     return { completed: 0, total: 1 };
@@ -247,6 +273,16 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateTraumaAssessment(field: TraumaRegionKey, fieldValue: boolean) {
+    setTraumaAssessment((current) => ({
+      ...current,
+      regions: {
+        ...current.regions,
+        [field]: fieldValue,
+      },
+    }));
+  }
+
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
       const progress = getTaskProgress(task.id);
@@ -276,6 +312,7 @@ export default function AssessmentSection({
     painAssessment,
     gcsAssessment,
     gfastAssessment,
+    traumaAssessment,
     onProgressChange,
   ]);
 
@@ -328,6 +365,15 @@ export default function AssessmentSection({
         <GfastAssessmentCard
           value={gfastAssessment}
           onChange={updateGfastAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'trauma-assessment') {
+      return (
+        <TraumaAssessmentCard
+          value={traumaAssessment}
+          onChange={updateTraumaAssessment}
         />
       );
     }
