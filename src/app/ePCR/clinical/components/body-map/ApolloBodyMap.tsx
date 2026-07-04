@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import ApolloBodyFigure from './ApolloBodyFigure';
 import { apolloBodyRegions } from './bodyMapData';
+import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
 import type {
   ApolloBodyMapMode,
   ApolloBodyRegionKey,
@@ -92,6 +93,17 @@ export default function ApolloBodyMap({
                 {activeStatus.note}
               </div>
             )}
+
+            {activeStatus?.overlays && activeStatus.overlays.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {activeStatus.overlays.map((overlay) => (
+                  <ApolloBodyOverlayBadge
+                    key={`${activeRegion}-${overlay.type}-${overlay.label}`}
+                    overlay={overlay}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-4 text-sm font-black text-slate-900">
@@ -127,6 +139,17 @@ export default function ApolloBodyMap({
                     {status?.note && (
                       <span className="mt-1 block text-xs font-bold text-slate-600">
                         {status.note}
+                      </span>
+                    )}
+
+                    {status?.overlays && status.overlays.length > 0 && (
+                      <span className="mt-2 flex flex-wrap gap-1">
+                        {status.overlays.map((overlay) => (
+                          <ApolloBodyOverlayBadge
+                            key={`${region.field}-${overlay.type}-${overlay.label}`}
+                            overlay={overlay}
+                          />
+                        ))}
                       </span>
                     )}
                   </button>

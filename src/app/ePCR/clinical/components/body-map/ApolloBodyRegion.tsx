@@ -1,5 +1,6 @@
 'use client';
 
+import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
 import type { ApolloBodyRegionKey, ApolloBodyRegionStatus } from './bodyMapTypes';
 
 type ApolloBodyRegionProps = {
@@ -28,7 +29,9 @@ export default function ApolloBodyRegion({
   const selected = Boolean(status.selected);
   const disabled = Boolean(status.disabled);
   const findingCount = status.findingCount ?? 0;
-  const hasClinicalData = findingCount > 0 || Boolean(status.note);
+  const overlays = status.overlays ?? [];
+  const hasClinicalData =
+    findingCount > 0 || Boolean(status.note) || overlays.length > 0;
   const placementClass = layoutClass || gridClass;
 
   return (
@@ -60,9 +63,20 @@ export default function ApolloBodyRegion({
     >
       <span className="block leading-tight">{selected ? `✓ ${label}` : label}</span>
 
-      {findingCount > 0 && (
-        <span className="ml-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-black text-amber-950">
-          {findingCount}
+      {layoutClass ? (
+        overlays.length > 0 && (
+          <span className="absolute -right-2 -top-2 rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-950 shadow-sm">
+            {overlays.length}
+          </span>
+        )
+      ) : (
+        <span className="mt-2 flex flex-wrap justify-center gap-1">
+          {overlays.map((overlay) => (
+            <ApolloBodyOverlayBadge
+              key={`${overlay.type}-${overlay.label}`}
+              overlay={overlay}
+            />
+          ))}
         </span>
       )}
     </button>

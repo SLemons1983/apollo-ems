@@ -160,6 +160,26 @@ export default function TraumaAssessmentCard({
             findingCount > 0 || cmsCount > 0
               ? `${findingCount} finding${findingCount === 1 ? '' : 's'} · ${cmsCount} CMS`
               : '',
+          overlays: [
+            ...(findingCount > 0
+              ? [
+                  {
+                    type: 'finding' as const,
+                    label: 'Findings',
+                    count: findingCount,
+                  },
+                ]
+              : []),
+            ...(cmsCount > 0
+              ? [
+                  {
+                    type: 'cms' as const,
+                    label: 'CMS',
+                    count: cmsCount,
+                  },
+                ]
+              : []),
+          ],
         },
       };
     },
