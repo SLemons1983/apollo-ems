@@ -89,6 +89,9 @@ export default function AssessmentSection({
       circulation: '',
       disability: '',
       exposure: '',
+      gcsEyes: '',
+      gcsVerbal: '',
+      gcsMotor: '',
       lifeThreats: '',
       transportPriority: '',
     });

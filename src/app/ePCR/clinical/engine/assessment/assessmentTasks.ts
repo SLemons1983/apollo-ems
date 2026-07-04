@@ -8,18 +8,6 @@ export const assessmentTasks: AssessmentTask[] = [
     alwaysShow: true,
   },
   {
-    id: 'consciousness-assessment',
-    title: 'Consciousness Assessment / AVPU',
-    mode: ['medical', 'trauma', 'cardiac-arrest', 'stroke', 'behavioral', 'ob', 'pediatric'],
-    alwaysShow: true,
-  },
-  {
-    id: 'neurological-assessment',
-    title: 'Neurological / GCS',
-    mode: ['medical', 'trauma', 'stroke', 'cardiac-arrest', 'behavioral', 'ob', 'pediatric'],
-    alwaysShow: true,
-  },
-  {
     id: 'pupillary-assessment',
     title: 'Pupillary Assessment / PERRLA',
     mode: ['medical', 'trauma', 'stroke', 'cardiac-arrest', 'behavioral', 'ob', 'pediatric'],
