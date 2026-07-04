@@ -91,3 +91,14 @@ export function getAssessmentFindingsForContext(
     );
   });
 }
+
+
+export function getAdditionalAssessmentTasksForContext(
+  context: AssessmentContext,
+): AssessmentTask[] {
+  const suggestedTaskIds = new Set(
+    getAssessmentTasksForContext(context).map((task) => task.id),
+  );
+
+  return assessmentTasks.filter((task) => !suggestedTaskIds.has(task.id));
+}

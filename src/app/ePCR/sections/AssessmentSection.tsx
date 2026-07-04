@@ -16,6 +16,7 @@ import PrimaryAssessmentCard, {
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
 import {
   determineAssessmentMode,
+  getAdditionalAssessmentTasksForContext,
   getAssessmentTasksForContext,
   type AssessmentStatus,
 } from '../clinical/engine/assessment';
@@ -48,8 +49,12 @@ export default function AssessmentSection({
   };
 
   const mode = determineAssessmentMode(context);
-  const tasks = getAssessmentTasksForContext(context);
-  const [selectedTaskId, setSelectedTaskId] = useState(tasks[0]?.id ?? '');
+  const suggestedTasks = getAssessmentTasksForContext(context);
+  const additionalTasks = getAdditionalAssessmentTasksForContext(context);
+  const tasks = [...suggestedTasks, ...additionalTasks];
+  const [selectedTaskId, setSelectedTaskId] = useState(
+    suggestedTasks[0]?.id ?? tasks[0]?.id ?? '',
+  );
   const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistoryForm>({
     onset: '',
     provocation: '',
@@ -218,16 +223,38 @@ export default function AssessmentSection({
             </h3>
           </div>
 
-          <div className="divide-y">
-            {tasks.map((task) => (
-              <AssessmentWorkflowCard
-                key={task.id}
-                title={task.title}
-                status={getTaskStatus(task.id)}
-                selected={selectedTaskId === task.id}
-                onClick={() => setSelectedTaskId(task.id)}
-              />
-            ))}
+          <div>
+            <div className="bg-emerald-50 px-5 py-2 text-xs font-bold uppercase tracking-wide text-emerald-800">
+              Suggested for This Patient
+            </div>
+
+            <div className="divide-y">
+              {suggestedTasks.map((task) => (
+                <AssessmentWorkflowCard
+                  key={task.id}
+                  title={task.title}
+                  status={getTaskStatus(task.id)}
+                  selected={selectedTaskId === task.id}
+                  onClick={() => setSelectedTaskId(task.id)}
+                />
+              ))}
+            </div>
+
+            <div className="bg-slate-100 px-5 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">
+              Additional Assessments
+            </div>
+
+            <div className="divide-y">
+              {additionalTasks.map((task) => (
+                <AssessmentWorkflowCard
+                  key={task.id}
+                  title={task.title}
+                  status={getTaskStatus(task.id)}
+                  selected={selectedTaskId === task.id}
+                  onClick={() => setSelectedTaskId(task.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
 
