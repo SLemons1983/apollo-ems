@@ -74,17 +74,34 @@ export default function ApolloBodyMap({
 
           {selectedRegionList.length > 0 ? (
             <div className="mt-3 space-y-2">
-              {selectedRegionList.map((region) => (
-                <button
-                  key={region.field}
-                  type="button"
-                  onClick={() => onRegionClick(region.field)}
-                  className="flex w-full items-center justify-between rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-sm font-semibold text-blue-950 hover:bg-blue-50"
-                >
-                  <span>{region.label}</span>
-                  <span>✓</span>
-                </button>
-              ))}
+              {selectedRegionList.map((region) => {
+                const status = regionStatuses[region.field];
+                const findingCount = status?.findingCount ?? 0;
+
+                return (
+                  <button
+                    key={region.field}
+                    type="button"
+                    onClick={() => onRegionClick(region.field)}
+                    className={`w-full rounded-lg border bg-white px-3 py-2 text-left text-sm font-semibold hover:bg-blue-50 ${
+                      findingCount > 0
+                        ? 'border-amber-300 text-amber-950'
+                        : 'border-blue-200 text-blue-950'
+                    }`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span>{region.label}</span>
+                      <span>✓</span>
+                    </span>
+
+                    {status?.note && (
+                      <span className="mt-1 block text-xs font-bold text-slate-600">
+                        {status.note}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm font-semibold text-slate-500">
@@ -101,8 +118,18 @@ export default function ApolloBodyMap({
             </div>
           </div>
 
-          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
-            Tip: select all regions examined, even if no abnormalities were found.
+          <div className="mt-4 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-full border border-blue-500 bg-blue-100" />
+              <span>Blue = selected / examined region</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-full border border-amber-500 bg-amber-100" />
+              <span>Amber = documented findings or CMS</span>
+            </div>
+            <div className="pt-2 text-slate-500">
+              Tip: select all regions examined, even if no abnormalities were found.
+            </div>
           </div>
         </div>
       </div>
