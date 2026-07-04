@@ -43,6 +43,15 @@ export default function EPCRClient() {
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>(() =>
     createDefaultComplaintForm(),
   );
+  const [assessmentProgress, setAssessmentProgress] = useState({
+    completedFields: 0,
+    totalFields: 0,
+    tasks: [] as {
+      title: string;
+      completedFields: number;
+      totalFields: number;
+    }[],
+  });
 
   const callRequiredFields = useMemo(
     () => getCallRequiredFields(callForm),
@@ -337,12 +346,19 @@ export default function EPCRClient() {
       totalFields: complaintTotalRequiredFields,
       tasks: complaintProgressTasks,
     },
+    {
+      title: 'Assessment',
+      completedFields: assessmentProgress.completedFields,
+      totalFields: assessmentProgress.totalFields || 1,
+      tasks: assessmentProgress.tasks,
+    },
     ...sections
       .filter(
         (section) =>
           section !== 'Call' &&
           section !== 'Patient' &&
-          section !== 'Complaint',
+          section !== 'Complaint' &&
+          section !== 'Assessment',
       )
       .map((section) => ({
         title: section,
@@ -548,6 +564,15 @@ export default function EPCRClient() {
                     cardiacArrest={
                       complaintForm.cardiacArrest !== '' &&
                       complaintForm.cardiacArrest !== 'No'
+                    }
+                    onProgressChange={(nextProgress) =>
+                      setAssessmentProgress((currentProgress) =>
+                        currentProgress.completedFields ===
+                          nextProgress.completedFields &&
+                        currentProgress.totalFields === nextProgress.totalFields
+                          ? currentProgress
+                          : nextProgress,
+                      )
                     }
                   />
                 ) : (

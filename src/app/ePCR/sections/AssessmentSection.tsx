@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PCRCard from '../components/PCRCard';
 import {
   determineAssessmentMode,
@@ -34,6 +34,15 @@ type AssessmentSectionProps = {
   possibleTrauma: boolean;
   behavioralHold: boolean;
   cardiacArrest: boolean;
+  onProgressChange: (progress: {
+    completedFields: number;
+    totalFields: number;
+    tasks: {
+      title: string;
+      completedFields: number;
+      totalFields: number;
+    }[];
+  }) => void;
 };
 
 export default function AssessmentSection({
@@ -43,6 +52,7 @@ export default function AssessmentSection({
   possibleTrauma,
   behavioralHold,
   cardiacArrest,
+  onProgressChange,
 }: AssessmentSectionProps) {
   const context = {
     clinicalCategory,
@@ -92,6 +102,10 @@ export default function AssessmentSection({
       gcsEyes: '',
       gcsVerbal: '',
       gcsMotor: '',
+      pupils: '',
+      skinColor: '',
+      skinTemperature: '',
+      skinCondition: '',
       lifeThreats: '',
       transportPriority: '',
     });
@@ -182,6 +196,13 @@ export default function AssessmentSection({
       ...current,
       [field]: fieldValue,
     }));
+
+    if (field === 'eventsLeadingToIllness') {
+      setPainAssessment((current) => ({
+        ...current,
+        onset: current.onset || fieldValue,
+      }));
+    }
   }
 
   function updatePainAssessment(
@@ -223,6 +244,38 @@ export default function AssessmentSection({
       [field]: fieldValue,
     }));
   }
+
+  useEffect(() => {
+    const taskProgress = suggestedTasks.map((task) => {
+      const progress = getTaskProgress(task.id);
+
+      return {
+        title: task.title,
+        completedFields: progress.completed,
+        totalFields: progress.total,
+      };
+    });
+
+    onProgressChange({
+      completedFields: taskProgress.reduce(
+        (total, task) => total + task.completedFields,
+        0,
+      ),
+      totalFields: taskProgress.reduce(
+        (total, task) => total + task.totalFields,
+        0,
+      ),
+      tasks: taskProgress,
+    });
+  }, [
+    suggestedTasks,
+    primaryAssessment,
+    clinicalHistory,
+    painAssessment,
+    gcsAssessment,
+    gfastAssessment,
+    onProgressChange,
+  ]);
 
   function renderTaskContent(taskId: string, title: string) {
     if (taskId === 'primary-assessment') {

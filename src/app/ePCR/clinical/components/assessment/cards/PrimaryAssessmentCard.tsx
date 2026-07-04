@@ -11,6 +11,10 @@ type PrimaryAssessmentForm = {
   gcsEyes: string;
   gcsVerbal: string;
   gcsMotor: string;
+  pupils: string;
+  skinColor: string;
+  skinTemperature: string;
+  skinCondition: string;
   lifeThreats: string;
   transportPriority: string;
 };
@@ -74,6 +78,26 @@ const groups: {
     field: 'gcsMotor',
     label: 'GCS - Motor Response',
     options: ['6 - Obeys Commands', '5 - Localizes Pain', '4 - Withdraws From Pain', '3 - Flexion To Pain', '2 - Extension To Pain', '1 - None'],
+  },
+  {
+    field: 'pupils',
+    label: 'PERRLA',
+    options: ['PERRLA', 'Unequal', 'Sluggish', 'Fixed', 'Unable to Assess'],
+  },
+  {
+    field: 'skinColor',
+    label: 'Skin Color',
+    options: ['Normal', 'Pale', 'Flushed', 'Cyanotic', 'Jaundiced'],
+  },
+  {
+    field: 'skinTemperature',
+    label: 'Skin Temperature',
+    options: ['Warm', 'Cool', 'Hot', 'Cold'],
+  },
+  {
+    field: 'skinCondition',
+    label: 'Skin Condition',
+    options: ['Dry', 'Diaphoretic', 'Moist', 'Poor Turgor'],
   },
   {
     field: 'lifeThreats',

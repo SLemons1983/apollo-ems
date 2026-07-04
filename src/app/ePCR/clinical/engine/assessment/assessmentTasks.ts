@@ -8,12 +8,6 @@ export const assessmentTasks: AssessmentTask[] = [
     alwaysShow: true,
   },
   {
-    id: 'pupillary-assessment',
-    title: 'Pupillary Assessment / PERRLA',
-    mode: ['medical', 'trauma', 'stroke', 'cardiac-arrest', 'behavioral', 'ob', 'pediatric'],
-    alwaysShow: true,
-  },
-  {
     id: 'history-taking',
     title: 'History Assessment / SAMPLE',
     mode: ['medical', 'trauma', 'stroke', 'behavioral', 'ob', 'pediatric'],
@@ -83,12 +77,6 @@ export const assessmentTasks: AssessmentTask[] = [
     id: 'neonate-assessment',
     title: 'Neonate Assessment / APGAR',
     mode: ['ob', 'pediatric'],
-  },
-  {
-    id: 'skin-assessment',
-    title: 'Skin Assessment',
-    mode: ['medical', 'trauma', 'stroke', 'cardiac-arrest'],
-    alwaysShow: true,
   },
   {
     id: 'reassessment',
