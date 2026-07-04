@@ -4,6 +4,7 @@ import { useState } from 'react';
 import ApolloBodyFigure from './ApolloBodyFigure';
 import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
 import { apolloBodyRegions, type ApolloBodyRegionDefinition } from './bodyMapData';
+import { apolloBodyMapModeConfig } from './bodyMapModeConfig';
 import type {
   ApolloBodyMapMode,
   ApolloBodyRegionKey,
@@ -57,6 +58,8 @@ export default function ApolloBodyMap({
     null,
   );
 
+  const modeConfig = apolloBodyMapModeConfig[mode];
+
   const selectedRegionList = apolloBodyRegions.filter(
     (region) => selectedRegions[region.field],
   );
@@ -74,10 +77,10 @@ export default function ApolloBodyMap({
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-black uppercase tracking-wide text-slate-700">
-            Apollo Body Map
+            {modeConfig.title}
           </h4>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            Select body regions using the map or the region buttons below.
+            {modeConfig.instructions}
           </p>
         </div>
 
@@ -223,7 +226,7 @@ export default function ApolloBodyMap({
               </div>
             ) : (
               <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm font-semibold text-slate-500">
-                No regions selected yet.
+                {modeConfig.emptyState}
               </div>
             )}
           </div>
@@ -240,14 +243,14 @@ export default function ApolloBodyMap({
           <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full border border-blue-500 bg-blue-100" />
-              <span>Blue = selected / examined region</span>
+              <span>{modeConfig.selectedLegend}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full border border-amber-500 bg-amber-100" />
-              <span>Amber = documented findings or CMS</span>
+              <span>{modeConfig.clinicalDataLegend}</span>
             </div>
             <div className="pt-2 text-slate-500">
-              Tip: select all regions examined, even if no abnormalities were found.
+              {modeConfig.tip}
             </div>
           </div>
         </div>
