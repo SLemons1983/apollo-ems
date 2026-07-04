@@ -1,8 +1,7 @@
 'use client';
 
-import ApolloBodyMap, {
-  type ApolloBodyRegionKey,
-} from '../../body-map/ApolloBodyMap';
+import ApolloBodyMap from '../../body-map/ApolloBodyMap';
+import type { ApolloBodyRegionKey } from '../../body-map/bodyMapTypes';
 
 type TraumaRegionKey =
   | 'head'
@@ -161,6 +160,7 @@ export default function TraumaAssessmentCard({
       </div>
 
       <ApolloBodyMap
+        mode="trauma"
         selectedRegions={selectedBodyMapRegions}
         onRegionClick={(region) =>
           onRegionChange(region, !value.regions[region].selected)
