@@ -4,6 +4,9 @@ import { useState } from 'react';
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
 } from '../clinical/components/assessment/cards/ClinicalHistoryCard';
+import ConsciousnessAssessmentCard, {
+  type ConsciousnessAssessmentForm,
+} from '../clinical/components/assessment/cards/ConsciousnessAssessmentCard';
 import AssessmentWorkflowCard from '../clinical/components/assessment/AssessmentWorkflowCard';
 import GcsAssessmentCard, {
   type GcsAssessmentForm,
@@ -58,6 +61,12 @@ export default function AssessmentSection({
   const [selectedTaskId, setSelectedTaskId] = useState(
     suggestedTasks[0]?.id ?? tasks[0]?.id ?? '',
   );
+  const [consciousnessAssessment, setConsciousnessAssessment] =
+    useState<ConsciousnessAssessmentForm>({
+      avpu: '',
+      orientation: '',
+    });
+
   const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistoryForm>({
     eventsLeadingToIllness: '',
     additionalHistoryNotes: '',
@@ -102,6 +111,13 @@ export default function AssessmentSection({
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === 'consciousness-assessment') {
+      const completedFields = Object.values(consciousnessAssessment).filter(Boolean).length;
+
+      if (completedFields === Object.keys(consciousnessAssessment).length) return 'complete';
+      if (completedFields > 0) return 'in-progress';
+    }
+
     if (taskId === 'history-taking') {
       const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
 
@@ -191,6 +207,16 @@ export default function AssessmentSection({
     }
 
     return 'not-started';
+  }
+
+  function updateConsciousnessAssessment(
+    field: keyof ConsciousnessAssessmentForm,
+    fieldValue: string,
+  ) {
+    setConsciousnessAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
   }
 
   function updateClinicalHistory(
@@ -326,7 +352,12 @@ export default function AssessmentSection({
                 </p>
               </div>
 
-              {selectedTask.id === 'history-taking' ? (
+              {selectedTask.id === 'consciousness-assessment' ? (
+                <ConsciousnessAssessmentCard
+                  value={consciousnessAssessment}
+                  onChange={updateConsciousnessAssessment}
+                />
+              ) : selectedTask.id === 'history-taking' ? (
                 <ClinicalHistoryCard
                   value={clinicalHistory}
                   patientForm={patientForm}
