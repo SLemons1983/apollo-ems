@@ -27,6 +27,7 @@ import PrimaryAssessmentCard, {
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
 import TraumaAssessmentCard, {
   type TraumaAssessmentForm,
+  type TraumaFindingKey,
   type TraumaRegionKey,
 } from '../clinical/components/assessment/cards/TraumaAssessmentCard';
 import type { PatientForm } from '../types';
@@ -134,17 +135,149 @@ export default function AssessmentSection({
   const [traumaAssessment, setTraumaAssessment] =
     useState<TraumaAssessmentForm>({
       regions: {
-        head: false,
-        face: false,
-        neck: false,
-        chest: false,
-        abdomen: false,
-        pelvis: false,
-        back: false,
-        rightArm: false,
-        leftArm: false,
-        rightLeg: false,
-        leftLeg: false,
+        head: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        face: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        neck: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        chest: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        abdomen: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        pelvis: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        back: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        rightArm: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        leftArm: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        rightLeg: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
+        leftLeg: {
+          selected: false,
+          findings: {
+            deformity: false,
+            contusions: false,
+            abrasions: false,
+            puncturesPenetrations: false,
+            burns: false,
+            tenderness: false,
+            lacerations: false,
+            swelling: false,
+          },
+        },
       },
     });
 
@@ -199,8 +332,19 @@ export default function AssessmentSection({
     }
 
     if (taskId === 'trauma-assessment') {
-      const completed = Object.values(traumaAssessment.regions).filter(Boolean).length;
-      return { completed, total: Object.keys(traumaAssessment.regions).length };
+      const selectedRegions = Object.values(traumaAssessment.regions).filter(
+        (region) => region.selected,
+      );
+      const completedFindings = selectedRegions.reduce(
+        (total, region) =>
+          total + Object.values(region.findings).filter(Boolean).length,
+        0,
+      );
+
+      return {
+        completed: selectedRegions.length + completedFindings,
+        total: Object.keys(traumaAssessment.regions).length,
+      };
     }
 
     return { completed: 0, total: 1 };
@@ -273,12 +417,35 @@ export default function AssessmentSection({
     }));
   }
 
-  function updateTraumaAssessment(field: TraumaRegionKey, fieldValue: boolean) {
+  function updateTraumaRegion(field: TraumaRegionKey, fieldValue: boolean) {
     setTraumaAssessment((current) => ({
       ...current,
       regions: {
         ...current.regions,
-        [field]: fieldValue,
+        [field]: {
+          ...current.regions[field],
+          selected: fieldValue,
+        },
+      },
+    }));
+  }
+
+  function updateTraumaFinding(
+    region: TraumaRegionKey,
+    finding: TraumaFindingKey,
+    fieldValue: boolean,
+  ) {
+    setTraumaAssessment((current) => ({
+      ...current,
+      regions: {
+        ...current.regions,
+        [region]: {
+          ...current.regions[region],
+          findings: {
+            ...current.regions[region].findings,
+            [finding]: fieldValue,
+          },
+        },
       },
     }));
   }
@@ -373,7 +540,8 @@ export default function AssessmentSection({
       return (
         <TraumaAssessmentCard
           value={traumaAssessment}
-          onChange={updateTraumaAssessment}
+          onRegionChange={updateTraumaRegion}
+          onFindingChange={updateTraumaFinding}
         />
       );
     }
