@@ -11,6 +11,9 @@ import GcsAssessmentCard, {
 import GfastAssessmentCard, {
   type GfastAssessmentForm,
 } from '../clinical/components/assessment/cards/GfastAssessmentCard';
+import PainAssessmentCard, {
+  type PainAssessmentForm,
+} from '../clinical/components/assessment/cards/PainAssessmentCard';
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
@@ -65,6 +68,18 @@ export default function AssessmentSection({
     associatedSymptoms: '',
   });
 
+  const [painAssessment, setPainAssessment] = useState<PainAssessmentForm>({
+    painPresent: '',
+    painScaleType: '',
+    numericPainScore: '',
+    facesPainScore: '',
+    onset: '',
+    provocation: '',
+    quality: '',
+    radiation: '',
+    time: '',
+  });
+
   const [primaryAssessment, setPrimaryAssessment] =
     useState<PrimaryAssessmentForm>({
       generalImpression: '',
@@ -92,6 +107,35 @@ export default function AssessmentSection({
   const selectedTask = tasks.find((task) => task.id === selectedTaskId);
 
   function getTaskStatus(taskId: string): AssessmentStatus {
+    if (taskId === 'pain-assessment') {
+      const requiredFields = [
+        painAssessment.painPresent,
+        ...(painAssessment.painPresent === 'Yes'
+          ? [
+              painAssessment.painScaleType,
+              painAssessment.painScaleType === '0-10 Numeric'
+                ? painAssessment.numericPainScore
+                : painAssessment.facesPainScore,
+              painAssessment.onset,
+              painAssessment.provocation,
+              painAssessment.quality,
+              painAssessment.radiation,
+              painAssessment.time,
+            ]
+          : []),
+      ];
+
+      const completedFields = requiredFields.filter(Boolean).length;
+
+      if (completedFields === requiredFields.length) {
+        return 'complete';
+      }
+
+      if (completedFields > 0) {
+        return 'in-progress';
+      }
+    }
+
     if (taskId === 'history-taking') {
       const completedFields = Object.values(clinicalHistory).filter(Boolean).length;
 
@@ -145,6 +189,16 @@ export default function AssessmentSection({
     }
 
     return 'not-started';
+  }
+
+  function updatePainAssessment(
+    field: keyof PainAssessmentForm,
+    fieldValue: string,
+  ) {
+    setPainAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
   }
 
   function updateClinicalHistory(
@@ -270,7 +324,12 @@ export default function AssessmentSection({
                 </p>
               </div>
 
-              {selectedTask.id === 'history-taking' ? (
+              {selectedTask.id === 'pain-assessment' ? (
+                <PainAssessmentCard
+                  value={painAssessment}
+                  onChange={updatePainAssessment}
+                />
+              ) : selectedTask.id === 'history-taking' ? (
                 <ClinicalHistoryCard
                   value={clinicalHistory}
                   patientForm={patientForm}
