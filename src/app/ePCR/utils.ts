@@ -21,6 +21,15 @@ export function createDefaultCallForm(): CallForm {
     respondingUnitNumber: '',
     respondingCrew: '',
     pcrDocumentedBy: '',
+    crewMembers: [
+      {
+        id: 'crew-1',
+        name: '',
+        certification: 'EMT',
+        role: 'Primary Care Giver',
+        isDocumentingPcr: true,
+      },
+    ],
     dispatchedNatureOfCall: '',
     typeOfServiceRequested: '',
     responseModeToScene: '',
@@ -56,8 +65,15 @@ export function getCallRequiredFields(callForm: CallForm) {
     callForm.emsIncidentNumber,
     callForm.dispatchedPriority,
     callForm.respondingUnitNumber,
-    callForm.respondingCrew,
-    callForm.pcrDocumentedBy,
+    callForm.crewMembers.length > 0 &&
+    callForm.crewMembers.every(
+      (member) => member.name && member.certification && member.role,
+    )
+      ? 'crew-complete'
+      : '',
+    callForm.crewMembers.some((member) => member.isDocumentingPcr)
+      ? 'documentor-selected'
+      : '',
     callForm.dispatchedNatureOfCall,
     callForm.typeOfServiceRequested,
     callForm.responseModeToScene,

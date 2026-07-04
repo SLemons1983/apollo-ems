@@ -1,3 +1,11 @@
+export type CrewMember = {
+  id: string;
+  name: string;
+  certification: 'EMT' | 'Paramedic' | 'Trainee/Student';
+  role: 'Primary Care Giver' | 'Secondary Care Giver' | 'Observer-Non Care Giver';
+  isDocumentingPcr: boolean;
+};
+
 export type CallForm = {
   emsResponseNumber: string;
   emsIncidentNumber: string;
@@ -5,6 +13,7 @@ export type CallForm = {
   respondingUnitNumber: string;
   respondingCrew: string;
   pcrDocumentedBy: string;
+  crewMembers: CrewMember[];
   dispatchedNatureOfCall: string;
   typeOfServiceRequested: string;
   responseModeToScene: string;

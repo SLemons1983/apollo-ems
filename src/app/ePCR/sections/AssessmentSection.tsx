@@ -29,6 +29,7 @@ import type { PatientForm } from '../types';
 
 type AssessmentSectionProps = {
   patientForm: PatientForm;
+  providerScope: 'BLS' | 'ALS';
   clinicalCategory: string;
   suspectedStroke: boolean;
   possibleTrauma: boolean;
@@ -47,6 +48,7 @@ type AssessmentSectionProps = {
 
 export default function AssessmentSection({
   patientForm,
+  providerScope,
   clinicalCategory,
   suspectedStroke,
   possibleTrauma,
@@ -360,6 +362,15 @@ export default function AssessmentSection({
             </div>
             <div className="text-lg font-semibold text-slate-900">
               {clinicalCategory || 'Not Yet Selected'}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-bold uppercase text-slate-500">
+              Documenting Provider Scope
+            </div>
+            <div className="text-lg font-semibold text-slate-900">
+              {providerScope}
             </div>
           </div>
         </div>

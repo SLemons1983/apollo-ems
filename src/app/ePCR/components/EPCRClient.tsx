@@ -212,8 +212,15 @@ export default function EPCRClient() {
       title: 'Crew Information',
       completedFields: [
         callForm.respondingUnitNumber,
-        callForm.pcrDocumentedBy,
-        callForm.respondingCrew,
+        callForm.crewMembers.length > 0 &&
+        callForm.crewMembers.every(
+          (member) => member.name && member.certification && member.role,
+        )
+          ? 'crew-complete'
+          : '',
+        callForm.crewMembers.some((member) => member.isDocumentingPcr)
+          ? 'documentor-selected'
+          : '',
       ].filter(Boolean).length,
       totalFields: 3,
     },
@@ -436,6 +443,21 @@ export default function EPCRClient() {
 
       setCallForm({
         ...uploadedCallForm,
+        crewMembers:
+          uploadedCallForm.crewMembers && uploadedCallForm.crewMembers.length > 0
+            ? uploadedCallForm.crewMembers
+            : [
+                {
+                  id: 'crew-1',
+                  name:
+                    uploadedCallForm.pcrDocumentedBy ||
+                    uploadedCallForm.respondingCrew ||
+                    '',
+                  certification: 'EMT',
+                  role: 'Primary Care Giver',
+                  isDocumentingPcr: true,
+                },
+              ],
         personalProtectiveEquipmentUsed: Array.isArray(
           uploadedCallForm.personalProtectiveEquipmentUsed,
         )
@@ -555,6 +577,13 @@ export default function EPCRClient() {
                 ) : section === 'Assessment' ? (
                   <AssessmentSection
                     patientForm={patientForm}
+                    providerScope={
+                      callForm.crewMembers.find(
+                        (member) => member.isDocumentingPcr,
+                      )?.certification === 'Paramedic'
+                        ? 'ALS'
+                        : 'BLS'
+                    }
                     clinicalCategory={complaintForm.clinicalCategory}
                     suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
                     possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
