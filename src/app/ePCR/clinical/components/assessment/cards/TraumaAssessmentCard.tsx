@@ -1,5 +1,9 @@
 'use client';
 
+import ApolloBodyMap, {
+  type ApolloBodyRegionKey,
+} from '../../body-map/ApolloBodyMap';
+
 type TraumaRegionKey =
   | 'head'
   | 'face'
@@ -126,6 +130,14 @@ export default function TraumaAssessmentCard({
     (region) => value.regions[region.field].selected,
   );
 
+  const selectedBodyMapRegions = traumaRegions.reduce(
+    (regions, region) => ({
+      ...regions,
+      [region.field]: value.regions[region.field].selected,
+    }),
+    {} as Record<ApolloBodyRegionKey, boolean>,
+  );
+
   const totalFindings = selectedRegions.reduce(
     (total, region) => total + getRegionFindingCount(value.regions[region.field]),
     0,
@@ -147,6 +159,13 @@ export default function TraumaAssessmentCard({
           each selected region.
         </div>
       </div>
+
+      <ApolloBodyMap
+        selectedRegions={selectedBodyMapRegions}
+        onRegionClick={(region) =>
+          onRegionChange(region, !value.regions[region].selected)
+        }
+      />
 
       <div>
         <h4 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
