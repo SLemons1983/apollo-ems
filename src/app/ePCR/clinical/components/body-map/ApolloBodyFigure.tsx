@@ -81,7 +81,7 @@ export default function ApolloBodyFigure({
         <ApolloBodyRegion
           key={region.field}
           region={region.field}
-          label={region.label}
+          label={region.shortLabel}
           layoutClass={regionPositionClasses[region.field]}
           status={{
             ...regionStatuses[region.field],

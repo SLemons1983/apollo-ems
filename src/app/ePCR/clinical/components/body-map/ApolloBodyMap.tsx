@@ -39,6 +39,11 @@ export default function ApolloBodyMap({
 
   const activeStatus = activeRegion ? regionStatuses[activeRegion] : undefined;
 
+  const clinicalGroupLabel = activeRegionDefinition?.clinicalGroup
+    .split('-')
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(' ');
+
   return (
     <div className="rounded-xl border border-slate-300 bg-white p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -88,8 +93,22 @@ export default function ApolloBodyMap({
             <div className="mt-1 text-sm font-black text-slate-900">
               {activeRegionDefinition?.label || 'None'}
             </div>
+            {activeRegionDefinition && (
+              <div className="mt-2 grid gap-2 text-xs font-bold text-slate-600">
+                <div className="rounded-lg bg-slate-50 px-2 py-1">
+                  Group: {clinicalGroupLabel}
+                </div>
+                <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
+                  Laterality: {activeRegionDefinition.laterality}
+                </div>
+                <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
+                  View: {activeRegionDefinition.view}
+                </div>
+              </div>
+            )}
+
             {activeStatus?.note && (
-              <div className="mt-1 text-xs font-bold text-amber-700">
+              <div className="mt-2 text-xs font-bold text-amber-700">
                 {activeStatus.note}
               </div>
             )}
