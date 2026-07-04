@@ -26,3 +26,6 @@ export type ApolloBodyRegionStatus = {
   findingCount?: number;
   note?: string;
 };
+
+
+export type ApolloBodyView = 'front' | 'back';
