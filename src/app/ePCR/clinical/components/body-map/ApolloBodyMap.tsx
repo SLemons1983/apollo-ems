@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import ApolloBodyFigure from './ApolloBodyFigure';
+import ApolloBodySvg from './svg/ApolloBodySvg';
 import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
 import { apolloBodyRegions, type ApolloBodyRegionDefinition } from './bodyMapData';
 import { apolloBodyMapModeConfig } from './bodyMapModeConfig';
@@ -138,7 +138,7 @@ export default function ApolloBodyMap({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-        <ApolloBodyFigure
+        <ApolloBodySvg
           view={view}
           selectedRegions={selectedRegions}
           regionStatuses={combinedRegionStatuses}
