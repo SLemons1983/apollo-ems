@@ -22,35 +22,77 @@ type ApolloBodySvgProps = {
 export default function ApolloBodySvg(props: ApolloBodySvgProps) {
   const regions = props.view === 'front' ? bodySvgFront : bodySvgBack;
 
-  // Until the anatomical SVG is populated, continue using the
-  // current renderer so nothing regresses.
   if (regions.length === 0) {
     return <ApolloBodyFigure {...props} />;
   }
 
   return (
-    <div className="rounded-2xl border border-slate-300 bg-white p-4">
+    <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4">
       <svg
         viewBox="0 0 600 900"
+        role="img"
+        aria-label={`Apollo body map ${props.view} view`}
         className="mx-auto h-auto w-full max-w-md"
       >
-        {regions.map((region) => (
-          <path
-            key={region.id}
-            d={region.path}
-            fill={
-              props.selectedRegions[region.id]
-                ? '#3b82f6'
-                : '#f8fafc'
-            }
-            stroke="#475569"
-            strokeWidth="2"
-            onClick={() => props.onRegionClick(region.id)}
-            onMouseEnter={() => props.onFocusRegion(region.id)}
-            onMouseLeave={props.onBlurRegion}
-            style={{ cursor: 'pointer' }}
-          />
-        ))}
+        <rect x="0" y="0" width="600" height="900" rx="32" fill="#f8fafc" />
+
+        {regions.map((region) => {
+          const selected = props.selectedRegions[region.id];
+          const status = props.regionStatuses[region.id];
+          const hasClinicalData =
+            (status?.findingCount ?? 0) > 0 ||
+            Boolean(status?.note) ||
+            Boolean(status?.overlays?.length);
+          const active = props.activeRegion === region.id;
+
+          return (
+            <path
+              key={region.id}
+              d={region.path}
+              fill={
+                selected
+                  ? hasClinicalData
+                    ? '#fef3c7'
+                    : '#dbeafe'
+                  : hasClinicalData
+                    ? '#fffbeb'
+                    : '#ffffff'
+              }
+              stroke={active ? '#0f172a' : selected ? '#2563eb' : '#64748b'}
+              strokeWidth={active ? 5 : selected ? 4 : 2}
+              onClick={() => props.onRegionClick(region.id)}
+              onMouseEnter={() => props.onFocusRegion(region.id)}
+              onMouseLeave={props.onBlurRegion}
+              onFocus={() => props.onFocusRegion(region.id)}
+              onBlur={props.onBlurRegion}
+              tabIndex={0}
+              role="button"
+              aria-pressed={selected}
+              aria-label={region.label}
+              className="cursor-pointer transition"
+            />
+          );
+        })}
+
+        {regions.map((region) => {
+          const status = props.regionStatuses[region.id];
+          const count = status?.overlays?.length ?? status?.findingCount ?? 0;
+
+          if (!count) {
+            return null;
+          }
+
+          return (
+            <text
+              key={`${region.id}-count`}
+              x="300"
+              y="40"
+              className="hidden"
+            >
+              {region.label}: {count}
+            </text>
+          );
+        })}
       </svg>
     </div>
   );
