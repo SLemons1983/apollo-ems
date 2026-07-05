@@ -2,6 +2,10 @@
 
 import ApolloBodyMap from '../../body-map/ApolloBodyMap';
 import type { ApolloBodyRegionKey } from '../../body-map/bodyMapTypes';
+import {
+  createCmsOverlay,
+  createFindingOverlay,
+} from '../../../body-map/overlayFactory';
 import type { ApolloClinicalOverlay } from '../../../body-map/types';
 
 type TraumaRegionKey =
@@ -154,25 +158,17 @@ export default function TraumaAssessmentCard({
 
       const findingOverlays = traumaFindings
         .filter((finding) => regionValue.findings[finding.field])
-        .map((finding) => ({
-          id: `${region.field}-${finding.field}`,
-          region: region.field,
-          type: 'finding' as const,
-          label: finding.label,
-          value: finding.label,
-          color: 'amber' as const,
-        }));
+        .map((finding) => createFindingOverlay(region.field, finding.label));
 
       const cmsOverlays = cmsGroups
         .filter((group) => regionValue.cms[group.field])
-        .map((group) => ({
-          id: `${region.field}-cms-${group.field}`,
-          region: region.field,
-          type: 'cms' as const,
-          label: group.label,
-          value: `${group.label}: ${regionValue.cms[group.field]}`,
-          color: 'green' as const,
-        }));
+        .map((group) =>
+          createCmsOverlay(
+            region.field,
+            group.label,
+            regionValue.cms[group.field],
+          ),
+        );
 
       return [...findingOverlays, ...cmsOverlays];
     },
