@@ -24,6 +24,7 @@ export type ApolloClinicalOverlay = {
   label: string;
   value?: string;
   severity?: number;
+  severityLabel?: string;
   laterality?: 'left' | 'right' | 'bilateral' | 'midline';
   color?: ApolloClinicalOverlayColor;
   metadata?: Record<string, string | number | boolean>;

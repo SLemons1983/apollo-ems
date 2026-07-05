@@ -29,6 +29,7 @@ export function buildBodyRegionStatusesFromClinicalOverlays(
             label: overlay.label,
             value: overlay.value,
             count: overlay.severity,
+            severityLabel: overlay.severityLabel,
             color: overlay.color,
           })),
         },

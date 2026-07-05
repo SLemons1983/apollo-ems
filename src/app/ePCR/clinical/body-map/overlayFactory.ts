@@ -11,6 +11,7 @@ type CreateClinicalOverlayInput = {
   label: string;
   value?: string;
   severity?: number;
+  severityLabel?: string;
   color?: ApolloClinicalOverlayColor;
   metadata?: Record<string, string | number | boolean>;
 };
@@ -44,6 +45,7 @@ export function createClinicalOverlay({
   label,
   value,
   severity,
+  severityLabel,
   color,
   metadata,
 }: CreateClinicalOverlayInput): ApolloClinicalOverlay {
@@ -58,6 +60,7 @@ export function createClinicalOverlay({
     label,
     value,
     severity,
+    severityLabel,
     color: color ?? defaultOverlayColors[type],
     metadata,
   };

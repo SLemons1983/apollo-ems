@@ -33,11 +33,18 @@ export default function ApolloBodyOverlayBadge({
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide ${colorClass}`}
     >
       <span>{overlay.label || overlayLabels[overlay.type]}</span>
-      {overlay.count !== undefined && overlay.count > 0 && (
+      {overlay.severityLabel && (
         <span className="rounded-full bg-white/80 px-1.5 py-0.5">
-          {overlay.count}
+          {overlay.severityLabel}
         </span>
       )}
+      {!overlay.severityLabel &&
+        overlay.count !== undefined &&
+        overlay.count > 0 && (
+          <span className="rounded-full bg-white/80 px-1.5 py-0.5">
+            {overlay.count}
+          </span>
+        )}
     </span>
   );
 }

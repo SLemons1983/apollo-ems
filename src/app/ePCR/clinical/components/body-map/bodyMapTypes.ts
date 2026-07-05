@@ -39,6 +39,7 @@ export type ApolloBodyOverlay = {
   label: string;
   value?: string;
   count?: number;
+  severityLabel?: string;
   color?: ApolloBodyOverlayColor;
 };
 
