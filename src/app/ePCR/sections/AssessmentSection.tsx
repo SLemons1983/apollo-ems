@@ -25,6 +25,9 @@ import PainAssessmentCard, {
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
+import ReassessmentCard, {
+  type ReassessmentForm,
+} from '../clinical/components/assessment/cards/ReassessmentCard';
 import TraumaAssessmentCard, {
   type TraumaAssessmentForm,
   type TraumaCmsAssessment,
@@ -211,6 +214,18 @@ export default function AssessmentSection({
       },
     });
 
+  const [reassessment, setReassessment] = useState<ReassessmentForm>({
+    reason: '',
+    patientCondition: '',
+    mentalStatus: '',
+    airwayBreathing: '',
+    circulation: '',
+    painChange: '',
+    interventionsResponse: '',
+    transportPriority: '',
+    notes: '',
+  });
+
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
       const completed = Object.values(primaryAssessment).filter(Boolean).length;
@@ -280,6 +295,11 @@ export default function AssessmentSection({
         completed: selectedRegions.length + completedFindings + completedCms,
         total: Object.keys(traumaAssessment.regions).length,
       };
+    }
+
+    if (taskId === 'reassessment') {
+      const completed = Object.values(reassessment).filter(Boolean).length;
+      return { completed, total: Object.keys(reassessment).length };
     }
 
     return { completed: 0, total: 1 };
@@ -405,6 +425,16 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateReassessment(
+    field: keyof ReassessmentForm,
+    fieldValue: string,
+  ) {
+    setReassessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
       const progress = getTaskProgress(task.id);
@@ -435,6 +465,7 @@ export default function AssessmentSection({
     gcsAssessment,
     gfastAssessment,
     traumaAssessment,
+    reassessment,
     onProgressChange,
   ]);
 
@@ -498,6 +529,15 @@ export default function AssessmentSection({
           onRegionChange={updateTraumaRegion}
           onFindingChange={updateTraumaFinding}
           onCmsChange={updateTraumaCms}
+        />
+      );
+    }
+
+    if (taskId === 'reassessment') {
+      return (
+        <ReassessmentCard
+          value={reassessment}
+          onChange={updateReassessment}
         />
       );
     }
