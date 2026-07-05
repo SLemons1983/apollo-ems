@@ -114,7 +114,7 @@ export default function ApolloBodyMap({
         />
 
         <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="min-h-[178px] rounded-lg border border-slate-200 bg-white p-3">
             <div className="text-xs font-black uppercase tracking-wide text-slate-500">
               Current Focus
             </div>
@@ -122,36 +122,33 @@ export default function ApolloBodyMap({
               {activeRegionDefinition?.label || 'None'}
             </div>
 
-            {activeRegionDefinition && (
-              <div className="mt-2 grid gap-2 text-xs font-bold text-slate-600">
-                <div className="rounded-lg bg-slate-50 px-2 py-1">
-                  Group: {clinicalGroupLabels[activeRegionDefinition.clinicalGroup]}
-                </div>
-                <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
-                  Laterality: {activeRegionDefinition.laterality}
-                </div>
-                <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
-                  View: {activeRegionDefinition.view}
-                </div>
+            <div className="mt-2 grid gap-2 text-xs font-bold text-slate-600">
+              <div className="rounded-lg bg-slate-50 px-2 py-1">
+                Group:{' '}
+                {activeRegionDefinition
+                  ? clinicalGroupLabels[activeRegionDefinition.clinicalGroup]
+                  : '—'}
               </div>
-            )}
+              <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
+                Laterality: {activeRegionDefinition?.laterality || '—'}
+              </div>
+              <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
+                View: {activeRegionDefinition?.view || '—'}
+              </div>
+            </div>
 
-            {activeStatus?.note && (
-              <div className="mt-2 text-xs font-bold text-amber-700">
-                {activeStatus.note}
-              </div>
-            )}
+            <div className="mt-2 min-h-[18px] text-xs font-bold text-amber-700">
+              {activeStatus?.note || ''}
+            </div>
 
-            {activeStatus?.overlays && activeStatus.overlays.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {activeStatus.overlays.map((overlay) => (
-                  <ApolloBodyOverlayBadge
-                    key={`${activeRegion}-${overlay.type}-${overlay.label}`}
-                    overlay={overlay}
-                  />
-                ))}
-              </div>
-            )}
+            <div className="mt-2 flex min-h-[26px] flex-wrap gap-1">
+              {activeStatus?.overlays?.map((overlay) => (
+                <ApolloBodyOverlayBadge
+                  key={`${activeRegion}-${overlay.type}-${overlay.label}`}
+                  overlay={overlay}
+                />
+              ))}
+            </div>
           </div>
 
           <div>
