@@ -287,7 +287,7 @@ export default function ApolloBodyMap({
                             <span className="text-slate-900">
                               {item.region.label}:
                             </span>{' '}
-                            {item.overlay.label}
+                            {item.overlay.value || item.overlay.label}
                             {item.overlay.count !== undefined &&
                               item.overlay.count > 0 && (
                                 <span> ({item.overlay.count})</span>

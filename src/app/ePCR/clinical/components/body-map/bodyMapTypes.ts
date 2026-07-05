@@ -28,10 +28,18 @@ export type ApolloBodyOverlayType =
   | 'procedure'
   | 'treatment';
 
+export type ApolloBodyOverlayColor =
+  | 'blue'
+  | 'amber'
+  | 'red'
+  | 'green';
+
 export type ApolloBodyOverlay = {
   type: ApolloBodyOverlayType;
   label: string;
+  value?: string;
   count?: number;
+  color?: ApolloBodyOverlayColor;
 };
 
 export type ApolloBodyRegionStatus = {

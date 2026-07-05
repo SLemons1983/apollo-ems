@@ -27,7 +27,9 @@ export function buildBodyRegionStatusesFromClinicalOverlays(
           overlays: regionOverlays.map((overlay) => ({
             type: overlay.type,
             label: overlay.label,
+            value: overlay.value,
             count: overlay.severity,
+            color: overlay.color,
           })),
         },
       };
