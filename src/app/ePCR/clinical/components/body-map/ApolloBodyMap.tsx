@@ -53,6 +53,13 @@ function getGroupedRegions(regions: ApolloBodyRegionDefinition[]) {
     .filter((group) => group.regions.length > 0);
 }
 
+function getOverlayTypeLabel(type: string) {
+  return type
+    .split('-')
+    .map((word) => word[0].toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function ApolloBodyMap({
   selectedRegions,
   onRegionClick,
@@ -84,6 +91,21 @@ export default function ApolloBodyMap({
     : null;
 
   const activeStatus = activeRegion ? combinedRegionStatuses[activeRegion] : undefined;
+
+  const selectedOverlaySummary = selectedRegionList.flatMap((region) =>
+    (combinedRegionStatuses[region.field]?.overlays ?? []).map((overlay) => ({
+      region,
+      overlay,
+    })),
+  );
+
+  const groupedOverlaySummary = selectedOverlaySummary.reduce(
+    (groups, item) => ({
+      ...groups,
+      [item.overlay.type]: [...(groups[item.overlay.type] ?? []), item],
+    }),
+    {} as Record<string, typeof selectedOverlaySummary>,
+  );
 
   return (
     <div className="rounded-xl border border-slate-300 bg-white p-4">
@@ -240,6 +262,45 @@ export default function ApolloBodyMap({
               </div>
             )}
           </div>
+
+          {selectedOverlaySummary.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
+                <span>Clinical Overlay Summary</span>
+                <span>{selectedOverlaySummary.length}</span>
+              </div>
+
+              <div className="space-y-3">
+                {Object.entries(groupedOverlaySummary).map(
+                  ([overlayType, items]) => (
+                    <div key={overlayType}>
+                      <div className="mb-1 text-xs font-black uppercase tracking-wide text-slate-500">
+                        {getOverlayTypeLabel(overlayType)}
+                      </div>
+
+                      <div className="space-y-1">
+                        {items.map((item) => (
+                          <div
+                            key={`${item.region.field}-${item.overlay.type}-${item.overlay.label}-${item.overlay.count ?? 'none'}`}
+                            className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
+                          >
+                            <span className="text-slate-900">
+                              {item.region.label}:
+                            </span>{' '}
+                            {item.overlay.label}
+                            {item.overlay.count !== undefined &&
+                              item.overlay.count > 0 && (
+                                <span> ({item.overlay.count})</span>
+                              )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="border-t border-slate-200 pt-4">
             <div className="text-xs font-black uppercase tracking-wide text-slate-600">
