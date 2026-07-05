@@ -2,6 +2,7 @@
 
 import ApolloBodyMap from '../../body-map/ApolloBodyMap';
 import type { ApolloBodyRegionKey } from '../../body-map/bodyMapTypes';
+import type { ApolloClinicalOverlay } from '../../../body-map/types';
 
 type TraumaRegionKey =
   | 'head'
@@ -147,43 +148,34 @@ export default function TraumaAssessmentCard({
     0,
   );
 
-  const bodyMapRegionStatuses = traumaRegions.reduce(
-    (statuses, region) => {
-      const findingCount = getRegionFindingCount(value.regions[region.field]);
-      const cmsCount = getRegionCmsCount(value.regions[region.field]);
+  const clinicalOverlays: ApolloClinicalOverlay[] = selectedRegions.flatMap(
+    (region) => {
+      const regionValue = value.regions[region.field];
 
-      return {
-        ...statuses,
-        [region.field]: {
-          findingCount: findingCount + cmsCount,
-          note:
-            findingCount > 0 || cmsCount > 0
-              ? `${findingCount} finding${findingCount === 1 ? '' : 's'} · ${cmsCount} CMS`
-              : '',
-          overlays: [
-            ...(findingCount > 0
-              ? [
-                  {
-                    type: 'finding' as const,
-                    label: 'Findings',
-                    count: findingCount,
-                  },
-                ]
-              : []),
-            ...(cmsCount > 0
-              ? [
-                  {
-                    type: 'cms' as const,
-                    label: 'CMS',
-                    count: cmsCount,
-                  },
-                ]
-              : []),
-          ],
-        },
-      };
+      const findingOverlays = traumaFindings
+        .filter((finding) => regionValue.findings[finding.field])
+        .map((finding) => ({
+          id: `${region.field}-${finding.field}`,
+          region: region.field,
+          type: 'finding' as const,
+          label: finding.label,
+          value: finding.label,
+          color: 'amber' as const,
+        }));
+
+      const cmsOverlays = cmsGroups
+        .filter((group) => regionValue.cms[group.field])
+        .map((group) => ({
+          id: `${region.field}-cms-${group.field}`,
+          region: region.field,
+          type: 'cms' as const,
+          label: group.label,
+          value: `${group.label}: ${regionValue.cms[group.field]}`,
+          color: 'green' as const,
+        }));
+
+      return [...findingOverlays, ...cmsOverlays];
     },
-    {} as Record<ApolloBodyRegionKey, { findingCount: number; note: string }>,
   );
 
   return (
@@ -201,7 +193,7 @@ export default function TraumaAssessmentCard({
       <ApolloBodyMap
         mode="trauma"
         selectedRegions={selectedBodyMapRegions}
-        regionStatuses={bodyMapRegionStatuses}
+        clinicalOverlays={clinicalOverlays}
         onRegionClick={(region) =>
           onRegionChange(region, !value.regions[region].selected)
         }
