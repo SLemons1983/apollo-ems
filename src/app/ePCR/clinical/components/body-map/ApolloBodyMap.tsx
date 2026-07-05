@@ -5,6 +5,11 @@ import ApolloBodyFigure from './ApolloBodyFigure';
 import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
 import { apolloBodyRegions, type ApolloBodyRegionDefinition } from './bodyMapData';
 import { apolloBodyMapModeConfig } from './bodyMapModeConfig';
+import {
+  buildBodyRegionStatusesFromClinicalOverlays,
+  mergeBodyRegionStatuses,
+} from '../../body-map/renderer';
+import type { ApolloClinicalOverlay } from '../../body-map/types';
 import type {
   ApolloBodyMapMode,
   ApolloBodyRegionKey,
@@ -17,6 +22,7 @@ type ApolloBodyMapProps = {
   onRegionClick: (region: ApolloBodyRegionKey) => void;
   mode?: ApolloBodyMapMode;
   regionStatuses?: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
+  clinicalOverlays?: ApolloClinicalOverlay[];
 };
 
 const clinicalGroupLabels: Record<ApolloBodyRegionDefinition['clinicalGroup'], string> = {
@@ -52,6 +58,7 @@ export default function ApolloBodyMap({
   onRegionClick,
   mode = 'assessment',
   regionStatuses = {},
+  clinicalOverlays = [],
 }: ApolloBodyMapProps) {
   const [view, setView] = useState<ApolloBodyView>('front');
   const [activeRegion, setActiveRegion] = useState<ApolloBodyRegionKey | null>(
@@ -59,6 +66,12 @@ export default function ApolloBodyMap({
   );
 
   const modeConfig = apolloBodyMapModeConfig[mode];
+  const overlayRegionStatuses =
+    buildBodyRegionStatusesFromClinicalOverlays(clinicalOverlays);
+  const combinedRegionStatuses = mergeBodyRegionStatuses(
+    regionStatuses,
+    overlayRegionStatuses,
+  );
 
   const selectedRegionList = apolloBodyRegions.filter(
     (region) => selectedRegions[region.field],
@@ -70,7 +83,7 @@ export default function ApolloBodyMap({
     ? apolloBodyRegions.find((region) => region.field === activeRegion)
     : null;
 
-  const activeStatus = activeRegion ? regionStatuses[activeRegion] : undefined;
+  const activeStatus = activeRegion ? combinedRegionStatuses[activeRegion] : undefined;
 
   return (
     <div className="rounded-xl border border-slate-300 bg-white p-4">
@@ -106,7 +119,7 @@ export default function ApolloBodyMap({
         <ApolloBodyFigure
           view={view}
           selectedRegions={selectedRegions}
-          regionStatuses={regionStatuses}
+          regionStatuses={combinedRegionStatuses}
           activeRegion={activeRegion}
           onRegionClick={onRegionClick}
           onFocusRegion={setActiveRegion}
@@ -175,7 +188,7 @@ export default function ApolloBodyMap({
 
                     <div className="space-y-2">
                       {group.regions.map((region) => {
-                        const status = regionStatuses[region.field];
+                        const status = combinedRegionStatuses[region.field];
                         const findingCount = status?.findingCount ?? 0;
 
                         return (
