@@ -90,3 +90,92 @@ export function createCmsOverlay(
     value: `${label}: ${value}`,
   });
 }
+
+export function createPainOverlay(
+  region: ApolloBodyRegionKey,
+  painScore?: number,
+  value?: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'pain',
+    label: 'Pain',
+    value: value ?? (painScore !== undefined ? `Pain ${painScore}/10` : 'Pain'),
+    severity: painScore,
+    severityLabel: painScore !== undefined ? `${painScore}/10` : undefined,
+  });
+}
+
+export function createBurnOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+  severityLabel?: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'burn',
+    label: 'Burn',
+    value,
+    severityLabel,
+  });
+}
+
+export function createDeficitOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'deficit',
+    label: 'Deficit',
+    value,
+  });
+}
+
+export function createProcedureOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'procedure',
+    label: 'Procedure',
+    value,
+  });
+}
+
+export function createTreatmentOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'treatment',
+    label: 'Treatment',
+    value,
+  });
+}
+
+export function createDeviceOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'device',
+    label: 'Device',
+    value,
+  });
+}
+
+export function createLandmarkOverlay(
+  region: ApolloBodyRegionKey,
+  value: string,
+) {
+  return createClinicalOverlay({
+    region,
+    type: 'landmark',
+    label: 'Landmark',
+    value,
+  });
+}
