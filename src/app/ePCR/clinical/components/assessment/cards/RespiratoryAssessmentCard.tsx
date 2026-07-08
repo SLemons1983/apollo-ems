@@ -9,8 +9,8 @@ type RespiratoryAssessmentForm = {
   breathSoundsRight: string;
   accessoryMuscleUse: string;
   cough: string;
-  oxygenTherapy: string;
-  responseToTreatment: string;
+  currentRespiratorySupport: string;
+  observedResponse: string;
   pastmedProvocation: string;
   pastmedAssociatedSymptoms: string;
   pastmedSputum: string;
@@ -79,17 +79,17 @@ const sections: {
   },
   {
     id: 'treatment-response',
-    title: 'Oxygen / Treatment Response',
+    title: 'Support / Response Considerations',
     fields: [
       {
-        field: 'oxygenTherapy',
-        label: 'Oxygen / Airway Support',
+        field: 'currentRespiratorySupport',
+        label: 'Current Respiratory Support',
         options: ['Room Air', 'Nasal Cannula', 'Non-Rebreather', 'BVM', 'CPAP', 'Advanced Airway'],
       },
       {
-        field: 'responseToTreatment',
-        label: 'Response to Treatment',
-        options: ['Improved', 'Unchanged', 'Worsened', 'Unable to Determine', 'No Treatment Given'],
+        field: 'observedResponse',
+        label: 'Observed Respiratory Trend',
+        options: ['Improving', 'Unchanged', 'Worsening', 'Unable to Determine'],
       },
     ],
   },
@@ -201,8 +201,8 @@ export default function RespiratoryAssessmentCard({
           Respiratory Assessment / PASTMED
         </div>
         <div className="mt-1 text-sm font-semibold text-slate-800">
-          Document respiratory exam findings, oxygen therapy, treatment response,
-          and PASTMED respiratory history.
+          Document respiratory exam findings, current respiratory support,
+          observed respiratory trend, and PASTMED respiratory history.
         </div>
       </div>
 
