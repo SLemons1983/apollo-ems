@@ -10,6 +10,8 @@ export type RevisedTraumaScoreForm = {
 
 type RevisedTraumaScoreCardProps = {
   gcs: number;
+  respiratoryRate?: number;
+  systolicBloodPressure?: number;
   value: RevisedTraumaScoreForm;
   onChange: (
     field: keyof RevisedTraumaScoreForm,
@@ -25,11 +27,18 @@ function getCategory(score: number) {
 
 export default function RevisedTraumaScoreCard({
   gcs,
+  respiratoryRate,
+  systolicBloodPressure,
   value,
   onChange,
 }: RevisedTraumaScoreCardProps) {
-  const rr = Number(value.respiratoryRate) || 0;
-  const sbp = Number(value.systolicBloodPressure) || 0;
+  const rr =
+    respiratoryRate ??
+    (Number(value.respiratoryRate) || 0);
+
+  const sbp =
+    systolicBloodPressure ??
+    (Number(value.systolicBloodPressure) || 0);
 
   const rts = calculateRevisedTraumaScore({
     gcs,
