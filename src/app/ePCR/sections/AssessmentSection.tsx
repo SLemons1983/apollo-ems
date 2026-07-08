@@ -36,6 +36,9 @@ import ReassessmentCard, {
 import RevisedTraumaScoreCard, {
   type RevisedTraumaScoreForm,
 } from '../clinical/components/assessment/cards/RevisedTraumaScoreCard';
+import RespiratoryAssessmentCard, {
+  type RespiratoryAssessmentForm,
+} from '../clinical/components/assessment/cards/RespiratoryAssessmentCard';
 import TraumaAssessmentCard, {
   type TraumaAssessmentForm,
   type TraumaCmsAssessment,
@@ -262,6 +265,26 @@ export default function AssessmentSection({
       notes: '',
     });
 
+  const [respiratoryAssessment, setRespiratoryAssessment] =
+    useState<RespiratoryAssessmentForm>({
+      respiratoryEffort: '',
+      airwayPatency: '',
+      breathSoundsLeft: '',
+      breathSoundsRight: '',
+      accessoryMuscleUse: '',
+      cough: '',
+      oxygenTherapy: '',
+      responseToTreatment: '',
+      pastmedProvocation: '',
+      pastmedAssociatedSymptoms: '',
+      pastmedSputum: '',
+      pastmedTriggers: '',
+      pastmedMedicalHistory: '',
+      pastmedExerciseTolerance: '',
+      pastmedDuration: '',
+      notes: '',
+    });
+
 
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
@@ -337,6 +360,11 @@ export default function AssessmentSection({
         completed: selectedExtremities.length + completedFields,
         total: Object.keys(extremityAssessment).length,
       };
+    }
+
+    if (taskId === 'respiratory-assessment') {
+      const completed = Object.values(respiratoryAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(respiratoryAssessment).length };
     }
 
     if (taskId === 'trauma-assessment') {
@@ -563,6 +591,16 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateRespiratoryAssessment(
+    field: keyof RespiratoryAssessmentForm,
+    fieldValue: string,
+  ) {
+    setRespiratoryAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
 
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
@@ -679,6 +717,15 @@ export default function AssessmentSection({
           gcs={calculateGcsScore(primaryAssessment)}
           value={revisedTraumaScore}
           onChange={updateRevisedTraumaScore}
+        />
+      );
+    }
+
+    if (taskId === 'respiratory-assessment') {
+      return (
+        <RespiratoryAssessmentCard
+          value={respiratoryAssessment}
+          onChange={updateRespiratoryAssessment}
         />
       );
     }
