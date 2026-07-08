@@ -28,12 +28,16 @@ import PrimaryAssessmentCard, {
 import ReassessmentCard, {
   type ReassessmentForm,
 } from '../clinical/components/assessment/cards/ReassessmentCard';
+import RevisedTraumaScoreCard, {
+  type RevisedTraumaScoreForm,
+} from '../clinical/components/assessment/cards/RevisedTraumaScoreCard';
 import TraumaAssessmentCard, {
   type TraumaAssessmentForm,
   type TraumaCmsAssessment,
   type TraumaFindingKey,
   type TraumaRegionKey,
 } from '../clinical/components/assessment/cards/TraumaAssessmentCard';
+import { calculateGcsScore } from '../clinical/engine/scores/gcs';
 import type { PatientForm } from '../types';
 
 type AssessmentSectionProps = {
@@ -226,6 +230,14 @@ export default function AssessmentSection({
     notes: '',
   });
 
+  const [revisedTraumaScore, setRevisedTraumaScore] =
+    useState<RevisedTraumaScoreForm>({
+      respiratoryRate: '',
+      systolicBloodPressure: '',
+      notes: '',
+    });
+
+
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
       const completed = Object.values(primaryAssessment).filter(Boolean).length;
@@ -294,6 +306,34 @@ export default function AssessmentSection({
       return {
         completed: selectedRegions.length + completedFindings + completedCms,
         total: Object.keys(traumaAssessment.regions).length,
+      };
+    }
+
+    if (taskId === 'revised-trauma-score') {
+      const gcsScore = calculateGcsScore(primaryAssessment);
+      const requiredFields = [
+        gcsScore ? String(gcsScore) : '',
+        revisedTraumaScore.respiratoryRate,
+        revisedTraumaScore.systolicBloodPressure,
+      ];
+
+      return {
+        completed: requiredFields.filter(Boolean).length,
+        total: requiredFields.length,
+      };
+    }
+
+    if (taskId === 'revised-trauma-score') {
+      const gcsScore = calculateGcsScore(primaryAssessment);
+      const requiredFields = [
+        gcsScore ? String(gcsScore) : '',
+        revisedTraumaScore.respiratoryRate,
+        revisedTraumaScore.systolicBloodPressure,
+      ];
+
+      return {
+        completed: requiredFields.filter(Boolean).length,
+        total: requiredFields.length,
       };
     }
 
@@ -435,6 +475,17 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateRevisedTraumaScore(
+    field: keyof RevisedTraumaScoreForm,
+    fieldValue: string,
+  ) {
+    setRevisedTraumaScore((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
+
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
       const progress = getTaskProgress(task.id);
@@ -465,6 +516,7 @@ export default function AssessmentSection({
     gcsAssessment,
     gfastAssessment,
     traumaAssessment,
+    revisedTraumaScore,
     reassessment,
     onProgressChange,
   ]);
@@ -529,6 +581,26 @@ export default function AssessmentSection({
           onRegionChange={updateTraumaRegion}
           onFindingChange={updateTraumaFinding}
           onCmsChange={updateTraumaCms}
+        />
+      );
+    }
+
+    if (taskId === 'revised-trauma-score') {
+      return (
+        <RevisedTraumaScoreCard
+          gcs={calculateGcsScore(primaryAssessment)}
+          value={revisedTraumaScore}
+          onChange={updateRevisedTraumaScore}
+        />
+      );
+    }
+
+    if (taskId === 'revised-trauma-score') {
+      return (
+        <RevisedTraumaScoreCard
+          gcs={calculateGcsScore(primaryAssessment)}
+          value={revisedTraumaScore}
+          onChange={updateRevisedTraumaScore}
         />
       );
     }
