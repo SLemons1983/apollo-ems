@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 type ExtremityKey = 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg';
 
 type ExtremityCmsTpAssessment = {
@@ -88,14 +90,45 @@ function getCompletedFields(extremity: ExtremityCmsTpAssessment) {
   ].filter(Boolean).length;
 }
 
+function getCompletionLabel(extremity: ExtremityCmsTpAssessment) {
+  if (!extremity.selected) {
+    return 'Not Assessed';
+  }
+
+  const completed = getCompletedFields(extremity);
+
+  if (completed >= 7) {
+    return '✓ Complete';
+  }
+
+  return `${completed} / 8 Completed`;
+}
+
 export default function ExtremityAssessmentCard({
   value,
   onExtremityToggle,
   onChange,
 }: ExtremityAssessmentCardProps) {
-  const selectedExtremities = extremities.filter(
-    (extremity) => value[extremity.field].selected,
-  );
+  const [expandedExtremity, setExpandedExtremity] =
+    useState<ExtremityKey | ''>('');
+
+  function toggleExtremity(extremity: ExtremityKey) {
+    const isSelected = value[extremity].selected;
+    const nextSelected = !isSelected;
+
+    onExtremityToggle(extremity, nextSelected);
+    setExpandedExtremity(nextSelected ? extremity : '');
+  }
+
+  function toggleExpanded(extremity: ExtremityKey) {
+    if (!value[extremity].selected) {
+      onExtremityToggle(extremity, true);
+      setExpandedExtremity(extremity);
+      return;
+    }
+
+    setExpandedExtremity((current) => (current === extremity ? '' : extremity));
+  }
 
   return (
     <div className="space-y-5">
@@ -104,122 +137,138 @@ export default function ExtremityAssessmentCard({
           Extremity Assessment / CMS-TP
         </div>
         <div className="mt-1 text-sm font-semibold text-slate-800">
-          Select each extremity assessed, then document circulation, motor,
-          sensation, tenderness, and distal perfusion.
+          Select each extremity assessed, then expand it to document circulation,
+          motor, sensation, tenderness, pulses, skin, and capillary refill.
         </div>
       </div>
 
-      <div>
-        <h4 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
-          Extremities Assessed
-        </h4>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {extremities.map((extremity) => {
+          const selected = value[extremity.field].selected;
+          const completionLabel = getCompletionLabel(value[extremity.field]);
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {extremities.map((extremity) => {
-            const selected = value[extremity.field].selected;
-            const completedFields = getCompletedFields(value[extremity.field]);
+          return (
+            <button
+              key={extremity.field}
+              type="button"
+              onClick={() => toggleExtremity(extremity.field)}
+              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                selected
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <span className="block">
+                {selected ? `✓ ${extremity.label}` : extremity.label}
+              </span>
+              <span className="mt-1 block text-xs opacity-80">
+                {completionLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-            return (
+      <div className="space-y-3">
+        {extremities.map((extremity) => {
+          const extremityValue = value[extremity.field];
+          const expanded = expandedExtremity === extremity.field;
+          const completedFields = getCompletedFields(extremityValue);
+
+          return (
+            <div
+              key={extremity.field}
+              className={`rounded-xl border ${
+                extremityValue.selected
+                  ? 'border-slate-300 bg-white'
+                  : 'border-slate-200 bg-slate-50'
+              }`}
+            >
               <button
-                key={extremity.field}
                 type="button"
-                onClick={() => onExtremityToggle(extremity.field, !selected)}
-                className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                  selected
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-                }`}
+                onClick={() => toggleExpanded(extremity.field)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
               >
-                <span className="block">
-                  {selected ? `✓ ${extremity.label}` : extremity.label}
-                </span>
-                {completedFields > 0 && (
-                  <span className="mt-1 block text-xs opacity-80">
-                    {completedFields} field{completedFields === 1 ? '' : 's'}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {selectedExtremities.length > 0 ? (
-        <div className="space-y-4">
-          {selectedExtremities.map((extremity) => {
-            const extremityValue = value[extremity.field];
-
-            return (
-              <div
-                key={extremity.field}
-                className="rounded-xl border border-slate-300 bg-white p-4"
-              >
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-base font-black text-slate-900">
-                    {extremity.label}
-                  </h4>
-                  <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">
-                    CMS-TP
+                <div>
+                  <div className="text-base font-black text-slate-900">
+                    {expanded ? '▼' : '▶'} {extremity.label}
+                  </div>
+                  <div className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    {extremityValue.selected
+                      ? `${completedFields} / 8 Completed`
+                      : 'Not Assessed'}
                   </div>
                 </div>
 
-                {groups.map((group) => (
-                  <div key={group.field} className="mb-4">
-                    <h5 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
-                      {group.label}
-                    </h5>
+                <div
+                  className={`rounded-full px-3 py-1 text-xs font-black uppercase ${
+                    completedFields >= 7
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : extremityValue.selected
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {getCompletionLabel(extremityValue)}
+                </div>
+              </button>
 
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      {group.options.map((option) => {
-                        const selected = extremityValue[group.field] === option;
+              {expanded && extremityValue.selected && (
+                <div className="border-t border-slate-200 px-4 py-4">
+                  {groups.map((group) => (
+                    <div key={group.field} className="mb-4">
+                      <h5 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-600">
+                        {group.label}
+                      </h5>
 
-                        return (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() =>
-                              onChange(
-                                extremity.field,
-                                group.field,
-                                selected ? '' : option,
-                              )
-                            }
-                            className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                              selected
-                                ? 'border-slate-900 bg-slate-900 text-white'
-                                : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-                            }`}
-                          >
-                            {selected ? `✓ ${option}` : option}
-                          </button>
-                        );
-                      })}
+                      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                        {group.options.map((option) => {
+                          const selected = extremityValue[group.field] === option;
+
+                          return (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() =>
+                                onChange(
+                                  extremity.field,
+                                  group.field,
+                                  selected ? '' : option,
+                                )
+                              }
+                              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                                selected
+                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                              }`}
+                            >
+                              {selected ? `✓ ${option}` : option}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-bold uppercase tracking-wide text-slate-600">
-                    Extremity Notes
-                  </span>
-                  <textarea
-                    value={extremityValue.notes}
-                    onChange={(event) =>
-                      onChange(extremity.field, 'notes', event.target.value)
-                    }
-                    rows={3}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm"
-                  />
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm font-semibold text-slate-500">
-          Select one or more extremities to document CMS-TP findings.
-        </div>
-      )}
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-bold uppercase tracking-wide text-slate-600">
+                      Notes
+                    </span>
+                    <textarea
+                      value={extremityValue.notes}
+                      onChange={(event) =>
+                        onChange(extremity.field, 'notes', event.target.value)
+                      }
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
