@@ -10,6 +10,9 @@ import {
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
 } from '../clinical/components/assessment/cards/ClinicalHistoryCard';
+import AlocAssessmentCard, {
+  type AlocAssessmentForm,
+} from '../clinical/components/assessment/cards/AlocAssessmentCard';
 import ConsciousnessAssessmentCard, {
   type ConsciousnessAssessmentForm,
 } from '../clinical/components/assessment/cards/ConsciousnessAssessmentCard';
@@ -285,6 +288,24 @@ export default function AssessmentSection({
       notes: '',
     });
 
+  const [alocAssessment, setAlocAssessment] = useState<AlocAssessmentForm>({
+    currentMentalStatus: '',
+    orientation: '',
+    speech: '',
+    pupils: '',
+    bloodGlucose: '',
+    alcohol: '',
+    epilepsy: '',
+    insulin: '',
+    overdose: '',
+    uremia: '',
+    trauma: '',
+    infection: '',
+    psych: '',
+    stroke: '',
+    notes: '',
+  });
+
 
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
@@ -365,6 +386,11 @@ export default function AssessmentSection({
     if (taskId === 'respiratory-assessment') {
       const completed = Object.values(respiratoryAssessment).filter(Boolean).length;
       return { completed, total: Object.keys(respiratoryAssessment).length };
+    }
+
+    if (taskId === 'aloc-assessment') {
+      const completed = Object.values(alocAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(alocAssessment).length };
     }
 
     if (taskId === 'trauma-assessment') {
@@ -601,6 +627,16 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateAlocAssessment(
+    field: keyof AlocAssessmentForm,
+    fieldValue: string,
+  ) {
+    setAlocAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
 
   useEffect(() => {
     const taskProgress = suggestedTasks.map((task) => {
@@ -726,6 +762,15 @@ export default function AssessmentSection({
         <RespiratoryAssessmentCard
           value={respiratoryAssessment}
           onChange={updateRespiratoryAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'aloc-assessment') {
+      return (
+        <AlocAssessmentCard
+          value={alocAssessment}
+          onChange={updateAlocAssessment}
         />
       );
     }
