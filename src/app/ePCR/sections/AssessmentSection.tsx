@@ -21,6 +21,8 @@ import GfastAssessmentCard, {
 } from '../clinical/components/assessment/cards/GfastAssessmentCard';
 import ExtremityAssessmentCard, {
   type ExtremityAssessmentForm,
+  type ExtremityCmsTpAssessment,
+  type ExtremityKey,
 } from '../clinical/components/assessment/cards/ExtremityAssessmentCard';
 import PainAssessmentCard, {
   type PainAssessmentForm,
@@ -143,17 +145,24 @@ export default function AssessmentSection({
     bloodGlucose: '',
   });
 
+  const emptyExtremityAssessment: ExtremityCmsTpAssessment = {
+    selected: false,
+    circulation: '',
+    motor: '',
+    sensation: '',
+    tenderness: '',
+    pulses: '',
+    skin: '',
+    capillaryRefill: '',
+    notes: '',
+  };
+
   const [extremityAssessment, setExtremityAssessment] =
     useState<ExtremityAssessmentForm>({
-      extremity: '',
-      circulation: '',
-      motor: '',
-      sensation: '',
-      tenderness: '',
-      pulses: '',
-      skin: '',
-      capillaryRefill: '',
-      notes: '',
+      rightArm: { ...emptyExtremityAssessment },
+      leftArm: { ...emptyExtremityAssessment },
+      rightLeg: { ...emptyExtremityAssessment },
+      leftLeg: { ...emptyExtremityAssessment },
     });
 
   const emptyTraumaFindings = {
@@ -305,8 +314,29 @@ export default function AssessmentSection({
     }
 
     if (taskId === 'extremity-assessment') {
-      const completed = Object.values(extremityAssessment).filter(Boolean).length;
-      return { completed, total: Object.keys(extremityAssessment).length };
+      const selectedExtremities = Object.values(extremityAssessment).filter(
+        (extremity) => extremity.selected,
+      );
+      const completedFields = selectedExtremities.reduce(
+        (total, extremity) =>
+          total +
+          [
+            extremity.circulation,
+            extremity.motor,
+            extremity.sensation,
+            extremity.tenderness,
+            extremity.pulses,
+            extremity.skin,
+            extremity.capillaryRefill,
+            extremity.notes,
+          ].filter(Boolean).length,
+        0,
+      );
+
+      return {
+        completed: selectedExtremities.length + completedFields,
+        total: Object.keys(extremityAssessment).length,
+      };
     }
 
     if (taskId === 'trauma-assessment') {
@@ -433,13 +463,30 @@ export default function AssessmentSection({
     }));
   }
 
+  function toggleExtremityAssessment(
+    extremity: ExtremityKey,
+    selected: boolean,
+  ) {
+    setExtremityAssessment((current) => ({
+      ...current,
+      [extremity]: {
+        ...current[extremity],
+        selected,
+      },
+    }));
+  }
+
   function updateExtremityAssessment(
-    field: keyof ExtremityAssessmentForm,
+    extremity: ExtremityKey,
+    field: keyof ExtremityCmsTpAssessment,
     fieldValue: string,
   ) {
     setExtremityAssessment((current) => ({
       ...current,
-      [field]: fieldValue,
+      [extremity]: {
+        ...current[extremity],
+        [field]: fieldValue,
+      },
     }));
   }
 
@@ -609,6 +656,7 @@ export default function AssessmentSection({
       return (
         <ExtremityAssessmentCard
           value={extremityAssessment}
+          onExtremityToggle={toggleExtremityAssessment}
           onChange={updateExtremityAssessment}
         />
       );
