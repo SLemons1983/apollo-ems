@@ -1,5 +1,7 @@
 'use client';
 
+import { calculateGcsScore } from '../../../engine/scores/gcs';
+
 type PrimaryAssessmentForm = {
   generalImpression: string;
   levelOfConsciousness: string;
@@ -111,21 +113,11 @@ const groups: {
   },
 ];
 
-function getGcsScore(value: PrimaryAssessmentForm) {
-  const scores = [value.gcsEyes, value.gcsVerbal, value.gcsMotor]
-    .map((item) => Number(item.split(' - ')[0]))
-    .filter((score) => !Number.isNaN(score));
-
-  return scores.length === 3
-    ? scores.reduce((total, score) => total + score, 0)
-    : 0;
-}
-
 export default function PrimaryAssessmentCard({
   value,
   onChange,
 }: PrimaryAssessmentCardProps) {
-  const gcsScore = getGcsScore(value);
+  const gcsScore = calculateGcsScore(value);
 
   return (
     <div className="space-y-5">
