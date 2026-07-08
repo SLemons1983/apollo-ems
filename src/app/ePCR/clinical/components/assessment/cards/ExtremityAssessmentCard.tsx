@@ -77,6 +77,8 @@ const groups: {
   },
 ];
 
+const totalExtremityFields = 8;
+
 function getCompletedFields(extremity: ExtremityCmsTpAssessment) {
   return [
     extremity.circulation,
@@ -90,24 +92,64 @@ function getCompletedFields(extremity: ExtremityCmsTpAssessment) {
   ].filter(Boolean).length;
 }
 
-const totalExtremityFields = 8;
-
 function getCompletionPercent(extremity: ExtremityCmsTpAssessment) {
   return Math.round((getCompletedFields(extremity) / totalExtremityFields) * 100);
 }
 
+function isComplete(extremity: ExtremityCmsTpAssessment) {
+  return extremity.selected && getCompletedFields(extremity) >= totalExtremityFields - 1;
+}
+
 function getCompletionLabel(extremity: ExtremityCmsTpAssessment) {
   if (!extremity.selected) {
-    return 'Not Done';
+    return 'Not Assessed';
   }
 
-  const completed = getCompletedFields(extremity);
-
-  if (completed >= totalExtremityFields - 1) {
-    return 'Done';
+  if (isComplete(extremity)) {
+    return 'Complete';
   }
 
-  return `${completed} / ${totalExtremityFields}`;
+  return 'In Progress';
+}
+
+function getProgressColor(extremity: ExtremityCmsTpAssessment) {
+  if (!extremity.selected) {
+    return 'bg-slate-300';
+  }
+
+  if (isComplete(extremity)) {
+    return 'bg-emerald-500';
+  }
+
+  return 'bg-amber-500';
+}
+
+function getBadgeStyle(extremity: ExtremityCmsTpAssessment) {
+  if (!extremity.selected) {
+    return 'bg-slate-100 text-slate-600';
+  }
+
+  if (isComplete(extremity)) {
+    return 'bg-emerald-100 text-emerald-800';
+  }
+
+  return 'bg-amber-100 text-amber-800';
+}
+
+function getCardStyle(extremity: ExtremityCmsTpAssessment, active: boolean) {
+  if (active) {
+    return 'border-2 border-blue-500 bg-blue-50 text-blue-950 shadow-sm';
+  }
+
+  if (isComplete(extremity)) {
+    return 'border-emerald-300 bg-white text-slate-900';
+  }
+
+  if (extremity.selected) {
+    return 'border-amber-300 bg-white text-slate-900';
+  }
+
+  return 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50';
 }
 
 export default function ExtremityAssessmentCard({
@@ -118,12 +160,12 @@ export default function ExtremityAssessmentCard({
   const [expandedExtremity, setExpandedExtremity] =
     useState<ExtremityKey | ''>('');
 
-  function toggleExtremity(extremity: ExtremityKey) {
-    const isSelected = value[extremity].selected;
-    const nextSelected = !isSelected;
+  function beginOrOpenExtremity(extremity: ExtremityKey) {
+    if (!value[extremity].selected) {
+      onExtremityToggle(extremity, true);
+    }
 
-    onExtremityToggle(extremity, nextSelected);
-    setExpandedExtremity(nextSelected ? extremity : '');
+    setExpandedExtremity(extremity);
   }
 
   function toggleExpanded(extremity: ExtremityKey) {
@@ -148,52 +190,63 @@ export default function ExtremityAssessmentCard({
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {extremities.map((extremity) => {
-          const selected = value[extremity.field].selected;
-          const completionLabel = getCompletionLabel(value[extremity.field]);
+          const extremityValue = value[extremity.field];
+          const completedFields = getCompletedFields(extremityValue);
+          const completionPercent = getCompletionPercent(extremityValue);
+          const active = expandedExtremity === extremity.field;
 
           return (
             <button
               key={extremity.field}
               type="button"
-              onClick={() => toggleExtremity(extremity.field)}
-              className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                selected
-                  ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
-              }`}
+              onClick={() => beginOrOpenExtremity(extremity.field)}
+              className={`rounded-xl border px-4 py-4 text-left text-sm font-semibold transition ${getCardStyle(
+                extremityValue,
+                active,
+              )}`}
             >
-              <span className="block">
-                {selected ? `✓ ${extremity.label}` : extremity.label}
-              </span>
-              <span
-                className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-black uppercase ${
-                  selected
-                    ? getCompletedFields(value[extremity.field]) >= totalExtremityFields - 1
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-red-100 text-red-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {completionLabel}
-              </span>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-black">
+                    {extremityValue.selected ? '✓ ' : ''}
+                    {extremity.label}
+                  </div>
+                  <div
+                    className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-black uppercase ${getBadgeStyle(
+                      extremityValue,
+                    )}`}
+                  >
+                    {getCompletionLabel(extremityValue)}
+                  </div>
+                </div>
 
-              <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/40">
-                <span
-                  className={`block h-full rounded-full ${
-                    selected &&
-                    getCompletedFields(value[extremity.field]) >= totalExtremityFields - 1
-                      ? 'bg-emerald-500'
-                      : 'bg-red-500'
-                  }`}
+                <div className="text-xs font-black text-slate-500">
+                  {extremityValue.selected
+                    ? `${completedFields}/${totalExtremityFields}`
+                    : '—'}
+                </div>
+              </div>
+
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div
+                  className={`h-full rounded-full ${getProgressColor(
+                    extremityValue,
+                  )}`}
                   style={{
-                    width: selected
-                      ? `${getCompletionPercent(value[extremity.field])}%`
+                    width: extremityValue.selected
+                      ? `${completionPercent}%`
                       : '0%',
                   }}
                 />
-              </span>
+              </div>
+
+              <div className="mt-3 text-xs font-bold text-slate-500">
+                {extremityValue.selected
+                  ? `${completionPercent}% complete`
+                  : 'Click to begin'}
+              </div>
             </button>
           );
         })}
@@ -204,6 +257,7 @@ export default function ExtremityAssessmentCard({
           const extremityValue = value[extremity.field];
           const expanded = expandedExtremity === extremity.field;
           const completedFields = getCompletedFields(extremityValue);
+          const completionPercent = getCompletionPercent(extremityValue);
 
           return (
             <div
@@ -219,40 +273,39 @@ export default function ExtremityAssessmentCard({
                 onClick={() => toggleExpanded(extremity.field)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
               >
-                <div>
-                  <div className="text-base font-black text-slate-900">
-                    {expanded ? '▼' : '▶'} {extremity.label}
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="text-base font-black text-slate-900">
+                      {expanded ? '▼' : '▶'} {extremity.label}
+                    </div>
+
                     <div
-                      className={`h-full rounded-full ${
-                        completedFields >= totalExtremityFields - 1
-                          ? 'bg-emerald-500'
-                          : 'bg-red-500'
-                      }`}
+                      className={`rounded-full px-3 py-1 text-xs font-black uppercase ${getBadgeStyle(
+                        extremityValue,
+                      )}`}
+                    >
+                      {getCompletionLabel(extremityValue)}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 h-2 max-w-sm overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className={`h-full rounded-full ${getProgressColor(
+                        extremityValue,
+                      )}`}
                       style={{
                         width: extremityValue.selected
-                          ? `${getCompletionPercent(extremityValue)}%`
+                          ? `${completionPercent}%`
                           : '0%',
                       }}
                     />
                   </div>
+
                   <div className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                     {extremityValue.selected
                       ? `${completedFields} / ${totalExtremityFields} Completed`
-                      : 'Not Done'}
+                      : 'Not Assessed'}
                   </div>
-                </div>
-
-                <div
-                  className={`rounded-full px-3 py-1 text-xs font-black uppercase ${
-                    extremityValue.selected &&
-                    completedFields >= totalExtremityFields - 1
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}
-                >
-                  {getCompletionLabel(extremityValue)}
                 </div>
               </button>
 
@@ -281,7 +334,7 @@ export default function ExtremityAssessmentCard({
                               }
                               className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
                                 selected
-                                  ? 'border-slate-900 bg-slate-900 text-white'
+                                  ? 'border-2 border-blue-500 bg-blue-50 text-blue-950'
                                   : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
                               }`}
                             >
