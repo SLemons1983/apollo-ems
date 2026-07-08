@@ -19,6 +19,9 @@ import GcsAssessmentCard, {
 import GfastAssessmentCard, {
   type GfastAssessmentForm,
 } from '../clinical/components/assessment/cards/GfastAssessmentCard';
+import ExtremityAssessmentCard, {
+  type ExtremityAssessmentForm,
+} from '../clinical/components/assessment/cards/ExtremityAssessmentCard';
 import PainAssessmentCard, {
   type PainAssessmentForm,
 } from '../clinical/components/assessment/cards/PainAssessmentCard';
@@ -139,6 +142,19 @@ export default function AssessmentSection({
     time: '',
     bloodGlucose: '',
   });
+
+  const [extremityAssessment, setExtremityAssessment] =
+    useState<ExtremityAssessmentForm>({
+      extremity: '',
+      circulation: '',
+      motor: '',
+      sensation: '',
+      tenderness: '',
+      pulses: '',
+      skin: '',
+      capillaryRefill: '',
+      notes: '',
+    });
 
   const emptyTraumaFindings = {
     deformity: false,
@@ -288,6 +304,11 @@ export default function AssessmentSection({
       return { completed, total: Object.keys(gfastAssessment).length };
     }
 
+    if (taskId === 'extremity-assessment') {
+      const completed = Object.values(extremityAssessment).filter(Boolean).length;
+      return { completed, total: Object.keys(extremityAssessment).length };
+    }
+
     if (taskId === 'trauma-assessment') {
       const selectedRegions = Object.values(traumaAssessment.regions).filter(
         (region) => region.selected,
@@ -407,6 +428,16 @@ export default function AssessmentSection({
     fieldValue: string,
   ) {
     setGfastAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
+  function updateExtremityAssessment(
+    field: keyof ExtremityAssessmentForm,
+    fieldValue: string,
+  ) {
+    setExtremityAssessment((current) => ({
       ...current,
       [field]: fieldValue,
     }));
@@ -570,6 +601,15 @@ export default function AssessmentSection({
         <GfastAssessmentCard
           value={gfastAssessment}
           onChange={updateGfastAssessment}
+        />
+      );
+    }
+
+    if (taskId === 'extremity-assessment') {
+      return (
+        <ExtremityAssessmentCard
+          value={extremityAssessment}
+          onChange={updateExtremityAssessment}
         />
       );
     }
