@@ -90,18 +90,24 @@ function getCompletedFields(extremity: ExtremityCmsTpAssessment) {
   ].filter(Boolean).length;
 }
 
+const totalExtremityFields = 8;
+
+function getCompletionPercent(extremity: ExtremityCmsTpAssessment) {
+  return Math.round((getCompletedFields(extremity) / totalExtremityFields) * 100);
+}
+
 function getCompletionLabel(extremity: ExtremityCmsTpAssessment) {
   if (!extremity.selected) {
-    return 'Not Assessed';
+    return 'Not Done';
   }
 
   const completed = getCompletedFields(extremity);
 
-  if (completed >= 7) {
-    return '✓ Complete';
+  if (completed >= totalExtremityFields - 1) {
+    return 'Done';
   }
 
-  return `${completed} / 8 Completed`;
+  return `${completed} / ${totalExtremityFields}`;
 }
 
 export default function ExtremityAssessmentCard({
@@ -161,8 +167,32 @@ export default function ExtremityAssessmentCard({
               <span className="block">
                 {selected ? `✓ ${extremity.label}` : extremity.label}
               </span>
-              <span className="mt-1 block text-xs opacity-80">
+              <span
+                className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-black uppercase ${
+                  selected
+                    ? getCompletedFields(value[extremity.field]) >= totalExtremityFields - 1
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-red-100 text-red-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+              >
                 {completionLabel}
+              </span>
+
+              <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white/40">
+                <span
+                  className={`block h-full rounded-full ${
+                    selected &&
+                    getCompletedFields(value[extremity.field]) >= totalExtremityFields - 1
+                      ? 'bg-emerald-500'
+                      : 'bg-red-500'
+                  }`}
+                  style={{
+                    width: selected
+                      ? `${getCompletionPercent(value[extremity.field])}%`
+                      : '0%',
+                  }}
+                />
               </span>
             </button>
           );
@@ -193,20 +223,33 @@ export default function ExtremityAssessmentCard({
                   <div className="text-base font-black text-slate-900">
                     {expanded ? '▼' : '▶'} {extremity.label}
                   </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className={`h-full rounded-full ${
+                        completedFields >= totalExtremityFields - 1
+                          ? 'bg-emerald-500'
+                          : 'bg-red-500'
+                      }`}
+                      style={{
+                        width: extremityValue.selected
+                          ? `${getCompletionPercent(extremityValue)}%`
+                          : '0%',
+                      }}
+                    />
+                  </div>
                   <div className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                     {extremityValue.selected
-                      ? `${completedFields} / 8 Completed`
-                      : 'Not Assessed'}
+                      ? `${completedFields} / ${totalExtremityFields} Completed`
+                      : 'Not Done'}
                   </div>
                 </div>
 
                 <div
                   className={`rounded-full px-3 py-1 text-xs font-black uppercase ${
-                    completedFields >= 7
+                    extremityValue.selected &&
+                    completedFields >= totalExtremityFields - 1
                       ? 'bg-emerald-100 text-emerald-800'
-                      : extremityValue.selected
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-slate-200 text-slate-600'
+                      : 'bg-red-100 text-red-800'
                   }`}
                 >
                   {getCompletionLabel(extremityValue)}
