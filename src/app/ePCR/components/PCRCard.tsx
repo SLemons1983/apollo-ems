@@ -15,7 +15,7 @@ export default function PCRCard({
   onToggle,
   children,
 }: PCRCardProps) {
-  const complete = totalFields > 0 && completedFields === totalFields;
+  const complete = totalFields > 0 && completedFields >= totalFields;
   const percentage =
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
@@ -49,12 +49,18 @@ export default function PCRCard({
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            {completedFields} of {totalFields} required fields completed
+            {complete
+              ? 'All required fields completed'
+              : `${completedFields} of ${totalFields} required fields completed`}
           </p>
           <div className="mt-2 h-2 w-56 overflow-hidden rounded-full bg-slate-200">
             <div
               className={`h-full rounded-full ${
-                complete ? 'bg-emerald-600' : 'bg-red-600'
+                complete
+                  ? 'bg-emerald-600'
+                  : completedFields > 0
+                    ? 'bg-amber-500'
+                    : 'bg-red-600'
               }`}
               style={{ width: `${percentage}%` }}
             />
