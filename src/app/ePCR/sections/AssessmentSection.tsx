@@ -936,19 +936,44 @@ export default function AssessmentSection({
 
           {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
             .length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(selectedAssessmentRegions)
-                .filter(([, selected]) => selected)
-                .map(([region]) => (
-                  <span
-                    key={region}
-                    className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-900"
-                  >
-                    {region
-                      .replace(/([A-Z])/g, ' $1')
-                      .replace(/^./, (letter) => letter.toUpperCase())}
-                  </span>
-                ))}
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(selectedAssessmentRegions)
+                  .filter(([, selected]) => selected)
+                  .map(([region]) => (
+                    <span
+                      key={region}
+                      className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-900"
+                    >
+                      {region
+                        .replace(/([A-Z])/g, ' $1')
+                        .replace(/^./, (letter) => letter.toUpperCase())}
+                    </span>
+                  ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAssessmentRegion('');
+                  setSelectedAssessmentRegions({
+                    head: false,
+                    face: false,
+                    neck: false,
+                    chest: false,
+                    abdomen: false,
+                    pelvis: false,
+                    back: false,
+                    rightArm: false,
+                    leftArm: false,
+                    rightLeg: false,
+                    leftLeg: false,
+                  });
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-black uppercase text-slate-700 hover:bg-slate-50"
+              >
+                Clear Selected Regions
+              </button>
             </div>
           ) : (
             <div className="text-sm font-semibold text-slate-500">
