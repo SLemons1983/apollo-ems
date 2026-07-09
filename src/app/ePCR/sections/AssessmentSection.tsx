@@ -928,6 +928,34 @@ export default function AssessmentSection({
           selectedRegions={selectedAssessmentRegions}
           onRegionClick={handleAssessmentBodyRegionClick}
         />
+
+        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+          <div className="mb-2 text-xs font-black uppercase tracking-wide text-blue-800">
+            Selected Regions for Assessment
+          </div>
+
+          {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
+            .length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(selectedAssessmentRegions)
+                .filter(([, selected]) => selected)
+                .map(([region]) => (
+                  <span
+                    key={region}
+                    className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-900"
+                  >
+                    {region
+                      .replace(/([A-Z])/g, ' $1')
+                      .replace(/^./, (letter) => letter.toUpperCase())}
+                  </span>
+                ))}
+            </div>
+          ) : (
+            <div className="text-sm font-semibold text-slate-500">
+              No body regions selected yet.
+            </div>
+          )}
+        </div>
       </div>
 
       <div>
