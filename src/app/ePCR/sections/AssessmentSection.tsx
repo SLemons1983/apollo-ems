@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import PCRCard from '../components/PCRCard';
+import ApolloBodyMap from '../clinical/components/body-map/ApolloBodyMap';
+import type { ApolloBodyRegionKey } from '../clinical/components/body-map/bodyMapTypes';
 import {
   determineAssessmentMode,
   getAdditionalAssessmentTasksForContext,
@@ -92,6 +94,8 @@ export default function AssessmentSection({
   const suggestedTasks = getAssessmentTasksForContext(context);
   const additionalTasks = getAdditionalAssessmentTasksForContext(context);
   const [expandedTaskId, setExpandedTaskId] = useState('');
+  const [selectedAssessmentRegion, setSelectedAssessmentRegion] =
+    useState<ApolloBodyRegionKey | ''>('');
 
   const [consciousnessAssessment, setConsciousnessAssessment] =
     useState<ConsciousnessAssessmentForm>({
@@ -607,6 +611,48 @@ export default function AssessmentSection({
     }));
   }
 
+  function getAssessmentTaskForBodyRegion(region: ApolloBodyRegionKey) {
+    if (
+      region === 'rightArm' ||
+      region === 'leftArm' ||
+      region === 'rightLeg' ||
+      region === 'leftLeg'
+    ) {
+      return 'extremity-assessment';
+    }
+
+    if (region === 'chest') {
+      return 'respiratory-assessment';
+    }
+
+    if (region === 'head' || region === 'face') {
+      return suspectedStroke ? 'gfast-stroke-assessment' : 'aloc-assessment';
+    }
+
+    if (possibleTrauma) {
+      return 'trauma-assessment';
+    }
+
+    return 'primary-assessment';
+  }
+
+  function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
+    setSelectedAssessmentRegion(region);
+
+    const targetTaskId = getAssessmentTaskForBodyRegion(region);
+    setExpandedTaskId(targetTaskId);
+
+    if (
+      targetTaskId === 'extremity-assessment' &&
+      (region === 'rightArm' ||
+        region === 'leftArm' ||
+        region === 'rightLeg' ||
+        region === 'leftLeg')
+    ) {
+      toggleExtremityAssessment(region, true);
+    }
+  }
+
   function updateRevisedTraumaScore(
     field: keyof RevisedTraumaScoreForm,
     fieldValue: string,
@@ -802,6 +848,20 @@ export default function AssessmentSection({
     );
   }
 
+  const assessmentBodyMapSelection: Record<ApolloBodyRegionKey, boolean> = {
+    head: selectedAssessmentRegion === 'head',
+    face: selectedAssessmentRegion === 'face',
+    neck: selectedAssessmentRegion === 'neck',
+    chest: selectedAssessmentRegion === 'chest',
+    abdomen: selectedAssessmentRegion === 'abdomen',
+    pelvis: selectedAssessmentRegion === 'pelvis',
+    back: selectedAssessmentRegion === 'back',
+    rightArm: selectedAssessmentRegion === 'rightArm',
+    leftArm: selectedAssessmentRegion === 'leftArm',
+    rightLeg: selectedAssessmentRegion === 'rightLeg',
+    leftLeg: selectedAssessmentRegion === 'leftLeg',
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-slate-50 p-5">
@@ -837,6 +897,24 @@ export default function AssessmentSection({
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+        <div className="mb-4">
+          <h3 className="text-lg font-black text-blue-950">
+            Body Map Assessment Navigator
+          </h3>
+          <p className="mt-1 text-sm font-semibold text-blue-900">
+            Select an anatomical region to open the most relevant assessment workflow.
+            Apollo routes the clinician to the assessment area without making clinical decisions.
+          </p>
+        </div>
+
+        <ApolloBodyMap
+          mode="assessment"
+          selectedRegions={assessmentBodyMapSelection}
+          onRegionClick={handleAssessmentBodyRegionClick}
+        />
       </div>
 
       <div>
