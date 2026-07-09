@@ -776,6 +776,14 @@ export default function AssessmentSection({
       return (
         <ExtremityAssessmentCard
           value={extremityAssessment}
+          initiallyExpanded={
+            selectedAssessmentRegion === 'rightArm' ||
+            selectedAssessmentRegion === 'leftArm' ||
+            selectedAssessmentRegion === 'rightLeg' ||
+            selectedAssessmentRegion === 'leftLeg'
+              ? selectedAssessmentRegion
+              : ''
+          }
           onExtremityToggle={toggleExtremityAssessment}
           onChange={updateExtremityAssessment}
         />

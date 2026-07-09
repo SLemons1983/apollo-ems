@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type ExtremityKey = 'rightArm' | 'leftArm' | 'rightLeg' | 'leftLeg';
 
@@ -20,6 +20,7 @@ type ExtremityAssessmentForm = Record<ExtremityKey, ExtremityCmsTpAssessment>;
 
 type ExtremityAssessmentCardProps = {
   value: ExtremityAssessmentForm;
+  initiallyExpanded?: ExtremityKey | '';
   onExtremityToggle: (extremity: ExtremityKey, selected: boolean) => void;
   onChange: (
     extremity: ExtremityKey,
@@ -154,11 +155,18 @@ function getCardStyle(extremity: ExtremityCmsTpAssessment, active: boolean) {
 
 export default function ExtremityAssessmentCard({
   value,
+  initiallyExpanded,
   onExtremityToggle,
   onChange,
 }: ExtremityAssessmentCardProps) {
   const [expandedExtremity, setExpandedExtremity] =
-    useState<ExtremityKey | ''>('');
+    useState<ExtremityKey | ''>(initiallyExpanded ?? '');
+
+  useEffect(() => {
+    if (initiallyExpanded) {
+      setExpandedExtremity(initiallyExpanded);
+    }
+  }, [initiallyExpanded]);
 
   function beginOrOpenExtremity(extremity: ExtremityKey) {
     if (!value[extremity].selected) {
