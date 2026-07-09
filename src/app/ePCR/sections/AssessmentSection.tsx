@@ -96,6 +96,21 @@ export default function AssessmentSection({
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const [selectedAssessmentRegion, setSelectedAssessmentRegion] =
     useState<ApolloBodyRegionKey | ''>('');
+  const [selectedAssessmentRegions, setSelectedAssessmentRegions] = useState<
+    Record<ApolloBodyRegionKey, boolean>
+  >({
+    head: false,
+    face: false,
+    neck: false,
+    chest: false,
+    abdomen: false,
+    pelvis: false,
+    back: false,
+    rightArm: false,
+    leftArm: false,
+    rightLeg: false,
+    leftLeg: false,
+  });
 
   const [consciousnessAssessment, setConsciousnessAssessment] =
     useState<ConsciousnessAssessmentForm>({
@@ -638,6 +653,10 @@ export default function AssessmentSection({
 
   function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegion(region);
+    setSelectedAssessmentRegions((current) => ({
+      ...current,
+      [region]: !current[region],
+    }));
 
     const targetTaskId = getAssessmentTaskForBodyRegion(region);
     setExpandedTaskId(targetTaskId);
@@ -856,20 +875,6 @@ export default function AssessmentSection({
     );
   }
 
-  const assessmentBodyMapSelection: Record<ApolloBodyRegionKey, boolean> = {
-    head: selectedAssessmentRegion === 'head',
-    face: selectedAssessmentRegion === 'face',
-    neck: selectedAssessmentRegion === 'neck',
-    chest: selectedAssessmentRegion === 'chest',
-    abdomen: selectedAssessmentRegion === 'abdomen',
-    pelvis: selectedAssessmentRegion === 'pelvis',
-    back: selectedAssessmentRegion === 'back',
-    rightArm: selectedAssessmentRegion === 'rightArm',
-    leftArm: selectedAssessmentRegion === 'leftArm',
-    rightLeg: selectedAssessmentRegion === 'rightLeg',
-    leftLeg: selectedAssessmentRegion === 'leftLeg',
-  };
-
   return (
     <div className="space-y-6">
       <div className="rounded-xl border bg-slate-50 p-5">
@@ -920,7 +925,7 @@ export default function AssessmentSection({
 
         <ApolloBodyMap
           mode="assessment"
-          selectedRegions={assessmentBodyMapSelection}
+          selectedRegions={selectedAssessmentRegions}
           onRegionClick={handleAssessmentBodyRegionClick}
         />
       </div>
