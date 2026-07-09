@@ -651,6 +651,52 @@ export default function AssessmentSection({
     return 'primary-assessment';
   }
 
+  function getBodyRegionQueueStatus(region: ApolloBodyRegionKey) {
+    if (
+      region === 'rightArm' ||
+      region === 'leftArm' ||
+      region === 'rightLeg' ||
+      region === 'leftLeg'
+    ) {
+      const extremity = extremityAssessment[region];
+      const completedFields = [
+        extremity.circulation,
+        extremity.motor,
+        extremity.sensation,
+        extremity.tenderness,
+        extremity.pulses,
+        extremity.skin,
+        extremity.capillaryRefill,
+        extremity.notes,
+      ].filter(Boolean).length;
+
+      if (completedFields >= 7) {
+        return {
+          label: 'Complete',
+          dotClass: 'text-emerald-600',
+          chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+          statusClass: 'text-emerald-700',
+        };
+      }
+
+      if (completedFields > 0) {
+        return {
+          label: 'In Progress',
+          dotClass: 'text-amber-500',
+          chipClass: 'border-amber-200 bg-amber-50 text-amber-900',
+          statusClass: 'text-amber-700',
+        };
+      }
+    }
+
+    return {
+      label: 'Pending',
+      dotClass: 'text-blue-600',
+      chipClass: 'border-blue-200 bg-blue-50 text-blue-900',
+      statusClass: 'text-slate-400',
+    };
+  }
+
   function openAssessmentForBodyRegion(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegion(region);
 
@@ -959,24 +1005,29 @@ export default function AssessmentSection({
               <div className="flex flex-wrap gap-2">
                 {Object.entries(selectedAssessmentRegions)
                   .filter(([, selected]) => selected)
-                  .map(([region]) => (
-                    <button
-                      key={region}
-                      type="button"
-                      onClick={() =>
-                        openAssessmentForBodyRegion(region as ApolloBodyRegionKey)
-                      }
-                      className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase text-blue-900 hover:bg-blue-100"
-                    >
-                      <span className="text-emerald-600">●</span>
+                  .map(([region]) => {
+                    const typedRegion = region as ApolloBodyRegionKey;
+                    const queueStatus = getBodyRegionQueueStatus(typedRegion);
 
-                      {region
-                        .replace(/([A-Z])/g, ' $1')
-                        .replace(/^./, (letter) => letter.toUpperCase())}
+                    return (
+                      <button
+                        key={region}
+                        type="button"
+                        onClick={() => openAssessmentForBodyRegion(typedRegion)}
+                        className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase hover:opacity-90 ${queueStatus.chipClass}`}
+                      >
+                        <span className={queueStatus.dotClass}>●</span>
 
-                      <span className="text-slate-400">Pending</span>
-                    </button>
-                  ))}
+                        {region
+                          .replace(/([A-Z])/g, ' $1')
+                          .replace(/^./, (letter) => letter.toUpperCase())}
+
+                        <span className={queueStatus.statusClass}>
+                          {queueStatus.label}
+                        </span>
+                      </button>
+                    );
+                  })}
               </div>
 
               <button
