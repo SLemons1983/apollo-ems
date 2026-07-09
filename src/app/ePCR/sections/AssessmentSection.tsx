@@ -931,7 +931,12 @@ export default function AssessmentSection({
 
         <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
           <div className="mb-2 text-xs font-black uppercase tracking-wide text-blue-800">
-            Selected Regions for Assessment
+            Assessment Queue
+          </div>
+
+          <div className="mb-3 text-sm text-slate-600">
+            Regions selected on the Body Map become your active assessment queue.
+            Complete each assessment as you perform your head-to-toe exam.
           </div>
 
           {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
@@ -943,11 +948,15 @@ export default function AssessmentSection({
                   .map(([region]) => (
                     <span
                       key={region}
-                      className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-900"
+                      className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase text-blue-900"
                     >
+                      <span className="text-emerald-600">●</span>
+
                       {region
                         .replace(/([A-Z])/g, ' $1')
                         .replace(/^./, (letter) => letter.toUpperCase())}
+
+                      <span className="text-slate-400">Pending</span>
                     </span>
                   ))}
               </div>
