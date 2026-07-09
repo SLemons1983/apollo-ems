@@ -944,6 +944,15 @@ export default function AssessmentSection({
             Complete each assessment as you perform your head-to-toe exam.
           </div>
 
+          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-950">
+            Current Focus:{' '}
+            {selectedAssessmentRegion
+              ? selectedAssessmentRegion
+                  .replace(/([A-Z])/g, ' $1')
+                  .replace(/^./, (letter) => letter.toUpperCase())
+              : 'None'}
+          </div>
+
           {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
             .length > 0 ? (
             <div className="space-y-3">
