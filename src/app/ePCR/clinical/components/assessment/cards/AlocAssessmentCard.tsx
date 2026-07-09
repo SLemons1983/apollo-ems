@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { calculateGcsScore } from '../../../engine/scores/gcs';
+import type { PrimaryAssessmentForm } from './PrimaryAssessmentCard';
 
 type AlocAssessmentForm = {
   currentMentalStatus: string;
@@ -22,6 +24,7 @@ type AlocAssessmentForm = {
 
 type AlocAssessmentCardProps = {
   value: AlocAssessmentForm;
+  primaryAssessment: PrimaryAssessmentForm;
   onChange: (field: keyof AlocAssessmentForm, value: string) => void;
 };
 
@@ -170,11 +173,13 @@ function getStatusLabel(value: AlocAssessmentForm) {
 
 export default function AlocAssessmentCard({
   value,
+  primaryAssessment,
   onChange,
 }: AlocAssessmentCardProps) {
   const [expandedSection, setExpandedSection] = useState(sections[0].id);
   const completedFields = getCompletedFields(value);
   const completionPercent = getCompletionPercent(value);
+  const importedGcsScore = calculateGcsScore(primaryAssessment);
 
   return (
     <div className="space-y-5">
@@ -186,6 +191,37 @@ export default function AlocAssessmentCard({
           Document mental status findings and structured AEIOU-TIPS clinical
           considerations. Apollo does not diagnose; contact Base Hospital /
           Medical Control when clinical guidance is needed.
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-300 bg-white p-4">
+        <div className="mb-3 text-xs font-black uppercase tracking-wide text-slate-500">
+          Imported From Primary Assessment
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['LOC', primaryAssessment.levelOfConsciousness],
+            ['Disability', primaryAssessment.disability],
+            ['Pupils', primaryAssessment.pupils],
+            ['GCS', importedGcsScore ? String(importedGcsScore) : ''],
+            ['Skin Color', primaryAssessment.skinColor],
+            ['Skin Temperature', primaryAssessment.skinTemperature],
+            ['Skin Condition', primaryAssessment.skinCondition],
+            ['Transport Priority', primaryAssessment.transportPriority],
+          ].map(([label, importedValue]) => (
+            <div
+              key={label}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+            >
+              <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">
+                {label}
+              </div>
+              <div className="mt-1 text-sm font-bold text-slate-900">
+                {importedValue || 'Not Documented'}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

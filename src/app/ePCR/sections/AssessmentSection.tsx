@@ -770,6 +770,7 @@ export default function AssessmentSection({
       return (
         <AlocAssessmentCard
           value={alocAssessment}
+          primaryAssessment={primaryAssessment}
           onChange={updateAlocAssessment}
         />
       );
