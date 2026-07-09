@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import PCRCard from '../components/PCRCard';
 import ApolloBodyMap from '../clinical/components/body-map/ApolloBodyMap';
+import { apolloBodyRegionDetails } from '../clinical/components/body-map/bodyRegionDetails';
 import type { ApolloBodyRegionKey } from '../clinical/components/body-map/bodyMapTypes';
 import {
   determineAssessmentMode,
@@ -97,6 +98,22 @@ export default function AssessmentSection({
   const [selectedAssessmentRegion, setSelectedAssessmentRegion] =
     useState<ApolloBodyRegionKey | ''>('');
   const [selectedAssessmentRegions, setSelectedAssessmentRegions] = useState<
+    Record<ApolloBodyRegionKey, boolean>
+  >({
+    head: false,
+    face: false,
+    neck: false,
+    chest: false,
+    abdomen: false,
+    pelvis: false,
+    back: false,
+    rightArm: false,
+    leftArm: false,
+    rightLeg: false,
+    leftLeg: false,
+  });
+
+  const [bodyRegionUnremarkable, setBodyRegionUnremarkable] = useState<
     Record<ApolloBodyRegionKey, boolean>
   >({
     head: false,
@@ -652,6 +669,15 @@ export default function AssessmentSection({
   }
 
   function getBodyRegionQueueStatus(region: ApolloBodyRegionKey) {
+    if (bodyRegionUnremarkable[region]) {
+      return {
+        label: 'Unremarkable',
+        dotClass: 'text-emerald-600',
+        chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+        statusClass: 'text-emerald-700',
+      };
+    }
+
     if (
       region === 'rightArm' ||
       region === 'leftArm' ||
@@ -695,6 +721,18 @@ export default function AssessmentSection({
       chipClass: 'border-blue-200 bg-blue-50 text-blue-900',
       statusClass: 'text-slate-400',
     };
+  }
+
+  function markBodyRegionUnremarkable(region: ApolloBodyRegionKey) {
+    setSelectedAssessmentRegion(region);
+    setSelectedAssessmentRegions((current) => ({
+      ...current,
+      [region]: true,
+    }));
+    setBodyRegionUnremarkable((current) => ({
+      ...current,
+      [region]: true,
+    }));
   }
 
   function openAssessmentForBodyRegion(region: ApolloBodyRegionKey) {
@@ -999,6 +1037,33 @@ export default function AssessmentSection({
               : 'None'}
           </div>
 
+          {selectedAssessmentRegion && (
+            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+                Region Detail
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {apolloBodyRegionDetails[selectedAssessmentRegion].map((subRegion) => (
+                  <span
+                    key={subRegion.id}
+                    className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200"
+                  >
+                    {subRegion.label}
+                  </span>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => markBodyRegionUnremarkable(selectedAssessmentRegion)}
+                className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
+              >
+                Mark Region Unremarkable
+              </button>
+            </div>
+          )}
+
           {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
             .length > 0 ? (
             <div className="space-y-3">
@@ -1035,6 +1100,19 @@ export default function AssessmentSection({
                 onClick={() => {
                   setSelectedAssessmentRegion('');
                   setSelectedAssessmentRegions({
+                    head: false,
+                    face: false,
+                    neck: false,
+                    chest: false,
+                    abdomen: false,
+                    pelvis: false,
+                    back: false,
+                    rightArm: false,
+                    leftArm: false,
+                    rightLeg: false,
+                    leftLeg: false,
+                  });
+                  setBodyRegionUnremarkable({
                     head: false,
                     face: false,
                     neck: false,
