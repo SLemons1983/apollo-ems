@@ -651,12 +651,8 @@ export default function AssessmentSection({
     return 'primary-assessment';
   }
 
-  function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
+  function openAssessmentForBodyRegion(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegion(region);
-    setSelectedAssessmentRegions((current) => ({
-      ...current,
-      [region]: !current[region],
-    }));
 
     const targetTaskId = getAssessmentTaskForBodyRegion(region);
     setExpandedTaskId(targetTaskId);
@@ -670,6 +666,15 @@ export default function AssessmentSection({
     ) {
       toggleExtremityAssessment(region, true);
     }
+  }
+
+  function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
+    setSelectedAssessmentRegions((current) => ({
+      ...current,
+      [region]: !current[region],
+    }));
+
+    openAssessmentForBodyRegion(region);
   }
 
   function updateRevisedTraumaScore(
@@ -950,7 +955,7 @@ export default function AssessmentSection({
                       key={region}
                       type="button"
                       onClick={() =>
-                        handleAssessmentBodyRegionClick(region as ApolloBodyRegionKey)
+                        openAssessmentForBodyRegion(region as ApolloBodyRegionKey)
                       }
                       className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase text-blue-900 hover:bg-blue-100"
                     >
