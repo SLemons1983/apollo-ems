@@ -946,9 +946,13 @@ export default function AssessmentSection({
                 {Object.entries(selectedAssessmentRegions)
                   .filter(([, selected]) => selected)
                   .map(([region]) => (
-                    <span
+                    <button
                       key={region}
-                      className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase text-blue-900"
+                      type="button"
+                      onClick={() =>
+                        handleAssessmentBodyRegionClick(region as ApolloBodyRegionKey)
+                      }
+                      className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black uppercase text-blue-900 hover:bg-blue-100"
                     >
                       <span className="text-emerald-600">●</span>
 
@@ -957,7 +961,7 @@ export default function AssessmentSection({
                         .replace(/^./, (letter) => letter.toUpperCase())}
 
                       <span className="text-slate-400">Pending</span>
-                    </span>
+                    </button>
                   ))}
               </div>
 
