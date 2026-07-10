@@ -1,6 +1,12 @@
 'use client';
 
-import { ChangeEvent, useMemo, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import PCRProgress from './PCRProgress';
 import PCRSection from './PCRSection';
 import AssessmentSection from '../sections/AssessmentSection';
@@ -83,6 +89,44 @@ export default function EPCRClient() {
   const complaintCompletedRequiredFields =
     complaintRequiredFields.filter(Boolean).length;
   const complaintTotalRequiredFields = complaintRequiredFields.length;
+
+  const handleAssessmentProgressChange = useCallback(
+    (nextProgress: {
+      completedFields: number;
+      totalFields: number;
+      tasks: {
+        title: string;
+        completedFields: number;
+        totalFields: number;
+      }[];
+    }) => {
+      setAssessmentProgress((currentProgress) => {
+        const sameTaskProgress =
+          currentProgress.tasks.length === nextProgress.tasks.length &&
+          currentProgress.tasks.every((currentTask, index) => {
+            const nextTask = nextProgress.tasks[index];
+
+            return (
+              nextTask &&
+              currentTask.title === nextTask.title &&
+              currentTask.completedFields === nextTask.completedFields &&
+              currentTask.totalFields === nextTask.totalFields
+            );
+          });
+
+        if (
+          currentProgress.completedFields === nextProgress.completedFields &&
+          currentProgress.totalFields === nextProgress.totalFields &&
+          sameTaskProgress
+        ) {
+          return currentProgress;
+        }
+
+        return nextProgress;
+      });
+    },
+    [],
+  );
 
   function updateCallForm(field: keyof CallForm, value: string | string[]) {
     setCallForm((current) => ({
@@ -603,15 +647,7 @@ export default function EPCRClient() {
                       complaintForm.cardiacArrest !== '' &&
                       complaintForm.cardiacArrest !== 'No'
                     }
-                    onProgressChange={(nextProgress) =>
-                      setAssessmentProgress((currentProgress) =>
-                        currentProgress.completedFields ===
-                          nextProgress.completedFields &&
-                        currentProgress.totalFields === nextProgress.totalFields
-                          ? currentProgress
-                          : nextProgress,
-                      )
-                    }
+                    onProgressChange={handleAssessmentProgressChange}
                   />
                 ) : (
                   <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">

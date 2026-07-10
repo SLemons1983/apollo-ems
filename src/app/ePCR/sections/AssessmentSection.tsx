@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -106,8 +107,28 @@ export default function AssessmentSection({
   };
 
   const mode = determineAssessmentMode(context);
-  const suggestedTasks = getAssessmentTasksForContext(context);
-  const additionalTasks = getAdditionalAssessmentTasksForContext(context);
+
+  const suggestedTasks = useMemo(
+    () => getAssessmentTasksForContext(context),
+    [
+      clinicalCategory,
+      suspectedStroke,
+      possibleTrauma,
+      behavioralHold,
+      cardiacArrest,
+    ],
+  );
+
+  const additionalTasks = useMemo(
+    () => getAdditionalAssessmentTasksForContext(context),
+    [
+      clinicalCategory,
+      suspectedStroke,
+      possibleTrauma,
+      behavioralHold,
+      cardiacArrest,
+    ],
+  );
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
   const selectedAssessmentRegions = assessmentForm.bodyMap.selectedRegions;
