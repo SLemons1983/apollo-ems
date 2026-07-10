@@ -1,6 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import {
+  useEffect,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import PCRCard from '../components/PCRCard';
 import ApolloBodyMap from '../clinical/components/body-map/ApolloBodyMap';
 import { apolloBodyRegionDetails } from '../clinical/components/body-map/bodyRegionDetails';
@@ -54,8 +59,14 @@ import TraumaAssessmentCard, {
 } from '../clinical/components/assessment/cards/TraumaAssessmentCard';
 import { calculateGcsScore } from '../clinical/engine/scores/gcs';
 import type { PatientForm } from '../types';
+import type {
+  AssessmentForm,
+  ApolloBodyRegionSelection,
+} from '../clinical/assessment/assessmentForm';
 
 type AssessmentSectionProps = {
+  assessmentForm: AssessmentForm;
+  onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
   patientForm: PatientForm;
   providerScope: 'BLS' | 'ALS';
   clinicalCategory: string;
@@ -75,6 +86,8 @@ type AssessmentSectionProps = {
 };
 
 export default function AssessmentSection({
+  assessmentForm,
+  onAssessmentFormChange,
   patientForm,
   providerScope,
   clinicalCategory,
@@ -96,39 +109,70 @@ export default function AssessmentSection({
   const suggestedTasks = getAssessmentTasksForContext(context);
   const additionalTasks = getAdditionalAssessmentTasksForContext(context);
   const [expandedTaskId, setExpandedTaskId] = useState('');
-  const [selectedAssessmentRegion, setSelectedAssessmentRegion] =
-    useState<ApolloBodyRegionKey | ''>('');
-  const [selectedAssessmentRegions, setSelectedAssessmentRegions] = useState<
-    Record<ApolloBodyRegionKey, boolean>
-  >({
-    head: false,
-    face: false,
-    neck: false,
-    chest: false,
-    abdomen: false,
-    pelvis: false,
-    back: false,
-    rightArm: false,
-    leftArm: false,
-    rightLeg: false,
-    leftLeg: false,
-  });
+  const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
+  const selectedAssessmentRegions = assessmentForm.bodyMap.selectedRegions;
+  const bodyRegionUnremarkable =
+    assessmentForm.bodyMap.unremarkableRegions;
 
-  const [bodyRegionUnremarkable, setBodyRegionUnremarkable] = useState<
-    Record<ApolloBodyRegionKey, boolean>
-  >({
-    head: false,
-    face: false,
-    neck: false,
-    chest: false,
-    abdomen: false,
-    pelvis: false,
-    back: false,
-    rightArm: false,
-    leftArm: false,
-    rightLeg: false,
-    leftLeg: false,
-  });
+  function setSelectedAssessmentRegion(
+    nextValue: SetStateAction<ApolloBodyRegionKey | ''>,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentValue = current.bodyMap.currentFocus;
+      const resolvedValue =
+        typeof nextValue === 'function'
+          ? nextValue(currentValue)
+          : nextValue;
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: resolvedValue,
+        },
+      };
+    });
+  }
+
+  function setSelectedAssessmentRegions(
+    nextValue: SetStateAction<ApolloBodyRegionSelection>,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentValue = current.bodyMap.selectedRegions;
+      const resolvedValue =
+        typeof nextValue === 'function'
+          ? nextValue(currentValue)
+          : nextValue;
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          selectedRegions: resolvedValue,
+        },
+      };
+    });
+  }
+
+  function setBodyRegionUnremarkable(
+    nextValue: SetStateAction<ApolloBodyRegionSelection>,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentValue = current.bodyMap.unremarkableRegions;
+      const resolvedValue =
+        typeof nextValue === 'function'
+          ? nextValue(currentValue)
+          : nextValue;
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          unremarkableRegions: resolvedValue,
+        },
+      };
+    });
+  }
 
   const [consciousnessAssessment, setConsciousnessAssessment] =
     useState<ConsciousnessAssessmentForm>({

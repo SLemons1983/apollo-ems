@@ -9,6 +9,10 @@ import ComplaintSection from '../sections/ComplaintSection';
 import PatientSection from '../sections/PatientSection';
 import type { CallForm, ComplaintForm, PatientForm } from '../types';
 import {
+  createDefaultAssessmentForm,
+  type AssessmentForm,
+} from '../clinical/assessment/assessmentForm';
+import {
   createDefaultCallForm,
   createDefaultComplaintForm,
   createDefaultPatientForm,
@@ -42,6 +46,9 @@ export default function EPCRClient() {
   );
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>(() =>
     createDefaultComplaintForm(),
+  );
+  const [assessmentForm, setAssessmentForm] = useState<AssessmentForm>(() =>
+    createDefaultAssessmentForm(),
   );
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
@@ -576,6 +583,8 @@ export default function EPCRClient() {
                   />
                 ) : section === 'Assessment' ? (
                   <AssessmentSection
+                    assessmentForm={assessmentForm}
+                    onAssessmentFormChange={setAssessmentForm}
                     patientForm={patientForm}
                     providerScope={
                       callForm.crewMembers.find(
