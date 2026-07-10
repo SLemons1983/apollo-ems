@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import PCRCard from '../components/PCRCard';
 import ApolloBodyMap from '../clinical/components/body-map/ApolloBodyMap';
 import { apolloBodyRegionDetails } from '../clinical/components/body-map/bodyRegionDetails';
+import { getClinicalDisplayName } from '../clinical/components/body-map/bodyAnatomy';
 import type { ApolloBodyRegionKey } from '../clinical/components/body-map/bodyMapTypes';
 import {
   determineAssessmentMode,
@@ -1031,9 +1032,7 @@ export default function AssessmentSection({
           <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-950">
             Current Focus:{' '}
             {selectedAssessmentRegion
-              ? selectedAssessmentRegion
-                  .replace(/([A-Z])/g, ' $1')
-                  .replace(/^./, (letter) => letter.toUpperCase())
+              ? getClinicalDisplayName(selectedAssessmentRegion)
               : 'None'}
           </div>
 
@@ -1083,9 +1082,7 @@ export default function AssessmentSection({
                       >
                         <span className={queueStatus.dotClass}>●</span>
 
-                        {region
-                          .replace(/([A-Z])/g, ' $1')
-                          .replace(/^./, (letter) => letter.toUpperCase())}
+                        {getClinicalDisplayName(typedRegion)}
 
                         <span className={queueStatus.statusClass}>
                           {queueStatus.label}
@@ -1094,6 +1091,28 @@ export default function AssessmentSection({
                     );
                   })}
               </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setBodyRegionUnremarkable((current) => {
+                    const updated = { ...current };
+
+                    Object.entries(selectedAssessmentRegions).forEach(
+                      ([region, selected]) => {
+                        if (selected) {
+                          updated[region as ApolloBodyRegionKey] = true;
+                        }
+                      },
+                    );
+
+                    return updated;
+                  });
+                }}
+                className="mr-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
+              >
+                Mark Selected Unremarkable
+              </button>
 
               <button
                 type="button"
