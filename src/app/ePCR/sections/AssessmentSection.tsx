@@ -11,7 +11,10 @@ import PCRCard from '../components/PCRCard';
 import ApolloBodyMap from '../clinical/components/body-map/ApolloBodyMap';
 import { apolloBodyRegionDetails } from '../clinical/components/body-map/bodyRegionDetails';
 import { getClinicalDisplayName } from '../clinical/components/body-map/bodyAnatomy';
-import type { ApolloBodyRegionKey } from '../clinical/components/body-map/bodyMapTypes';
+import type {
+  ApolloBodyRegionKey,
+  ApolloBodyRegionStatus,
+} from '../clinical/components/body-map/bodyMapTypes';
 import {
   determineAssessmentMode,
   getAdditionalAssessmentTasksForContext,
@@ -739,6 +742,85 @@ export default function AssessmentSection({
     return 'primary-assessment';
   }
 
+  function getBodyRegionAssessmentStatus(
+    region: ApolloBodyRegionKey,
+  ): ApolloBodyRegionStatus | undefined {
+    const selected = selectedAssessmentRegions[region];
+    const unremarkable = bodyRegionUnremarkable[region];
+    const regionFinding =
+      assessmentForm.bodyMap.regionFindings[region];
+
+    const selectedFindings = dcapBtlsFindings.filter(
+      (finding) => regionFinding.dcapBtls[finding.field],
+    );
+
+    if (unremarkable) {
+      return {
+        selected: true,
+        assessmentState: 'unremarkable',
+        findingCount: 0,
+        note: 'Unremarkable',
+      };
+    }
+
+    if (selectedFindings.length > 0) {
+      return {
+        selected: true,
+        assessmentState: 'abnormal',
+        findingCount: selectedFindings.length,
+        note: selectedFindings
+          .map((finding) => finding.label)
+          .join(' · '),
+        overlays: selectedFindings.map((finding) => ({
+          type: 'finding',
+          label: finding.label,
+          color: 'red',
+        })),
+      };
+    }
+
+    if (regionFinding.notes.trim()) {
+      return {
+        selected: true,
+        assessmentState: 'noted',
+        findingCount: 0,
+        note: regionFinding.notes.trim(),
+      };
+    }
+
+    if (selected) {
+      return {
+        selected: true,
+        assessmentState: 'pending',
+        findingCount: 0,
+        note: 'Assessment pending',
+      };
+    }
+
+    return undefined;
+  }
+
+  const assessmentBodyRegionStatuses =
+    (
+      Object.keys(selectedAssessmentRegions) as ApolloBodyRegionKey[]
+    ).reduce(
+      (statuses, region) => {
+        const status = getBodyRegionAssessmentStatus(region);
+
+        if (!status) {
+          return statuses;
+        }
+
+        return {
+          ...statuses,
+          [region]: status,
+        };
+      },
+      {} as Partial<
+        Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>
+      >,
+    );
+
   function getBodyRegionQueueStatus(region: ApolloBodyRegionKey) {
     if (bodyRegionUnremarkable[region]) {
       return {
@@ -1162,6 +1244,7 @@ export default function AssessmentSection({
         <ApolloBodyMap
           mode="assessment"
           selectedRegions={selectedAssessmentRegions}
+          regionStatuses={assessmentBodyRegionStatuses}
           onRegionClick={handleAssessmentBodyRegionClick}
         />
 
@@ -1186,6 +1269,46 @@ export default function AssessmentSection({
             <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
                 Region Detail
+              </div>
+
+              <div
+                className={`mb-4 rounded-lg border px-4 py-3 ${
+                  bodyRegionUnremarkable[selectedAssessmentRegion]
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : dcapBtlsFindings.some(
+                          (finding) =>
+                            assessmentForm.bodyMap.regionFindings[
+                              selectedAssessmentRegion
+                            ].dcapBtls[finding.field],
+                        )
+                      ? 'border-red-300 bg-red-50'
+                      : assessmentForm.bodyMap.regionFindings[
+                            selectedAssessmentRegion
+                          ].notes.trim()
+                        ? 'border-amber-300 bg-amber-50'
+                        : 'border-blue-200 bg-blue-50'
+                }`}
+              >
+                <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Assessment Status
+                </div>
+
+                <div className="mt-1 text-base font-black text-slate-900">
+                  {bodyRegionUnremarkable[selectedAssessmentRegion]
+                    ? '✓ Unremarkable'
+                    : dcapBtlsFindings.some(
+                          (finding) =>
+                            assessmentForm.bodyMap.regionFindings[
+                              selectedAssessmentRegion
+                            ].dcapBtls[finding.field],
+                        )
+                      ? 'Abnormal Findings Documented'
+                      : assessmentForm.bodyMap.regionFindings[
+                            selectedAssessmentRegion
+                          ].notes.trim()
+                        ? 'Notes Documented'
+                        : 'Not Yet Assessed'}
+                </div>
               </div>
 
               <div className="mb-4 flex flex-wrap gap-2">

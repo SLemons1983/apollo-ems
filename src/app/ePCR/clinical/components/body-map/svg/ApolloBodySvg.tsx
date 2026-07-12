@@ -44,22 +44,43 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
             Boolean(status?.note) ||
             Boolean(status?.overlays?.length);
           const active = props.activeRegion === region.id;
+          const assessmentState = status?.assessmentState;
+
+          const fill =
+            assessmentState === 'unremarkable'
+              ? '#dcfce7'
+              : assessmentState === 'abnormal'
+                ? '#fee2e2'
+                : assessmentState === 'noted'
+                  ? '#fef3c7'
+                  : selected
+                    ? '#dbeafe'
+                    : hasClinicalData
+                      ? '#fffbeb'
+                      : '#ffffff';
+
+          const stroke =
+            active
+              ? '#0f172a'
+              : assessmentState === 'unremarkable'
+                ? '#16a34a'
+                : assessmentState === 'abnormal'
+                  ? '#dc2626'
+                  : assessmentState === 'noted'
+                    ? '#d97706'
+                    : selected
+                      ? '#2563eb'
+                      : '#64748b';
 
           return (
             <path
               key={region.id}
               d={region.path}
-              fill={
-                selected
-                  ? hasClinicalData
-                    ? '#fef3c7'
-                    : '#dbeafe'
-                  : hasClinicalData
-                    ? '#fffbeb'
-                    : '#ffffff'
+              fill={fill}
+              stroke={stroke}
+              strokeWidth={
+                active || assessmentState || selected ? 4 : 2
               }
-              stroke={active ? '#0f172a' : selected ? '#2563eb' : '#64748b'}
-              strokeWidth={active ? 5 : selected ? 4 : 2}
               onClick={() => props.onRegionClick(region.id)}
               onMouseEnter={() => props.onFocusRegion(region.id)}
               onMouseLeave={props.onBlurRegion}

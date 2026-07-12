@@ -43,10 +43,17 @@ export type ApolloBodyOverlay = {
   color?: ApolloBodyOverlayColor;
 };
 
+export type ApolloBodyAssessmentState =
+  | 'pending'
+  | 'unremarkable'
+  | 'abnormal'
+  | 'noted';
+
 export type ApolloBodyRegionStatus = {
   selected?: boolean;
   disabled?: boolean;
   highlighted?: boolean;
+  assessmentState?: ApolloBodyAssessmentState;
   findingCount?: number;
   note?: string;
   overlays?: ApolloBodyOverlay[];
