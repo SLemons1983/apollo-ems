@@ -16,6 +16,11 @@ import type {
   ApolloBodyRegionStatus,
 } from '../clinical/components/body-map/bodyMapTypes';
 import {
+  createEmptyAssessmentCmsTp,
+  isAssessmentExtremityRegion,
+  type AssessmentCmsTpField,
+} from '../clinical/assessment/assessmentForm';
+import {
   determineAssessmentMode,
   getAdditionalAssessmentTasksForContext,
   getAssessmentTasksForContext,
@@ -73,6 +78,61 @@ import {
   type DcapBtlsFindingKey,
 } from '../clinical/assessment/dcapBtls';
 
+const cmsTpFields: {
+  field: Exclude<AssessmentCmsTpField, 'notes'>;
+  label: string;
+  options: string[];
+}[] = [
+  {
+    field: 'circulation',
+    label: 'Circulation',
+    options: ['Normal', 'Impaired', 'Absent', 'Unable to Assess'],
+  },
+  {
+    field: 'motor',
+    label: 'Motor',
+    options: ['Intact', 'Weak', 'Absent', 'Unable to Assess'],
+  },
+  {
+    field: 'sensation',
+    label: 'Sensation',
+    options: ['Intact', 'Decreased', 'Absent', 'Unable to Assess'],
+  },
+  {
+    field: 'tenderness',
+    label: 'Tenderness',
+    options: ['None', 'Present', 'Unable to Assess'],
+  },
+  {
+    field: 'pulses',
+    label: 'Pulses',
+    options: ['Normal', 'Weak', 'Absent', 'Unable to Assess'],
+  },
+  {
+    field: 'skin',
+    label: 'Skin',
+    options: [
+      'Normal',
+      'Pale',
+      'Cyanotic',
+      'Cool',
+      'Warm',
+      'Diaphoretic',
+      'Unable to Assess',
+    ],
+  },
+  {
+    field: 'capillaryRefill',
+    label: 'Capillary Refill',
+    options: [
+      'Less Than 2 Seconds',
+      '2 to 3 Seconds',
+      'Greater Than 3 Seconds',
+      'Unable to Assess',
+    ],
+  },
+];
+
 type AssessmentSectionProps = {
   assessmentForm: AssessmentForm;
   onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
@@ -117,7 +177,10 @@ export default function AssessmentSection({
   const mode = determineAssessmentMode(context);
 
   const suggestedTasks = useMemo(
-    () => getAssessmentTasksForContext(context),
+    () =>
+      getAssessmentTasksForContext(context).filter(
+        (task) => task.id !== 'extremity-assessment',
+      ),
     [
       clinicalCategory,
       suspectedStroke,
@@ -128,7 +191,10 @@ export default function AssessmentSection({
   );
 
   const additionalTasks = useMemo(
-    () => getAdditionalAssessmentTasksForContext(context),
+    () =>
+      getAdditionalAssessmentTasksForContext(context).filter(
+        (task) => task.id !== 'extremity-assessment',
+      ),
     [
       clinicalCategory,
       suspectedStroke,
@@ -718,13 +784,8 @@ export default function AssessmentSection({
   }
 
   function getAssessmentTaskForBodyRegion(region: ApolloBodyRegionKey) {
-    if (
-      region === 'rightArm' ||
-      region === 'leftArm' ||
-      region === 'rightLeg' ||
-      region === 'leftLeg'
-    ) {
-      return 'extremity-assessment';
+    if (isAssessmentExtremityRegion(region)) {
+      return '';
     }
 
     if (region === 'chest') {
@@ -779,6 +840,28 @@ export default function AssessmentSection({
       };
     }
 
+    if (isAssessmentExtremityRegion(region)) {
+      const cmsTp =
+        regionFinding.cmsTp ?? createEmptyAssessmentCmsTp();
+
+      const documentedCmsTp = cmsTpFields
+        .filter((field) => Boolean(cmsTp[field.field]))
+        .map((field) => `${field.label}: ${cmsTp[field.field]}`);
+
+      if (cmsTp.notes.trim()) {
+        documentedCmsTp.push(`CMS-TP Notes: ${cmsTp.notes.trim()}`);
+      }
+
+      if (documentedCmsTp.length > 0) {
+        return {
+          selected: true,
+          assessmentState: 'noted',
+          findingCount: 0,
+          note: documentedCmsTp.join(' · '),
+        };
+      }
+    }
+
     if (regionFinding.notes.trim()) {
       return {
         selected: true,
@@ -831,39 +914,69 @@ export default function AssessmentSection({
       };
     }
 
-    if (
-      region === 'rightArm' ||
-      region === 'leftArm' ||
-      region === 'rightLeg' ||
-      region === 'leftLeg'
-    ) {
-      const extremity = extremityAssessment[region];
+    if (isAssessmentExtremityRegion(region)) {
+      const regionFinding =
+        assessmentForm.bodyMap.regionFindings[region];
+
+      const cmsTp =
+        regionFinding.cmsTp ?? createEmptyAssessmentCmsTp();
+
       const completedFields = [
-        extremity.circulation,
-        extremity.motor,
-        extremity.sensation,
-        extremity.tenderness,
-        extremity.pulses,
-        extremity.skin,
-        extremity.capillaryRefill,
-        extremity.notes,
+        cmsTp.circulation,
+        cmsTp.motor,
+        cmsTp.sensation,
+        cmsTp.tenderness,
+        cmsTp.pulses,
+        cmsTp.skin,
+        cmsTp.capillaryRefill,
       ].filter(Boolean).length;
 
-      if (completedFields >= 7) {
+      const hasCmsTpNotes = Boolean(cmsTp.notes.trim());
+      const hasDcapBtlsFindings = Object.values(
+        regionFinding.dcapBtls,
+      ).some(Boolean);
+      const hasRegionNotes = Boolean(regionFinding.notes.trim());
+
+      if (completedFields === 7) {
         return {
-          label: 'Complete',
-          dotClass: 'text-emerald-600',
-          chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-          statusClass: 'text-emerald-700',
+          label:
+            hasDcapBtlsFindings || hasRegionNotes
+              ? 'Abnormal Findings Documented'
+              : 'Complete',
+          dotClass:
+            hasDcapBtlsFindings || hasRegionNotes
+              ? 'text-red-600'
+              : 'text-emerald-600',
+          chipClass:
+            hasDcapBtlsFindings || hasRegionNotes
+              ? 'border-red-200 bg-red-50 text-red-900'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-900',
+          statusClass:
+            hasDcapBtlsFindings || hasRegionNotes
+              ? 'text-red-700'
+              : 'text-emerald-700',
         };
       }
 
-      if (completedFields > 0) {
+      if (
+        completedFields > 0 ||
+        hasCmsTpNotes ||
+        hasDcapBtlsFindings ||
+        hasRegionNotes
+      ) {
         return {
-          label: 'In Progress',
-          dotClass: 'text-amber-500',
-          chipClass: 'border-amber-200 bg-amber-50 text-amber-900',
-          statusClass: 'text-amber-700',
+          label: hasDcapBtlsFindings
+            ? 'Abnormal Findings Documented'
+            : 'In Progress',
+          dotClass: hasDcapBtlsFindings
+            ? 'text-red-600'
+            : 'text-amber-500',
+          chipClass: hasDcapBtlsFindings
+            ? 'border-red-200 bg-red-50 text-red-900'
+            : 'border-amber-200 bg-amber-50 text-amber-900',
+          statusClass: hasDcapBtlsFindings
+            ? 'text-red-700'
+            : 'text-amber-700',
         };
       }
     }
@@ -939,6 +1052,46 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateBodyRegionCmsTp(
+    region: ApolloBodyRegionKey,
+    field: AssessmentCmsTpField,
+    fieldValue: string,
+  ) {
+    if (!isAssessmentExtremityRegion(region)) {
+      return;
+    }
+
+    onAssessmentFormChange((current) => {
+      const currentRegion = current.bodyMap.regionFindings[region];
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          regionFindings: {
+            ...current.bodyMap.regionFindings,
+            [region]: {
+              ...currentRegion,
+              cmsTp: {
+                ...(currentRegion.cmsTp ?? createEmptyAssessmentCmsTp()),
+                [field]: fieldValue,
+              },
+            },
+          },
+        },
+      };
+    });
+  }
+
   function markBodyRegionUnremarkable(region: ApolloBodyRegionKey) {
     onAssessmentFormChange((current) => ({
       ...current,
@@ -957,6 +1110,7 @@ export default function AssessmentSection({
           ...current.bodyMap.regionFindings,
           [region]: {
             dcapBtls: createEmptyDcapBtlsFindings(),
+            cmsTp: createEmptyAssessmentCmsTp(),
             notes: '',
           },
         },
@@ -968,16 +1122,9 @@ export default function AssessmentSection({
     setSelectedAssessmentRegion(region);
 
     const targetTaskId = getAssessmentTaskForBodyRegion(region);
-    setExpandedTaskId(targetTaskId);
 
-    if (
-      targetTaskId === 'extremity-assessment' &&
-      (region === 'rightArm' ||
-        region === 'leftArm' ||
-        region === 'rightLeg' ||
-        region === 'leftLeg')
-    ) {
-      toggleExtremityAssessment(region, true);
+    if (targetTaskId) {
+      setExpandedTaskId(targetTaskId);
     }
   }
 
@@ -1378,6 +1525,81 @@ export default function AssessmentSection({
                     className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
                   />
                 </label>
+
+                {isAssessmentExtremityRegion(selectedAssessmentRegion) && (
+                  <div className="mt-5 border-t border-slate-200 pt-5">
+                    <div className="mb-1 text-sm font-black uppercase tracking-wide text-slate-700">
+                      CMS-TP
+                    </div>
+
+                    <p className="mb-4 text-xs font-semibold text-slate-500">
+                      Document circulation, motor function, sensation,
+                      tenderness, pulses, skin, and capillary refill.
+                    </p>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {cmsTpFields.map((cmsField) => {
+                        const cmsTp =
+                          assessmentForm.bodyMap.regionFindings[
+                            selectedAssessmentRegion
+                          ].cmsTp ?? createEmptyAssessmentCmsTp();
+
+                        return (
+                          <label key={cmsField.field} className="block">
+                            <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                              {cmsField.label}
+                            </span>
+
+                            <select
+                              value={cmsTp[cmsField.field]}
+                              onChange={(event) =>
+                                updateBodyRegionCmsTp(
+                                  selectedAssessmentRegion,
+                                  cmsField.field,
+                                  event.target.value,
+                                )
+                              }
+                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                            >
+                              <option value="" />
+
+                              {cmsField.options.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        );
+                      })}
+                    </div>
+
+                    <label className="mt-4 block">
+                      <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                        CMS-TP Notes
+                      </span>
+
+                      <textarea
+                        value={
+                          (
+                            assessmentForm.bodyMap.regionFindings[
+                              selectedAssessmentRegion
+                            ].cmsTp ?? createEmptyAssessmentCmsTp()
+                          ).notes
+                        }
+                        onChange={(event) =>
+                          updateBodyRegionCmsTp(
+                            selectedAssessmentRegion,
+                            'notes',
+                            event.target.value,
+                          )
+                        }
+                        rows={3}
+                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               <button
