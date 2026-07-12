@@ -64,6 +64,11 @@ import type {
   AssessmentForm,
   ApolloBodyRegionSelection,
 } from '../clinical/assessment/assessmentForm';
+import {
+  createEmptyDcapBtlsFindings,
+  dcapBtlsFindings,
+  type DcapBtlsFindingKey,
+} from '../clinical/assessment/dcapBtls';
 
 type AssessmentSectionProps = {
   assessmentForm: AssessmentForm;
@@ -789,15 +794,91 @@ export default function AssessmentSection({
     };
   }
 
-  function markBodyRegionUnremarkable(region: ApolloBodyRegionKey) {
-    setSelectedAssessmentRegion(region);
-    setSelectedAssessmentRegions((current) => ({
+  function toggleBodyRegionDcapBtlsFinding(
+    region: ApolloBodyRegionKey,
+    finding: DcapBtlsFindingKey,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentRegion = current.bodyMap.regionFindings[region];
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          regionFindings: {
+            ...current.bodyMap.regionFindings,
+            [region]: {
+              ...currentRegion,
+              dcapBtls: {
+                ...currentRegion.dcapBtls,
+                [finding]: !currentRegion.dcapBtls[finding],
+              },
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function updateBodyRegionNotes(
+    region: ApolloBodyRegionKey,
+    notes: string,
+  ) {
+    onAssessmentFormChange((current) => ({
       ...current,
-      [region]: true,
+      bodyMap: {
+        ...current.bodyMap,
+        currentFocus: region,
+        selectedRegions: {
+          ...current.bodyMap.selectedRegions,
+          [region]: true,
+        },
+        unremarkableRegions: {
+          ...current.bodyMap.unremarkableRegions,
+          [region]: false,
+        },
+        regionFindings: {
+          ...current.bodyMap.regionFindings,
+          [region]: {
+            ...current.bodyMap.regionFindings[region],
+            notes,
+          },
+        },
+      },
     }));
-    setBodyRegionUnremarkable((current) => ({
+  }
+
+  function markBodyRegionUnremarkable(region: ApolloBodyRegionKey) {
+    onAssessmentFormChange((current) => ({
       ...current,
-      [region]: true,
+      bodyMap: {
+        ...current.bodyMap,
+        currentFocus: region,
+        selectedRegions: {
+          ...current.bodyMap.selectedRegions,
+          [region]: true,
+        },
+        unremarkableRegions: {
+          ...current.bodyMap.unremarkableRegions,
+          [region]: true,
+        },
+        regionFindings: {
+          ...current.bodyMap.regionFindings,
+          [region]: {
+            dcapBtls: createEmptyDcapBtlsFindings(),
+            notes: '',
+          },
+        },
+      },
     }));
   }
 
@@ -1107,7 +1188,7 @@ export default function AssessmentSection({
                 Region Detail
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="mb-4 flex flex-wrap gap-2">
                 {apolloBodyRegionDetails[selectedAssessmentRegion].map((subRegion) => (
                   <span
                     key={subRegion.id}
@@ -1118,12 +1199,78 @@ export default function AssessmentSection({
                 ))}
               </div>
 
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-700">
+                  DCAP-BTLS Findings
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {dcapBtlsFindings.map((finding) => {
+                    const selected =
+                      assessmentForm.bodyMap.regionFindings[
+                        selectedAssessmentRegion
+                      ].dcapBtls[finding.field];
+
+                    return (
+                      <button
+                        key={finding.field}
+                        type="button"
+                        onClick={() =>
+                          toggleBodyRegionDcapBtlsFinding(
+                            selectedAssessmentRegion,
+                            finding.field,
+                          )
+                        }
+                        className={`rounded-lg border px-3 py-3 text-left text-sm font-bold transition ${
+                          selected
+                            ? 'border-red-300 bg-red-50 text-red-900'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {selected ? '✓ ' : ''}
+                        {finding.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <label className="mt-4 block">
+                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                    Region Notes
+                  </span>
+
+                  <textarea
+                    value={
+                      assessmentForm.bodyMap.regionFindings[
+                        selectedAssessmentRegion
+                      ].notes
+                    }
+                    onChange={(event) =>
+                      updateBodyRegionNotes(
+                        selectedAssessmentRegion,
+                        event.target.value,
+                      )
+                    }
+                    rows={3}
+                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                  />
+                </label>
+              </div>
+
               <button
                 type="button"
-                onClick={() => markBodyRegionUnremarkable(selectedAssessmentRegion)}
-                className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
+                onClick={() =>
+                  markBodyRegionUnremarkable(selectedAssessmentRegion)
+                }
+                className={`mt-3 rounded-lg border px-3 py-2 text-xs font-black uppercase ${
+                  bodyRegionUnremarkable[selectedAssessmentRegion]
+                    ? 'border-emerald-500 bg-emerald-600 text-white'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                }`}
               >
-                Mark Region Unremarkable
+                {bodyRegionUnremarkable[selectedAssessmentRegion]
+                  ? '✓ Region Unremarkable'
+                  : 'Mark Region Unremarkable'}
               </button>
             </div>
           )}
