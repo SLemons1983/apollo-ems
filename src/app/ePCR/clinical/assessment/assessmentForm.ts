@@ -6,8 +6,28 @@ import {
 
 export type ApolloBodyRegionSelection = Record<ApolloBodyRegionKey, boolean>;
 
+export type AssessmentExtremityRegionKey =
+  | 'rightArm'
+  | 'leftArm'
+  | 'rightLeg'
+  | 'leftLeg';
+
+export type AssessmentCmsTpForm = {
+  circulation: string;
+  motor: string;
+  sensation: string;
+  tenderness: string;
+  pulses: string;
+  skin: string;
+  capillaryRefill: string;
+  notes: string;
+};
+
+export type AssessmentCmsTpField = keyof AssessmentCmsTpForm;
+
 export type AssessmentBodyRegionFinding = {
   dcapBtls: DcapBtlsFindings;
+  cmsTp: AssessmentCmsTpForm;
   notes: string;
 };
 
@@ -27,6 +47,17 @@ export type AssessmentForm = {
   bodyMap: AssessmentBodyMapForm;
 };
 
+export function isAssessmentExtremityRegion(
+  region: ApolloBodyRegionKey | '',
+): region is AssessmentExtremityRegionKey {
+  return (
+    region === 'rightArm' ||
+    region === 'leftArm' ||
+    region === 'rightLeg' ||
+    region === 'leftLeg'
+  );
+}
+
 export function createEmptyBodyRegionSelection(): ApolloBodyRegionSelection {
   return {
     head: false,
@@ -43,9 +74,23 @@ export function createEmptyBodyRegionSelection(): ApolloBodyRegionSelection {
   };
 }
 
+export function createEmptyAssessmentCmsTp(): AssessmentCmsTpForm {
+  return {
+    circulation: '',
+    motor: '',
+    sensation: '',
+    tenderness: '',
+    pulses: '',
+    skin: '',
+    capillaryRefill: '',
+    notes: '',
+  };
+}
+
 function createEmptyBodyRegionFinding(): AssessmentBodyRegionFinding {
   return {
     dcapBtls: createEmptyDcapBtlsFindings(),
+    cmsTp: createEmptyAssessmentCmsTp(),
     notes: '',
   };
 }
