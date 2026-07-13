@@ -7,6 +7,14 @@ import { calculatePatientAge } from '../utils';
 
 const genderOptions = ['Male', 'Female', 'Undetermined'];
 
+const codeStatusOptions = [
+  'Full Code',
+  'Do Not Resuscitate',
+  'Limited Interventions',
+  'Comfort Measures Only',
+  'Unknown',
+];
+
 const raceOptions = [
   'American Indian or Alaska Native',
   'Asian',
@@ -103,6 +111,10 @@ export default function PatientSection({
 
   const calculatedAge = calculatePatientAge(patientForm.dateOfBirth);
 
+  const calculatedWeightKilograms = patientForm.weightPounds
+    ? (Number(patientForm.weightPounds) * 0.45359237).toFixed(1)
+    : '';
+
   const demographicsFields = [
     patientForm.unablePatientName
       ? 'unable'
@@ -113,6 +125,9 @@ export default function PatientSection({
       ? 'unable'
       : patientForm.patientStreet && patientForm.patientCity && patientForm.patientZip,
     patientForm.unableGender ? 'unable' : patientForm.gender,
+    patientForm.heightInches,
+    patientForm.weightPounds,
+    patientForm.codeStatus,
     patientForm.unablePhoneNumber ? 'unable' : patientForm.phoneNumber,
     patientForm.unableSocialSecurityNumber
       ? 'unable'
@@ -286,6 +301,83 @@ export default function PatientSection({
                 updatePatientForm('unableGender', !patientForm.unableGender)
               }
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Height (inches)
+            </span>
+
+            <input
+              type="text"
+              inputMode="decimal"
+              value={patientForm.heightInches}
+              onChange={(event) =>
+                updatePatientForm(
+                  'heightInches',
+                  event.target.value
+                    .replace(/[^0-9.]/g, '')
+                    .replace(/(\..*)\./g, '$1'),
+                )
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Weight (pounds)
+            </span>
+
+            <input
+              type="text"
+              inputMode="decimal"
+              value={patientForm.weightPounds}
+              onChange={(event) =>
+                updatePatientForm(
+                  'weightPounds',
+                  event.target.value
+                    .replace(/[^0-9.]/g, '')
+                    .replace(/(\..*)\./g, '$1'),
+                )
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Weight (kilograms)
+            </span>
+
+            <input
+              type="text"
+              value={calculatedWeightKilograms}
+              readOnly
+              className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 shadow-sm"
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Code Status
+            </span>
+
+            <select
+              value={patientForm.codeStatus}
+              onChange={(event) =>
+                updatePatientForm('codeStatus', event.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+            >
+              <option value=""></option>
+
+              {codeStatusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
           </label>
 
           <div className="md:col-span-3">

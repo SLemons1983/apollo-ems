@@ -57,6 +57,9 @@ export type PatientForm = {
   unablePatientAddress: boolean;
   gender: string;
   unableGender: boolean;
+  heightInches: string;
+  weightPounds: string;
+  codeStatus: string;
   phoneNumber: string;
   unablePhoneNumber: boolean;
   socialSecurityNumber: string;
@@ -82,6 +85,7 @@ export type CodedSelection = {
 };
 
 export type ComplaintForm = {
+  chiefComplaint: string;
   clinicalCategory: string;
   primaryImpression: CodedSelection | null;
   secondaryImpression: CodedSelection | null;

@@ -72,6 +72,7 @@ export default function ComplaintSection({
   }
 
   const complaintFields = [
+    complaintForm.chiefComplaint,
     complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
@@ -129,6 +130,24 @@ export default function ComplaintSection({
         onToggle={() => toggleCard('Complaint')}
       >
         <div className="grid gap-5 md:grid-cols-2">
+          <label className="block md:col-span-2">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Chief Complaint
+            </span>
+
+            <input
+              type="text"
+              value={complaintForm.chiefComplaint}
+              onChange={(event) =>
+                updateComplaintForm(
+                  'chiefComplaint',
+                  event.target.value,
+                )
+              }
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+            />
+          </label>
+
           <ClinicalCategoryPicker
             label="Clinical Category"
             listType="impression"

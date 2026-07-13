@@ -9,6 +9,7 @@ import {
 } from 'react';
 import PCRProgress from './PCRProgress';
 import PCRSection from './PCRSection';
+import PatientHandoffRail from './PatientHandoffRail';
 import AssessmentSection from '../sections/AssessmentSection';
 import CallSection from '../sections/CallSection';
 import ComplaintSection from '../sections/ComplaintSection';
@@ -538,8 +539,8 @@ export default function EPCRClient() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-[1600px]">
         <h1 className="mb-2 text-4xl font-bold text-slate-900">
           ApolloEMS ePCR
         </h1>
@@ -584,8 +585,15 @@ export default function EPCRClient() {
 
         <PCRProgress sections={progressSections} />
 
-        <div className="space-y-4">
-          {sections.map((section) => {
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
+          <PatientHandoffRail
+            callForm={callForm}
+            patientForm={patientForm}
+            complaintForm={complaintForm}
+          />
+
+          <div className="min-w-0 space-y-4">
+            {sections.map((section) => {
             const sectionProgress = progressSections.find(
               (progressSection) => progressSection.title === section,
             ) ?? {
@@ -656,7 +664,9 @@ export default function EPCRClient() {
                 )}
               </PCRSection>
             );
-          })}        </div>
+            })}
+          </div>
+        </div>
       </div>
     </main>
   );

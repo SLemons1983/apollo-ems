@@ -126,6 +126,9 @@ export function createDefaultPatientForm(): PatientForm {
     unablePatientAddress: false,
     gender: '',
     unableGender: false,
+    heightInches: '',
+    weightPounds: '',
+    codeStatus: '',
     phoneNumber: '',
     unablePhoneNumber: false,
     socialSecurityNumber: '',
@@ -229,6 +232,7 @@ export function getPatientRequiredFields(patientForm: PatientForm) {
 
 export function createDefaultComplaintForm(): ComplaintForm {
   return {
+    chiefComplaint: '',
     clinicalCategory: '',
     primaryImpression: null,
     secondaryImpression: null,
