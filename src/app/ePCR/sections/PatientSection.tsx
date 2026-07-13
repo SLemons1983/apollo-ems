@@ -68,11 +68,31 @@ function normalizeDateInput(value: string) {
 }
 
 function normalizePhoneInput(value: string) {
-  return value.replace(/\D/g, '').slice(0, 10);
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+
+  if (digits.length <= 3) {
+    return digits ? `(${digits}` : '';
+  }
+
+  if (digits.length <= 6) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 function normalizeSsnInput(value: string) {
-  return value.replace(/\D/g, '').slice(0, 9);
+  const digits = value.replace(/\D/g, '').slice(0, 9);
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 5) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
 }
 
 function UnableButton({
@@ -111,6 +131,16 @@ export default function PatientSection({
 
   const calculatedAge = calculatePatientAge(patientForm.dateOfBirth);
 
+  const totalHeightInches = Number(patientForm.heightInches) || 0;
+
+  const heightFeet = patientForm.heightInches
+    ? String(Math.floor(totalHeightInches / 12))
+    : '';
+
+  const heightRemainingInches = patientForm.heightInches
+    ? String(totalHeightInches % 12)
+    : '';
+
   const calculatedWeightKilograms = patientForm.weightPounds
     ? (Number(patientForm.weightPounds) * 0.45359237).toFixed(1)
     : '';
@@ -127,7 +157,6 @@ export default function PatientSection({
     patientForm.unableGender ? 'unable' : patientForm.gender,
     patientForm.heightInches,
     patientForm.weightPounds,
-    patientForm.codeStatus,
     patientForm.unablePhoneNumber ? 'unable' : patientForm.phoneNumber,
     patientForm.unableSocialSecurityNumber
       ? 'unable'
@@ -140,6 +169,7 @@ export default function PatientSection({
     patientForm.surgicalHistory,
     patientForm.currentMedications,
     patientForm.lastOralIntake,
+    patientForm.codeStatus,
   ];
 
   const allergyFields = [
@@ -303,26 +333,76 @@ export default function PatientSection({
             />
           </label>
 
-          <label className="block">
+          <div className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
-              Height (inches)
+              Height
             </span>
 
-            <input
-              type="text"
-              inputMode="decimal"
-              value={patientForm.heightInches}
-              onChange={(event) =>
-                updatePatientForm(
-                  'heightInches',
-                  event.target.value
-                    .replace(/[^0-9.]/g, '')
-                    .replace(/(\..*)\./g, '$1'),
-                )
-              }
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-            />
-          </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                  Feet
+                </span>
+
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={heightFeet}
+                  onChange={(event) => {
+                    const feet = event.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 1);
+
+                    const nextTotalInches =
+                      (Number(feet) || 0) * 12 +
+                      (Number(heightRemainingInches) || 0);
+
+                    updatePatientForm(
+                      'heightInches',
+                      feet || heightRemainingInches
+                        ? String(nextTotalInches)
+                        : '',
+                    );
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                  Inches
+                </span>
+
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={heightRemainingInches}
+                  onChange={(event) => {
+                    const rawInches = event.target.value
+                      .replace(/\D/g, '')
+                      .slice(0, 2);
+
+                    const inches = Math.min(
+                      Number(rawInches) || 0,
+                      11,
+                    );
+
+                    const nextTotalInches =
+                      (Number(heightFeet) || 0) * 12 +
+                      inches;
+
+                    updatePatientForm(
+                      'heightInches',
+                      heightFeet || rawInches
+                        ? String(nextTotalInches)
+                        : '',
+                    );
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+                />
+              </label>
+            </div>
+          </div>
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
@@ -356,28 +436,6 @@ export default function PatientSection({
               readOnly
               className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 shadow-sm"
             />
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-sm font-semibold text-slate-700">
-              Code Status
-            </span>
-
-            <select
-              value={patientForm.codeStatus}
-              onChange={(event) =>
-                updatePatientForm('codeStatus', event.target.value)
-              }
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
-            >
-              <option value=""></option>
-
-              {codeStatusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
           </label>
 
           <div className="md:col-span-3">
@@ -539,6 +597,28 @@ export default function PatientSection({
         onToggle={() => toggleCard('Medical Information')}
       >
         <div className="grid gap-4 md:grid-cols-2">
+          <label className="block md:col-span-2">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Code Status
+            </span>
+
+            <select
+              value={patientForm.codeStatus}
+              onChange={(event) =>
+                updatePatientForm('codeStatus', event.target.value)
+              }
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+            >
+              <option value=""></option>
+
+              {codeStatusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {[
             ['medicalHistory', 'Medical History'],
             ['surgicalHistory', 'Surgical History'],

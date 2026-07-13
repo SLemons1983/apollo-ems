@@ -59,7 +59,7 @@ function formatPatientAge(patientForm: PatientForm) {
   );
 
   return calculatedAge
-    ? `${calculatedAge} Y`
+    ? calculatedAge
     : 'Not documented';
 }
 
@@ -179,8 +179,7 @@ export default function PatientHandoffRail({
             <HandoffField
               label="EMS Number"
               value={displayValue(
-                callForm.emsResponseNumber ||
-                  callForm.emsIncidentNumber,
+                callForm.emsIncidentNumber,
               )}
             />
           </div>
