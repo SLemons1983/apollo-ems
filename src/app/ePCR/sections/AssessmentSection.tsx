@@ -17,7 +17,13 @@ import type {
 } from '../clinical/components/body-map/bodyMapTypes';
 import {
   createEmptyAssessmentCmsTp,
+  getBodyRegionAssessmentStatusFromSubregions,
+  getBodySubRegionAssessmentStatus,
   isAssessmentExtremityRegion,
+  markAssessmentRegionUnremarkable,
+  markAssessmentSubregionUnremarkable,
+  markEntireAssessmentBodyUnremarkable,
+  type AssessmentClinicalStatus,
   type AssessmentCmsTpField,
 } from '../clinical/assessment/assessmentForm';
 import {
@@ -204,6 +210,10 @@ export default function AssessmentSection({
     ],
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
+  const [expandedBodyRegion, setExpandedBodyRegion] =
+    useState<ApolloBodyRegionKey | ''>('');
+  const [expandedBodySubregionId, setExpandedBodySubregionId] =
+    useState('');
   const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
   const selectedAssessmentRegions = assessmentForm.bodyMap.selectedRegions;
   const bodyRegionUnremarkable =
@@ -807,67 +817,94 @@ export default function AssessmentSection({
     region: ApolloBodyRegionKey,
   ): ApolloBodyRegionStatus | undefined {
     const selected = selectedAssessmentRegions[region];
-    const unremarkable = bodyRegionUnremarkable[region];
-    const regionFinding =
-      assessmentForm.bodyMap.regionFindings[region];
 
-    const selectedFindings = dcapBtlsFindings.filter(
-      (finding) => regionFinding.dcapBtls[finding.field],
-    );
+    const subregionFindings =
+      assessmentForm.bodyMap.subregionFindings[region];
 
-    if (unremarkable) {
+    const regionStatus =
+      getBodyRegionAssessmentStatusFromSubregions(
+        subregionFindings,
+      );
+
+    if (regionStatus === 'unremarkable') {
       return {
         selected: true,
         assessmentState: 'unremarkable',
         findingCount: 0,
-        note: 'Unremarkable',
+        note: 'All subregions unremarkable',
       };
     }
 
-    if (selectedFindings.length > 0) {
+    if (regionStatus === 'abnormal') {
+      const abnormalFindings = Object.entries(
+        subregionFindings,
+      ).flatMap(([subregionId, finding]) => {
+        const subregionLabel =
+          apolloBodyRegionDetails[region].find(
+            (subregion) => subregion.id === subregionId,
+          )?.label ?? subregionId;
+
+        return dcapBtlsFindings
+          .filter(
+            (dcapFinding) =>
+              finding.dcapBtls[dcapFinding.field],
+          )
+          .map(
+            (dcapFinding) =>
+              `${subregionLabel}: ${dcapFinding.label}`,
+          );
+      });
+
       return {
         selected: true,
         assessmentState: 'abnormal',
-        findingCount: selectedFindings.length,
-        note: selectedFindings
-          .map((finding) => finding.label)
-          .join(' · '),
-        overlays: selectedFindings.map((finding) => ({
+        findingCount: abnormalFindings.length,
+        note:
+          abnormalFindings.length > 0
+            ? abnormalFindings.join(' · ')
+            : 'Abnormal findings documented',
+        overlays: abnormalFindings.map((label) => ({
           type: 'finding',
-          label: finding.label,
+          label,
           color: 'red',
         })),
       };
     }
 
-    if (isAssessmentExtremityRegion(region)) {
-      const cmsTp =
-        regionFinding.cmsTp ?? createEmptyAssessmentCmsTp();
-
-      const documentedCmsTp = cmsTpFields
-        .filter((field) => Boolean(cmsTp[field.field]))
-        .map((field) => `${field.label}: ${cmsTp[field.field]}`);
-
-      if (cmsTp.notes.trim()) {
-        documentedCmsTp.push(`CMS-TP Notes: ${cmsTp.notes.trim()}`);
-      }
-
-      if (documentedCmsTp.length > 0) {
-        return {
-          selected: true,
-          assessmentState: 'noted',
-          findingCount: 0,
-          note: documentedCmsTp.join(' · '),
-        };
-      }
+    if (regionStatus === 'complete') {
+      return {
+        selected: true,
+        assessmentState: 'unremarkable',
+        findingCount: 0,
+        note: 'Assessment complete',
+      };
     }
 
-    if (regionFinding.notes.trim()) {
+    if (regionStatus === 'in-progress') {
+      const addressedSubregions = Object.entries(
+        subregionFindings,
+      )
+        .filter(
+          ([, finding]) =>
+            getBodySubRegionAssessmentStatus(finding) !==
+            'not-assessed',
+        )
+        .map(([subregionId]) => {
+          return (
+            apolloBodyRegionDetails[region].find(
+              (subregion) => subregion.id === subregionId,
+            )?.label ?? subregionId
+          );
+        });
+
       return {
         selected: true,
         assessmentState: 'noted',
         findingCount: 0,
-        note: regionFinding.notes.trim(),
+        note:
+          addressedSubregions.length > 0
+            ? `In progress: ${addressedSubregions.join(', ')}`
+            : 'Assessment in progress',
       };
     }
 
@@ -904,8 +941,65 @@ export default function AssessmentSection({
       >,
     );
 
+  function getAssessmentClinicalStatusPresentation(
+    status: AssessmentClinicalStatus,
+  ) {
+    if (status === 'unremarkable') {
+      return {
+        label: 'Unremarkable',
+        borderClass: 'border-emerald-300',
+        backgroundClass: 'bg-emerald-50',
+        textClass: 'text-emerald-800',
+        dotClass: 'text-emerald-600',
+      };
+    }
+
+    if (status === 'abnormal') {
+      return {
+        label: 'Abnormal Findings Documented',
+        borderClass: 'border-red-300',
+        backgroundClass: 'bg-red-50',
+        textClass: 'text-red-800',
+        dotClass: 'text-red-600',
+      };
+    }
+
+    if (status === 'complete') {
+      return {
+        label: 'Complete',
+        borderClass: 'border-emerald-300',
+        backgroundClass: 'bg-emerald-50',
+        textClass: 'text-emerald-800',
+        dotClass: 'text-emerald-600',
+      };
+    }
+
+    if (status === 'in-progress') {
+      return {
+        label: 'In Progress',
+        borderClass: 'border-amber-300',
+        backgroundClass: 'bg-amber-50',
+        textClass: 'text-amber-800',
+        dotClass: 'text-amber-500',
+      };
+    }
+
+    return {
+      label: 'Not Assessed',
+      borderClass: 'border-slate-300',
+      backgroundClass: 'bg-white',
+      textClass: 'text-slate-600',
+      dotClass: 'text-slate-400',
+    };
+  }
+
   function getBodyRegionQueueStatus(region: ApolloBodyRegionKey) {
-    if (bodyRegionUnremarkable[region]) {
+    const regionStatus =
+      getBodyRegionAssessmentStatusFromSubregions(
+        assessmentForm.bodyMap.subregionFindings[region],
+      );
+
+    if (regionStatus === 'unremarkable') {
       return {
         label: 'Unremarkable',
         dotClass: 'text-emerald-600',
@@ -914,78 +1008,38 @@ export default function AssessmentSection({
       };
     }
 
-    if (isAssessmentExtremityRegion(region)) {
-      const regionFinding =
-        assessmentForm.bodyMap.regionFindings[region];
+    if (regionStatus === 'abnormal') {
+      return {
+        label: 'Abnormal Findings Documented',
+        dotClass: 'text-red-600',
+        chipClass: 'border-red-200 bg-red-50 text-red-900',
+        statusClass: 'text-red-700',
+      };
+    }
 
-      const cmsTp =
-        regionFinding.cmsTp ?? createEmptyAssessmentCmsTp();
+    if (regionStatus === 'complete') {
+      return {
+        label: 'Complete',
+        dotClass: 'text-emerald-600',
+        chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+        statusClass: 'text-emerald-700',
+      };
+    }
 
-      const completedFields = [
-        cmsTp.circulation,
-        cmsTp.motor,
-        cmsTp.sensation,
-        cmsTp.tenderness,
-        cmsTp.pulses,
-        cmsTp.skin,
-        cmsTp.capillaryRefill,
-      ].filter(Boolean).length;
-
-      const hasCmsTpNotes = Boolean(cmsTp.notes.trim());
-      const hasDcapBtlsFindings = Object.values(
-        regionFinding.dcapBtls,
-      ).some(Boolean);
-      const hasRegionNotes = Boolean(regionFinding.notes.trim());
-
-      if (completedFields === 7) {
-        return {
-          label:
-            hasDcapBtlsFindings || hasRegionNotes
-              ? 'Abnormal Findings Documented'
-              : 'Complete',
-          dotClass:
-            hasDcapBtlsFindings || hasRegionNotes
-              ? 'text-red-600'
-              : 'text-emerald-600',
-          chipClass:
-            hasDcapBtlsFindings || hasRegionNotes
-              ? 'border-red-200 bg-red-50 text-red-900'
-              : 'border-emerald-200 bg-emerald-50 text-emerald-900',
-          statusClass:
-            hasDcapBtlsFindings || hasRegionNotes
-              ? 'text-red-700'
-              : 'text-emerald-700',
-        };
-      }
-
-      if (
-        completedFields > 0 ||
-        hasCmsTpNotes ||
-        hasDcapBtlsFindings ||
-        hasRegionNotes
-      ) {
-        return {
-          label: hasDcapBtlsFindings
-            ? 'Abnormal Findings Documented'
-            : 'In Progress',
-          dotClass: hasDcapBtlsFindings
-            ? 'text-red-600'
-            : 'text-amber-500',
-          chipClass: hasDcapBtlsFindings
-            ? 'border-red-200 bg-red-50 text-red-900'
-            : 'border-amber-200 bg-amber-50 text-amber-900',
-          statusClass: hasDcapBtlsFindings
-            ? 'text-red-700'
-            : 'text-amber-700',
-        };
-      }
+    if (regionStatus === 'in-progress') {
+      return {
+        label: 'In Progress',
+        dotClass: 'text-amber-500',
+        chipClass: 'border-amber-200 bg-amber-50 text-amber-900',
+        statusClass: 'text-amber-700',
+      };
     }
 
     return {
-      label: 'Pending',
+      label: 'Not Assessed',
       dotClass: 'text-blue-600',
       chipClass: 'border-blue-200 bg-blue-50 text-blue-900',
-      statusClass: 'text-slate-400',
+      statusClass: 'text-blue-700',
     };
   }
 
@@ -1050,6 +1104,143 @@ export default function AssessmentSection({
         },
       },
     }));
+  }
+
+  function toggleBodySubregionDcapBtlsFinding(
+    region: ApolloBodyRegionKey,
+    subregionId: string,
+    finding: DcapBtlsFindingKey,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentSubregion =
+        current.bodyMap.subregionFindings[region][subregionId];
+
+      if (!currentSubregion) {
+        return current;
+      }
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          subregionFindings: {
+            ...current.bodyMap.subregionFindings,
+            [region]: {
+              ...current.bodyMap.subregionFindings[region],
+              [subregionId]: {
+                ...currentSubregion,
+                unremarkable: false,
+                dcapBtls: {
+                  ...currentSubregion.dcapBtls,
+                  [finding]: !currentSubregion.dcapBtls[finding],
+                },
+              },
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function updateBodySubregionNotes(
+    region: ApolloBodyRegionKey,
+    subregionId: string,
+    notes: string,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentSubregion =
+        current.bodyMap.subregionFindings[region][subregionId];
+
+      if (!currentSubregion) {
+        return current;
+      }
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          subregionFindings: {
+            ...current.bodyMap.subregionFindings,
+            [region]: {
+              ...current.bodyMap.subregionFindings[region],
+              [subregionId]: {
+                ...currentSubregion,
+                unremarkable: false,
+                notes,
+              },
+            },
+          },
+        },
+      };
+    });
+  }
+
+  function updateBodySubregionCmsTp(
+    region: ApolloBodyRegionKey,
+    subregionId: string,
+    field: AssessmentCmsTpField,
+    fieldValue: string,
+  ) {
+    if (!isAssessmentExtremityRegion(region)) {
+      return;
+    }
+
+    onAssessmentFormChange((current) => {
+      const currentSubregion =
+        current.bodyMap.subregionFindings[region][subregionId];
+
+      if (!currentSubregion) {
+        return current;
+      }
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          subregionFindings: {
+            ...current.bodyMap.subregionFindings,
+            [region]: {
+              ...current.bodyMap.subregionFindings[region],
+              [subregionId]: {
+                ...currentSubregion,
+                unremarkable: false,
+                cmsTp: {
+                  ...currentSubregion.cmsTp,
+                  [field]: fieldValue,
+                },
+              },
+            },
+          },
+        },
+      };
+    });
   }
 
   function updateBodyRegionCmsTp(
@@ -1388,6 +1579,38 @@ export default function AssessmentSection({
           </p>
         </div>
 
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div>
+            <div className="text-sm font-black uppercase tracking-wide text-emerald-950">
+              Complete Normal Assessment
+            </div>
+
+            <p className="mt-1 text-xs font-semibold text-emerald-800">
+              Mark every body region and subregion as unremarkable.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              const confirmed = window.confirm(
+                'This will clear all documented Body Map findings and mark every body region and subregion as unremarkable. Continue?',
+              );
+
+              if (!confirmed) {
+                return;
+              }
+
+              onAssessmentFormChange((current) =>
+                markEntireAssessmentBodyUnremarkable(current),
+              );
+            }}
+            className="rounded-lg border border-emerald-500 bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-700"
+          >
+            Mark Entire Body Unremarkable
+          </button>
+        </div>
+
         <ApolloBodyMap
           mode="assessment"
           selectedRegions={selectedAssessmentRegions}
@@ -1412,211 +1635,336 @@ export default function AssessmentSection({
               : 'None'}
           </div>
 
-          {selectedAssessmentRegion && (
-            <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
-                Region Detail
-              </div>
+          {Object.entries(selectedAssessmentRegions).some(
+            ([, selected]) => selected,
+          ) && (
+            <div className="mb-4 space-y-3">
+              {(
+                Object.keys(
+                  selectedAssessmentRegions,
+                ) as ApolloBodyRegionKey[]
+              )
+                .filter(
+                  (region) => selectedAssessmentRegions[region],
+                )
+                .map((region) => {
+                  const regionSubregions =
+                    assessmentForm.bodyMap.subregionFindings[region];
 
-              <div
-                className={`mb-4 rounded-lg border px-4 py-3 ${
-                  bodyRegionUnremarkable[selectedAssessmentRegion]
-                    ? 'border-emerald-300 bg-emerald-50'
-                    : dcapBtlsFindings.some(
-                          (finding) =>
-                            assessmentForm.bodyMap.regionFindings[
-                              selectedAssessmentRegion
-                            ].dcapBtls[finding.field],
-                        )
-                      ? 'border-red-300 bg-red-50'
-                      : assessmentForm.bodyMap.regionFindings[
-                            selectedAssessmentRegion
-                          ].notes.trim()
-                        ? 'border-amber-300 bg-amber-50'
-                        : 'border-blue-200 bg-blue-50'
-                }`}
-              >
-                <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-                  Assessment Status
-                </div>
-
-                <div className="mt-1 text-base font-black text-slate-900">
-                  {bodyRegionUnremarkable[selectedAssessmentRegion]
-                    ? '✓ Unremarkable'
-                    : dcapBtlsFindings.some(
-                          (finding) =>
-                            assessmentForm.bodyMap.regionFindings[
-                              selectedAssessmentRegion
-                            ].dcapBtls[finding.field],
-                        )
-                      ? 'Abnormal Findings Documented'
-                      : assessmentForm.bodyMap.regionFindings[
-                            selectedAssessmentRegion
-                          ].notes.trim()
-                        ? 'Notes Documented'
-                        : 'Not Yet Assessed'}
-                </div>
-              </div>
-
-              <div className="mb-4 flex flex-wrap gap-2">
-                {apolloBodyRegionDetails[selectedAssessmentRegion].map((subRegion) => (
-                  <span
-                    key={subRegion.id}
-                    className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-200"
-                  >
-                    {subRegion.label}
-                  </span>
-                ))}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="mb-3 text-sm font-black uppercase tracking-wide text-slate-700">
-                  DCAP-BTLS Findings
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                  {dcapBtlsFindings.map((finding) => {
-                    const selected =
-                      assessmentForm.bodyMap.regionFindings[
-                        selectedAssessmentRegion
-                      ].dcapBtls[finding.field];
-
-                    return (
-                      <button
-                        key={finding.field}
-                        type="button"
-                        onClick={() =>
-                          toggleBodyRegionDcapBtlsFinding(
-                            selectedAssessmentRegion,
-                            finding.field,
-                          )
-                        }
-                        className={`rounded-lg border px-3 py-3 text-left text-sm font-bold transition ${
-                          selected
-                            ? 'border-red-300 bg-red-50 text-red-900'
-                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {selected ? '✓ ' : ''}
-                        {finding.label}
-                      </button>
+                  const regionStatus =
+                    getBodyRegionAssessmentStatusFromSubregions(
+                      regionSubregions,
                     );
-                  })}
-                </div>
 
-                <label className="mt-4 block">
-                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                    Region Notes
-                  </span>
+                  const regionPresentation =
+                    getAssessmentClinicalStatusPresentation(
+                      regionStatus,
+                    );
 
-                  <textarea
-                    value={
-                      assessmentForm.bodyMap.regionFindings[
-                        selectedAssessmentRegion
-                      ].notes
-                    }
-                    onChange={(event) =>
-                      updateBodyRegionNotes(
-                        selectedAssessmentRegion,
-                        event.target.value,
-                      )
-                    }
-                    rows={3}
-                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-                  />
-                </label>
+                  const regionExpanded =
+                    expandedBodyRegion === region;
 
-                {isAssessmentExtremityRegion(selectedAssessmentRegion) && (
-                  <div className="mt-5 border-t border-slate-200 pt-5">
-                    <div className="mb-1 text-sm font-black uppercase tracking-wide text-slate-700">
-                      CMS-TP
-                    </div>
+                  return (
+                    <div
+                      key={region}
+                      className={`overflow-hidden rounded-xl border ${regionPresentation.borderClass} ${regionPresentation.backgroundClass}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedAssessmentRegion(region);
+                          setExpandedBodyRegion((current) =>
+                            current === region ? '' : region,
+                          );
+                          setExpandedBodySubregionId('');
+                        }}
+                        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
+                      >
+                        <div>
+                          <div className="text-base font-black text-slate-900">
+                            {getClinicalDisplayName(region)} Assessment
+                          </div>
 
-                    <p className="mb-4 text-xs font-semibold text-slate-500">
-                      Document circulation, motor function, sensation,
-                      tenderness, pulses, skin, and capillary refill.
-                    </p>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      {cmsTpFields.map((cmsField) => {
-                        const cmsTp =
-                          assessmentForm.bodyMap.regionFindings[
-                            selectedAssessmentRegion
-                          ].cmsTp ?? createEmptyAssessmentCmsTp();
-
-                        return (
-                          <label key={cmsField.field} className="block">
-                            <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                              {cmsField.label}
-                            </span>
-
-                            <select
-                              value={cmsTp[cmsField.field]}
-                              onChange={(event) =>
-                                updateBodyRegionCmsTp(
-                                  selectedAssessmentRegion,
-                                  cmsField.field,
-                                  event.target.value,
-                                )
-                              }
-                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                          <div
+                            className={`mt-1 text-xs font-black uppercase tracking-wide ${regionPresentation.textClass}`}
+                          >
+                            <span
+                              className={regionPresentation.dotClass}
                             >
-                              <option value="" />
+                              ●
+                            </span>{' '}
+                            {regionPresentation.label}
+                          </div>
+                        </div>
 
-                              {cmsField.options.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        );
-                      })}
+                        <span className="text-xl font-black text-slate-500">
+                          {regionExpanded ? '−' : '+'}
+                        </span>
+                      </button>
+
+                      {regionExpanded && (
+                        <div className="border-t border-slate-200 bg-white p-4">
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                {getClinicalDisplayName(region)} Subregions
+                              </div>
+
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                Address each anatomical subregion individually.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onAssessmentFormChange((current) =>
+                                  markAssessmentRegionUnremarkable(
+                                    current,
+                                    region,
+                                  ),
+                                );
+                                setExpandedBodySubregionId('');
+                              }}
+                              className="rounded-lg border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-emerald-700"
+                            >
+                              Mark All Unremarkable
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            {apolloBodyRegionDetails[region].map(
+                              (subregion) => {
+                                const finding =
+                                  regionSubregions[subregion.id];
+
+                                const subregionStatus =
+                                  getBodySubRegionAssessmentStatus(
+                                    finding,
+                                  );
+
+                                const subregionPresentation =
+                                  getAssessmentClinicalStatusPresentation(
+                                    subregionStatus,
+                                  );
+
+                                const subregionExpanded =
+                                  expandedBodySubregionId ===
+                                  `${region}:${subregion.id}`;
+
+                                return (
+                                  <div
+                                    key={subregion.id}
+                                    className={`overflow-hidden rounded-xl border ${subregionPresentation.borderClass} ${subregionPresentation.backgroundClass}`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedAssessmentRegion(
+                                          region,
+                                        );
+                                        setExpandedBodySubregionId(
+                                          (current) =>
+                                            current ===
+                                            `${region}:${subregion.id}`
+                                              ? ''
+                                              : `${region}:${subregion.id}`,
+                                        );
+                                      }}
+                                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+                                    >
+                                      <div>
+                                        <div className="text-sm font-black text-slate-900">
+                                          {subregion.label}
+                                        </div>
+
+                                        <div
+                                          className={`mt-1 text-xs font-black uppercase tracking-wide ${subregionPresentation.textClass}`}
+                                        >
+                                          <span
+                                            className={
+                                              subregionPresentation.dotClass
+                                            }
+                                          >
+                                            ●
+                                          </span>{' '}
+                                          {subregionPresentation.label}
+                                        </div>
+                                      </div>
+
+                                      <span className="text-lg font-black text-slate-500">
+                                        {subregionExpanded ? '−' : '+'}
+                                      </span>
+                                    </button>
+
+                                    {subregionExpanded && (
+                                      <div className="border-t border-slate-200 bg-white p-4">
+                                        <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                          DCAP-BTLS Findings
+                                        </div>
+
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                          {dcapBtlsFindings.map(
+                                            (dcapFinding) => {
+                                              const selected =
+                                                finding.dcapBtls[
+                                                  dcapFinding.field
+                                                ];
+
+                                              return (
+                                                <button
+                                                  key={
+                                                    dcapFinding.field
+                                                  }
+                                                  type="button"
+                                                  onClick={() =>
+                                                    toggleBodySubregionDcapBtlsFinding(
+                                                      region,
+                                                      subregion.id,
+                                                      dcapFinding.field,
+                                                    )
+                                                  }
+                                                  className={`rounded-lg border px-3 py-3 text-left text-sm font-bold transition ${
+                                                    selected
+                                                      ? 'border-red-300 bg-red-50 text-red-900'
+                                                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                  }`}
+                                                >
+                                                  {selected ? '✓ ' : ''}
+                                                  {dcapFinding.label}
+                                                </button>
+                                              );
+                                            },
+                                          )}
+                                        </div>
+
+                                        {isAssessmentExtremityRegion(region) && (
+                                          <div className="mt-5 border-t border-slate-200 pt-5">
+                                            <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                              CMS-TP
+                                            </div>
+
+                                            <p className="mt-1 text-xs font-semibold text-slate-500">
+                                              Document circulation, motor function,
+                                              sensation, tenderness, pulses, skin,
+                                              and capillary refill.
+                                            </p>
+
+                                            <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                              {cmsTpFields.map((cmsField) => (
+                                                <label
+                                                  key={cmsField.field}
+                                                  className="block"
+                                                >
+                                                  <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                                    {cmsField.label}
+                                                  </span>
+
+                                                  <select
+                                                    value={
+                                                      finding.cmsTp[
+                                                        cmsField.field
+                                                      ]
+                                                    }
+                                                    onChange={(event) =>
+                                                      updateBodySubregionCmsTp(
+                                                        region,
+                                                        subregion.id,
+                                                        cmsField.field,
+                                                        event.target.value,
+                                                      )
+                                                    }
+                                                    className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                                                  >
+                                                    <option value="" />
+
+                                                    {cmsField.options.map(
+                                                      (option) => (
+                                                        <option
+                                                          key={option}
+                                                          value={option}
+                                                        >
+                                                          {option}
+                                                        </option>
+                                                      ),
+                                                    )}
+                                                  </select>
+                                                </label>
+                                              ))}
+                                            </div>
+
+                                            <label className="mt-4 block">
+                                              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                                CMS-TP Notes
+                                              </span>
+
+                                              <textarea
+                                                value={finding.cmsTp.notes}
+                                                onChange={(event) =>
+                                                  updateBodySubregionCmsTp(
+                                                    region,
+                                                    subregion.id,
+                                                    'notes',
+                                                    event.target.value,
+                                                  )
+                                                }
+                                                rows={3}
+                                                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                                              />
+                                            </label>
+                                          </div>
+                                        )}
+
+                                        <label className="mt-4 block">
+                                          <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                            Assessment Notes
+                                          </span>
+
+                                          <textarea
+                                            value={finding.notes}
+                                            onChange={(event) =>
+                                              updateBodySubregionNotes(
+                                                region,
+                                                subregion.id,
+                                                event.target.value,
+                                              )
+                                            }
+                                            rows={3}
+                                            className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                                          />
+                                        </label>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            onAssessmentFormChange(
+                                              (current) =>
+                                                markAssessmentSubregionUnremarkable(
+                                                  current,
+                                                  region,
+                                                  subregion.id,
+                                                ),
+                                            )
+                                          }
+                                          className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
+                                        >
+                                          {subregionStatus ===
+                                          'unremarkable'
+                                            ? '✓ Unremarkable'
+                                            : 'Mark Unremarkable'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              },
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-
-                    <label className="mt-4 block">
-                      <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                        CMS-TP Notes
-                      </span>
-
-                      <textarea
-                        value={
-                          (
-                            assessmentForm.bodyMap.regionFindings[
-                              selectedAssessmentRegion
-                            ].cmsTp ?? createEmptyAssessmentCmsTp()
-                          ).notes
-                        }
-                        onChange={(event) =>
-                          updateBodyRegionCmsTp(
-                            selectedAssessmentRegion,
-                            'notes',
-                            event.target.value,
-                          )
-                        }
-                        rows={3}
-                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-                      />
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  markBodyRegionUnremarkable(selectedAssessmentRegion)
-                }
-                className={`mt-3 rounded-lg border px-3 py-2 text-xs font-black uppercase ${
-                  bodyRegionUnremarkable[selectedAssessmentRegion]
-                    ? 'border-emerald-500 bg-emerald-600 text-white'
-                    : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                }`}
-              >
-                {bodyRegionUnremarkable[selectedAssessmentRegion]
-                  ? '✓ Region Unremarkable'
-                  : 'Mark Region Unremarkable'}
-              </button>
+                  );
+                })}
             </div>
           )}
 
@@ -1652,19 +2000,26 @@ export default function AssessmentSection({
               <button
                 type="button"
                 onClick={() => {
-                  setBodyRegionUnremarkable((current) => {
-                    const updated = { ...current };
+                  const selectedRegions = (
+                    Object.keys(
+                      selectedAssessmentRegions,
+                    ) as ApolloBodyRegionKey[]
+                  ).filter(
+                    (region) => selectedAssessmentRegions[region],
+                  );
 
-                    Object.entries(selectedAssessmentRegions).forEach(
-                      ([region, selected]) => {
-                        if (selected) {
-                          updated[region as ApolloBodyRegionKey] = true;
-                        }
-                      },
-                    );
+                  onAssessmentFormChange((current) =>
+                    selectedRegions.reduce(
+                      (updated, region) =>
+                        markAssessmentRegionUnremarkable(
+                          updated,
+                          region,
+                        ),
+                      current,
+                    ),
+                  );
 
-                    return updated;
-                  });
+                  setExpandedBodySubregionId('');
                 }}
                 className="mr-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
               >
