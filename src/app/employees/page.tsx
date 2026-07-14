@@ -1347,6 +1347,35 @@ export default function EmployeeProfilesPage() {
     }
   }
 
+  function handleEmployeeCertificationDocumentDrop(
+    event: React.DragEvent<HTMLDivElement>,
+    employeeId: string,
+    field: CertificationField,
+    label: string,
+    isUploadingDocument: boolean,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (isUploadingDocument) return;
+
+    const droppedFile = event.dataTransfer.files?.[0] ?? null;
+
+    if (!droppedFile) {
+      window.alert(
+        'Apollo did not receive an actual file from the drop. Some Google Drive browser views provide a link instead of the file. Try Google Drive for desktop, or download the file before dragging it into Apollo.',
+      );
+      return;
+    }
+
+    void handleEmployeeCertificationDocumentUpload(
+      employeeId,
+      field,
+      label,
+      droppedFile,
+    );
+  }
+
   async function handleEmployeeCertificationDocumentView(document: CertificationDocument | undefined) {
     if (!document?.path) {
       window.alert('No certification document is currently on file.');
@@ -1697,10 +1726,51 @@ export default function EmployeeProfilesPage() {
                       </div>
                     )}
 
+                    {documentKey && (
+                      <div
+                        className={`mt-2 text-sm font-semibold ${
+                          document && status === 'valid'
+                            ? 'text-emerald-700'
+                            : 'text-red-700'
+                        }`}
+                      >
+                        {!document
+                          ? 'Missing required document'
+                          : status === 'valid'
+                            ? 'Uploaded / Compliant'
+                            : status === 'expired'
+                              ? 'Uploaded / Certification expired'
+                              : 'Uploaded / Expiration date required'}
+                      </div>
+                    )}
+
                     {employeeId && documentKey && (
-                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'copy';
+                        }}
+                        onDrop={(event) =>
+                          handleEmployeeCertificationDocumentDrop(
+                            event,
+                            employeeId,
+                            field,
+                            label,
+                            isUploadingDocument,
+                          )
+                        }
+                        className={`mt-2 rounded-xl border border-dashed p-3 transition ${
+                          isUploadingDocument
+                            ? 'border-slate-200 bg-slate-100'
+                            : 'border-slate-400 bg-slate-50 hover:border-blue-500 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Document on File
+                        </div>
+
+                        <div className="mb-2 text-xs text-slate-500">
+                          Drag and drop a PDF, JPG, or PNG here, or use the upload button.
                         </div>
 
                         <div className="mb-3 text-sm text-slate-700">
@@ -1779,9 +1849,32 @@ export default function EmployeeProfilesPage() {
                     </div>
 
                     {employeeId && documentKey && (
-                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'copy';
+                        }}
+                        onDrop={(event) =>
+                          handleEmployeeCertificationDocumentDrop(
+                            event,
+                            employeeId,
+                            field,
+                            label,
+                            isUploadingDocument,
+                          )
+                        }
+                        className={`mt-2 rounded-xl border border-dashed p-3 transition ${
+                          isUploadingDocument
+                            ? 'border-slate-200 bg-slate-100'
+                            : 'border-slate-400 bg-slate-50 hover:border-blue-500 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Document on File
+                        </div>
+
+                        <div className="mb-2 text-xs text-slate-500">
+                          Drag and drop a PDF, JPG, or PNG here, or use the upload button.
                         </div>
 
                         <div className="mb-3 text-sm text-slate-700">
@@ -1880,10 +1973,51 @@ export default function EmployeeProfilesPage() {
                       </div>
                     )}
 
+                    {documentKey && (
+                      <div
+                        className={`mt-2 text-sm font-semibold ${
+                          document && status === 'valid'
+                            ? 'text-emerald-700'
+                            : 'text-red-700'
+                        }`}
+                      >
+                        {!document
+                          ? 'Missing required document'
+                          : status === 'valid'
+                            ? 'Uploaded / Compliant'
+                            : status === 'expired'
+                              ? 'Uploaded / Certification expired'
+                              : 'Uploaded / Expiration date required'}
+                      </div>
+                    )}
+
                     {employeeId && documentKey && (
-                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'copy';
+                        }}
+                        onDrop={(event) =>
+                          handleEmployeeCertificationDocumentDrop(
+                            event,
+                            employeeId,
+                            field,
+                            label,
+                            isUploadingDocument,
+                          )
+                        }
+                        className={`mt-2 rounded-xl border border-dashed p-3 transition ${
+                          isUploadingDocument
+                            ? 'border-slate-200 bg-slate-100'
+                            : 'border-slate-400 bg-slate-50 hover:border-blue-500 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Document on File
+                        </div>
+
+                        <div className="mb-2 text-xs text-slate-500">
+                          Drag and drop a PDF, JPG, or PNG here, or use the upload button.
                         </div>
 
                         <div className="mb-3 text-sm text-slate-700">

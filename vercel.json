@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/timecard-reminder",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/certification-reminder",
+      "schedule": "15 7 * * *"
     }
   ]
 }
