@@ -4079,17 +4079,13 @@ export default function SchedulePage() {
                                 : 'border-slate-500 bg-slate-100 hover:bg-slate-200'
                             }`}
                           >
-                            <div className="mb-3 flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <input
-                                  type="text"
-                                  value={extra.label}
-                                  onChange={(event) =>
-                                    handleExtraShiftChange(dateKey, extra.id, 'label', event.target.value)
-                                  }
-                                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 outline-none transition focus:border-slate-500"
-                                />
-                                <div className="mt-2 flex items-center gap-2">
+                            <div className="mb-2">
+                              <div className="truncate text-sm font-bold text-slate-900">
+                                {extra.label}
+                              </div>
+
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <div className="flex min-w-0 items-center gap-2">
                                   <div
                                     className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                                       staffingLevel === 'ALS'
@@ -4102,22 +4098,25 @@ export default function SchedulePage() {
                                     {staffingLevel}
                                   </div>
 
-                                  {extra.hiddenFromEmployees && (
-                                    <div className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                      Hidden
+                                  {!isExpanded && (
+                                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                      Click to Edit
                                     </div>
                                   )}
 
-                                  <select
-                                    value={extra.category}
-                                    onChange={(event) =>
-                                      handleExtraShiftChange(dateKey, extra.id, 'category', event.target.value)
-                                    }
-                                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-500"
-                                  >
-                                    <option value="UNIT">UNIT</option>
-                                    <option value="SUPERVISOR">SUPERVISOR</option>
-                                  </select>
+                                  {extra.hiddenFromEmployees && (
+                                    <div className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                                      Hidden
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex shrink-0 items-center gap-2">
+                                  {extra.vehicle && (
+                                    <div className="rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700">
+                                      Unit {extra.vehicle}
+                                    </div>
+                                  )}
 
                                   {warningMessages.length > 0 ? (
                                     <div
@@ -4127,20 +4126,15 @@ export default function SchedulePage() {
                                       ⚠
                                     </div>
                                   ) : approvalMessages.length > 0 ? (
-                                    <div className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                      Approved
+                                    <div
+                                      title={approvalMessages.join(' | ')}
+                                      className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                                    >
+                                      ✓
                                     </div>
                                   ) : null}
                                 </div>
                               </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveExtraShift(dateKey, extra.id, extra.label)}
-                                className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-                              >
-                                Remove
-                              </button>
                             </div>
 
                             <div
