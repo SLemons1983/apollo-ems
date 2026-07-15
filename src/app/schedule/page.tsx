@@ -550,6 +550,56 @@ function formatHours(hours: number): string {
   return hours.toFixed(1);
 }
 
+function formatCollapsedShiftHours(startTime: string, endTime: string): string {
+  const normalizedStart = normalizeMilitaryTime(startTime, DEFAULT_START_TIME);
+  const normalizedEnd = normalizeMilitaryTime(endTime, DEFAULT_END_TIME);
+  const hours = calculateSlotHours(normalizedStart, normalizedEnd);
+
+  if (normalizedStart === '06:00' && normalizedEnd === '06:00') {
+    return '24 H';
+  }
+
+  if (normalizedStart === '06:00' && normalizedEnd === '18:00') {
+    return 'Day 12';
+  }
+
+  if (normalizedStart === '18:00' && normalizedEnd === '06:00') {
+    return 'Night 12';
+  }
+
+  return `${formatHours(hours)} H`;
+}
+
+function getCollapsedShiftTypeLabel(shiftType: ShiftType): string {
+  switch (shiftType) {
+    case 'SICK':
+      return 'Sick';
+    case 'VACATION':
+      return 'Vacation';
+    case 'LEAVE':
+      return 'Leave';
+    case 'TRAINING':
+      return 'Training';
+    default:
+      return '';
+  }
+}
+
+function getCollapsedShiftTypeClasses(shiftType: ShiftType): string {
+  switch (shiftType) {
+    case 'SICK':
+      return 'bg-red-100 text-red-700';
+    case 'VACATION':
+      return 'bg-amber-100 text-amber-700';
+    case 'LEAVE':
+      return 'bg-purple-100 text-purple-700';
+    case 'TRAINING':
+      return 'bg-blue-100 text-blue-700';
+    default:
+      return '';
+  }
+}
+
 function requiresSupervisorNote(slot: EmployeeSlot): boolean {
   if (!slot.employeeId || isOpenShiftSlot(slot.employeeId)) {
     return false;
@@ -2718,6 +2768,11 @@ export default function SchedulePage() {
         slot.shiftType &&
         slot.shiftType !== 'REGULAR';
 
+      const shiftTypeLabel = getCollapsedShiftTypeLabel(slot.shiftType);
+      const collapsedHours = slot.employeeId
+        ? formatCollapsedShiftHours(slot.startTime, slot.endTime)
+        : '';
+
       return (
         <div
           className={`rounded-lg border px-3 py-2 ${
@@ -2726,14 +2781,34 @@ export default function SchedulePage() {
               : 'border-slate-300 bg-white'
           }`}
         >
-          <div
-            className={`text-sm font-semibold ${
-              isSpecialShiftType
-                ? 'text-yellow-900'
-                : 'text-slate-800'
-            }`}
-          >
-            {collapsedName}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div
+                className={`truncate text-sm font-semibold ${
+                  isSpecialShiftType
+                    ? 'text-yellow-900'
+                    : 'text-slate-800'
+                }`}
+              >
+                {collapsedName}
+              </div>
+
+              {shiftTypeLabel && (
+                <div
+                  className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                    getCollapsedShiftTypeClasses(slot.shiftType)
+                  }`}
+                >
+                  {shiftTypeLabel}
+                </div>
+              )}
+            </div>
+
+            {collapsedHours && (
+              <div className="shrink-0 text-xs font-bold text-slate-600">
+                {collapsedHours}
+              </div>
+            )}
           </div>
         </div>
       );
@@ -3537,15 +3612,18 @@ export default function SchedulePage() {
               const dateKey = toDateKey(date);
               const previousDateKey = index > 0 ? toDateKey(dates[index - 1]) : '';
 
-              const isToday = toDateKey(new Date()) === dateKey;
+              const isToday = todayKey === dateKey;
+              const isPastDate = dateKey < todayKey;
 
               return (
                 <div
                   key={dateKey}
                   className={`sticky top-0 z-30 border-b border-r p-4 ${
                     isToday
-                      ? 'border-emerald-300 bg-emerald-50'
-                      : 'border-slate-200 bg-slate-50'
+                      ? 'border-emerald-400 bg-emerald-100'
+                      : isPastDate
+                        ? 'border-slate-400 bg-slate-200'
+                        : 'border-slate-200 bg-slate-50'
                   }`}
                 >
                   <div
@@ -3639,7 +3717,8 @@ export default function SchedulePage() {
                   const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
                   const approvalMessages = continuousHours.approvals;
                   const isSupervisorShift = category === 'SUPERVISOR';
-                  const isTodayColumn = toDateKey(new Date()) === dateKey;
+                  const isTodayColumn = todayKey === dateKey;
+                  const isPastColumn = dateKey < todayKey;
                   const isDarkScheduleRow = shiftName === 'R1' || shiftName === 'P' || shiftName === 'FIELD_SUP';
 
                   const expandedKey = `${shiftName}-${dateKey}`;
@@ -3648,12 +3727,16 @@ export default function SchedulePage() {
                   return (
                     <div
                       key={`${shiftName}-${dateKey}`}
-                      className={`border-b border-r border-slate-200 p-3 ${
+                      className={`border-b border-r border-slate-300 p-3 ${
                         isTodayColumn
                           ? 'bg-emerald-200'
-                          : isDarkScheduleRow
-                            ? 'bg-slate-300'
-                            : 'bg-white'
+                          : isPastColumn
+                            ? isDarkScheduleRow
+                              ? 'bg-slate-300'
+                              : 'bg-slate-200'
+                            : isDarkScheduleRow
+                              ? 'bg-slate-300'
+                              : 'bg-white'
                       }`}
                     >
                       <div
@@ -3671,39 +3754,55 @@ export default function SchedulePage() {
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between gap-2">
-                          <div
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              staffingLevel === 'ALS'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : staffingLevel === 'BLS'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-sky-100 text-sky-700'
-                            }`}
-                          >
-                            {staffingLevel}
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                staffingLevel === 'ALS'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : staffingLevel === 'BLS'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-sky-100 text-sky-700'
+                              }`}
+                            >
+                              {staffingLevel}
+                            </div>
+
+                            {!isExpanded && (
+                              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                Click to Edit
+                              </div>
+                            )}
+
+                            {shift.hiddenFromEmployees && (
+                              <div className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                                Hidden
+                              </div>
+                            )}
                           </div>
 
-                          {shift.hiddenFromEmployees && (
-                            <div className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                              Hidden
-                            </div>
-                          )}
+                          <div className="flex shrink-0 items-center gap-2">
+                            {shift.vehicle && (
+                              <div className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700">
+                                Unit {shift.vehicle}
+                              </div>
+                            )}
 
-                          {warningMessages.length > 0 ? (
-                            <div
-                              title={warningMessages.join(' | ')}
-                              className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
-                            >
-                              ⚠
-                            </div>
-                          ) : approvalMessages.length > 0 ? (
-                            <div
-                              title={approvalMessages.join(' | ')}
-                              className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
-                            >
-                              ✓
-                            </div>
-                          ) : null}
+                            {warningMessages.length > 0 ? (
+                              <div
+                                title={warningMessages.join(' | ')}
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
+                              >
+                                ⚠
+                              </div>
+                            ) : approvalMessages.length > 0 ? (
+                              <div
+                                title={approvalMessages.join(' | ')}
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                              >
+                                ✓
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
 
                         <div
@@ -3884,12 +3983,19 @@ export default function SchedulePage() {
             {visibleDates.map((date) => {
               const dateKey = toDateKey(date);
               const day = getDaySchedule(scheduleData, dateKey);
-              const isTodayColumn = toDateKey(new Date()) === dateKey;
+              const isTodayColumn = todayKey === dateKey;
+              const isPastColumn = dateKey < todayKey;
 
               return (
                 <div
                   key={`extras-${dateKey}`}
-                  className={`border-r border-slate-200 p-3 align-top ${isTodayColumn ? 'bg-emerald-200' : 'bg-white'}`}
+                  className={`border-r border-slate-300 p-3 align-top ${
+                    isTodayColumn
+                      ? 'bg-emerald-200'
+                      : isPastColumn
+                        ? 'bg-slate-200'
+                        : 'bg-white'
+                  }`}
                 >
                   <div
           className="space-y-2"
