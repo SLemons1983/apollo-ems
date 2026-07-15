@@ -6180,6 +6180,8 @@ export default function SupervisorPage() {
 
               <a
                 href="/employees"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
               >
                 Open Employee Profiles
