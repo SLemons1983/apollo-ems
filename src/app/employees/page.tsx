@@ -1259,6 +1259,36 @@ export default function EmployeeProfilesPage() {
     if (!documentKey || !file) return;
 
     const statusKey = `${employeeId}-${field}`;
+    const allowedTypes = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+    ]);
+    const maxFileSizeBytes = 10 * 1024 * 1024;
+
+    if (!allowedTypes.has(file.type)) {
+      const message = 'Only PDF, JPG, JPEG, and PNG files are allowed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+      return;
+    }
+
+    if (file.size > maxFileSizeBytes) {
+      const message = 'Certification file must be 10 MB or smaller.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+      return;
+    }
 
     setCertificationDocumentUploading((current) => ({
       ...current,
@@ -1267,31 +1297,130 @@ export default function EmployeeProfilesPage() {
 
     setCertificationDocumentStatus((current) => ({
       ...current,
-      [statusKey]: 'Uploading document...',
+      [statusKey]: 'Preparing secure upload...',
     }));
 
     try {
-      const formData = new FormData();
-      formData.append('employeeId', employeeId);
-      formData.append('certificationField', field);
-      formData.append('certificationLabel', label);
-      formData.append('certificationFile', file);
+      const prepareResponse = await fetch(
+        '/api/employee-certifications/upload',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'prepare',
+            employeeId,
+            certificationField: field,
+            certificationLabel: label,
+            filename: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+          }),
+        },
+      );
 
-      const response = await fetch('/api/employee-certifications/upload', {
-        method: 'POST',
-        body: formData,
-      });
+      const prepareText = await prepareResponse.text();
+      let prepareResult: {
+        error?: string;
+        path?: string;
+        token?: string;
+      } = {};
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Certification upload failed.');
+      if (prepareText) {
+        try {
+          prepareResult = JSON.parse(prepareText) as typeof prepareResult;
+        } catch {
+          throw new Error(
+            prepareResponse.ok
+              ? 'Apollo received an invalid upload preparation response.'
+              : `Upload preparation failed (${prepareResponse.status}).`,
+          );
+        }
       }
 
-      const uploadedDocument = result.document as CertificationDocument;
+      if (
+        !prepareResponse.ok ||
+        !prepareResult.path ||
+        !prepareResult.token
+      ) {
+        throw new Error(
+          prepareResult.error || 'Unable to prepare certification upload.',
+        );
+      }
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Uploading document...',
+      }));
+
+      const { error: uploadError } = await supabase.storage
+        .from('employee-certifications')
+        .uploadToSignedUrl(
+          prepareResult.path,
+          prepareResult.token,
+          file,
+          {
+            contentType: file.type,
+          },
+        );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Saving certification record...',
+      }));
+
+      const completeResponse = await fetch(
+        '/api/employee-certifications/upload',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'complete',
+            employeeId,
+            certificationField: field,
+            certificationLabel: label,
+            filename: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+            path: prepareResult.path,
+          }),
+        },
+      );
+
+      const completeText = await completeResponse.text();
+      let completeResult: {
+        error?: string;
+        document?: CertificationDocument;
+      } = {};
+
+      if (completeText) {
+        try {
+          completeResult = JSON.parse(completeText) as typeof completeResult;
+        } catch {
+          throw new Error(
+            completeResponse.ok
+              ? 'Apollo received an invalid certification save response.'
+              : `Certification save failed (${completeResponse.status}).`,
+          );
+        }
+      }
+
+      if (!completeResponse.ok || !completeResult.document) {
+        throw new Error(
+          completeResult.error || 'Certification record could not be saved.',
+        );
+      }
+
+      const uploadedDocument = completeResult.document;
 
       setEditingEmployees((current) => {
-        const existing = current[employeeId] ?? employees.find((employee) => employee.id === employeeId);
+        const existing =
+          current[employeeId] ??
+          employees.find((employee) => employee.id === employeeId);
+
         if (!existing) return current;
 
         return {
@@ -1330,8 +1459,15 @@ export default function EmployeeProfilesPage() {
         [statusKey]: `Uploaded ${uploadedDocument.filename}.`,
       }));
     } catch (error) {
-      console.error('Employee certification document upload failed:', error);
-      const message = error instanceof Error ? error.message : 'Certification upload failed.';
+      console.error(
+        'Employee certification document upload failed:',
+        error,
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Certification upload failed.';
 
       setCertificationDocumentStatus((current) => ({
         ...current,

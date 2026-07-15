@@ -30,10 +30,28 @@ const ALLOWED_CERTIFICATION_FIELDS = new Set([
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
-function getSafeFileExtension(filename: string, mimeType: string) {
-  const extension = filename.includes('.') ? filename.split('.').pop()?.toLowerCase() : '';
+type UploadRequest = {
+  action?: unknown;
+  employeeId?: unknown;
+  certificationField?: unknown;
+  certificationLabel?: unknown;
+  filename?: unknown;
+  contentType?: unknown;
+  sizeBytes?: unknown;
+  path?: unknown;
+};
 
-  if (extension === 'pdf' || extension === 'jpg' || extension === 'jpeg' || extension === 'png') {
+function getSafeFileExtension(filename: string, mimeType: string) {
+  const extension = filename.includes('.')
+    ? filename.split('.').pop()?.toLowerCase()
+    : '';
+
+  if (
+    extension === 'pdf' ||
+    extension === 'jpg' ||
+    extension === 'jpeg' ||
+    extension === 'png'
+  ) {
     return extension;
   }
 
@@ -44,98 +62,184 @@ function getSafeFileExtension(filename: string, mimeType: string) {
   return 'file';
 }
 
+function getValidatedRequest(body: UploadRequest) {
+  const action = String(body.action ?? '').trim();
+  const employeeId = String(body.employeeId ?? '').trim();
+  const certificationField = String(
+    body.certificationField ?? '',
+  ).trim();
+  const certificationLabel = String(
+    body.certificationLabel ?? '',
+  ).trim();
+  const filename = String(body.filename ?? '').trim();
+  const contentType = String(body.contentType ?? '').trim();
+  const sizeBytes = Number(body.sizeBytes ?? 0);
+  const path = String(body.path ?? '').trim();
+
+  if (
+    !employeeId ||
+    !certificationField ||
+    !certificationLabel ||
+    !filename ||
+    !contentType ||
+    !Number.isFinite(sizeBytes) ||
+    sizeBytes <= 0
+  ) {
+    throw new Error('Missing required certification upload fields.');
+  }
+
+  if (!ALLOWED_CERTIFICATION_FIELDS.has(certificationField)) {
+    throw new Error('Invalid certification field.');
+  }
+
+  if (!ALLOWED_TYPES.has(contentType)) {
+    throw new Error(
+      'Only PDF, JPG, JPEG, and PNG files are allowed.',
+    );
+  }
+
+  if (sizeBytes > MAX_FILE_SIZE_BYTES) {
+    throw new Error('Certification file must be 10 MB or smaller.');
+  }
+
+  return {
+    action,
+    employeeId,
+    certificationField,
+    certificationLabel,
+    filename,
+    contentType,
+    sizeBytes,
+    path,
+  };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!serviceRoleKey) {
-      throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable.');
+      throw new Error(
+        'Missing SUPABASE_SERVICE_ROLE_KEY environment variable.',
+      );
     }
 
-    const formData = await request.formData();
-
-    const employeeId = String(formData.get('employeeId') ?? '').trim();
-    const certificationField = String(formData.get('certificationField') ?? '').trim();
-    const certificationLabel = String(formData.get('certificationLabel') ?? '').trim();
-    const file = formData.get('certificationFile');
-
-    if (!employeeId || !certificationField || !certificationLabel || !(file instanceof File) || file.size === 0) {
-      return NextResponse.json({ error: 'Missing required certification upload fields.' }, { status: 400 });
-    }
-
-    if (!ALLOWED_CERTIFICATION_FIELDS.has(certificationField)) {
-      return NextResponse.json({ error: 'Invalid certification field.' }, { status: 400 });
-    }
-
-    if (!ALLOWED_TYPES.has(file.type)) {
-      return NextResponse.json({ error: 'Only PDF, JPG, JPEG, and PNG files are allowed.' }, { status: 400 });
-    }
-
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      return NextResponse.json({ error: 'Certification file must be 10 MB or smaller.' }, { status: 400 });
-    }
+    const body = (await request.json()) as UploadRequest;
+    const uploadRequest = getValidatedRequest(body);
 
     const supabase = createClient(SUPABASE_URL, serviceRoleKey);
 
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
       .select('id,certifications')
-      .eq('id', employeeId)
+      .eq('id', uploadRequest.employeeId)
       .single();
 
     if (employeeError) {
       throw employeeError;
     }
 
-    const extension = getSafeFileExtension(file.name, file.type);
-    const uploadedAt = new Date().toISOString();
-    const storagePath = `${employeeId}/${certificationField}-${Date.now()}.${extension}`;
+    if (uploadRequest.action === 'prepare') {
+      const extension = getSafeFileExtension(
+        uploadRequest.filename,
+        uploadRequest.contentType,
+      );
+      const storagePath =
+        `${uploadRequest.employeeId}/` +
+        `${uploadRequest.certificationField}-${Date.now()}.${extension}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(CERTIFICATION_BUCKET)
-      .upload(storagePath, Buffer.from(await file.arrayBuffer()), {
-        contentType: file.type,
-        upsert: false,
+      const { data, error } = await supabase.storage
+        .from(CERTIFICATION_BUCKET)
+        .createSignedUploadUrl(storagePath);
+
+      if (error) {
+        throw error;
+      }
+
+      return NextResponse.json({
+        ok: true,
+        path: data.path,
+        token: data.token,
       });
-
-    if (uploadError) {
-      throw uploadError;
     }
 
-    const existingCertifications =
-      employee.certifications && typeof employee.certifications === 'object'
-        ? employee.certifications
-        : {};
+    if (uploadRequest.action === 'complete') {
+      const expectedPathPrefix =
+        `${uploadRequest.employeeId}/` +
+        `${uploadRequest.certificationField}-`;
 
-    const documentKey = `${certificationField}Document`;
+      if (
+        !uploadRequest.path ||
+        !uploadRequest.path.startsWith(expectedPathPrefix) ||
+        uploadRequest.path.includes('..') ||
+        uploadRequest.path.startsWith('/')
+      ) {
+        return NextResponse.json(
+          { error: 'Invalid certification document path.' },
+          { status: 400 },
+        );
+      }
 
-    const updatedCertifications = {
-      ...existingCertifications,
-      [documentKey]: {
-        path: storagePath,
-        filename: file.name,
-        contentType: file.type,
-        sizeBytes: file.size,
+      const existingCertifications =
+        employee.certifications &&
+        typeof employee.certifications === 'object'
+          ? employee.certifications
+          : {};
+
+      const documentKey =
+        `${uploadRequest.certificationField}Document`;
+      const uploadedAt = new Date().toISOString();
+
+      const document = {
+        path: uploadRequest.path,
+        filename: uploadRequest.filename,
+        contentType: uploadRequest.contentType,
+        sizeBytes: uploadRequest.sizeBytes,
         uploadedAt,
-        label: certificationLabel,
-      },
-    };
+        label: uploadRequest.certificationLabel,
+      };
 
-    const { error: updateError } = await supabase
-      .from('employees')
-      .update({ certifications: updatedCertifications })
-      .eq('id', employeeId);
+      const updatedCertifications = {
+        ...existingCertifications,
+        [documentKey]: document,
+      };
 
-    if (updateError) {
-      throw updateError;
+      const { error: updateError } = await supabase
+        .from('employees')
+        .update({ certifications: updatedCertifications })
+        .eq('id', uploadRequest.employeeId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      return NextResponse.json({
+        ok: true,
+        document,
+      });
     }
 
-    return NextResponse.json({
-      ok: true,
-      document: updatedCertifications[documentKey],
-    });
+    return NextResponse.json(
+      { error: 'Invalid certification upload action.' },
+      { status: 400 },
+    );
   } catch (error) {
     console.error('Employee certification upload error:', error);
-    return NextResponse.json({ error: 'Failed to upload employee certification.' }, { status: 500 });
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Failed to process employee certification upload.';
+
+    const isValidationError =
+      message === 'Missing required certification upload fields.' ||
+      message === 'Invalid certification field.' ||
+      message === 'Only PDF, JPG, JPEG, and PNG files are allowed.' ||
+      message === 'Certification file must be 10 MB or smaller.';
+
+    return NextResponse.json(
+      { error: message },
+      { status: isValidationError ? 400 : 500 },
+    );
   }
 }
