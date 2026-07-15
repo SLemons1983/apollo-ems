@@ -2777,8 +2777,8 @@ export default function SchedulePage() {
         <div
           className={`rounded-lg border px-3 py-2 ${
             isSpecialShiftType
-              ? 'border-yellow-300 bg-yellow-100'
-              : 'border-slate-300 bg-white'
+              ? 'border-yellow-500 bg-yellow-100'
+              : 'border-slate-400 bg-white'
           }`}
         >
           <div className="flex items-center justify-between gap-3">
@@ -3198,7 +3198,7 @@ export default function SchedulePage() {
   return (
     <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-6 rounded-2xl border border-slate-400 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -3214,7 +3214,7 @@ export default function SchedulePage() {
                 <select
                   value={selectedPayPeriodValue}
                   onChange={(event) => handlePayPeriodChange(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                  className="w-full rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
                 >
                   {payPeriodOptions.map((option) => (
                     <option key={`${option.year}-${toDateKey(option.start)}`} value={`${option.year}|${toDateKey(option.start)}`}>
@@ -3228,12 +3228,12 @@ export default function SchedulePage() {
                 <div
                   className={`inline-flex rounded-xl px-3 py-2 text-xs font-semibold ${
                     saveStatus.startsWith('Saving')
-                      ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                      ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-400'
                       : saveStatus.toLowerCase().includes('failed')
-                        ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                        ? 'bg-red-50 text-red-700 ring-1 ring-red-400'
                         : hasUnsavedChanges
-                          ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-                          : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                          ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-400'
+                          : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-400'
                   }`}
                 >
                   {saveStatus}
@@ -3245,8 +3245,8 @@ export default function SchedulePage() {
                   disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')}
                   className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                     hasUnsavedChanges
-                      ? 'bg-emerald-700 text-white hover:bg-emerald-800'
-                      : 'cursor-not-allowed bg-slate-200 text-slate-500'
+                      ? 'border border-emerald-800 bg-emerald-700 text-white hover:bg-emerald-800'
+                      : 'cursor-not-allowed border border-slate-400 bg-slate-200 text-slate-500'
                   }`}
                 >
                   Confirm Changes
@@ -3257,7 +3257,7 @@ export default function SchedulePage() {
               <button
                 type="button"
                 onClick={goToCurrentPayPeriod}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 Current Pay Period
               </button>
@@ -3267,7 +3267,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingShiftTradeRequests.length > 0 ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${pendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3341,7 +3341,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-500 bg-red-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3416,7 +3416,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${hasUnreadOpenShiftDecisions ? 'border-red-500 bg-red-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3479,7 +3479,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${showOnDutyEmployees ? 'border-emerald-300 bg-emerald-50' : 'border-emerald-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${showOnDutyEmployees ? 'border-emerald-600 bg-emerald-50' : 'border-emerald-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3501,7 +3501,7 @@ export default function SchedulePage() {
             </button>
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${showOpenShiftsNeedingCoverage ? 'border-red-300 bg-red-50' : 'border-red-200 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${showOpenShiftsNeedingCoverage ? 'border-red-600 bg-red-50' : 'border-red-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3533,7 +3533,7 @@ export default function SchedulePage() {
         event.target.value as 'WEEK1' | 'WEEK2' | 'ALL'
       )
     }
-    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+    className="w-full rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700"
   >
     <option value="WEEK1">Week 1</option>
     <option value="WEEK2">Week 2</option>
@@ -3602,9 +3602,9 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className={`grid ${visibleScheduleWeek === 'ALL' ? 'min-w-[3900px] grid-cols-[180px_repeat(14,minmax(270px,1fr))]' : 'min-w-[1500px] grid-cols-[65px_repeat(7,minmax(205px,1fr))]'}`}>
-            <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-200 bg-slate-50 p-4 shadow-sm">
+            <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
               
             </div>
 
@@ -3623,7 +3623,7 @@ export default function SchedulePage() {
                       ? 'border-emerald-400 bg-emerald-100'
                       : isPastDate
                         ? 'border-slate-400 bg-slate-200'
-                        : 'border-slate-200 bg-slate-50'
+                        : 'border-slate-400 bg-slate-50'
                   }`}
                 >
                   <div
@@ -3650,7 +3650,7 @@ export default function SchedulePage() {
 
             {SHIFT_ORDER.map((shiftName) => (
               <React.Fragment key={shiftName}>
-                <div className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-4">
+                <div className="sticky left-0 z-10 border-b border-r border-slate-400 bg-white p-4">
                   <div className="flex h-full flex-col justify-center">
                     <div className="text-base font-bold text-slate-900">{shiftName === 'FIELD_SUP' ? 'SUP' : shiftName}</div>
                   </div>
@@ -3747,10 +3747,10 @@ export default function SchedulePage() {
                         }
                         className={`cursor-pointer rounded-xl border p-2 shadow-sm transition ${
                           warningMessages.length > 0
-                            ? 'border-red-300 bg-red-100 hover:bg-red-200'
+                            ? 'border-red-500 bg-red-100 hover:bg-red-200'
                             : isExpanded
-                              ? 'border-slate-500 bg-slate-200'
-                              : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
+                              ? 'border-slate-700 bg-slate-200'
+                              : 'border-slate-500 bg-slate-100 hover:bg-slate-200'
                         }`}
                       >
                         <div className="mb-2 flex items-center justify-between gap-2">
@@ -3782,7 +3782,7 @@ export default function SchedulePage() {
 
                           <div className="flex shrink-0 items-center gap-2">
                             {shift.vehicle && (
-                              <div className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-bold text-slate-700">
+                              <div className="rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700">
                                 Unit {shift.vehicle}
                               </div>
                             )}
@@ -3974,7 +3974,7 @@ export default function SchedulePage() {
               </React.Fragment>
             ))}
 
-            <div className="sticky left-0 z-10 border-r border-slate-200 bg-white p-4">
+            <div className="sticky left-0 z-10 border-r border-slate-400 bg-white p-4">
               <div className="flex h-full items-center justify-center">
                 <div className="text-base font-bold text-slate-900">EX</div>
               </div>
@@ -4075,8 +4075,8 @@ export default function SchedulePage() {
                             }
                             className={`cursor-pointer rounded-xl border p-2 shadow-sm transition ${
                               isExpanded
-                                ? 'border-slate-500 bg-slate-200'
-                                : 'border-slate-300 bg-slate-100 hover:bg-slate-200'
+                                ? 'border-slate-700 bg-slate-200'
+                                : 'border-slate-500 bg-slate-100 hover:bg-slate-200'
                             }`}
                           >
                             <div className="mb-3 flex items-start justify-between gap-2">
