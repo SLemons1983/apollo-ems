@@ -600,12 +600,8 @@ function getCollapsedShiftTypeClasses(shiftType: ShiftType): string {
   }
 }
 
-function requiresSupervisorNote(slot: EmployeeSlot): boolean {
-  if (!slot.employeeId || isOpenShiftSlot(slot.employeeId)) {
-    return false;
-  }
-
-  return slot.endTime !== DEFAULT_END_TIME;
+function requiresSupervisorNote(_slot: EmployeeSlot): boolean {
+  return false;
 }
 
 function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
@@ -1012,9 +1008,15 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
     return [];
   }
 
+  const isActiveAssignmentSlot = (slot: EmployeeSlot) =>
+    !isOpenShiftSlot(slot.employeeId) &&
+    slot.shiftType !== 'SICK' &&
+    slot.shiftType !== 'VACATION' &&
+    slot.shiftType !== 'LEAVE';
+
   const messages: string[] = [];
   const targetSlots = getAssignedSlotsForAssignment(target.category, target.shift)
-    .filter((slot) => !isOpenShiftSlot(slot.employeeId));
+    .filter(isActiveAssignmentSlot);
 
   const seenInSameShift = new Set<string>();
   for (const slot of targetSlots) {
@@ -1038,7 +1040,8 @@ function getEmployeeConflictMessages(day: DaySchedule, target: AssignmentRef, em
         continue;
       }
 
-      const otherSlots = getAssignedSlotsForAssignment(other.category, other.shift);
+      const otherSlots = getAssignedSlotsForAssignment(other.category, other.shift)
+        .filter(isActiveAssignmentSlot);
 
       if (otherSlots.some((otherSlot) => otherSlot.employeeId === slot.employeeId)) {
         messages.push(`${employee?.name ?? 'Employee'} is also assigned to ${other.label} on the same day.`);
@@ -1176,20 +1179,6 @@ function getContinuousHoursResult(
     warnings: Array.from(new Set(warnings)),
     approvals: Array.from(new Set(approvals)),
   };
-}
-
-function getRequiredNoteMessages(target: AssignmentRef, employees: EmployeeOption[]): string[] {
-  const messages: string[] = [];
-
-  const slots = getAssignedSlotsForAssignment(target.category, target.shift);
-  for (const slot of slots) {
-    if (requiresSupervisorNote(slot) && !slot.note.trim()) {
-      const employee = getEmployeeById(slot.employeeId, employees);
-      messages.push(`${employee?.name ?? 'Employee'} has a custom end time and requires a supervisor note.`);
-    }
-  }
-
-  return Array.from(new Set(messages));
 }
 
 function getCertificationMessages(target: AssignmentRef, employees: EmployeeOption[]): string[] {
@@ -3712,9 +3701,8 @@ export default function SchedulePage() {
                   const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
                   const vehicleMessages = getVehicleConflictMessages(day, assignmentRef);
                   const continuousHours = getContinuousHoursResult(scheduleData, dateKey, assignmentRef, employees);
-                  const requiredNoteMessages = getRequiredNoteMessages(assignmentRef, employees);
                   const certificationMessages = getCertificationMessages(assignmentRef, employees);
-                  const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
+                  const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...certificationMessages];
                   const approvalMessages = continuousHours.approvals;
                   const isSupervisorShift = category === 'SUPERVISOR';
                   const isTodayColumn = todayKey === dateKey;
@@ -3787,21 +3775,14 @@ export default function SchedulePage() {
                               </div>
                             )}
 
-                            {warningMessages.length > 0 ? (
+                            {warningMessages.length > 0 && (
                               <div
                                 title={warningMessages.join(' | ')}
                                 className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
                               >
                                 ⚠
                               </div>
-                            ) : approvalMessages.length > 0 ? (
-                              <div
-                                title={approvalMessages.join(' | ')}
-                                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
-                              >
-                                ✓
-                              </div>
-                            ) : null}
+                            )}
                           </div>
                         </div>
 
@@ -4057,9 +4038,8 @@ export default function SchedulePage() {
                         const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
                         const vehicleMessages = getVehicleConflictMessages(day, assignmentRef);
                         const continuousHours = getContinuousHoursResult(scheduleData, dateKey, assignmentRef, employees);
-                        const requiredNoteMessages = getRequiredNoteMessages(assignmentRef, employees);
                         const certificationMessages = getCertificationMessages(assignmentRef, employees);
-                        const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...requiredNoteMessages, ...certificationMessages];
+                        const warningMessages = [...employeeMessages, ...vehicleMessages, ...continuousHours.warnings, ...certificationMessages];
                         const approvalMessages = continuousHours.approvals;
                         const isSupervisorShift = extra.category === 'SUPERVISOR';
                         const expandedKey = `extra-${extra.id}-${dateKey}`;
@@ -4118,21 +4098,14 @@ export default function SchedulePage() {
                                     </div>
                                   )}
 
-                                  {warningMessages.length > 0 ? (
+                                  {warningMessages.length > 0 && (
                                     <div
                                       title={warningMessages.join(' | ')}
                                       className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
                                     >
                                       ⚠
                                     </div>
-                                  ) : approvalMessages.length > 0 ? (
-                                    <div
-                                      title={approvalMessages.join(' | ')}
-                                      className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
-                                    >
-                                      ✓
-                                    </div>
-                                  ) : null}
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -4364,7 +4337,6 @@ export default function SchedulePage() {
                     ...getEmployeeConflictMessages(day, assignmentRef, employees),
                     ...getVehicleConflictMessages(day, assignmentRef),
                     ...getContinuousHoursResult(scheduleData, selectedExtraShift.dateKey, assignmentRef, employees).warnings,
-                    ...getRequiredNoteMessages(assignmentRef, employees),
                     ...getCertificationMessages(assignmentRef, employees),
                   ];
 
@@ -4490,7 +4462,6 @@ export default function SchedulePage() {
                         ...getEmployeeConflictMessages(day, assignmentRef, employees),
                         ...getVehicleConflictMessages(day, assignmentRef),
                         ...getContinuousHoursResult(scheduleData, selectedShift.dateKey, assignmentRef, employees).warnings,
-                        ...getRequiredNoteMessages(assignmentRef, employees),
                         ...getCertificationMessages(assignmentRef, employees),
                       ];
 
