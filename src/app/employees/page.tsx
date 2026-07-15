@@ -1264,7 +1264,12 @@ export default function EmployeeProfilesPage() {
       'image/jpeg',
       'image/png',
     ]);
-    const maxFileSizeBytes = 10 * 1024 * 1024;
+    const maxFileSizeBytes =
+      field === 'medicalExaminerCertificate'
+        ? 20 * 1024 * 1024
+        : 10 * 1024 * 1024;
+    const maxFileSizeMegabytes =
+      field === 'medicalExaminerCertificate' ? 20 : 10;
 
     if (!allowedTypes.has(file.type)) {
       const message = 'Only PDF, JPG, JPEG, and PNG files are allowed.';
@@ -1279,7 +1284,7 @@ export default function EmployeeProfilesPage() {
     }
 
     if (file.size > maxFileSizeBytes) {
-      const message = 'Certification file must be 10 MB or smaller.';
+      const message = `Certification file must be ${maxFileSizeMegabytes} MB or smaller.`;
 
       setCertificationDocumentStatus((current) => ({
         ...current,

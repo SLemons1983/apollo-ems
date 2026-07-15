@@ -28,7 +28,8 @@ const ALLOWED_CERTIFICATION_FIELDS = new Set([
   'ccemsaEmtLicense',
 ]);
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MEDICAL_EXAMINER_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 type UploadRequest = {
   action?: unknown;
@@ -98,8 +99,17 @@ function getValidatedRequest(body: UploadRequest) {
     );
   }
 
-  if (sizeBytes > MAX_FILE_SIZE_BYTES) {
-    throw new Error('Certification file must be 10 MB or smaller.');
+  const maxFileSizeBytes =
+    certificationField === 'medicalExaminerCertificate'
+      ? MEDICAL_EXAMINER_MAX_FILE_SIZE_BYTES
+      : DEFAULT_MAX_FILE_SIZE_BYTES;
+  const maxFileSizeMegabytes =
+    certificationField === 'medicalExaminerCertificate' ? 20 : 10;
+
+  if (sizeBytes > maxFileSizeBytes) {
+    throw new Error(
+      `Certification file must be ${maxFileSizeMegabytes} MB or smaller.`,
+    );
   }
 
   return {
@@ -235,7 +245,8 @@ export async function POST(request: NextRequest) {
       message === 'Missing required certification upload fields.' ||
       message === 'Invalid certification field.' ||
       message === 'Only PDF, JPG, JPEG, and PNG files are allowed.' ||
-      message === 'Certification file must be 10 MB or smaller.';
+      message === 'Certification file must be 10 MB or smaller.' ||
+      message === 'Certification file must be 20 MB or smaller.';
 
     return NextResponse.json(
       { error: message },
