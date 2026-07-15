@@ -1269,7 +1269,6 @@ export default function SupervisorPage() {
       'ambulanceDriversLicense',
       'ahaBlsCpr',
       'medicalExaminerCertificate',
-      'annualTbScreen',
       'californiaParamedicLicense',
       'ccemsaParamedicLicense',
       'acls',

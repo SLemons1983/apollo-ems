@@ -87,7 +87,6 @@ function getRequiredCertificationFields(
     ['ambulanceDriversLicense', "Ambulance Driver's License"],
     ['ahaBlsCpr', 'AHA BLS CPR'],
     ['medicalExaminerCertificate', 'Medical Examiner Certificate'],
-    ['annualTbScreen', 'Annual TB Screen'],
   ];
 
   if (scope === 'ALS') {

@@ -1622,7 +1622,6 @@ export default function EmployeeProfilesPage() {
       ['ambulanceDriversLicense', "Ambulance Driver's License"],
       ['ahaBlsCpr', 'AHA BLS CPR'],
       ['medicalExaminerCertificate', 'Medical Examiner Certificate'],
-      ['annualTbScreen', 'Annual TB Screen'],
       employee.scope === 'ALS'
         ? ['californiaParamedicLicense', 'California Paramedic License']
         : ['californiaEmtLicense', 'California EMT License'],
@@ -1686,7 +1685,6 @@ export default function EmployeeProfilesPage() {
       ['ambulanceDriversLicense', "Ambulance Driver's License"],
       ['ahaBlsCpr', 'AHA BLS CPR'],
       ['medicalExaminerCertificate', 'Medical Examiner Certificate'],
-      ['annualTbScreen', 'Annual TB Screen'],
       employee.scope === 'ALS'
         ? ['californiaParamedicLicense', 'California Paramedic License']
         : ['californiaEmtLicense', 'California EMT License'],

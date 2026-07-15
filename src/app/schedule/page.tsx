@@ -332,7 +332,6 @@ function getRequiredCertificationKeys(scope: 'ALS' | 'BLS'): Array<keyof Certifi
     'ambulanceDriversLicense',
     'ahaBlsCpr',
     'medicalExaminerCertificate',
-    'annualTbScreen',
   ];
 
   const alsOnly: Array<keyof CertificationRecord> = [
