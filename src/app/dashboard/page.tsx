@@ -308,6 +308,17 @@ type EditableTimecardRow = {
   clockOutTime: string;
 };
 
+type TimecardRowWarning = {
+  type: 'EARLY_START' | 'LATE_CLOCK_OUT';
+  label: string;
+  message: string;
+};
+
+type TimecardWarningDialog = {
+  title: string;
+  messages: string[];
+};
+
 type ActiveShiftInfo = {
   date: Date;
   dateKey: string;
@@ -973,6 +984,12 @@ export default function DashboardPage() {
   const [hideReadMessages, setHideReadMessages] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [timecardStatus, setTimecardStatus] = useState('');
+  const [timecardWarningDialog, setTimecardWarningDialog] =
+    useState<TimecardWarningDialog | null>(null);
+  const [
+    acknowledgedTimecardWarnings,
+    setAcknowledgedTimecardWarnings,
+  ] = useState<Record<string, boolean>>({});
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
@@ -2939,6 +2956,145 @@ export default function DashboardPage() {
       });
   }
 
+  function getManualTimecardWarnings(
+    date: Date,
+    row: EditableTimecardRow,
+  ): TimecardRowWarning[] {
+    if (!row.shiftLabel || row.payType === 'LEAVE') {
+      return [];
+    }
+
+    const assignment = getAssignedShiftForDate(date);
+
+    if (!assignment || assignment.label !== row.shiftLabel) {
+      return [];
+    }
+
+    const slot =
+      assignment.slots.find(
+        (item) => item.employeeId === currentEmployeeId,
+      ) ?? null;
+
+    if (!slot) {
+      return [];
+    }
+
+    const scheduledRange = getShiftDateTimeRange(date, slot);
+    const warnings: TimecardRowWarning[] = [];
+
+    if (
+      row.clockInDate &&
+      isCompleteTimeValue(row.clockInTime)
+    ) {
+      const enteredClockIn = new Date(
+        `${row.clockInDate}T${row.clockInTime}:00`,
+      );
+
+      if (
+        !Number.isNaN(enteredClockIn.getTime()) &&
+        enteredClockIn.getTime() < scheduledRange.start.getTime()
+      ) {
+        warnings.push({
+          type: 'EARLY_START',
+          label: 'Early Start',
+          message:
+            'You entered a clock-in time earlier than the scheduled start of your shift. Employees are not expected to begin work before their scheduled start time. If this early start was approved by the on-duty supervisor, please contact that supervisor so your scheduled start time can be adjusted.',
+        });
+      }
+    }
+
+    if (
+      row.clockOutDate &&
+      isCompleteTimeValue(row.clockOutTime)
+    ) {
+      const enteredClockOut = new Date(
+        `${row.clockOutDate}T${row.clockOutTime}:00`,
+      );
+
+      if (
+        !Number.isNaN(enteredClockOut.getTime()) &&
+        enteredClockOut.getTime() > scheduledRange.end.getTime()
+      ) {
+        warnings.push({
+          type: 'LATE_CLOCK_OUT',
+          label: 'Late Clock-Out',
+          message:
+            'You entered a clock-out time later than the scheduled end of your shift. Please add an Employee Note explaining the reason for the late clock-out and include any associated EMS run numbers.',
+        });
+      }
+    }
+
+    return warnings;
+  }
+
+  function handleTimecardTimeChange(
+    date: Date,
+    rowId: string,
+    row: EditableTimecardRow,
+    field: 'clockInTime' | 'clockOutTime',
+    value: string,
+  ) {
+    const normalizedValue = normalizeManualTimeInput(value);
+    const nextRow: EditableTimecardRow = {
+      ...row,
+      [field]: normalizedValue,
+    };
+
+    updateEditableRowById(date, rowId, {
+      [field]: normalizedValue,
+    });
+
+    const warnings = getManualTimecardWarnings(date, nextRow);
+    const warningKeyPrefix = `${rowId}:`;
+
+    if (warnings.length === 0) {
+      setAcknowledgedTimecardWarnings((current) => {
+        const next = { ...current };
+
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith(warningKeyPrefix)) {
+            delete next[key];
+          }
+        });
+
+        return next;
+      });
+
+      return;
+    }
+
+    const unacknowledgedWarnings = warnings.filter(
+      (warning) =>
+        !acknowledgedTimecardWarnings[
+          `${rowId}:${warning.type}`
+        ],
+    );
+
+    if (unacknowledgedWarnings.length === 0) {
+      return;
+    }
+
+    setAcknowledgedTimecardWarnings((current) => {
+      const next = { ...current };
+
+      unacknowledgedWarnings.forEach((warning) => {
+        next[`${rowId}:${warning.type}`] = true;
+      });
+
+      return next;
+    });
+
+    setTimecardWarningDialog({
+      title:
+        unacknowledgedWarnings.length > 1
+          ? 'Timecard Warnings'
+          : 'Timecard Warning',
+      messages: unacknowledgedWarnings.map(
+        (warning) => warning.message,
+      ),
+    });
+  }
+
   function updateEditableRowById(date: Date, rowId: string, partial: Partial<EditableTimecardRow>) {
     const dateKey = toDateKey(date);
     const current =
@@ -3571,13 +3727,29 @@ export default function DashboardPage() {
       activeShift ??
       (type === 'CLOCK_OUT' && lastPunch?.type === 'CLOCK_IN'
         ? (() => {
-            const fallbackGeofence = SHIFT_GEOFENCES[lastPunch.shiftLabel] ?? SHIFT_GEOFENCES['Reedley 1'];
+            const fallbackGeofence =
+              SHIFT_GEOFENCES[lastPunch.shiftLabel] ??
+              SHIFT_GEOFENCES['Reedley 1'];
+            const fallbackDate = parseDateKey(
+              lastPunch.shiftDateKey,
+            );
+            const fallbackAssignment = (
+              assignmentsByDate[lastPunch.shiftDateKey] ?? []
+            ).find(
+              (assignment) =>
+                assignment.label === lastPunch.shiftLabel,
+            );
+            const fallbackSlot =
+              fallbackAssignment?.slots.find(
+                (slot) =>
+                  slot.employeeId === currentEmployeeId,
+              ) ?? createEmptyEmployeeSlot();
 
             return {
-              date: parseDateKey(lastPunch.shiftDateKey),
+              date: fallbackDate,
               dateKey: lastPunch.shiftDateKey,
               label: lastPunch.shiftLabel,
-              slot: createEmptyEmployeeSlot(),
+              slot: fallbackSlot,
               locationLabel: fallbackGeofence.label,
               latitude: fallbackGeofence.latitude,
               longitude: fallbackGeofence.longitude,
@@ -3641,6 +3813,16 @@ export default function DashboardPage() {
         [punchStatus, timingNotice].filter(Boolean).join(' '),
       );
 
+      if (timingNotice) {
+        setTimecardWarningDialog({
+          title:
+            type === 'CLOCK_IN'
+              ? 'Early Clock-In Warning'
+              : 'Late Clock-Out Warning',
+          messages: [timingNotice],
+        });
+      }
+
       saveTimePunches([punch, ...timePunches]);
       updateEditableRow(parseDateKey(punch.shiftDateKey), {
         shiftLabel: punch.shiftLabel,
@@ -3699,6 +3881,16 @@ export default function DashboardPage() {
           .filter(Boolean)
           .join(' '),
       );
+
+      if (timingNotice) {
+        setTimecardWarningDialog({
+          title:
+            type === 'CLOCK_IN'
+              ? 'Early Clock-In Warning'
+              : 'Late Clock-Out Warning',
+          messages: [timingNotice],
+        });
+      }
     } finally {
       setIsPunching(false);
     }
@@ -4797,6 +4989,54 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                {timecardWarningDialog && (
+                  <div
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="timecard-warning-title"
+                  >
+                    <div className="w-full max-w-lg rounded-2xl border border-amber-300 bg-white p-6 shadow-2xl">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl text-amber-700">
+                          ⚠
+                        </div>
+
+                        <div>
+                          <h3
+                            id="timecard-warning-title"
+                            className="text-lg font-bold text-slate-950"
+                          >
+                            {timecardWarningDialog.title}
+                          </h3>
+
+                          <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
+                            {timecardWarningDialog.messages.map(
+                              (message, index) => (
+                                <p key={`${index}-${message}`}>
+                                  {message}
+                                </p>
+                              ),
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTimecardWarningDialog(null)
+                          }
+                          className="rounded-xl bg-amber-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-amber-700"
+                        >
+                          OK
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {timecardStatus && (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                     {timecardStatus}
@@ -4910,6 +5150,8 @@ export default function DashboardPage() {
                               const rowId = row.id ?? getEditableRowKey(dateKey);
                               const totalHours = getEditableRowHours(row);
                               const isBaseRow = rowIndex === 0;
+                              const rowWarnings =
+                                getManualTimecardWarnings(date, row);
 
                               return (
                                 <tr key={`${week.label}-${dateKey}-${rowId}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
@@ -5012,7 +5254,15 @@ export default function DashboardPage() {
                                       maxLength={5}
                                       value={row.clockInTime}
                                       disabled={row.payType === 'LEAVE'}
-                                      onChange={(event) => updateEditableRowById(date, rowId, { clockInTime: normalizeManualTimeInput(event.target.value) })}
+                                      onChange={(event) =>
+                                        handleTimecardTimeChange(
+                                          date,
+                                          rowId,
+                                          row,
+                                          'clockInTime',
+                                          event.target.value,
+                                        )
+                                      }
                                       className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
                                   </td>
@@ -5033,16 +5283,64 @@ export default function DashboardPage() {
                                       maxLength={5}
                                       value={row.clockOutTime}
                                       disabled={row.payType === 'LEAVE'}
-                                      onChange={(event) => updateEditableRowById(date, rowId, { clockOutTime: normalizeManualTimeInput(event.target.value) })}
+                                      onChange={(event) =>
+                                        handleTimecardTimeChange(
+                                          date,
+                                          rowId,
+                                          row,
+                                          'clockOutTime',
+                                          event.target.value,
+                                        )
+                                      }
                                       className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
                                   </td>
                                   <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
-                                    {row.payType === 'LEAVE'
-                                      ? '0.00'
-                                      : totalHours > 0
-                                        ? totalHours.toFixed(2)
-                                        : ''}
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <span>
+                                        {row.payType === 'LEAVE'
+                                          ? '0.00'
+                                          : totalHours > 0
+                                            ? totalHours.toFixed(2)
+                                            : ''}
+                                      </span>
+
+                                      {rowWarnings.length > 0 && (
+                                        <span
+                                          className="group relative inline-flex"
+                                          tabIndex={0}
+                                          aria-label={rowWarnings
+                                            .map((warning) => warning.label)
+                                            .join(', ')}
+                                        >
+                                          <span className="cursor-help text-base leading-none text-amber-600">
+                                            ⚠
+                                          </span>
+
+                                          <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-80 -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-left text-xs font-normal leading-5 text-amber-950 shadow-xl group-hover:block group-focus:block">
+                                            <span className="block font-bold">
+                                              {rowWarnings
+                                                .map(
+                                                  (warning) =>
+                                                    warning.label,
+                                                )
+                                                .join(' • ')}
+                                            </span>
+
+                                            {rowWarnings.map(
+                                              (warning) => (
+                                                <span
+                                                  key={warning.type}
+                                                  className="mt-1 block"
+                                                >
+                                                  {warning.message}
+                                                </span>
+                                              ),
+                                            )}
+                                          </span>
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="border border-slate-400 px-2 py-1 text-center">
                                     <button
