@@ -2823,201 +2823,81 @@ export default function DashboardPage() {
     return hours >= 23 ? 'TWENTY_FOUR_HOUR' : 'DAILY_OT_DT';
   }
 
-  function getContinuousPunchPairForScheduledShift(
-    date: Date,
-    assignment: DisplayAssignment | null,
-  ): { clockIn: TimePunch | null; clockOut: TimePunch | null } {
-    const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId);
-    if (!assignment || !slot) {
-      return { clockIn: null, clockOut: null };
-    }
-
-    const { start, end } = getShiftDateTimeRange(date, slot);
-
-    const realClockIn =
-      payPeriodPunches
-        .filter(
-          (punch) =>
-            punch.type === 'CLOCK_IN' &&
-            new Date(punch.timestamp).getTime() <= start.getTime(),
-        )
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] ?? null;
-
-    const realClockOut =
-      payPeriodPunches
-        .filter(
-          (punch) =>
-            punch.type === 'CLOCK_OUT' &&
-            new Date(punch.timestamp).getTime() >= end.getTime(),
-        )
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0] ?? null;
-
-    if (!realClockIn || !realClockOut) {
-      return { clockIn: null, clockOut: null };
-    }
-
-    return {
-      clockIn: {
-        ...realClockIn,
-        timestamp: start.toISOString(),
-        shiftDateKey: toDateKey(date),
-        shiftLabel: assignment.label,
-      },
-      clockOut: {
-        ...realClockOut,
-        timestamp: end.toISOString(),
-        shiftDateKey: toDateKey(date),
-        shiftLabel: assignment.label,
-      },
-    };
-  }
-
   function getEditableRowForDate(date: Date): EditableTimecardRow {
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const saved = editableTimecardRows[rowKey];
-
-    const hasManualData =
-      saved &&
-      (
-        saved.shiftLabel ||
-        saved.clockInDate ||
-        saved.clockInTime ||
-        saved.clockOutDate ||
-        saved.clockOutTime
-      );
-
-    if (hasManualData) {
-      const assignment = getAssignedShiftForDate(date);
-      const isBlankDateValue = (value: string | undefined) => {
-        const trimmed = (value ?? '').trim();
-        return !trimmed || trimmed === 'mm/dd/yyyy' || !/^\d{4}-\d{2}-\d{2}$/.test(trimmed);
-      };
-
-      const isBlankTimeValue = (value: string | undefined) => {
-        const trimmed = (value ?? '').trim();
-        return !trimmed || trimmed === 'HH:MM';
-      };
-
-      const savedHasBlankTimes =
-        isBlankDateValue(saved.clockInDate) &&
-        isBlankTimeValue(saved.clockInTime) &&
-        isBlankDateValue(saved.clockOutDate) &&
-        isBlankTimeValue(saved.clockOutTime);
-
-      const savedIsOffRow =
-        (!saved.shiftLabel || saved.shiftLabel === 'Off') &&
-        savedHasBlankTimes;
-
-      const savedMatchesAssignedShift =
-        assignment &&
-        saved.shiftLabel === assignment.label &&
-        savedHasBlankTimes;
-
-      if (assignment && (savedIsOffRow || savedMatchesAssignedShift)) {
-        const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
-        const scheduledRange = slot ? getShiftDateTimeRange(date, slot) : null;
-        const scheduledHours = scheduledRange
-          ? Math.max(0, (scheduledRange.end.getTime() - scheduledRange.start.getTime()) / (1000 * 60 * 60))
-          : 0;
-
-        return {
-          id: rowKey,
-          shiftLabel: assignment.label,
-          payType: getDefaultPayType(assignment.label, scheduledHours, slot?.shiftType),
-          clockInDate: scheduledRange ? getIsoDateInputValue(scheduledRange.start) : '',
-          clockInTime: scheduledRange ? `${scheduledRange.start.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.start.getMinutes()}`.padStart(2, '0') : '',
-          clockOutDate: scheduledRange ? getIsoDateInputValue(scheduledRange.end) : '',
-          clockOutTime: scheduledRange ? `${scheduledRange.end.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.end.getMinutes()}`.padStart(2, '0') : '',
-        };
-      }
-
-      const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
-      const punchPair = scheduledPair.clockIn && scheduledPair.clockOut
-        ? scheduledPair
-        : saved.shiftLabel
-          ? getPunchPairForShift(dateKey, saved.shiftLabel)
-          : { clockIn: null, clockOut: null };
-      const clockOutDate = !saved.clockOutDate && punchPair.clockOut
-        ? new Date(punchPair.clockOut.timestamp)
-        : null;
-
-      const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
-      const scheduledRange = assignment && slot ? getShiftDateTimeRange(date, slot) : null;
-
-      return {
-        ...saved,
-        id: saved.id ?? rowKey,
-        clockInDate:
-          isBlankDateValue(saved.clockInDate) && scheduledRange
-            ? getIsoDateInputValue(scheduledRange.start)
-            : saved.clockInDate,
-        clockInTime:
-          isBlankTimeValue(saved.clockInTime) && scheduledRange
-            ? `${scheduledRange.start.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.start.getMinutes()}`.padStart(2, '0')
-            : saved.clockInTime,
-        clockOutDate:
-          clockOutDate
-            ? getIsoDateInputValue(clockOutDate)
-            : isBlankDateValue(saved.clockOutDate) && scheduledRange
-              ? getIsoDateInputValue(scheduledRange.end)
-              : saved.clockOutDate,
-        clockOutTime:
-          clockOutDate
-            ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0')
-            : isBlankTimeValue(saved.clockOutTime) && scheduledRange
-              ? `${scheduledRange.end.getHours()}`.padStart(2, '0') + ':' + `${scheduledRange.end.getMinutes()}`.padStart(2, '0')
-              : saved.clockOutTime,
-        payType:
-          saved.payType ||
-          getDefaultPayType(
-            assignment?.label ?? saved.shiftLabel,
-            getEditableRowHours(saved),
-            assignment?.slots.find(
-              (slot) => slot.employeeId === currentEmployeeId,
-            )?.shiftType,
-          ),
-      };
-    }
-
     const assignment = getAssignedShiftForDate(date);
-    const scheduledPair = getContinuousPunchPairForScheduledShift(date, assignment);
-    const punchPair =
-      scheduledPair.clockIn && scheduledPair.clockOut
-        ? scheduledPair
-        : assignment
-          ? getPunchPairForShift(dateKey, assignment.label)
-          : { clockIn: null, clockOut: null };
-    const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId) ?? null;
-    const scheduledRange = assignment && slot ? getShiftDateTimeRange(date, slot) : null;
-    const clockInDate = punchPair.clockIn
-      ? new Date(punchPair.clockIn.timestamp)
-      : scheduledRange?.start ?? null;
-    const clockOutDate = punchPair.clockOut
-      ? new Date(punchPair.clockOut.timestamp)
-      : scheduledRange?.end ?? null;
+    const slot =
+      assignment?.slots.find(
+        (item) => item.employeeId === currentEmployeeId,
+      ) ?? null;
 
-    const inferredHours =
-      punchPair.clockIn && punchPair.clockOut
-        ? getHoursNumberBetween(punchPair.clockIn, punchPair.clockOut)
-        : scheduledRange
-          ? Math.max(0, (scheduledRange.end.getTime() - scheduledRange.start.getTime()) / (1000 * 60 * 60))
-          : 0;
+    const scheduledRange =
+      assignment && slot ? getShiftDateTimeRange(date, slot) : null;
+
+    const scheduledHours = scheduledRange
+      ? Math.max(
+          0,
+          (scheduledRange.end.getTime() -
+            scheduledRange.start.getTime()) /
+            (1000 * 60 * 60),
+        )
+      : 0;
+
+    const shiftLabel =
+      saved?.shiftLabel || assignment?.label || '';
+
+    const punchPair = shiftLabel
+      ? getPunchPairForShift(dateKey, shiftLabel)
+      : { clockIn: null, clockOut: null };
+
+    const clockInTimestamp = punchPair.clockIn
+      ? new Date(punchPair.clockIn.timestamp)
+      : null;
+
+    const clockOutTimestamp = punchPair.clockOut
+      ? new Date(punchPair.clockOut.timestamp)
+      : null;
 
     return {
-      id: rowKey,
-      shiftLabel: assignment?.label ?? '',
-      payType: getDefaultPayType(
-        assignment?.label ?? '',
-        inferredHours,
-        assignment?.slots.find(
-          (slot) => slot.employeeId === currentEmployeeId,
-        )?.shiftType,
-      ),
-      clockInDate: clockInDate ? getIsoDateInputValue(clockInDate) : '',
-      clockInTime: punchPair.clockIn && clockInDate ? `${clockInDate.getHours()}`.padStart(2, '0') + ':' + `${clockInDate.getMinutes()}`.padStart(2, '0') : '',
-      clockOutDate: clockOutDate ? getIsoDateInputValue(clockOutDate) : '',
-      clockOutTime: punchPair.clockOut && clockOutDate ? `${clockOutDate.getHours()}`.padStart(2, '0') + ':' + `${clockOutDate.getMinutes()}`.padStart(2, '0') : '',
+      id: saved?.id ?? rowKey,
+      shiftLabel,
+      payType:
+        saved?.payType ||
+        getDefaultPayType(
+          shiftLabel,
+          scheduledHours,
+          slot?.shiftType,
+        ),
+      clockInDate:
+        saved?.clockInDate ||
+        (clockInTimestamp
+          ? getIsoDateInputValue(clockInTimestamp)
+          : scheduledRange
+            ? getIsoDateInputValue(scheduledRange.start)
+            : ''),
+      clockInTime:
+        saved?.clockInTime ||
+        (clockInTimestamp
+          ? `${clockInTimestamp.getHours()}`.padStart(2, '0') +
+            ':' +
+            `${clockInTimestamp.getMinutes()}`.padStart(2, '0')
+          : ''),
+      clockOutDate:
+        saved?.clockOutDate ||
+        (clockOutTimestamp
+          ? getIsoDateInputValue(clockOutTimestamp)
+          : scheduledRange
+            ? getIsoDateInputValue(scheduledRange.end)
+            : ''),
+      clockOutTime:
+        saved?.clockOutTime ||
+        (clockOutTimestamp
+          ? `${clockOutTimestamp.getHours()}`.padStart(2, '0') +
+            ':' +
+            `${clockOutTimestamp.getMinutes()}`.padStart(2, '0')
+          : ''),
     };
   }
 
@@ -3109,17 +2989,20 @@ export default function DashboardPage() {
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const rows = getEditableRowsForDate(date);
-    const sourceRow = rows[rows.length - 1] ?? getEditableRowForDate(date);
+    const sourceRow =
+      rows[rows.length - 1] ?? getEditableRowForDate(date);
+    const baseRow = getEditableRowForDate(date);
     const nextIndex = rows.length;
     const segmentKey = `${rowKey}-segment-${nextIndex}`;
+
     const segmentRow: EditableTimecardRow = {
       id: segmentKey,
-      shiftLabel: sourceRow.shiftLabel || getEditableRowForDate(date).shiftLabel,
+      shiftLabel: sourceRow.shiftLabel || baseRow.shiftLabel,
       payType: 'SICK_TIME',
-      clockInDate: sourceRow.clockOutDate || sourceRow.clockInDate,
-      clockInTime: sourceRow.clockOutTime || sourceRow.clockInTime,
-      clockOutDate: sourceRow.clockOutDate,
-      clockOutTime: sourceRow.clockOutTime,
+      clockInDate: baseRow.clockInDate,
+      clockInTime: '',
+      clockOutDate: baseRow.clockOutDate,
+      clockOutTime: '',
     };
 
     updateEditableRowById(date, segmentKey, segmentRow);
