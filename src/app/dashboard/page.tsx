@@ -373,6 +373,8 @@ const CURRENT_SUPERVISOR_ID = 'supervisor-001';
 const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
 const OPEN_SUPERVISOR_SLOT_ID = '__OPEN_SUPERVISOR__';
+const OPEN_SHIFT_RELEASE_WINDOW_HOURS = 72;
+const STAFFING_PRIORITY_LABEL = '🟠 Staffing Priority';
 const SYSTEM_CONFIG_STORAGE_KEY = 'apollo-system-config-v1';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 
@@ -2243,7 +2245,7 @@ export default function DashboardPage() {
           const hasEligibleOpenShift =
             isFutureOrToday(date) &&
             !assignment.hiddenFromEmployees &&
-            getEligibleOpenSlotCount(assignment) > 0;
+            getEligibleOpenSlotCount(date, assignment) > 0;
 
           return hasAssignedShift || hasEligibleOpenShift;
         }
@@ -4032,16 +4034,54 @@ export default function DashboardPage() {
     return compare >= today;
   }
 
+  function isWithinOpenShiftReleaseWindow(
+    date: Date,
+    slot: EmployeeSlot,
+  ): boolean {
+    const { start } = getShiftDateTimeRange(date, slot);
+    const millisecondsUntilStart =
+      start.getTime() - Date.now();
+    const releaseWindowMilliseconds =
+      OPEN_SHIFT_RELEASE_WINDOW_HOURS *
+      60 *
+      60 *
+      1000;
+
+    return (
+      millisecondsUntilStart >= 0 &&
+      millisecondsUntilStart <= releaseWindowMilliseconds
+    );
+  }
+
   function getOpenSlotCount(assignment: DisplayAssignment): number {
     return assignment.slots.filter((slot) => isOpenShiftSlot(slot.employeeId)).length;
   }
 
   function isEligibleOpenShiftSlot(
+    date: Date,
     assignment: DisplayAssignment,
-    employeeId: string,
+    slot: EmployeeSlot,
   ): boolean {
     if (!currentEmployee) {
       return false;
+    }
+
+    if (
+      currentEmployee.status?.trim().toLowerCase() ===
+      'removed'
+    ) {
+      return false;
+    }
+
+    if (!isOpenShiftSlot(slot.employeeId)) {
+      return false;
+    }
+
+    // Once an open shift is within 72 hours of its actual
+    // scheduled start, every active employee may see and
+    // request it. Supervisor approval is still required.
+    if (isWithinOpenShiftReleaseWindow(date, slot)) {
+      return true;
     }
 
     const isSupervisorAssignment =
@@ -4049,34 +4089,36 @@ export default function DashboardPage() {
       assignment.key.includes('ADMIN_SUP');
 
     if (isSupervisorAssignment) {
-      return (
-        currentEmployee.role === 'Supervisor' &&
-        isOpenShiftSlot(employeeId)
-      );
+      return currentEmployee.role === 'Supervisor';
     }
 
-    if (employeeId === OPEN_ALS_SLOT_ID) {
+    if (slot.employeeId === OPEN_ALS_SLOT_ID) {
       return (
         currentEmployee.role === 'Supervisor' ||
         currentEmployee.scope === 'ALS'
       );
     }
 
-    if (employeeId === OPEN_BLS_SLOT_ID) {
+    if (slot.employeeId === OPEN_BLS_SLOT_ID) {
       return (
         currentEmployee.role === 'Supervisor' ||
         currentEmployee.scope === 'BLS'
       );
     }
 
+    if (slot.employeeId === OPEN_SUPERVISOR_SLOT_ID) {
+      return currentEmployee.role === 'Supervisor';
+    }
+
     return false;
   }
 
   function getEligibleOpenSlotCount(
+    date: Date,
     assignment: DisplayAssignment,
   ): number {
     return assignment.slots.filter((slot) =>
-      isEligibleOpenShiftSlot(assignment, slot.employeeId),
+      isEligibleOpenShiftSlot(date, assignment, slot),
     ).length;
   }
 
@@ -4142,7 +4184,7 @@ export default function DashboardPage() {
       return;
     }
 
-    if (getEligibleOpenSlotCount(assignment) <= 0) {
+    if (getEligibleOpenSlotCount(date, assignment) <= 0) {
       window.alert('This shift does not currently have an eligible open slot.');
       return;
     }
@@ -4473,8 +4515,9 @@ export default function DashboardPage() {
             if (
               isOpenSlot &&
               !isEligibleOpenShiftSlot(
+                date,
                 assignment,
-                slot.employeeId,
+                slot,
               )
             ) {
               return null;
@@ -4657,16 +4700,44 @@ export default function DashboardPage() {
                         <>
                           <div className="mb-2 flex items-start justify-between gap-2">
                             {getOpenSlotCount(assignment) > 0 ? (
-                              <div className="text-xs font-semibold text-emerald-700">
-                                {getOpenSlotCount(assignment)} open slot{getOpenSlotCount(assignment) === 1 ? '' : 's'}
-                              </div>
+                              assignment.slots.some(
+                                (slot) =>
+                                  isOpenShiftSlot(slot.employeeId) &&
+                                  isWithinOpenShiftReleaseWindow(
+                                    date,
+                                    slot,
+                                  ),
+                              ) ? (
+                                <div
+                                  className="group relative inline-flex"
+                                  tabIndex={0}
+                                  aria-label="Staffing Priority information"
+                                >
+                                  <div className="cursor-help rounded-full border border-amber-300 bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                                    {STAFFING_PRIORITY_LABEL}
+                                  </div>
+
+                                  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 hidden w-72 -translate-x-1/2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-left text-xs font-normal leading-5 text-amber-950 shadow-xl group-hover:block group-focus:block">
+                                    <div className="font-bold">
+                                      {STAFFING_PRIORITY_LABEL}
+                                    </div>
+                                    <div className="mt-1">
+                                      This open shift is within the agency&apos;s staffing priority window. All active employees may request it. Supervisor approval is still required before the schedule is changed.
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs font-semibold text-emerald-700">
+                                  {getOpenSlotCount(assignment)} open slot{getOpenSlotCount(assignment) === 1 ? '' : 's'}
+                                </div>
+                              )
                             ) : (
                               <div />
                             )}
 
                             {(showFullSchedule || showOpenShiftsOnly) &&
                               isFutureOrToday(date) &&
-                              getEligibleOpenSlotCount(assignment) > 0 &&
+                              getEligibleOpenSlotCount(date, assignment) > 0 &&
                               !assignment.hiddenFromEmployees &&
                               !assignment.slots.some((slot) => slot.employeeId === currentEmployeeId) && (
                                 <button
@@ -4694,8 +4765,9 @@ export default function DashboardPage() {
                               if (
                                 isOpenSlot &&
                                 !isEligibleOpenShiftSlot(
+                                  date,
                                   assignment,
-                                  slot.employeeId,
+                                  slot,
                                 )
                               ) {
                                 return null;
@@ -5593,7 +5665,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
                     {showOpenShiftsOnly
-                      ? `Showing eligible open ${currentEmployee?.scope ?? ''} shifts only.`
+                      ? 'Showing eligible open shifts. Staffing Priority shifts are available to every active employee and still require supervisor approval.'
                       : showFullSchedule
                         ? 'Showing the full schedule with your assignments highlighted.'
                         : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
