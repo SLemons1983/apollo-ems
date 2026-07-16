@@ -215,6 +215,7 @@ type TimecardPayType =
   | 'CALL_IN'
   | 'SICK_TIME'
   | 'VACATION'
+  | 'LEAVE'
   | 'JURY_DUTY';
 
 type TimePunch = {
@@ -2615,6 +2616,7 @@ export default function DashboardPage() {
       value === 'CALL_IN' ||
       value === 'SICK_TIME' ||
       value === 'VACATION' ||
+      value === 'LEAVE' ||
       value === 'JURY_DUTY'
     ) {
       return value;
@@ -2801,7 +2803,7 @@ export default function DashboardPage() {
     }
 
     if (shiftType === 'LEAVE') {
-      return 'VACATION';
+      return 'LEAVE';
     }
 
     if (shiftType === 'TRAINING') {
@@ -3109,6 +3111,10 @@ export default function DashboardPage() {
   }
 
   function getEditableRowHours(row: EditableTimecardRow): number {
+    if (row.payType === 'LEAVE') {
+      return 0;
+    }
+
     if (!row.clockInDate || !row.clockInTime || !row.clockOutDate || !row.clockOutTime) {
       return 0;
     }
@@ -3234,7 +3240,7 @@ export default function DashboardPage() {
       const dateKey = toDateKey(date);
 
       getEditableRowsForDate(date).forEach((row, rowIndex) => {
-        if (!row.shiftLabel) {
+        if (!row.shiftLabel || row.payType === 'LEAVE') {
           return;
         }
 
@@ -4912,11 +4918,20 @@ export default function DashboardPage() {
                                   <td className="border border-slate-400 px-2 py-1 text-center">
                                     <select
                                       value={row.payType}
-                                      onChange={(event) =>
+                                      onChange={(event) => {
+                                        const nextPayType =
+                                          event.target.value as EditableTimecardRow['payType'];
+
                                         updateEditableRowById(date, rowId, {
-                                          payType: event.target.value as EditableTimecardRow['payType'],
-                                        })
-                                      }
+                                          payType: nextPayType,
+                                          ...(nextPayType === 'LEAVE'
+                                            ? {
+                                                clockInTime: '',
+                                                clockOutTime: '',
+                                              }
+                                            : {}),
+                                        });
+                                      }}
                                       disabled={!row.shiftLabel}
                                       className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:bg-white disabled:text-slate-900 disabled:opacity-100"
                                       title="Shift Type controls how this row calculates regular, overtime, and double time."
@@ -4926,6 +4941,7 @@ export default function DashboardPage() {
                                       <option value="CALL_IN">Call In</option>
                                       <option value="SICK_TIME">Sick Time</option>
                                       <option value="VACATION">Vacation</option>
+                                      <option value="LEAVE">Leave</option>
                                       <option value="JURY_DUTY">Jury Duty</option>
                                     </select>
                                   </td>
@@ -4945,8 +4961,9 @@ export default function DashboardPage() {
                                       pattern="[0-9]{2}:[0-9]{2}"
                                       maxLength={5}
                                       value={row.clockInTime}
+                                      disabled={row.payType === 'LEAVE'}
                                       onChange={(event) => updateEditableRowById(date, rowId, { clockInTime: normalizeManualTimeInput(event.target.value) })}
-                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
                                   </td>
                                   <td className="border border-slate-400 px-2 py-1 text-center">
@@ -4965,12 +4982,17 @@ export default function DashboardPage() {
                                       pattern="[0-9]{2}:[0-9]{2}"
                                       maxLength={5}
                                       value={row.clockOutTime}
+                                      disabled={row.payType === 'LEAVE'}
                                       onChange={(event) => updateEditableRowById(date, rowId, { clockOutTime: normalizeManualTimeInput(event.target.value) })}
-                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500"
+                                      className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                                     />
                                   </td>
                                   <td className="border border-slate-400 px-2 py-1 text-center font-semibold">
-                                    {totalHours > 0 ? totalHours.toFixed(2) : ''}
+                                    {row.payType === 'LEAVE'
+                                      ? '0.00'
+                                      : totalHours > 0
+                                        ? totalHours.toFixed(2)
+                                        : ''}
                                   </td>
                                   <td className="border border-slate-400 px-2 py-1 text-center">
                                     <button
@@ -5115,7 +5137,7 @@ export default function DashboardPage() {
                   <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                     <div className="font-bold text-slate-900">Pay Calculation Rules</div>
                     <div className="mt-1">
-                      Shift Type controls the calculation rule. Non 24-Shift respects the weekly 40-hour regular cap, with over 12 hours on that row paid as double time. 24-Hour Shift uses weekly OT after 40 worked hours per week. Sick Time, Vacation, and Jury Duty are regular-only and do not accrue OT/DT. Missed meal declarations add one regular-rate penalty hour after supervisor approval.
+                      Shift Type controls the calculation rule. Non 24-Shift respects the weekly 40-hour regular cap, with over 12 hours on that row paid as double time. 24-Hour Shift uses weekly OT after 40 worked hours per week. Sick Time, Vacation, and Jury Duty are regular-only and do not accrue OT/DT. Leave documents a scheduled absence but contributes zero paid or worked hours. Missed meal declarations add one regular-rate penalty hour after supervisor approval.
                     </div>
                   </div>
 
