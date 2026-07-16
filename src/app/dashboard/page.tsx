@@ -4056,11 +4056,17 @@ export default function DashboardPage() {
     }
 
     if (employeeId === OPEN_ALS_SLOT_ID) {
-      return currentEmployee.scope === 'ALS';
+      return (
+        currentEmployee.role === 'Supervisor' ||
+        currentEmployee.scope === 'ALS'
+      );
     }
 
     if (employeeId === OPEN_BLS_SLOT_ID) {
-      return currentEmployee.scope === 'BLS';
+      return (
+        currentEmployee.role === 'Supervisor' ||
+        currentEmployee.scope === 'BLS'
+      );
     }
 
     return false;
