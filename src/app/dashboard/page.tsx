@@ -4012,9 +4012,23 @@ export default function DashboardPage() {
     return assignment.slots.filter((slot) => isOpenShiftSlot(slot.employeeId)).length;
   }
 
-  function isEligibleOpenShiftSlot(employeeId: string): boolean {
+  function isEligibleOpenShiftSlot(
+    assignment: DisplayAssignment,
+    employeeId: string,
+  ): boolean {
     if (!currentEmployee) {
       return false;
+    }
+
+    const isSupervisorAssignment =
+      assignment.key.includes('FIELD_SUP') ||
+      assignment.key.includes('ADMIN_SUP');
+
+    if (isSupervisorAssignment) {
+      return (
+        currentEmployee.role === 'Supervisor' &&
+        isOpenShiftSlot(employeeId)
+      );
     }
 
     if (employeeId === OPEN_ALS_SLOT_ID) {
@@ -4028,8 +4042,12 @@ export default function DashboardPage() {
     return false;
   }
 
-  function getEligibleOpenSlotCount(assignment: DisplayAssignment): number {
-    return assignment.slots.filter((slot) => isEligibleOpenShiftSlot(slot.employeeId)).length;
+  function getEligibleOpenSlotCount(
+    assignment: DisplayAssignment,
+  ): number {
+    return assignment.slots.filter((slot) =>
+      isEligibleOpenShiftSlot(assignment, slot.employeeId),
+    ).length;
   }
 
   function hasCurrentEmployeeRequestedShift(dateKey: string, shiftKey: string): boolean {
@@ -4422,7 +4440,13 @@ export default function DashboardPage() {
             const isOpenSlot = isOpenShiftSlot(slot.employeeId);
             const targetEmployee = employees.find((employee) => employee.id === slot.employeeId);
 
-            if (isOpenSlot && !isEligibleOpenShiftSlot(slot.employeeId)) {
+            if (
+              isOpenSlot &&
+              !isEligibleOpenShiftSlot(
+                assignment,
+                slot.employeeId,
+              )
+            ) {
               return null;
             }
 
@@ -4637,7 +4661,13 @@ export default function DashboardPage() {
                               const isOpenSlot = isOpenShiftSlot(slot.employeeId);
                               const isCurrentEmployee = slot.employeeId === currentEmployeeId;
 
-                              if (isOpenSlot && !isEligibleOpenShiftSlot(slot.employeeId)) {
+                              if (
+                                isOpenSlot &&
+                                !isEligibleOpenShiftSlot(
+                                  assignment,
+                                  slot.employeeId,
+                                )
+                              ) {
                                 return null;
                               }
 
