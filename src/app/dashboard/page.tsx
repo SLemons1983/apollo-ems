@@ -372,6 +372,7 @@ const APOLLO_MESSAGES_STORAGE_KEY = 'apollo-messages-v2';
 const CURRENT_SUPERVISOR_ID = 'supervisor-001';
 const OPEN_ALS_SLOT_ID = '__OPEN_ALS__';
 const OPEN_BLS_SLOT_ID = '__OPEN_BLS__';
+const OPEN_SUPERVISOR_SLOT_ID = '__OPEN_SUPERVISOR__';
 const SYSTEM_CONFIG_STORAGE_KEY = 'apollo-system-config-v1';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 
@@ -1287,12 +1288,23 @@ export default function DashboardPage() {
           rebuilt[dateKey] = createEmptyDaySchedule();
         }
 
+        const shiftKey = String(row.shift_key ?? '');
+        const isSupervisorOpenSlot =
+          row.is_open_slot &&
+          (
+            shiftKey === 'FIELD_SUP' ||
+            shiftKey === 'ADMIN_SUP' ||
+            shiftKey.includes('SUPERVISOR')
+          );
+
         const savedEmployeeId = row.is_open_slot
           ? row.open_slot_scope === 'ALS'
             ? OPEN_ALS_SLOT_ID
             : row.open_slot_scope === 'BLS'
               ? OPEN_BLS_SLOT_ID
-              : ''
+              : isSupervisorOpenSlot
+                ? OPEN_SUPERVISOR_SLOT_ID
+                : ''
           : row.employee_id ?? '';
 
         const slot: EmployeeSlot = {
@@ -3897,7 +3909,11 @@ export default function DashboardPage() {
   }
 
   function isOpenShiftSlot(employeeId: string): boolean {
-    return employeeId === OPEN_ALS_SLOT_ID || employeeId === OPEN_BLS_SLOT_ID;
+    return (
+      employeeId === OPEN_ALS_SLOT_ID ||
+      employeeId === OPEN_BLS_SLOT_ID ||
+      employeeId === OPEN_SUPERVISOR_SLOT_ID
+    );
   }
 
   function getEmployeeName(employeeId: string): string {
@@ -3907,6 +3923,10 @@ export default function DashboardPage() {
 
     if (employeeId === OPEN_BLS_SLOT_ID) {
       return 'Open BLS';
+    }
+
+    if (employeeId === OPEN_SUPERVISOR_SLOT_ID) {
+      return 'Open Supervisor';
     }
 
     return employees.find((employee) => employee.id === employeeId)?.name ?? 'Unassigned';
@@ -3919,6 +3939,10 @@ export default function DashboardPage() {
 
     if (employeeId === OPEN_BLS_SLOT_ID) {
       return 'border-red-200 bg-red-50 text-red-800';
+    }
+
+    if (employeeId === OPEN_SUPERVISOR_SLOT_ID) {
+      return 'border-amber-200 bg-amber-50 text-amber-800';
     }
 
     return '';
