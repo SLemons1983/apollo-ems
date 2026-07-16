@@ -3535,6 +3535,37 @@ export default function DashboardPage() {
     });
   }
 
+  function getPunchTimingNotice(
+    type: 'CLOCK_IN' | 'CLOCK_OUT',
+    punchTime: Date,
+    shiftInfo: ActiveShiftInfo,
+  ): string {
+    if (!shiftInfo.slot.employeeId) {
+      return '';
+    }
+
+    const scheduledRange = getShiftDateTimeRange(
+      shiftInfo.date,
+      shiftInfo.slot,
+    );
+
+    if (
+      type === 'CLOCK_IN' &&
+      punchTime.getTime() < scheduledRange.start.getTime()
+    ) {
+      return 'You clocked in before the scheduled start of your shift. Employees are not expected to begin work before their scheduled start time. If this early start was approved by the on-duty supervisor, please contact that supervisor so your scheduled start time can be adjusted.';
+    }
+
+    if (
+      type === 'CLOCK_OUT' &&
+      punchTime.getTime() > scheduledRange.end.getTime()
+    ) {
+      return 'You clocked out after your scheduled shift end. Please add an Employee Note explaining the reason for the late clock-out and include any associated EMS run numbers.';
+    }
+
+    return '';
+  }
+
   async function handlePunch(type: 'CLOCK_IN' | 'CLOCK_OUT') {
     const punchShiftContext =
       activeShift ??
@@ -3595,17 +3626,22 @@ export default function DashboardPage() {
         geofenceStatus: approved ? 'APPROVED' : 'OUTSIDE_GEOFENCE',
       };
 
-      if (!approved) {
-        setTimecardStatus(
-          `Punch recorded as outside geofence. Distance: ${Math.round(distanceFeet)} ft from ${punchShiftContext.locationLabel}.`,
-        );
-      } else {
-        setTimecardStatus(`${type === 'CLOCK_IN' ? 'Clock in' : 'Clock out'} recorded successfully.`);
-      }
+      const punchTime = new Date(punch.timestamp);
+      const timingNotice = getPunchTimingNotice(
+        type,
+        punchTime,
+        punchShiftContext,
+      );
+
+      const punchStatus = approved
+        ? `${type === 'CLOCK_IN' ? 'Clock in' : 'Clock out'} recorded successfully.`
+        : `Punch recorded as outside geofence. Distance: ${Math.round(distanceFeet)} ft from ${punchShiftContext.locationLabel}.`;
+
+      setTimecardStatus(
+        [punchStatus, timingNotice].filter(Boolean).join(' '),
+      );
 
       saveTimePunches([punch, ...timePunches]);
-
-      const punchTime = new Date(punch.timestamp);
       updateEditableRow(parseDateKey(punch.shiftDateKey), {
         shiftLabel: punch.shiftLabel,
         ...(type === 'CLOCK_IN'
@@ -3636,6 +3672,12 @@ export default function DashboardPage() {
       saveTimePunches([punch, ...timePunches]);
 
       const punchTime = new Date(punch.timestamp);
+      const timingNotice = getPunchTimingNotice(
+        type,
+        punchTime,
+        punchShiftContext,
+      );
+
       updateEditableRow(parseDateKey(punch.shiftDateKey), {
         shiftLabel: punch.shiftLabel,
         ...(type === 'CLOCK_IN'
@@ -3648,7 +3690,15 @@ export default function DashboardPage() {
               clockOutTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
             }),
       });
-      setTimecardStatus('Location was unavailable. Punch was recorded for supervisor review.');
+
+      setTimecardStatus(
+        [
+          'Location was unavailable. Punch was recorded for supervisor review.',
+          timingNotice,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
     } finally {
       setIsPunching(false);
     }
