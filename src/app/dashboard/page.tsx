@@ -70,6 +70,88 @@ type SupabaseEmployeeRow = {
   status: string | null;
 };
 
+type SmsCategoryPreferences = {
+  notify_announcements: boolean;
+  notify_messages: boolean;
+  notify_shift_requests: boolean;
+  notify_shift_trades: boolean;
+  notify_certifications: boolean;
+  notify_timecards: boolean;
+  notify_supervisor_messages: boolean;
+};
+
+type SmsCategoryKey = keyof SmsCategoryPreferences;
+
+type SmsPreferenceRow = SmsCategoryPreferences & {
+  employee_id: string;
+  employee_email: string;
+  phone_e164: string;
+  sms_enabled: boolean;
+  consented_at: string | null;
+  consent_version: string | null;
+  consent_source: string | null;
+  opted_out_at: string | null;
+  opt_out_source: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const SMS_CONSENT_VERSION = '2026-07-17';
+
+const DEFAULT_SMS_CATEGORY_PREFERENCES: SmsCategoryPreferences = {
+  notify_announcements: true,
+  notify_messages: true,
+  notify_shift_requests: true,
+  notify_shift_trades: true,
+  notify_certifications: true,
+  notify_timecards: true,
+  notify_supervisor_messages: true,
+};
+
+const SMS_NOTIFICATION_OPTIONS: Array<{
+  key: SmsCategoryKey;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: 'notify_announcements',
+    label: 'Company Announcements',
+    description: 'Notification when a new company announcement is posted.',
+  },
+  {
+    key: 'notify_messages',
+    label: 'Apollo Message Received',
+    description: 'Notification when a new ApolloEMS message is received.',
+  },
+  {
+    key: 'notify_shift_requests',
+    label: 'Shift Request Decisions',
+    description: 'Approval or denial notices for open-shift requests.',
+  },
+  {
+    key: 'notify_shift_trades',
+    label: 'Shift Trade Decisions',
+    description: 'Approval or denial notices for shift-trade requests.',
+  },
+  {
+    key: 'notify_certifications',
+    label: 'Certification Reminders',
+    description: 'Reminders when a certification is approaching expiration.',
+  },
+  {
+    key: 'notify_timecards',
+    label: 'Timecard Notifications',
+    description:
+      'Submission reminders, approvals, and notices that a timecard was returned for correction.',
+  },
+  {
+    key: 'notify_supervisor_messages',
+    label: 'Supervisor SMS Messages',
+    description:
+      'Operational SMS messages sent by a supervisor to selected employees or groups.',
+  },
+];
+
 type ShiftType = 'REGULAR' | 'SICK' | 'VACATION' | 'LEAVE' | 'TRAINING';
 
 type EmployeeSlot = {
@@ -639,6 +721,40 @@ function normalizeCertificationRecord(value: Partial<CertificationRecord> | unde
   };
 }
 
+function normalizeUsPhoneToE164(value: string): string | null {
+  const digits = value.replace(/\D/g, '');
+
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+
+  return null;
+}
+
+function formatConsentTimestamp(value: string | null): string {
+  if (!value) {
+    return '';
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+
+  return parsed.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function buildEmployeeName(profile: StoredEmployeeProfile): string {
   const first = (profile.firstName ?? '').trim();
   const last = (profile.lastName ?? '').trim();
@@ -1021,6 +1137,13 @@ export default function DashboardPage() {
   const [selectedVacationShift, setSelectedVacationShift] = useState<SelectedVacationShift | null>(null);
   const [vacationReason, setVacationReason] = useState('');
   const [vacationRequestStatus, setVacationRequestStatus] = useState('');
+  const [smsPreferenceRow, setSmsPreferenceRow] = useState<SmsPreferenceRow | null>(null);
+  const [smsCategoryPreferences, setSmsCategoryPreferences] =
+    useState<SmsCategoryPreferences>({ ...DEFAULT_SMS_CATEGORY_PREFERENCES });
+  const [smsConsentAcknowledged, setSmsConsentAcknowledged] = useState(false);
+  const [smsPreferencesLoading, setSmsPreferencesLoading] = useState(false);
+  const [smsPreferencesSaving, setSmsPreferencesSaving] = useState(false);
+  const [smsPreferencesStatus, setSmsPreferencesStatus] = useState('');
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
   const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
@@ -1036,6 +1159,213 @@ export default function DashboardPage() {
   }, [authEmail, employees]);
 
   const currentEmployeeId = currentEmployee?.id ?? '';
+  const currentEmployeeEmail = currentEmployee?.email.trim().toLowerCase() ?? '';
+  const currentEmployeePhoneE164 = normalizeUsPhoneToE164(currentEmployee?.phone ?? '');
+  const smsPhoneMatchesProfile =
+    Boolean(currentEmployeePhoneE164) &&
+    smsPreferenceRow?.phone_e164 === currentEmployeePhoneE164;
+  const smsNotificationsEnabled =
+    Boolean(smsPreferenceRow?.sms_enabled) && smsPhoneMatchesProfile;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!currentEmployeeId || !currentEmployeeEmail) {
+      setSmsPreferenceRow(null);
+      setSmsCategoryPreferences({ ...DEFAULT_SMS_CATEGORY_PREFERENCES });
+      setSmsPreferencesStatus('');
+      setSmsPreferencesLoading(false);
+      return;
+    }
+
+    async function loadSmsPreferences() {
+      setSmsPreferencesLoading(true);
+      setSmsPreferencesStatus('');
+
+      const { data, error } = await supabase
+        .from('employee_sms_preferences')
+        .select('*')
+        .eq('employee_id', currentEmployeeId)
+        .maybeSingle();
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error) {
+        console.error('Failed to load SMS preferences:', error);
+        setSmsPreferenceRow(null);
+        setSmsCategoryPreferences({ ...DEFAULT_SMS_CATEGORY_PREFERENCES });
+        setSmsPreferencesStatus('Unable to load SMS notification settings.');
+        setSmsPreferencesLoading(false);
+        return;
+      }
+
+      const preference = (data as SmsPreferenceRow | null) ?? null;
+      setSmsPreferenceRow(preference);
+
+      if (preference) {
+        setSmsCategoryPreferences({
+          notify_announcements: preference.notify_announcements,
+          notify_messages: preference.notify_messages,
+          notify_shift_requests: preference.notify_shift_requests,
+          notify_shift_trades: preference.notify_shift_trades,
+          notify_certifications: preference.notify_certifications,
+          notify_timecards: preference.notify_timecards,
+          notify_supervisor_messages: preference.notify_supervisor_messages,
+        });
+      } else {
+        setSmsCategoryPreferences({ ...DEFAULT_SMS_CATEGORY_PREFERENCES });
+      }
+
+      setSmsPreferencesLoading(false);
+    }
+
+    void loadSmsPreferences();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentEmployeeEmail, currentEmployeeId]);
+
+  function handleSmsCategoryChange(
+    key: SmsCategoryKey,
+    enabled: boolean,
+  ) {
+    setSmsCategoryPreferences((current) => ({
+      ...current,
+      [key]: enabled,
+    }));
+    setSmsPreferencesStatus('');
+  }
+
+  async function enableSmsNotifications() {
+    if (!currentEmployee || !currentEmployeeId || !currentEmployeeEmail) {
+      setSmsPreferencesStatus('Unable to identify the signed-in employee.');
+      return;
+    }
+
+    if (!currentEmployeePhoneE164) {
+      setSmsPreferencesStatus(
+        'A valid 10-digit US mobile number must be added to your employee profile before SMS notifications can be enabled.',
+      );
+      return;
+    }
+
+    if (!smsConsentAcknowledged) {
+      setSmsPreferencesStatus(
+        'Review the disclosure and check the consent box before enabling SMS notifications.',
+      );
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setSmsPreferencesSaving(true);
+    setSmsPreferencesStatus('Saving SMS consent...');
+
+    const payload = {
+      employee_id: currentEmployeeId,
+      employee_email: currentEmployeeEmail,
+      phone_e164: currentEmployeePhoneE164,
+      sms_enabled: true,
+      ...smsCategoryPreferences,
+      consented_at: now,
+      consent_version: SMS_CONSENT_VERSION,
+      consent_source: 'dashboard',
+      opted_out_at: null,
+      opt_out_source: null,
+    };
+
+    const { data, error } = await supabase
+      .from('employee_sms_preferences')
+      .upsert(payload, { onConflict: 'employee_id' })
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to enable SMS notifications:', error);
+      setSmsPreferencesStatus(
+        'Unable to enable SMS notifications. Please try again.',
+      );
+      setSmsPreferencesSaving(false);
+      return;
+    }
+
+    setSmsPreferenceRow(data as SmsPreferenceRow);
+    setSmsConsentAcknowledged(false);
+    setSmsPreferencesStatus('SMS notifications are enabled.');
+    setSmsPreferencesSaving(false);
+  }
+
+  async function saveSmsCategoryPreferences() {
+    if (!smsPreferenceRow || !currentEmployeeId) {
+      setSmsPreferencesStatus(
+        'Enable SMS notifications before saving notification categories.',
+      );
+      return;
+    }
+
+    setSmsPreferencesSaving(true);
+    setSmsPreferencesStatus('Saving notification preferences...');
+
+    const { data, error } = await supabase
+      .from('employee_sms_preferences')
+      .update(smsCategoryPreferences)
+      .eq('employee_id', currentEmployeeId)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to save SMS category preferences:', error);
+      setSmsPreferencesStatus(
+        'Unable to save notification preferences. Please try again.',
+      );
+      setSmsPreferencesSaving(false);
+      return;
+    }
+
+    setSmsPreferenceRow(data as SmsPreferenceRow);
+    setSmsPreferencesStatus('SMS notification preferences saved.');
+    setSmsPreferencesSaving(false);
+  }
+
+  async function disableSmsNotifications() {
+    if (!smsPreferenceRow || !currentEmployeeId) {
+      setSmsPreferencesStatus('SMS notifications are not currently enabled.');
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    setSmsPreferencesSaving(true);
+    setSmsPreferencesStatus('Disabling SMS notifications...');
+
+    const { data, error } = await supabase
+      .from('employee_sms_preferences')
+      .update({
+        sms_enabled: false,
+        opted_out_at: now,
+        opt_out_source: 'dashboard',
+      })
+      .eq('employee_id', currentEmployeeId)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Failed to disable SMS notifications:', error);
+      setSmsPreferencesStatus(
+        'Unable to disable SMS notifications. Please try again.',
+      );
+      setSmsPreferencesSaving(false);
+      return;
+    }
+
+    setSmsPreferenceRow(data as SmsPreferenceRow);
+    setSmsConsentAcknowledged(false);
+    setSmsPreferencesStatus('SMS notifications are disabled.');
+    setSmsPreferencesSaving(false);
+  }
 
   async function handleIncidentReportSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -5957,6 +6287,259 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {renderTile(
+            'sms-notifications',
+            'SMS Notifications',
+            smsNotificationsEnabled
+              ? 'SMS notifications are enabled for your mobile number.'
+              : 'Choose which ApolloEMS operational updates you would like to receive by text.',
+            <div className="space-y-5">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <div className="font-bold">SMS enrollment is now available</div>
+                <p className="mt-1 leading-6">
+                  ApolloEMS is completing carrier activation. You may save your
+                  consent and preferences now. SMS delivery will begin after
+                  carrier registration is approved and the ApolloEMS sending
+                  number is activated.
+                </p>
+              </div>
+
+              {smsPreferencesLoading ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-600">
+                  Loading SMS notification settings...
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Mobile number
+                      </div>
+                      <div className="mt-2 text-base font-bold text-slate-900">
+                        {currentEmployee?.phone || 'No mobile number on file'}
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Mobile numbers are maintained in your employee profile.
+                        Contact a supervisor if this number needs to be changed.
+                      </p>
+                    </div>
+
+                    <div
+                      className={`rounded-xl border p-4 ${
+                        smsNotificationsEnabled
+                          ? 'border-emerald-300 bg-emerald-50'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Current status
+                      </div>
+                      <div
+                        className={`mt-2 text-base font-bold ${
+                          smsNotificationsEnabled
+                            ? 'text-emerald-800'
+                            : 'text-slate-700'
+                        }`}
+                      >
+                        {smsNotificationsEnabled ? 'Enabled' : 'Not enabled'}
+                      </div>
+                      {smsNotificationsEnabled && smsPreferenceRow?.consented_at && (
+                        <p className="mt-1 text-xs leading-5 text-emerald-700">
+                          Consent recorded{' '}
+                          {formatConsentTimestamp(smsPreferenceRow.consented_at)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {!currentEmployeePhoneE164 && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                      <div className="font-bold">Valid mobile number required</div>
+                      <p className="mt-1 leading-6">
+                        A valid 10-digit US mobile number must be added to your
+                        employee profile before SMS notifications can be enabled.
+                      </p>
+                    </div>
+                  )}
+
+                  {Boolean(
+                    smsPreferenceRow?.sms_enabled &&
+                      currentEmployeePhoneE164 &&
+                      !smsPhoneMatchesProfile,
+                  ) && (
+                    <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+                      <div className="font-bold">Mobile number changed</div>
+                      <p className="mt-1 leading-6">
+                        Your current employee-profile number does not match the
+                        number previously authorized for SMS. Review the
+                        disclosure and provide consent again to authorize the
+                        current number.
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      Notification categories
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Select the operational notifications you want ApolloEMS to
+                      send by SMS.
+                    </p>
+
+                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                      {SMS_NOTIFICATION_OPTIONS.map((option) => (
+                        <label
+                          key={option.key}
+                          className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:bg-blue-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={smsCategoryPreferences[option.key]}
+                            onChange={(event) =>
+                              handleSmsCategoryChange(
+                                option.key,
+                                event.target.checked,
+                              )
+                            }
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                          />
+                          <span>
+                            <span className="block text-sm font-bold text-slate-900">
+                              {option.label}
+                            </span>
+                            <span className="mt-1 block text-xs leading-5 text-slate-500">
+                              {option.description}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {smsNotificationsEnabled ? (
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={saveSmsCategoryPreferences}
+                          disabled={smsPreferencesSaving}
+                          className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          {smsPreferencesSaving
+                            ? 'Saving...'
+                            : 'Save Notification Preferences'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={disableSmsNotifications}
+                          disabled={smsPreferencesSaving}
+                          className="rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Disable SMS Notifications
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-slate-300 bg-slate-50 p-5">
+                      <div className="text-sm font-bold text-slate-900">
+                        SMS consent disclosure
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        By checking the box below and selecting Enable SMS
+                        Notifications, you agree to receive recurring
+                        operational text messages from ApolloEMS at the mobile
+                        number shown above. Messages may include company
+                        announcements, Apollo message alerts, shift and
+                        shift-trade decisions, certification reminders,
+                        timecard notifications, and supervisor operational
+                        messages. Message frequency varies. Message and data
+                        rates may apply. Reply STOP to opt out or HELP for help.
+                        Consent is voluntary and is not a condition of using
+                        ApolloEMS or employment.
+                      </p>
+
+                      <p className="mt-3 text-sm leading-6 text-slate-700">
+                        Review the{' '}
+                        <a
+                          href="/sms-terms"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-blue-700 underline underline-offset-2"
+                        >
+                          SMS Terms and Conditions
+                        </a>{' '}
+                        and{' '}
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-bold text-blue-700 underline underline-offset-2"
+                        >
+                          Privacy Policy
+                        </a>
+                        .
+                      </p>
+
+                      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-300 bg-white p-4">
+                        <input
+                          type="checkbox"
+                          checked={smsConsentAcknowledged}
+                          onChange={(event) => {
+                            setSmsConsentAcknowledged(event.target.checked);
+                            setSmsPreferencesStatus('');
+                          }}
+                          className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                        />
+                        <span className="text-sm font-semibold leading-6 text-slate-800">
+                          I confirm that the mobile number shown above belongs
+                          to me or that I am authorized to receive messages at
+                          that number, and I consent to receive the selected
+                          ApolloEMS SMS notifications.
+                        </span>
+                      </label>
+
+                      <button
+                        type="button"
+                        onClick={enableSmsNotifications}
+                        disabled={
+                          smsPreferencesSaving ||
+                          !currentEmployeePhoneE164 ||
+                          !smsConsentAcknowledged
+                        }
+                        className="mt-4 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      >
+                        {smsPreferencesSaving
+                          ? 'Saving Consent...'
+                          : smsPreferenceRow?.sms_enabled &&
+                              !smsPhoneMatchesProfile
+                            ? 'Authorize Current Number'
+                            : 'Enable SMS Notifications'}
+                      </button>
+                    </div>
+                  )}
+
+                  {smsPreferencesStatus && (
+                    <div
+                      className={`rounded-xl border p-4 text-sm font-semibold ${
+                        smsPreferencesStatus.includes('Unable') ||
+                        smsPreferencesStatus.includes('required')
+                          ? 'border-red-300 bg-red-50 text-red-800'
+                          : smsPreferencesStatus.includes('enabled') ||
+                              smsPreferencesStatus.includes('saved') ||
+                              smsPreferencesStatus.includes('disabled')
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                            : 'border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {smsPreferencesStatus}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>,
           )}
 
           {renderTile(
