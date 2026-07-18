@@ -6,10 +6,6 @@ export const metadata: Metadata = {
   title: 'SMS Opt-In Process | ApolloEMS',
   description:
     'Documentation of the affirmative employee opt-in process for ApolloEMS operational SMS notifications.',
-  robots: {
-    index: false,
-    follow: false,
-  },
 };
 
 export default function SmsOptInProcessPage() {
@@ -76,6 +72,13 @@ export default function SmsOptInProcessPage() {
           Notifications button remains disabled until the employee
           affirmatively checks the consent box. Consent is voluntary and is not
           a condition of using ApolloEMS or employment.
+        </p>
+        <p>
+          <strong>
+            ApolloEMS does not share, sell, rent, or otherwise provide mobile
+            phone numbers or messaging consent information to any third parties
+            or affiliates for marketing or promotional purposes.
+          </strong>
         </p>
 
         <figure className="mt-5 overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">

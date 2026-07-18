@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       title="Privacy Policy"
       description="This policy explains how ApolloEMS handles account, workforce, operational, and SMS notification information."
     >
-      <p className="policy-date">Last updated: July 17, 2026</p>
+      <p className="policy-date">Last updated: July 18, 2026</p>
 
       <section>
         <h2>1. About ApolloEMS</h2>
@@ -99,16 +99,23 @@ export default function PrivacyPage() {
         </p>
         <p>
           <strong>
-            ApolloEMS does not sell, rent, or share mobile phone numbers with
-            third parties or affiliates for marketing or promotional purposes.
+            ApolloEMS does not share, sell, rent, or otherwise provide mobile
+            phone numbers or messaging consent information to any third parties
+            or affiliates for marketing or promotional purposes.
           </strong>
         </p>
         <p>
-          Text-message originator opt-in data and consent will not be shared
-          with third parties, except with service providers that support
-          delivery of the requested messages or when disclosure is required by
-          law. Those providers may process information only as necessary to
-          provide their services to ApolloEMS.
+          All information-sharing categories described in this Privacy Policy
+          exclude text-messaging originator opt-in data and consent. This
+          information will not be shared with any third parties or affiliates
+          for marketing or promotional purposes.
+        </p>
+        <p>
+          ApolloEMS SMS messages may be recurring. Message frequency varies
+          based on the notifications selected by the user and operational
+          activity. Message and data rates may apply. Recipients may reply{' '}
+          <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for
+          assistance.
         </p>
       </section>
 
@@ -119,14 +126,18 @@ export default function PrivacyPage() {
           database services, authentication, email delivery, SMS delivery,
           storage, monitoring, and security. These providers receive only the
           information reasonably necessary to perform their services and are
-          not authorized by ApolloEMS to use mobile information for their own
-          marketing.
+          prohibited from using information received from ApolloEMS for their
+          own marketing or promotional purposes. The SMS-specific restrictions
+          in Section 4 apply regardless of anything else stated in this policy.
         </p>
       </section>
 
       <section>
         <h2>6. Information sharing</h2>
-        <p>ApolloEMS may share information:</p>
+        <p>
+          Subject to the SMS-specific restrictions in Section 4, ApolloEMS may
+          share non-SMS information:
+        </p>
         <ul>
           <li>
             With the authorized organization that manages the user&apos;s

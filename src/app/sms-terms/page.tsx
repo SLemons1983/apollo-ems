@@ -14,7 +14,7 @@ export default function SmsTermsPage() {
       title="SMS Terms and Conditions"
       description="These terms govern optional operational text messages sent by ApolloEMS to authorized users."
     >
-      <p className="policy-date">Last updated: July 17, 2026</p>
+      <p className="policy-date">Last updated: July 18, 2026</p>
 
       <section>
         <h2>1. Program description</h2>
@@ -118,10 +118,17 @@ export default function SmsTermsPage() {
       <section>
         <h2>7. Privacy</h2>
         <p>
-          ApolloEMS does not sell, rent, or share mobile phone numbers with
-          third parties or affiliates for marketing or promotional purposes.
-          SMS opt-in data and consent are not shared except with providers
-          supporting message delivery or when required by law.
+          <strong>
+            ApolloEMS does not share, sell, rent, or otherwise provide mobile
+            phone numbers or messaging consent information to any third parties
+            or affiliates for marketing or promotional purposes.
+          </strong>
+        </p>
+        <p>
+          All information-sharing categories described in the ApolloEMS Privacy
+          Policy exclude text-messaging originator opt-in data and consent. This
+          information will not be shared with any third parties or affiliates
+          for marketing or promotional purposes.
         </p>
         <p>
           Additional information is available in the{' '}
