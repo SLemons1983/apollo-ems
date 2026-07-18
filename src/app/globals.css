@@ -24,3 +24,62 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ApolloEMS public legal pages */
+.legal-content {
+  color: #334155;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.legal-content .policy-date {
+  margin: 0 0 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 1.25rem;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.legal-content section + section {
+  margin-top: 2rem;
+}
+
+.legal-content h2 {
+  margin-bottom: 0.75rem;
+  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.4;
+}
+
+.legal-content p + p {
+  margin-top: 0.9rem;
+}
+
+.legal-content ul {
+  margin: 0.9rem 0 0;
+  padding-left: 1.4rem;
+  list-style: disc;
+}
+
+.legal-content li + li {
+  margin-top: 0.5rem;
+}
+
+.legal-content strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.legal-content a {
+  color: #1d4ed8;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-content a:hover {
+  color: #1e3a8a;
+}
