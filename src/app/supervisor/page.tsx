@@ -3024,7 +3024,7 @@ export default function SupervisorPage() {
               }`}
             >
               {timecard.status === 'PENDING_SUPERVISOR_REVIEW'
-                ? 'Pending Review ({pendingTimecards.length})'
+                ? 'Pending Review'
                 : timecard.status === 'APPROVED'
                   ? 'Approved'
                   : 'Returned'}
@@ -6011,7 +6011,7 @@ export default function SupervisorPage() {
                   className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
                 >
                   <span className="text-sm font-semibold text-slate-900">
-                    Pending Review
+                    Pending Review ({pendingTimecards.length})
                   </span>
 
                   <span className="text-xs font-bold text-slate-500">
