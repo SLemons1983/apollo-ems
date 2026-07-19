@@ -1103,6 +1103,8 @@ export default function DashboardPage() {
   const [hideReadMessages, setHideReadMessages] = useState(false);
   const [messageSearch, setMessageSearch] = useState('');
   const [timecardStatus, setTimecardStatus] = useState('');
+  const [showTimecardSubmitConfirmation, setShowTimecardSubmitConfirmation] = useState(false);
+  const [isSubmittingTimecard, setIsSubmittingTimecard] = useState(false);
   const [timecardWarningDialog, setTimecardWarningDialog] =
     useState<TimecardWarningDialog | null>(null);
   const [
@@ -3870,9 +3872,7 @@ export default function DashboardPage() {
     setTimecardStatus('Timecard correction request removed.');
   }
 
-  function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
-    setSubmittedTimecards(nextTimecards);
-
+  async function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
     const payload = nextTimecards.map((timecard) => ({
       id: timecard.id,
       employee_id: timecard.employeeId,
@@ -3894,30 +3894,30 @@ export default function DashboardPage() {
       updated_at: new Date().toISOString(),
     }));
 
-    supabase
+    const { error } = await supabase
       .from('submitted_timecards')
-      .upsert(payload, { onConflict: 'id' })
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to save submitted timecards:', error);
-          window.alert(`Submitted timecard save failed: ${error.message}`);
-        }
-      });
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      throw error;
+    }
+
+    setSubmittedTimecards(nextTimecards);
   }
 
-  function submitTimecardForReview() {
+  async function submitTimecardForReview() {
     if (submittedTimecard && !returnedTimecard) {
+      setShowTimecardSubmitConfirmation(false);
       setTimecardStatus('This timecard has already been submitted for supervisor review.');
       return;
     }
 
-    const confirmed = window.confirm(
-      'I certify that this timecard is true and accurate. I understand that falsification may result in disciplinary action, up to and including termination. Submit this timecard for supervisor review?',
-    );
-
-    if (!confirmed) {
+    if (isSubmittingTimecard) {
       return;
     }
+
+    setIsSubmittingTimecard(true);
+    setTimecardStatus('');
 
     const timecard: SubmittedTimecard = {
       id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${Date.now()}`,
@@ -3973,13 +3973,29 @@ export default function DashboardPage() {
           }
         : null;
 
-    saveSubmittedTimecards([timecard, ...submittedTimecards.filter((item) => item.id !== returnedForThisPeriod?.id)]);
+    const nextTimecards = [
+      timecard,
+      ...submittedTimecards.filter((item) => item.id !== returnedForThisPeriod?.id),
+    ];
 
-    if (supervisorMessage) {
-      saveApolloMessages([supervisorMessage, ...apolloMessages]);
+    try {
+      await saveSubmittedTimecards(nextTimecards);
+
+      if (supervisorMessage) {
+        saveApolloMessages([supervisorMessage, ...apolloMessages]);
+      }
+
+      setShowTimecardSubmitConfirmation(false);
+      setTimecardStatus('Timecard submitted for supervisor review.');
+    } catch (error) {
+      console.error('Failed to submit timecard:', error);
+      const message = error instanceof Error ? error.message : 'Unknown database error';
+      setTimecardStatus(
+        `Action Required: Your timecard was not submitted. Please try again. ${message}`,
+      );
+    } finally {
+      setIsSubmittingTimecard(false);
     }
-
-    setTimecardStatus('Timecard submitted for supervisor review.');
   }
 
   function getCorrectionTypeLabel(type: TimecardCorrectionRequest['correctionType']): string {
@@ -5966,13 +5982,67 @@ export default function DashboardPage() {
 
                     <button
                       type="button"
-                      disabled={Boolean(submittedTimecard && !returnedTimecard)}
-                      onClick={submitTimecardForReview}
+                      disabled={Boolean(submittedTimecard && !returnedTimecard) || isSubmittingTimecard}
+                      onClick={() => {
+                        setTimecardStatus('');
+                        setShowTimecardSubmitConfirmation(true);
+                      }}
                       className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                     >
-                      {returnedTimecard ? 'Resubmit Timecard' : submittedTimecard ? 'Submitted' : 'Approve & Submit'}
+                      {isSubmittingTimecard
+                        ? 'Submitting...'
+                        : returnedTimecard
+                          ? 'Resubmit Timecard'
+                          : submittedTimecard
+                            ? 'Submitted'
+                            : 'Approve & Submit'}
                     </button>
                   </div>
+
+                  {showTimecardSubmitConfirmation && (
+                    <div
+                      className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-4"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="timecard-submit-title"
+                    >
+                      <div className="w-full max-w-lg rounded-2xl border border-slate-300 bg-white p-6 shadow-2xl">
+                        <h3 id="timecard-submit-title" className="text-lg font-bold text-slate-950">
+                          Confirm Timecard Submission
+                        </h3>
+
+                        <p className="mt-3 text-sm leading-6 text-slate-700">
+                          I certify that this timecard is true and accurate. I understand that
+                          falsification may result in disciplinary action, up to and including
+                          termination.
+                        </p>
+
+                        <p className="mt-3 text-sm font-semibold text-slate-900">
+                          Submit this timecard for supervisor review?
+                        </p>
+
+                        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                          <button
+                            type="button"
+                            disabled={isSubmittingTimecard}
+                            onClick={() => setShowTimecardSubmitConfirmation(false)}
+                            className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={isSubmittingTimecard}
+                            onClick={() => void submitTimecardForReview()}
+                            className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                          >
+                            {isSubmittingTimecard ? 'Submitting...' : 'Confirm & Submit'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

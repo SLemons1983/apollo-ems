@@ -800,16 +800,38 @@ export default function SupervisorPage() {
           }
         });
 
-      supabase
-        .from('schedule_assignments')
-        .select('date_key,employee_id,is_open_slot,shift_label')
-        .then(({ data, error }) => {
+      void (async () => {
+        const assignments: any[] = [];
+        const assignmentPageSize = 1000;
+        let assignmentPageStart = 0;
+
+        while (true) {
+          const { data, error } = await supabase
+            .from('schedule_assignments')
+            .select('date_key,employee_id,is_open_slot,shift_label')
+            .order('date_key', { ascending: true })
+            .order('employee_id', { ascending: true })
+            .range(
+              assignmentPageStart,
+              assignmentPageStart + assignmentPageSize - 1,
+            );
+
           if (error) {
             console.error('Failed to load schedule assignments:', error);
-          } else {
-            setScheduleAssignments(data ?? []);
+            return;
           }
-        });
+
+          assignments.push(...(data ?? []));
+
+          if (!data || data.length < assignmentPageSize) {
+            break;
+          }
+
+          assignmentPageStart += assignmentPageSize;
+        }
+
+        setScheduleAssignments(assignments);
+      })();
 
       supabase
         .from('payroll_submissions')
