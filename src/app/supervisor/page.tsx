@@ -675,6 +675,10 @@ export default function SupervisorPage() {
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [returnComments, setReturnComments] = useState<Record<string, string>>({});
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
+  const [submittedTimecardsLoaded, setSubmittedTimecardsLoaded] = useState(false);
+  const [scheduleAssignmentsLoaded, setScheduleAssignmentsLoaded] = useState(false);
+  const [employeesLoaded, setEmployeesLoaded] = useState(false);
+  const [timecardReviewPeriodInitialized, setTimecardReviewPeriodInitialized] = useState(false);
   const [payrollSubmission, setPayrollSubmission] = useState<{
     submittedBy: string;
     submittedAt: string;
@@ -703,6 +707,74 @@ export default function SupervisorPage() {
   const selectedPayPeriod = useMemo(() => {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
   }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
+
+  useEffect(() => {
+    if (
+      timecardReviewPeriodInitialized ||
+      !submittedTimecardsLoaded ||
+      !scheduleAssignmentsLoaded ||
+      !employeesLoaded
+    ) {
+      return;
+    }
+
+    const previousPayPeriod = [...payPeriodOptions]
+      .filter((option) => option.end < currentPayPeriod.start)
+      .sort((a, b) => b.end.getTime() - a.end.getTime())[0];
+
+    if (!previousPayPeriod) {
+      setSelectedPayPeriodKey(currentPayPeriod.key);
+      setTimecardReviewPeriodInitialized(true);
+      return;
+    }
+
+    const previousStartKey = makeDateInputValue(previousPayPeriod.start);
+    const previousEndKey = makeDateInputValue(previousPayPeriod.end);
+
+    const scheduledEmployeeIds = new Set(
+      scheduleAssignments
+        .filter(
+          (row) =>
+            row.employee_id &&
+            !row.is_open_slot &&
+            row.date_key >= previousStartKey &&
+            row.date_key <= previousEndKey,
+        )
+        .map((row) => row.employee_id as string),
+    );
+
+    const approvedEmployeeIds = new Set(
+      submittedTimecards
+        .filter(
+          (timecard) =>
+            timecard.payPeriodKey === previousPayPeriod.key &&
+            timecard.status === 'APPROVED',
+        )
+        .map((timecard) => timecard.employeeId),
+    );
+
+    const previousPeriodHasUnresolvedTimecards =
+      scheduledEmployeeIds.size > 0 &&
+      Array.from(scheduledEmployeeIds).some(
+        (employeeId) => !approvedEmployeeIds.has(employeeId),
+      );
+
+    setSelectedPayPeriodKey(
+      previousPeriodHasUnresolvedTimecards
+        ? previousPayPeriod.key
+        : currentPayPeriod.key,
+    );
+    setTimecardReviewPeriodInitialized(true);
+  }, [
+    currentPayPeriod,
+    employeesLoaded,
+    payPeriodOptions,
+    scheduleAssignments,
+    scheduleAssignmentsLoaded,
+    submittedTimecards,
+    submittedTimecardsLoaded,
+    timecardReviewPeriodInitialized,
+  ]);
 
   const payrollLocked = payrollSubmission?.payPeriodKey === selectedPayPeriod.key;
 
@@ -797,6 +869,7 @@ export default function SupervisorPage() {
                 reviewedBy: row.reviewed_by ?? undefined,
               })),
             );
+            setSubmittedTimecardsLoaded(true);
           }
         });
 
@@ -831,6 +904,7 @@ export default function SupervisorPage() {
         }
 
         setScheduleAssignments(assignments);
+        setScheduleAssignmentsLoaded(true);
       })();
 
       supabase
@@ -966,13 +1040,13 @@ export default function SupervisorPage() {
       loadEmployeesFromSupabase()
         .then((loadedEmployees) => {
           setEmployees(loadedEmployees);
+          setEmployeesLoaded(true);
         })
         .catch((employeeError) => {
           console.error('Failed to load employees from Supabase:', employeeError);
           setEmployees(loadEmployeesFromProfiles());
+          setEmployeesLoaded(true);
         });
-
-      setSelectedPayPeriodKey(currentPayPeriod.key);
     } catch (error) {
       console.error('Failed to load supervisor data:', error);
     }
@@ -5620,7 +5694,10 @@ export default function SupervisorPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={selectedPayPeriod.key}
-                    onChange={(event) => setSelectedPayPeriodKey(event.target.value)}
+                    onChange={(event) => {
+                      setTimecardReviewPeriodInitialized(true);
+                      setSelectedPayPeriodKey(event.target.value);
+                    }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
                   >
                     {payPeriodOptions.map((option) => (
@@ -5632,7 +5709,10 @@ export default function SupervisorPage() {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedPayPeriodKey(currentPayPeriod.key)}
+                    onClick={() => {
+                      setTimecardReviewPeriodInitialized(true);
+                      setSelectedPayPeriodKey(currentPayPeriod.key);
+                    }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                   >
                     Current Pay Period
