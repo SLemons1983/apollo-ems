@@ -2780,13 +2780,6 @@ export default function SchedulePage() {
     );
 
     if (!showDetails) {
-      const collapsedName =
-        slot.employeeId === OPEN_ALS_SLOT_ID
-          ? 'Open ALS'
-          : slot.employeeId === OPEN_BLS_SLOT_ID
-            ? 'Open BLS'
-            : selectedEmployee?.name || 'Open';
-
       const isOpenAls = slot.employeeId === OPEN_ALS_SLOT_ID;
       const isOpenBls = slot.employeeId === OPEN_BLS_SLOT_ID;
       const isSpecialShiftType =
@@ -2797,6 +2790,38 @@ export default function SchedulePage() {
       const collapsedHours = slot.employeeId
         ? formatCollapsedShiftHours(slot.startTime, slot.endTime)
         : '';
+
+      const handleCollapsedEmployeeChange = async (
+        event: React.ChangeEvent<HTMLSelectElement>,
+      ) => {
+        event.stopPropagation();
+
+        if (isSavingScheduleRef.current) {
+          return;
+        }
+
+        const previousEmployeeId = slot.employeeId;
+        const nextEmployeeId = event.target.value;
+
+        if (nextEmployeeId === previousEmployeeId) {
+          return;
+        }
+
+        onChange('employeeId', nextEmployeeId);
+
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, 0);
+        });
+
+        const saved = await saveScheduleToSupabase();
+
+        if (!saved) {
+          onChange('employeeId', previousEmployeeId);
+          setSaveStatus(
+            'Action Required — assignment was restored because the schedule could not be saved.',
+          );
+        }
+      };
 
       return (
         <div
@@ -2811,20 +2836,58 @@ export default function SchedulePage() {
           }`}
         >
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div
-                className={`truncate text-sm font-semibold ${
+            <div
+              className="min-w-0 flex-1"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <label className="sr-only">
+                Change {slotLabel} assignment
+              </label>
+
+              <select
+                value={slot.employeeId}
+                onChange={(event) => void handleCollapsedEmployeeChange(event)}
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                disabled={saveStatus.startsWith('Saving')}
+                aria-label={`Change ${slotLabel} assignment`}
+                title={`Change ${slotLabel} assignment`}
+                className={`w-full min-w-0 cursor-pointer truncate rounded-lg border px-2 py-1.5 text-sm font-semibold outline-none transition focus:ring-2 disabled:cursor-wait disabled:opacity-70 ${
                   isOpenAls
-                    ? 'text-blue-900'
+                    ? 'border-blue-400 bg-blue-50 text-blue-900 focus:border-blue-600 focus:ring-blue-200'
                     : isOpenBls
-                      ? 'text-red-900'
+                      ? 'border-red-400 bg-red-50 text-red-900 focus:border-red-600 focus:ring-red-200'
                       : isSpecialShiftType
-                        ? 'text-yellow-900'
-                        : 'text-slate-800'
+                        ? 'border-yellow-400 bg-yellow-50 text-yellow-900 focus:border-yellow-600 focus:ring-yellow-200'
+                        : 'border-slate-300 bg-white text-slate-800 focus:border-slate-500 focus:ring-slate-200'
                 }`}
               >
-                {collapsedName}
-              </div>
+                <option value="">Open</option>
+                <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
+                <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
+
+                {eligibleEmployees.map((employee) => {
+                  const eligibility =
+                    eligibilityMap[employee.id] ?? {
+                      eligible: true,
+                      reason: '',
+                    };
+
+                  return (
+                    <option
+                      key={employee.id}
+                      value={employee.id}
+                      disabled={
+                        !eligibility.eligible &&
+                        slot.employeeId !== employee.id
+                      }
+                    >
+                      {employee.name}
+                    </option>
+                  );
+                })}
+              </select>
 
               {shiftTypeLabel && (
                 <div
@@ -2846,6 +2909,7 @@ export default function SchedulePage() {
         </div>
       );
     }
+
 
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-3">
