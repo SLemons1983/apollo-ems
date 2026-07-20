@@ -1346,6 +1346,7 @@ export default function SchedulePage() {
   const [reviewedDecisionSignature, setReviewedDecisionSignature] = useState('');
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
   const dirtyDatesRef = useRef<Set<string>>(new Set());
+  const isSavingScheduleRef = useRef(false);
 
   function markUnsavedChanges(dateKey?: string) {
     if (dateKey) {
@@ -1676,10 +1677,16 @@ export default function SchedulePage() {
     };
   }
 
-  async function saveScheduleToSupabase() {
+  async function saveScheduleToSupabase(): Promise<boolean> {
     if (!mounted) {
-      return;
+      return false;
     }
+
+    if (isSavingScheduleRef.current) {
+      return false;
+    }
+
+    isSavingScheduleRef.current = true;
 
     const saveStartedAt = Date.now();
     setSaveStatus('Saving schedule changes...');
@@ -1849,10 +1856,14 @@ export default function SchedulePage() {
       const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
       console.log(`Apollo schedule save completed in ${saveSeconds}s.`);
       setSaveStatus(`Schedule saved at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} (${saveSeconds}s).`);
+      return true;
     } catch (error) {
       console.error('Supabase schedule save failed:', error);
-      setSaveStatus('Schedule save failed. Check console and try again.');
-      window.alert('Schedule save failed. Please check the console for details and try again.');
+      setSaveStatus('Action Required — schedule changes were not saved.');
+      window.alert('Schedule changes were not saved. The shift editor will remain open so you can try again.');
+      return false;
+    } finally {
+      isSavingScheduleRef.current = false;
     }
   }
 
@@ -2320,9 +2331,33 @@ export default function SchedulePage() {
   };
 
   const saveChangesAndContinue = async () => {
-    await saveScheduleToSupabase();
+    const saved = await saveScheduleToSupabase();
+
+    if (!saved) {
+      return;
+    }
+
     setExpandedShiftKey(pendingExpandedShiftKey);
     setPendingExpandedShiftKey(null);
+  };
+
+  const closeExpandedShiftEditor = async () => {
+    if (isSavingScheduleRef.current) {
+      return;
+    }
+
+    if (!hasUnsavedChanges) {
+      setExpandedShiftKey(null);
+      return;
+    }
+
+    const saved = await saveScheduleToSupabase();
+
+    if (!saved) {
+      return;
+    }
+
+    setExpandedShiftKey(null);
   };
   const visibleYear = visiblePayPeriod.end.getFullYear();
   const payPeriodOptions = useMemo(() => {
@@ -4336,14 +4371,6 @@ export default function SchedulePage() {
                 <h2 className="text-xl font-bold text-slate-900">Edit Shift</h2>
                 <p className="mt-1 text-sm text-slate-600">{expandedShiftKey}</p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setExpandedShiftKey(null)}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-              >
-                Close
-              </button>
             </div>
 
             <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -4454,11 +4481,11 @@ export default function SchedulePage() {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
                           saveStatus.startsWith('Saving')
                             ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-                            : saveStatus.toLowerCase().includes('failed')
+                            : saveStatus.toLowerCase().includes('failed') || saveStatus.startsWith('Action Required')
                               ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
                               : hasUnsavedChanges
                                 ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
@@ -4467,9 +4494,29 @@ export default function SchedulePage() {
                           {saveStatus}
                         </div>
 
-                        <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
-                          Confirm Changes
-                        </button>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void closeExpandedShiftEditor()}
+                            disabled={saveStatus.startsWith('Saving')}
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {saveStatus.startsWith('Saving') ? 'Saving...' : 'Close'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => void saveScheduleToSupabase()}
+                            disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')}
+                            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                              hasUnsavedChanges && !saveStatus.startsWith('Saving')
+                                ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                                : 'cursor-not-allowed bg-slate-200 text-slate-500'
+                            }`}
+                          >
+                            {saveStatus.startsWith('Saving') ? 'Saving...' : 'Confirm Changes'}
+                          </button>
+                        </div>
 
                         <button type="button" onClick={() => handleRemoveExtraShift(selectedExtraShift.dateKey, extra.id, extra.label)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
                           Remove Extra Shift
@@ -4560,11 +4607,11 @@ export default function SchedulePage() {
                             </div>
                           )}
 
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
                               saveStatus.startsWith('Saving')
                                 ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-                                : saveStatus.toLowerCase().includes('failed')
+                                : saveStatus.toLowerCase().includes('failed') || saveStatus.startsWith('Action Required')
                                   ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
                                   : hasUnsavedChanges
                                     ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
@@ -4573,9 +4620,29 @@ export default function SchedulePage() {
                               {saveStatus}
                             </div>
 
-                            <button type="button" onClick={saveScheduleToSupabase} disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')} className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${hasUnsavedChanges ? 'bg-emerald-700 text-white hover:bg-emerald-800' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
-                              Confirm Changes
-                            </button>
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void closeExpandedShiftEditor()}
+                                disabled={saveStatus.startsWith('Saving')}
+                                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {saveStatus.startsWith('Saving') ? 'Saving...' : 'Close'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void saveScheduleToSupabase()}
+                                disabled={!hasUnsavedChanges || saveStatus.startsWith('Saving')}
+                                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                                  hasUnsavedChanges && !saveStatus.startsWith('Saving')
+                                    ? 'bg-emerald-700 text-white hover:bg-emerald-800'
+                                    : 'cursor-not-allowed bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {saveStatus.startsWith('Saving') ? 'Saving...' : 'Confirm Changes'}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
