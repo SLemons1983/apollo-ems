@@ -2752,6 +2752,8 @@ export default function SchedulePage() {
             ? 'Open BLS'
             : selectedEmployee?.name || 'Open';
 
+      const isOpenAls = slot.employeeId === OPEN_ALS_SLOT_ID;
+      const isOpenBls = slot.employeeId === OPEN_BLS_SLOT_ID;
       const isSpecialShiftType =
         slot.shiftType &&
         slot.shiftType !== 'REGULAR';
@@ -2764,18 +2766,26 @@ export default function SchedulePage() {
       return (
         <div
           className={`rounded-lg border px-3 py-2 ${
-            isSpecialShiftType
-              ? 'border-yellow-500 bg-yellow-100'
-              : 'border-slate-400 bg-white'
+            isOpenAls
+              ? 'border-blue-500 bg-blue-100'
+              : isOpenBls
+                ? 'border-red-500 bg-red-100'
+                : isSpecialShiftType
+                  ? 'border-yellow-500 bg-yellow-100'
+                  : 'border-slate-400 bg-white'
           }`}
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div
                 className={`truncate text-sm font-semibold ${
-                  isSpecialShiftType
-                    ? 'text-yellow-900'
-                    : 'text-slate-800'
+                  isOpenAls
+                    ? 'text-blue-900'
+                    : isOpenBls
+                      ? 'text-red-900'
+                      : isSpecialShiftType
+                        ? 'text-yellow-900'
+                        : 'text-slate-800'
                 }`}
               >
                 {collapsedName}
