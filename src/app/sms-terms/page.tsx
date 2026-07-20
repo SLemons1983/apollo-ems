@@ -132,7 +132,7 @@ export default function SmsTermsPage() {
         </p>
         <p>
           Additional information is available in the{' '}
-          <a href="/privacy">ApolloEMS Privacy Policy</a>.
+          <a href="/sms-privacy">ApolloEMS SMS Privacy Policy</a>.
         </p>
       </section>
 

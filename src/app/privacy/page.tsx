@@ -117,6 +117,10 @@ export default function PrivacyPage() {
           <strong>STOP</strong> to unsubscribe or <strong>HELP</strong> for
           assistance.
         </p>
+        <p>
+          Additional mobile-specific information is available in the{' '}
+          <a href="/sms-privacy">ApolloEMS SMS Privacy Policy</a>.
+        </p>
       </section>
 
       <section>

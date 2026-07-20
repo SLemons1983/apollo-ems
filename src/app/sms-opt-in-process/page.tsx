@@ -65,7 +65,7 @@ export default function SmsOptInProcessPage() {
           message categories, varying message-frequency notice, message-and-data
           rate disclosure, STOP and HELP instructions, and links to the public{' '}
           <a href="/sms-terms">SMS Terms and Conditions</a> and{' '}
-          <a href="/privacy">Privacy Policy</a>.
+          <a href="/sms-privacy">SMS Privacy Policy</a>.
         </p>
         <p>
           The consent checkbox is unchecked by default. The Enable SMS
