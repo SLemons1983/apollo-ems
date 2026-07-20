@@ -2791,6 +2791,10 @@ export default function SchedulePage() {
         ? formatCollapsedShiftHours(slot.startTime, slot.endTime)
         : '';
 
+      const sortedEligibleEmployees = [...eligibleEmployees].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+      );
+
       const handleCollapsedEmployeeChange = async (
         event: React.ChangeEvent<HTMLSelectElement>,
       ) => {
@@ -2867,7 +2871,7 @@ export default function SchedulePage() {
                 <option value={OPEN_ALS_SLOT_ID}>Open ALS</option>
                 <option value={OPEN_BLS_SLOT_ID}>Open BLS</option>
 
-                {eligibleEmployees.map((employee) => {
+                {sortedEligibleEmployees.map((employee) => {
                   const eligibility =
                     eligibilityMap[employee.id] ?? {
                       eligible: true,
