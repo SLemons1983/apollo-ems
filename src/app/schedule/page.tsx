@@ -3778,10 +3778,28 @@ export default function SchedulePage() {
                           </div>
 
                           <div className="flex shrink-0 items-center gap-2">
-                            {shift.vehicle && (
-                              <div className="rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700">
-                                Unit {shift.vehicle}
-                              </div>
+                            {!isExpanded && (
+                              <select
+                                value={shift.vehicle}
+                                aria-label={`Vehicle for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
+                                onClick={(event) => event.stopPropagation()}
+                                onChange={(event) => {
+                                  event.stopPropagation();
+                                  handleStandardShiftChange(
+                                    dateKey,
+                                    shiftName,
+                                    'vehicle',
+                                    event.target.value,
+                                  );
+                                }}
+                                className="w-[92px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                              >
+                                {getVehicleOptions(category).map((vehicle) => (
+                                  <option key={vehicle || 'none'} value={vehicle}>
+                                    {vehicle ? `Unit ${vehicle}` : 'No Unit'}
+                                  </option>
+                                ))}
+                              </select>
                             )}
 
                             {warningMessages.length > 0 && (
@@ -4101,10 +4119,28 @@ export default function SchedulePage() {
                                 </div>
 
                                 <div className="flex shrink-0 items-center gap-2">
-                                  {extra.vehicle && (
-                                    <div className="rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700">
-                                      Unit {extra.vehicle}
-                                    </div>
+                                  {!isExpanded && (
+                                    <select
+                                      value={extra.vehicle}
+                                      aria-label={`Vehicle for ${extra.label} on ${dateKey}`}
+                                      onClick={(event) => event.stopPropagation()}
+                                      onChange={(event) => {
+                                        event.stopPropagation();
+                                        handleExtraShiftChange(
+                                          dateKey,
+                                          extra.id,
+                                          'vehicle',
+                                          event.target.value,
+                                        );
+                                      }}
+                                      className="w-[92px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                    >
+                                      {getVehicleOptions(extra.category).map((vehicle) => (
+                                        <option key={vehicle || 'none'} value={vehicle}>
+                                          {vehicle ? `Unit ${vehicle}` : 'No Unit'}
+                                        </option>
+                                      ))}
+                                    </select>
                                   )}
 
                                   {warningMessages.length > 0 && (
