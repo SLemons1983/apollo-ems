@@ -3872,8 +3872,8 @@ export default function DashboardPage() {
     setTimecardStatus('Timecard correction request removed.');
   }
 
-  async function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
-    const payload = nextTimecards.map((timecard) => ({
+  async function saveSubmittedTimecard(timecard: SubmittedTimecard) {
+    const payload = {
       id: timecard.id,
       employee_id: timecard.employeeId,
       employee_name: timecard.employeeName,
@@ -3892,7 +3892,7 @@ export default function DashboardPage() {
       reviewed_at: 'reviewedAt' in timecard ? (timecard.reviewedAt ?? null) : null,
       reviewed_by: 'reviewedBy' in timecard ? (timecard.reviewedBy ?? null) : null,
       updated_at: new Date().toISOString(),
-    }));
+    };
 
     const { error } = await supabase
       .from('submitted_timecards')
@@ -3902,7 +3902,10 @@ export default function DashboardPage() {
       throw error;
     }
 
-    setSubmittedTimecards(nextTimecards);
+    setSubmittedTimecards((current) => [
+      timecard,
+      ...current.filter((item) => item.id !== timecard.id),
+    ]);
   }
 
   async function submitTimecardForReview() {
@@ -3943,6 +3946,10 @@ export default function DashboardPage() {
         item.status === 'RETURNED',
     );
 
+    if (returnedForThisPeriod) {
+      timecard.id = returnedForThisPeriod.id;
+    }
+
     const createdAt = new Date().toISOString();
     const supervisorRecipients = employees
       .filter((employee) => employee.role === 'Supervisor' && employee.status !== 'Removed')
@@ -3973,13 +3980,8 @@ export default function DashboardPage() {
           }
         : null;
 
-    const nextTimecards = [
-      timecard,
-      ...submittedTimecards.filter((item) => item.id !== returnedForThisPeriod?.id),
-    ];
-
     try {
-      await saveSubmittedTimecards(nextTimecards);
+      await saveSubmittedTimecard(timecard);
 
       if (supervisorMessage) {
         saveApolloMessages([supervisorMessage, ...apolloMessages]);

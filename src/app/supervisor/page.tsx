@@ -1244,10 +1244,68 @@ export default function SupervisorPage() {
     return () => window.clearInterval(interval);
   }, []);
 
-  function saveSubmittedTimecards(nextTimecards: SubmittedTimecard[]) {
-    setSubmittedTimecards(nextTimecards);
+  async function refreshSubmittedTimecards() {
+    const rows: any[] = [];
+    const pageSize = 1000;
+    let pageStart = 0;
 
-    const payload = nextTimecards.map((timecard) => ({
+    while (true) {
+      const { data, error } = await supabase
+        .from('submitted_timecards')
+        .select('*')
+        .order('submitted_at', { ascending: false })
+        .range(pageStart, pageStart + pageSize - 1);
+
+      if (error) {
+        console.error('Failed to refresh submitted timecards:', error);
+        return;
+      }
+
+      rows.push(...(data ?? []));
+
+      if (!data || data.length < pageSize) {
+        break;
+      }
+
+      pageStart += pageSize;
+    }
+
+    setSubmittedTimecards(
+      rows.map((row: any) => ({
+        id: row.id,
+        employeeId: row.employee_id,
+        employeeName: row.employee_name,
+        payPeriodKey: row.pay_period_key,
+        payPeriodStart: row.pay_period_start,
+        payPeriodEnd: row.pay_period_end,
+        submittedAt: row.submitted_at,
+        totalHours: Number(row.total_hours ?? 0),
+        payBreakdown: row.pay_breakdown ?? undefined,
+        punches: Array.isArray(row.punches) ? row.punches : [],
+        missedMealBreaks: Array.isArray(row.missed_meal_breaks)
+          ? row.missed_meal_breaks
+          : [],
+        corrections: Array.isArray(row.corrections) ? row.corrections : [],
+        note: row.note ?? '',
+        status: row.status,
+        supervisorComment: row.supervisor_comment ?? undefined,
+        reviewedAt: row.reviewed_at ?? undefined,
+        reviewedBy: row.reviewed_by ?? undefined,
+      })),
+    );
+    setSubmittedTimecardsLoaded(true);
+  }
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void refreshSubmittedTimecards();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  async function saveSubmittedTimecard(timecard: SubmittedTimecard) {
+    const payload = {
       id: timecard.id,
       employee_id: timecard.employeeId,
       employee_name: timecard.employeeName,
@@ -1262,24 +1320,26 @@ export default function SupervisorPage() {
       corrections: timecard.corrections ?? [],
       note: timecard.note ?? '',
       status: timecard.status,
-      supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
-      reviewed_at: 'reviewedAt' in timecard ? (timecard.reviewedAt ?? null) : null,
-      reviewed_by: 'reviewedBy' in timecard ? (timecard.reviewedBy ?? null) : null,
+      supervisor_comment: timecard.supervisorComment ?? null,
+      reviewed_at: timecard.reviewedAt ?? null,
+      reviewed_by: timecard.reviewedBy ?? null,
       updated_at: new Date().toISOString(),
-    }));
+    };
 
-    supabase
+    const { error } = await supabase
       .from('submitted_timecards')
-      .upsert(payload, { onConflict: 'id' })
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to save submitted timecards:', error);
-          window.alert(`Submitted timecard save failed: ${error.message}`);
-        }
-      });
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      throw error;
+    }
+
+    setSubmittedTimecards((current) =>
+      current.map((item) => (item.id === timecard.id ? timecard : item)),
+    );
   }
 
-  function approveTimecard(timecardId: string) {
+  async function approveTimecard(timecardId: string) {
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
 
     if (timecard?.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID) {
@@ -1287,19 +1347,25 @@ export default function SupervisorPage() {
       return;
     }
 
-    const nextTimecards = submittedTimecards.map((item) =>
-      item.id === timecardId
-        ? {
-            ...item,
-            status: 'APPROVED' as const,
-            reviewedAt: new Date().toISOString(),
-            reviewedBy: 'Supervisor',
-            supervisorComment: '',
-          }
-        : item,
-    );
+    if (!timecard) {
+      return;
+    }
 
-    saveSubmittedTimecards(nextTimecards);
+    const approvedTimecard: SubmittedTimecard = {
+      ...timecard,
+      status: 'APPROVED',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: currentEmployee?.name ?? 'Supervisor',
+      supervisorComment: '',
+    };
+
+    try {
+      await saveSubmittedTimecard(approvedTimecard);
+    } catch (error) {
+      console.error('Failed to approve submitted timecard:', error);
+      const message = error instanceof Error ? error.message : 'Unknown database error';
+      window.alert(`Timecard approval failed: ${message}`);
+    }
   }
 
   function saveApolloMessages(nextMessages: ApolloMessage[]) {
@@ -2193,7 +2259,7 @@ export default function SupervisorPage() {
     );
   }
 
-  function returnTimecard(timecardId: string) {
+  async function returnTimecard(timecardId: string) {
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
     const comment = (returnComments[timecardId] ?? '').trim();
 
@@ -2214,17 +2280,13 @@ export default function SupervisorPage() {
       return;
     }
 
-    const nextTimecards = submittedTimecards.map((item) =>
-      item.id === timecardId
-        ? {
-            ...item,
-            status: 'RETURNED' as const,
-            reviewedAt: new Date().toISOString(),
-            reviewedBy: 'Supervisor',
-            supervisorComment: comment,
-          }
-        : item,
-    );
+    const returnedTimecard: SubmittedTimecard = {
+      ...timecard,
+      status: 'RETURNED',
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: currentEmployee?.name ?? 'Supervisor',
+      supervisorComment: comment,
+    };
 
     const createdAt = new Date().toISOString();
     const message: ApolloMessage = {
@@ -2251,13 +2313,20 @@ export default function SupervisorPage() {
       priority: 'IMPORTANT',
     };
 
-    saveSubmittedTimecards(nextTimecards);
-    saveApolloMessages([message, ...apolloMessages]);
+    try {
+      await saveSubmittedTimecard(returnedTimecard);
+      saveApolloMessages([message, ...apolloMessages]);
 
-    setReturnComments((current) => ({
-      ...current,
-      [timecardId]: '',
-    }));
+      setReturnComments((current) => ({
+        ...current,
+        [timecardId]: '',
+      }));
+    } catch (error) {
+      console.error('Failed to return submitted timecard:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown database error';
+      window.alert(`Timecard return failed: ${errorMessage}`);
+    }
   }
 
   function getPunchPairForDate(timecard: SubmittedTimecard, dateKey: string) {
@@ -2314,25 +2383,28 @@ export default function SupervisorPage() {
   }
 
   function getPayBreakdown(timecard: SubmittedTimecard): PayBreakdown {
-    if (timecard.payBreakdown) {
-      return timecard.payBreakdown;
-    }
+    const stored = timecard.payBreakdown;
+    const totalHours = Number(timecard.totalHours ?? 0);
+    const week1 = stored?.week1;
+    const week2 = stored?.week2;
 
     return {
-      regularHours: timecard.totalHours,
-      overtimeHours: 0,
-      doubleTimeHours: 0,
-      holidayPremiumHours: 0,
-      missedMealPenaltyHours: timecard.missedMealBreaks.length,
+      regularHours: Number(stored?.regularHours ?? totalHours),
+      overtimeHours: Number(stored?.overtimeHours ?? 0),
+      doubleTimeHours: Number(stored?.doubleTimeHours ?? 0),
+      holidayPremiumHours: Number(stored?.holidayPremiumHours ?? 0),
+      missedMealPenaltyHours: Number(
+        stored?.missedMealPenaltyHours ?? timecard.missedMealBreaks.length,
+      ),
       week1: {
-        regularHours: timecard.totalHours,
-        overtimeHours: 0,
-        doubleTimeHours: 0,
+        regularHours: Number(week1?.regularHours ?? totalHours),
+        overtimeHours: Number(week1?.overtimeHours ?? 0),
+        doubleTimeHours: Number(week1?.doubleTimeHours ?? 0),
       },
       week2: {
-        regularHours: 0,
-        overtimeHours: 0,
-        doubleTimeHours: 0,
+        regularHours: Number(week2?.regularHours ?? 0),
+        overtimeHours: Number(week2?.overtimeHours ?? 0),
+        doubleTimeHours: Number(week2?.doubleTimeHours ?? 0),
       },
     };
   }
@@ -5696,6 +5768,7 @@ export default function SupervisorPage() {
                     value={selectedPayPeriod.key}
                     onChange={(event) => {
                       setTimecardReviewPeriodInitialized(true);
+                      setSelectedTimecardId(null);
                       setSelectedPayPeriodKey(event.target.value);
                     }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
@@ -5711,6 +5784,7 @@ export default function SupervisorPage() {
                     type="button"
                     onClick={() => {
                       setTimecardReviewPeriodInitialized(true);
+                      setSelectedTimecardId(null);
                       setSelectedPayPeriodKey(currentPayPeriod.key);
                     }}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
@@ -5932,7 +6006,7 @@ export default function SupervisorPage() {
                     ) : (
                       <div className="space-y-3">
                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                          {reviewedTimecards.slice(0, 10).map((timecard) => (
+                          {reviewedTimecards.map((timecard) => (
                             <button
                               key={timecard.id}
                               type="button"
@@ -5948,7 +6022,7 @@ export default function SupervisorPage() {
                           ))}
                         </div>
 
-                        {reviewedTimecards.slice(0, 10).map((timecard) =>
+                        {reviewedTimecards.map((timecard) =>
                           selectedTimecardId === timecard.id ? renderSubmittedTimecard(timecard) : null
                         )}
                       </div>
