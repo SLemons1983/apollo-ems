@@ -3984,7 +3984,9 @@ export default function DashboardPage() {
         acceptedAt: acknowledgementAcceptedAt,
         submissionAction: isResubmission ? 'RESUBMITTED' : 'SUBMITTED',
         certificationText:
-          'I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.',
+          payPeriodMissedMealBreaks.length > 0
+            ? `I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I reported ${payPeriodMissedMealBreaks.length} missed meal break${payPeriodMissedMealBreaks.length === 1 ? '' : 's'} and acknowledge that the declarations and reasons entered for those missed meal breaks are accurate. I am requesting the applicable meal-period compensation. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.`
+            : 'I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I acknowledge that I received adequate time for my meal breaks and that no additional meal-break compensation is needed for this pay period. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.',
       },
       note: timecardNotes[getTimecardNoteKey()] ?? '',
       status: 'PENDING_SUPERVISOR_REVIEW',

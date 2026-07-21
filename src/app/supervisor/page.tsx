@@ -3443,6 +3443,141 @@ export default function SupervisorPage() {
               </div>
             )}
 
+            <div
+              className={`mb-4 rounded-xl border p-4 ${
+                timecard.missedMealBreaks.length > 0
+                  ? 'border-amber-300 bg-amber-50'
+                  : 'border-emerald-300 bg-emerald-50'
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div
+                    className={`text-sm font-bold ${
+                      timecard.missedMealBreaks.length > 0
+                        ? 'text-amber-950'
+                        : 'text-emerald-950'
+                    }`}
+                  >
+                    Meal Break Acknowledgement
+                  </div>
+
+                  <div
+                    className={`mt-1 text-xs font-semibold uppercase tracking-wide ${
+                      timecard.missedMealBreaks.length > 0
+                        ? 'text-amber-800'
+                        : 'text-emerald-800'
+                    }`}
+                  >
+                    {timecard.missedMealBreaks.length > 0
+                      ? `${timecard.missedMealBreaks.length} Missed Meal ${
+                          timecard.missedMealBreaks.length === 1
+                            ? 'Break'
+                            : 'Breaks'
+                        } Reported`
+                      : 'Meal Breaks Received'}
+                  </div>
+                </div>
+
+                <div
+                  className={`rounded-lg border bg-white px-3 py-2 text-right text-xs text-slate-700 ${
+                    timecard.missedMealBreaks.length > 0
+                      ? 'border-amber-300'
+                      : 'border-emerald-300'
+                  }`}
+                >
+                  <div className="font-bold text-slate-900">
+                    {timecard.employeeName}
+                  </div>
+
+                  <div>
+                    Acknowledged{' '}
+                    {new Date(
+                      timecard.submissionAcknowledgement?.acceptedAt ??
+                        timecard.submittedAt,
+                    ).toLocaleString('en-US', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {timecard.missedMealBreaks.length === 0 ? (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-white p-3 text-sm leading-6 text-slate-800">
+                  The employee acknowledged that they received adequate time
+                  for their meal breaks and that no additional meal-break
+                  compensation is needed for this pay period.
+                </div>
+              ) : (
+                <>
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-white p-3 text-sm leading-6 text-slate-800">
+                    The employee reported the following missed meal break
+                    {timecard.missedMealBreaks.length === 1 ? '' : 's'} and
+                    requested the applicable meal-period compensation.
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {[...timecard.missedMealBreaks]
+                      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+                      .map((mealBreak) => (
+                        <div
+                          key={mealBreak.id}
+                          className="rounded-lg border border-amber-200 bg-white p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-bold text-slate-900">
+                                {new Date(
+                                  `${mealBreak.dateKey}T12:00:00`,
+                                ).toLocaleDateString('en-US', {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                })}
+                              </div>
+
+                              <div className="mt-1 text-sm text-slate-800">
+                                <span className="font-semibold">
+                                  Employee reason:
+                                </span>{' '}
+                                {mealBreak.reason}
+                              </div>
+                            </div>
+
+                            <div className="text-xs text-slate-600">
+                              Declared{' '}
+                              {new Date(mealBreak.createdAt).toLocaleString(
+                                'en-US',
+                                {
+                                  month: 'numeric',
+                                  day: 'numeric',
+                                  year: 'numeric',
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                },
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+
+                  <div className="mt-3 text-xs font-semibold text-amber-900">
+                    Requested meal-period compensation:{' '}
+                    {timecard.missedMealBreaks.length}{' '}
+                    {timecard.missedMealBreaks.length === 1
+                      ? 'meal premium'
+                      : 'meal premiums'}
+                  </div>
+                </>
+              )}
+            </div>
+
             {timecard.additionalCompensation.length > 0 && (
               <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
