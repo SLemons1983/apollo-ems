@@ -4574,8 +4574,9 @@ export default function SchedulePage() {
                         </label>
 
                         <textarea
-                          value={extra.supervisorNote}
-                          onChange={(event) =>
+                          key={`${selectedExtraShift.dateKey}-${extra.id}-supervisor-note`}
+                          defaultValue={extra.supervisorNote}
+                          onBlur={(event) =>
                             handleExtraShiftChange(
                               selectedExtraShift.dateKey,
                               extra.id,
@@ -4725,8 +4726,9 @@ export default function SchedulePage() {
                             </label>
 
                             <textarea
-                              value={selectedShift.shift.supervisorNote}
-                              onChange={(event) =>
+                              key={`${selectedShift.dateKey}-${selectedShift.shiftName}-supervisor-note`}
+                              defaultValue={selectedShift.shift.supervisorNote}
+                              onBlur={(event) =>
                                 handleStandardShiftChange(
                                   selectedShift.dateKey,
                                   selectedShift.shiftName,
