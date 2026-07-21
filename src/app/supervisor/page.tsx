@@ -115,6 +115,15 @@ type TimecardCorrectionRequest = {
   createdAt: string;
 };
 
+type AdditionalCompensation = {
+  id: string;
+  employeeId: string;
+  dateKey: string;
+  compensationType: 'LDT_STIPEND' | 'MEAL_PAY';
+  amount: number;
+  createdAt: string;
+};
+
 type PayBreakdown = {
   regularHours: number;
   overtimeHours: number;
@@ -146,6 +155,7 @@ type SubmittedTimecard = {
   punches: TimePunch[];
   missedMealBreaks: MissedMealBreak[];
   corrections: TimecardCorrectionRequest[];
+  additionalCompensation: AdditionalCompensation[];
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
   supervisorComment?: string;
@@ -862,6 +872,9 @@ export default function SupervisorPage() {
                 punches: row.punches ?? [],
                 missedMealBreaks: row.missed_meal_breaks ?? [],
                 corrections: row.corrections ?? [],
+                additionalCompensation: Array.isArray(row.additional_compensation)
+                  ? row.additional_compensation
+                  : [],
                 note: row.note ?? '',
                 status: row.status,
                 supervisorComment: row.supervisor_comment ?? undefined,
@@ -1286,6 +1299,9 @@ export default function SupervisorPage() {
           ? row.missed_meal_breaks
           : [],
         corrections: Array.isArray(row.corrections) ? row.corrections : [],
+        additionalCompensation: Array.isArray(row.additional_compensation)
+          ? row.additional_compensation
+          : [],
         note: row.note ?? '',
         status: row.status,
         supervisorComment: row.supervisor_comment ?? undefined,
@@ -1318,6 +1334,7 @@ export default function SupervisorPage() {
       punches: timecard.punches ?? [],
       missed_meal_breaks: timecard.missedMealBreaks ?? [],
       corrections: timecard.corrections ?? [],
+      additional_compensation: timecard.additionalCompensation ?? [],
       note: timecard.note ?? '',
       status: timecard.status,
       supervisor_comment: timecard.supervisorComment ?? null,
@@ -3353,6 +3370,47 @@ export default function SupervisorPage() {
                   {timecard.missedMealBreaks.map((item) => (
                     <div key={item.id} className="text-sm text-amber-800">
                       <span className="font-semibold">{item.dateKey}:</span> {item.reason}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {timecard.additionalCompensation.length > 0 && (
+              <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-bold text-violet-900">
+                    Additional Compensation
+                  </div>
+
+                  <div className="text-sm font-bold text-violet-900">
+                    ${timecard.additionalCompensation
+                      .reduce((total, item) => total + Number(item.amount || 0), 0)
+                      .toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="mt-2 space-y-2">
+                  {timecard.additionalCompensation.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <span className="font-semibold text-slate-900">
+                          {item.dateKey}
+                        </span>
+
+                        <span className="ml-2 text-slate-700">
+                          {item.compensationType === 'LDT_STIPEND'
+                            ? 'LDT Stipend'
+                            : 'Meal Pay'}
+                        </span>
+                      </div>
+
+                      <div className="font-bold text-violet-900">
+                        ${Number(item.amount || 0).toFixed(2)}
+                      </div>
                     </div>
                   ))}
                 </div>

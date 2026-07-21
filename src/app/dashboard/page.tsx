@@ -376,6 +376,7 @@ type SubmittedTimecard = {
   punches: TimePunch[];
   missedMealBreaks: MissedMealBreak[];
   corrections: TimecardCorrectionRequest[];
+  additionalCompensation: AdditionalCompensation[];
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
 };
@@ -2024,6 +2025,9 @@ export default function DashboardPage() {
                 punches: row.punches ?? [],
                 missedMealBreaks: row.missed_meal_breaks ?? [],
                 corrections: row.corrections ?? [],
+                additionalCompensation: Array.isArray(row.additional_compensation)
+                  ? row.additional_compensation
+                  : [],
                 note: row.note ?? '',
                 status: row.status,
               })),
@@ -3886,6 +3890,7 @@ export default function DashboardPage() {
       punches: timecard.punches ?? [],
       missed_meal_breaks: timecard.missedMealBreaks ?? [],
       corrections: timecard.corrections ?? [],
+      additional_compensation: timecard.additionalCompensation ?? [],
       note: timecard.note ?? '',
       status: timecard.status,
       supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
@@ -3935,6 +3940,26 @@ export default function DashboardPage() {
       punches: getEditableTimecardPunches(),
       missedMealBreaks: payPeriodMissedMealBreaks,
       corrections: payPeriodCorrections,
+      additionalCompensation: additionalCompensation
+        .filter((item) => {
+          const payPeriodStartKey = toDateKey(selectedPayPeriod.start);
+          const payPeriodEndKey = toDateKey(selectedPayPeriod.end);
+
+          return (
+            item.employeeId === currentEmployeeId &&
+            item.dateKey >= payPeriodStartKey &&
+            item.dateKey <= payPeriodEndKey
+          );
+        })
+        .sort((a, b) => {
+          const dateCompare = a.dateKey.localeCompare(b.dateKey);
+
+          if (dateCompare !== 0) {
+            return dateCompare;
+          }
+
+          return a.createdAt.localeCompare(b.createdAt);
+        }),
       note: timecardNotes[getTimecardNoteKey()] ?? '',
       status: 'PENDING_SUPERVISOR_REVIEW',
     };
