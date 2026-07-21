@@ -79,6 +79,10 @@ type SmsRecipientMode =
   | 'PER_DIEM'
   | 'PARAMEDICS'
   | 'EMTS'
+  | 'FULL_TIME_PARAMEDICS'
+  | 'FULL_TIME_EMTS'
+  | 'PER_DIEM_PARAMEDICS'
+  | 'PER_DIEM_EMTS'
   | 'SUPERVISORS';
 
 type CompanyAnnouncement = {
@@ -838,16 +842,6 @@ export default function SupervisorPage() {
     [employees, smsEligibleEmployeeIds],
   );
 
-  const smsExcludedEmployeeCount = useMemo(
-    () =>
-      employees.filter(
-        (employee) =>
-          employee.status.toLowerCase() === 'active' &&
-          !smsEligibleEmployeeIds.has(employee.id),
-      ).length,
-    [employees, smsEligibleEmployeeIds],
-  );
-
   const smsSelectedRecipientCount = useMemo(() => {
     if (smsRecipientMode === 'INDIVIDUAL') {
       return smsEligibleEmployees.some(
@@ -863,21 +857,42 @@ export default function SupervisorPage() {
 
     return smsEligibleEmployees.filter((employee) => {
       const employeeType = employee.employeeType.toLowerCase();
+      const isFullTime = employeeType.includes('full');
+      const isPerDiem = employeeType.includes('per');
+      const isParamedic =
+        employee.role === 'Paramedic' || employee.scope === 'ALS';
+      const isEmt = employee.role === 'EMT' || employee.scope === 'BLS';
 
       if (smsRecipientMode === 'FULL_TIME') {
-        return employeeType.includes('full');
+        return isFullTime;
       }
 
       if (smsRecipientMode === 'PER_DIEM') {
-        return employeeType.includes('per');
+        return isPerDiem;
       }
 
       if (smsRecipientMode === 'PARAMEDICS') {
-        return employee.role === 'Paramedic' || employee.scope === 'ALS';
+        return isParamedic;
       }
 
       if (smsRecipientMode === 'EMTS') {
-        return employee.role === 'EMT' || employee.scope === 'BLS';
+        return isEmt;
+      }
+
+      if (smsRecipientMode === 'FULL_TIME_PARAMEDICS') {
+        return isFullTime && isParamedic;
+      }
+
+      if (smsRecipientMode === 'FULL_TIME_EMTS') {
+        return isFullTime && isEmt;
+      }
+
+      if (smsRecipientMode === 'PER_DIEM_PARAMEDICS') {
+        return isPerDiem && isParamedic;
+      }
+
+      if (smsRecipientMode === 'PER_DIEM_EMTS') {
+        return isPerDiem && isEmt;
       }
 
       if (smsRecipientMode === 'SUPERVISORS') {
@@ -5981,7 +5996,7 @@ export default function SupervisorPage() {
                 </div>
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-bold text-slate-900">
                     Compose SMS Notification
@@ -6001,16 +6016,24 @@ export default function SupervisorPage() {
                         className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900 outline-none focus:border-slate-500"
                       >
                         <option value="INDIVIDUAL">Individual Employee</option>
-                        <option value="ALL_ACTIVE">
-                          All Eligible Employees
-                        </option>
-                        <option value="ALL_ON_DUTY">
-                          All On Duty
-                        </option>
+                        <option value="ALL_ACTIVE">All Employees</option>
+                        <option value="ALL_ON_DUTY">All On Duty</option>
                         <option value="FULL_TIME">Full-Time Employees</option>
                         <option value="PER_DIEM">Per-Diem Employees</option>
-                        <option value="PARAMEDICS">Paramedics / ALS</option>
-                        <option value="EMTS">EMTs / BLS</option>
+                        <option value="PARAMEDICS">All Paramedics</option>
+                        <option value="EMTS">All EMTs</option>
+                        <option value="FULL_TIME_PARAMEDICS">
+                          Full-Time Paramedics
+                        </option>
+                        <option value="FULL_TIME_EMTS">
+                          Full-Time EMTs
+                        </option>
+                        <option value="PER_DIEM_PARAMEDICS">
+                          Per-Diem Paramedics
+                        </option>
+                        <option value="PER_DIEM_EMTS">
+                          Per-Diem EMTs
+                        </option>
                         <option value="SUPERVISORS">Supervisors</option>
                       </select>
                     </label>
@@ -6066,19 +6089,6 @@ export default function SupervisorPage() {
                     </span>
                   </div>
 
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Message Preview
-                    </div>
-                    <div className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
-                      {smsMessageBody.trim() ||
-                        'Your SMS notification preview will appear here.'}
-                    </div>
-                    <div className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-500">
-                      ApolloEMS automated notification. Replies are not monitored.
-                    </div>
-                  </div>
-
                   <div className="mt-4 flex justify-end">
                     <button
                       type="button"
@@ -6091,63 +6101,6 @@ export default function SupervisorPage() {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-bold text-slate-900">
-                      Recipient Readiness
-                    </div>
-
-                    <dl className="mt-3 space-y-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="text-slate-600">Eligible</dt>
-                        <dd className="font-bold text-emerald-700">
-                          {smsPreferencesLoading
-                            ? '—'
-                            : smsEligibleEmployees.length}
-                        </dd>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="text-slate-600">
-                          Missing consent or unavailable
-                        </dt>
-                        <dd className="font-bold text-amber-700">
-                          {smsPreferencesLoading
-                            ? '—'
-                            : smsExcludedEmployeeCount}
-                        </dd>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="text-slate-600">
-                          Selected for this message
-                        </dt>
-                        <dd className="font-bold text-slate-900">
-                          {smsSelectedRecipientCount}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <div className="mt-3 text-xs text-slate-500">
-                      Apollo excludes employees who have not enabled SMS,
-                      disabled supervisor messages, opted out, or do not have a
-                      valid authorized mobile number.
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-bold text-slate-900">
-                      Sending Rules
-                    </div>
-                    <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                      <li>• Supervisor access only</li>
-                      <li>• Outbound notifications only</li>
-                      <li>• Consent-aware recipient filtering</li>
-                      <li>• No patient or protected health information</li>
-                      <li>• Every send recorded in the audit log</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-white p-4">
