@@ -142,6 +142,14 @@ type PayBreakdown = {
   };
 };
 
+type TimecardSubmissionAcknowledgement = {
+  employeeId: string;
+  employeeName: string;
+  acceptedAt: string;
+  submissionAction: 'SUBMITTED' | 'RESUBMITTED';
+  certificationText: string;
+};
+
 type SubmittedTimecard = {
   id: string;
   employeeId: string;
@@ -156,6 +164,7 @@ type SubmittedTimecard = {
   missedMealBreaks: MissedMealBreak[];
   corrections: TimecardCorrectionRequest[];
   additionalCompensation: AdditionalCompensation[];
+  submissionAcknowledgement: TimecardSubmissionAcknowledgement | null;
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
   supervisorComment?: string;
@@ -875,6 +884,11 @@ export default function SupervisorPage() {
                 additionalCompensation: Array.isArray(row.additional_compensation)
                   ? row.additional_compensation
                   : [],
+                submissionAcknowledgement:
+                  row.submission_acknowledgement &&
+                  typeof row.submission_acknowledgement === 'object'
+                    ? row.submission_acknowledgement
+                    : null,
                 note: row.note ?? '',
                 status: row.status,
                 supervisorComment: row.supervisor_comment ?? undefined,
@@ -1302,6 +1316,11 @@ export default function SupervisorPage() {
         additionalCompensation: Array.isArray(row.additional_compensation)
           ? row.additional_compensation
           : [],
+        submissionAcknowledgement:
+          row.submission_acknowledgement &&
+          typeof row.submission_acknowledgement === 'object'
+            ? row.submission_acknowledgement
+            : null,
         note: row.note ?? '',
         status: row.status,
         supervisorComment: row.supervisor_comment ?? undefined,
@@ -1335,6 +1354,7 @@ export default function SupervisorPage() {
       missed_meal_breaks: timecard.missedMealBreaks ?? [],
       corrections: timecard.corrections ?? [],
       additional_compensation: timecard.additionalCompensation ?? [],
+      submission_acknowledgement: timecard.submissionAcknowledgement ?? null,
       note: timecard.note ?? '',
       status: timecard.status,
       supervisor_comment: timecard.supervisorComment ?? null,
@@ -3372,6 +3392,53 @@ export default function SupervisorPage() {
                       <span className="font-semibold">{item.dateKey}:</span> {item.reason}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {timecard.submissionAcknowledgement && (
+              <div className="mb-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-emerald-950">
+                      Employee Submission Acknowledgement
+                    </div>
+
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                      {timecard.submissionAcknowledgement.submissionAction ===
+                      'RESUBMITTED'
+                        ? 'Timecard Resubmitted'
+                        : 'Timecard Submitted'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-right text-xs text-slate-700">
+                    <div className="font-bold text-slate-900">
+                      {timecard.submissionAcknowledgement.employeeName}
+                    </div>
+
+                    <div>
+                      Accepted{' '}
+                      {new Date(
+                        timecard.submissionAcknowledgement.acceptedAt,
+                      ).toLocaleString('en-US', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-white p-3 text-sm leading-6 text-slate-800">
+                  “{timecard.submissionAcknowledgement.certificationText}”
+                </div>
+
+                <div className="mt-2 text-xs font-semibold text-emerald-900">
+                  By submitting this timecard, the employee affirmed the
+                  certification above.
                 </div>
               </div>
             )}

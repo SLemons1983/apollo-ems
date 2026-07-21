@@ -363,6 +363,14 @@ type PayBreakdown = {
   };
 };
 
+type TimecardSubmissionAcknowledgement = {
+  employeeId: string;
+  employeeName: string;
+  acceptedAt: string;
+  submissionAction: 'SUBMITTED' | 'RESUBMITTED';
+  certificationText: string;
+};
+
 type SubmittedTimecard = {
   id: string;
   employeeId: string;
@@ -377,6 +385,7 @@ type SubmittedTimecard = {
   missedMealBreaks: MissedMealBreak[];
   corrections: TimecardCorrectionRequest[];
   additionalCompensation: AdditionalCompensation[];
+  submissionAcknowledgement: TimecardSubmissionAcknowledgement | null;
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
 };
@@ -2028,6 +2037,11 @@ export default function DashboardPage() {
                 additionalCompensation: Array.isArray(row.additional_compensation)
                   ? row.additional_compensation
                   : [],
+                submissionAcknowledgement:
+                  row.submission_acknowledgement &&
+                  typeof row.submission_acknowledgement === 'object'
+                    ? row.submission_acknowledgement
+                    : null,
                 note: row.note ?? '',
                 status: row.status,
               })),
@@ -3891,6 +3905,7 @@ export default function DashboardPage() {
       missed_meal_breaks: timecard.missedMealBreaks ?? [],
       corrections: timecard.corrections ?? [],
       additional_compensation: timecard.additionalCompensation ?? [],
+      submission_acknowledgement: timecard.submissionAcknowledgement ?? null,
       note: timecard.note ?? '',
       status: timecard.status,
       supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
@@ -3927,6 +3942,9 @@ export default function DashboardPage() {
     setIsSubmittingTimecard(true);
     setTimecardStatus('');
 
+    const acknowledgementAcceptedAt = new Date().toISOString();
+    const isResubmission = Boolean(returnedTimecard);
+
     const timecard: SubmittedTimecard = {
       id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${Date.now()}`,
       employeeId: currentEmployeeId,
@@ -3960,6 +3978,14 @@ export default function DashboardPage() {
 
           return a.createdAt.localeCompare(b.createdAt);
         }),
+      submissionAcknowledgement: {
+        employeeId: currentEmployeeId,
+        employeeName: currentEmployee?.name ?? 'Employee profile not linked',
+        acceptedAt: acknowledgementAcceptedAt,
+        submissionAction: isResubmission ? 'RESUBMITTED' : 'SUBMITTED',
+        certificationText:
+          'I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.',
+      },
       note: timecardNotes[getTimecardNoteKey()] ?? '',
       status: 'PENDING_SUPERVISOR_REVIEW',
     };
