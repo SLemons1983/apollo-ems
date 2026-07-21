@@ -77,6 +77,7 @@ type ShiftAssignment = {
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
+  supervisorNote: string;
 };
 
 type DayAssignments = Record<ShiftName, ShiftAssignment>;
@@ -95,6 +96,7 @@ type ExtraShiftAssignment = {
   vehicle: VehicleValue;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
+  supervisorNote: string;
 };
 
 type DaySchedule = {
@@ -467,6 +469,7 @@ function createEmptyShift(showEmployee3 = false): ShiftAssignment {
     vehicle: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
+    supervisorNote: '',
   };
 }
 
@@ -492,6 +495,7 @@ function createAdminSupervisorShift(): ShiftAssignment {
     vehicle: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
+    supervisorNote: '',
   };
 }
 
@@ -730,6 +734,10 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
     allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
     hiddenFromEmployees: Boolean((maybeShift as any).hiddenFromEmployees),
+    supervisorNote:
+      typeof (maybeShift as any).supervisorNote === 'string'
+        ? (maybeShift as any).supervisorNote
+        : '',
   };
 }
 
@@ -749,6 +757,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
       vehicle: '',
       allowExtendedHours: false,
       hiddenFromEmployees: false,
+      supervisorNote: '',
     };
   }
 
@@ -770,6 +779,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
     vehicle: normalized.vehicle,
     allowExtendedHours: normalized.allowExtendedHours,
     hiddenFromEmployees: normalized.hiddenFromEmployees,
+    supervisorNote: normalized.supervisorNote,
   };
 }
 
@@ -1553,6 +1563,7 @@ export default function SchedulePage() {
                 vehicle: (row.vehicle || '') as VehicleValue,
                 allowExtendedHours: Boolean(row.allow_extended_hours),
                 hiddenFromEmployees: Boolean(row.hidden_from_employees),
+                supervisorNote: '',
               };
               day.extras.push(extra);
             }
@@ -1562,6 +1573,11 @@ export default function SchedulePage() {
             extra.vehicle = (row.vehicle || '') as VehicleValue;
             extra.allowExtendedHours = Boolean(row.allow_extended_hours);
             extra.hiddenFromEmployees = Boolean(row.hidden_from_employees);
+
+            if (row.slot_number === 0) {
+              extra.supervisorNote = row.note || '';
+              continue;
+            }
 
             if (row.slot_number === 1) extra.employee1 = slot;
             if (row.slot_number === 2) extra.employee2 = slot;
@@ -1588,6 +1604,11 @@ export default function SchedulePage() {
             shift.vehicle = (row.vehicle || '') as VehicleValue;
             shift.allowExtendedHours = Boolean(row.allow_extended_hours);
             shift.hiddenFromEmployees = Boolean(row.hidden_from_employees);
+
+            if (row.slot_number === 0) {
+              shift.supervisorNote = row.note || '';
+              continue;
+            }
 
             if (row.slot_number === 1) shift.employee1 = slot;
             if (row.slot_number === 2) shift.employee2 = slot;
@@ -1737,7 +1758,7 @@ export default function SchedulePage() {
             employee_id: null,
             start_time: DEFAULT_START_TIME,
             end_time: getDefaultEndTimeForShift(shiftName, 'employee1'),
-            note: '',
+            note: shift.supervisorNote || '',
             vehicle: shift.vehicle || '',
             allow_extended_hours: Boolean(shift.allowExtendedHours),
             hidden_from_employees: Boolean(shift.hiddenFromEmployees),
@@ -1791,7 +1812,7 @@ export default function SchedulePage() {
             employee_id: null,
             start_time: DEFAULT_START_TIME,
             end_time: DEFAULT_END_TIME,
-            note: '',
+            note: extra.supervisorNote || '',
             vehicle: extra.vehicle || '',
             allow_extended_hours: Boolean(extra.allowExtendedHours),
             hidden_from_employees: Boolean(extra.hiddenFromEmployees),
@@ -2383,7 +2404,12 @@ export default function SchedulePage() {
   const handleStandardShiftChange = (
     dateKey: string,
     shiftName: ShiftName,
-    field: 'showEmployee3' | 'vehicle' | 'allowExtendedHours' | 'hiddenFromEmployees',
+    field:
+      | 'showEmployee3'
+      | 'vehicle'
+      | 'allowExtendedHours'
+      | 'hiddenFromEmployees'
+      | 'supervisorNote',
     value: string | boolean,
   ) => {
     markUnsavedChanges(dateKey);
@@ -2664,6 +2690,7 @@ export default function SchedulePage() {
         vehicle: '',
         allowExtendedHours: false,
         hiddenFromEmployees: false,
+        supervisorNote: '',
       });
 
       return next;
@@ -3099,14 +3126,18 @@ export default function SchedulePage() {
                           ? 'text-blue-700'
                           : 'text-slate-500'
                 }`}>
-                  Supervisor Note {noteRequired ? '(required)' : '(optional)'}
+                  Employee Note {noteRequired ? '(required)' : '(optional)'}
                 </label>
                 <textarea
                   defaultValue={slot.note}
                   onBlur={(event) => onChange('note', event.target.value)}
                   disabled={!slot.employeeId}
                   rows={2}
-                  placeholder={noteRequired ? 'Explain why the end time is not 06:00' : 'Add note if needed'}
+                  placeholder={
+                    noteRequired
+                      ? 'Explain why the end time is not 06:00'
+                      : 'Visible to the assigned employee'
+                  }
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 disabled:opacity-50"
                 />
               </div>
@@ -3231,51 +3262,45 @@ export default function SchedulePage() {
     const dateKey = toDateKey(date);
     const day = getDaySchedule(scheduleData, dateKey);
 
-    const standardNotes = SHIFT_ORDER.flatMap((shiftName) => {
-      const shift = day.standard[shiftName];
+    const standardNotes = SHIFT_ORDER
+      .map((shiftName) => {
+        const note = day.standard[shiftName].supervisorNote?.trim();
 
-      return (['employee1', 'employee2', 'employee3'] as const)
-        .map((slotKey) => {
-          const slot = shift[slotKey];
+        if (!note) {
+          return null;
+        }
 
-          if (!slot.employeeId || !slot.note.trim()) {
-            return null;
-          }
+        return {
+          id: `${dateKey}-${shiftName}-supervisor-note`,
+          dateKey,
+          shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+          employeeName: 'Shift-wide',
+          note,
+        };
+      })
+      .filter(
+        (entry): entry is NonNullable<typeof entry> => entry !== null,
+      );
 
-          const employee = employees.find((item) => item.id === slot.employeeId);
+    const extraNotes = day.extras
+      .map((extra) => {
+        const note = extra.supervisorNote?.trim();
 
-          return {
-            id: `${dateKey}-${shiftName}-${slotKey}`,
-            dateKey,
-            shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
-            employeeName: employee?.name ?? 'Unknown Employee',
-            note: slot.note.trim(),
-          };
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-    });
+        if (!note) {
+          return null;
+        }
 
-    const extraNotes = day.extras.flatMap((extra) =>
-      (['employee1', 'employee2', 'employee3'] as const)
-        .map((slotKey) => {
-          const slot = extra[slotKey];
-
-          if (!slot.employeeId || !slot.note.trim()) {
-            return null;
-          }
-
-          const employee = employees.find((item) => item.id === slot.employeeId);
-
-          return {
-            id: `${dateKey}-${extra.id}-${slotKey}`,
-            dateKey,
-            shiftLabel: extra.label,
-            employeeName: employee?.name ?? 'Unknown Employee',
-            note: slot.note.trim(),
-          };
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-    );
+        return {
+          id: `${dateKey}-${extra.id}-supervisor-note`,
+          dateKey,
+          shiftLabel: extra.label,
+          employeeName: 'Shift-wide',
+          note,
+        };
+      })
+      .filter(
+        (entry): entry is NonNullable<typeof entry> => entry !== null,
+      );
 
     return [...standardNotes, ...extraNotes];
   });
@@ -3978,17 +4003,25 @@ export default function SchedulePage() {
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
 
-                          {[
-                            shift.employee1,
-                            shift.employee2,
-                            shift.employee3,
-                            shift.employee4,
-                            shift.employee5,
-                          ].some((slot) => slot.note?.trim()) && (
-                            <div className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                              📝 Note
-                            </div>
-                          )}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {[
+                              shift.employee1,
+                              shift.employee2,
+                              shift.employee3,
+                              shift.employee4,
+                              shift.employee5,
+                            ].some((slot) => slot.note?.trim()) && (
+                              <div className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                                📝 Employee Note
+                              </div>
+                            )}
+
+                            {shift.supervisorNote?.trim() && (
+                              <div className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                                🔒 Supervisor Note
+                              </div>
+                            )}
+                          </div>
                           {false && isExpanded && (
                             <>
                               <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
@@ -4320,17 +4353,25 @@ export default function SchedulePage() {
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
 
-                              {[
-                                extra.employee1,
-                                extra.employee2,
-                                extra.employee3,
-                                extra.employee4,
-                                extra.employee5,
-                              ].some((slot) => slot.note?.trim()) && (
-                                <div className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-                                  📝 Note
-                                </div>
-                              )}
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {[
+                                  extra.employee1,
+                                  extra.employee2,
+                                  extra.employee3,
+                                  extra.employee4,
+                                  extra.employee5,
+                                ].some((slot) => slot.note?.trim()) && (
+                                  <div className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                                    📝 Employee Note
+                                  </div>
+                                )}
+
+                                {extra.supervisorNote?.trim() && (
+                                  <div className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                                    🔒 Supervisor Note
+                                  </div>
+                                )}
+                              </div>
                               {false && isExpanded && (
                                 <>
                                   <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
@@ -4527,6 +4568,31 @@ export default function SchedulePage() {
                         </div>
                       )}
 
+                      <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-violet-700">
+                          Supervisor Note
+                        </label>
+
+                        <textarea
+                          value={extra.supervisorNote}
+                          onChange={(event) =>
+                            handleExtraShiftChange(
+                              selectedExtraShift.dateKey,
+                              extra.id,
+                              'supervisorNote',
+                              event.target.value,
+                            )
+                          }
+                          rows={3}
+                          placeholder="Internal shift note"
+                          className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500"
+                        />
+
+                        <div className="mt-1 text-xs text-violet-700">
+                          Internal only. Employees will not see this note.
+                        </div>
+                      </div>
+
                       <div className="grid gap-3 md:grid-cols-2">
                         <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
                           <input type="checkbox" checked={extra.allowExtendedHours} onChange={(event) => handleExtraShiftChange(selectedExtraShift.dateKey, extra.id, 'allowExtendedHours', event.target.checked)} className="h-4 w-4" />
@@ -4652,6 +4718,31 @@ export default function SchedulePage() {
                               )}
                             </div>
                           )}
+
+                          <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-violet-700">
+                              Supervisor Note
+                            </label>
+
+                            <textarea
+                              value={selectedShift.shift.supervisorNote}
+                              onChange={(event) =>
+                                handleStandardShiftChange(
+                                  selectedShift.dateKey,
+                                  selectedShift.shiftName,
+                                  'supervisorNote',
+                                  event.target.value,
+                                )
+                              }
+                              rows={3}
+                              placeholder="Internal shift note"
+                              className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500"
+                            />
+
+                            <div className="mt-1 text-xs text-violet-700">
+                              Internal only. Employees will not see this note.
+                            </div>
+                          </div>
 
                           <div className="grid gap-3 md:grid-cols-2">
                             <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
