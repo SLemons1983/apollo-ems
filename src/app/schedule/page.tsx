@@ -2883,7 +2883,11 @@ export default function SchedulePage() {
                 onPointerDown={(event) => event.stopPropagation()}
                 disabled={saveStatus.startsWith('Saving')}
                 aria-label={`Change ${slotLabel} assignment`}
-                title={`Change ${slotLabel} assignment`}
+                title={
+                  slot.note?.trim()
+                    ? `Employee Note: ${slot.note.trim()}`
+                    : `Change ${slotLabel} assignment`
+                }
                 className={`w-full min-w-0 cursor-pointer truncate rounded-lg border px-2 py-1.5 text-sm font-semibold outline-none transition focus:ring-2 disabled:cursor-wait disabled:opacity-70 ${
                   isOpenAls
                     ? 'border-blue-400 bg-blue-50 text-blue-900 focus:border-blue-600 focus:ring-blue-200'
@@ -4011,13 +4015,34 @@ export default function SchedulePage() {
                               shift.employee4,
                               shift.employee5,
                             ].some((slot) => slot.note?.trim()) && (
-                              <div className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                              <div
+                                title={[
+                                  shift.employee1,
+                                  shift.employee2,
+                                  shift.employee3,
+                                  shift.employee4,
+                                  shift.employee5,
+                                ]
+                                  .filter((slot) => slot.employeeId && slot.note?.trim())
+                                  .map((slot) => {
+                                    const employeeName =
+                                      getEmployeeById(slot.employeeId, employees)?.name ??
+                                      'Unknown Employee';
+
+                                    return `${employeeName}: ${slot.note.trim()}`;
+                                  })
+                                  .join('\n')}
+                                className="inline-flex cursor-help rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200"
+                              >
                                 📝 Employee Note
                               </div>
                             )}
 
                             {shift.supervisorNote?.trim() && (
-                              <div className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                              <div
+                                title={shift.supervisorNote.trim()}
+                                className="inline-flex cursor-help rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200"
+                              >
                                 🔒 Supervisor Note
                               </div>
                             )}
@@ -4361,13 +4386,34 @@ export default function SchedulePage() {
                                   extra.employee4,
                                   extra.employee5,
                                 ].some((slot) => slot.note?.trim()) && (
-                                  <div className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                                  <div
+                                    title={[
+                                      extra.employee1,
+                                      extra.employee2,
+                                      extra.employee3,
+                                      extra.employee4,
+                                      extra.employee5,
+                                    ]
+                                      .filter((slot) => slot.employeeId && slot.note?.trim())
+                                      .map((slot) => {
+                                        const employeeName =
+                                          getEmployeeById(slot.employeeId, employees)?.name ??
+                                          'Unknown Employee';
+
+                                        return `${employeeName}: ${slot.note.trim()}`;
+                                      })
+                                      .join('\n')}
+                                    className="inline-flex cursor-help rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-sky-200"
+                                  >
                                     📝 Employee Note
                                   </div>
                                 )}
 
                                 {extra.supervisorNote?.trim() && (
-                                  <div className="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200">
+                                  <div
+                                    title={extra.supervisorNote.trim()}
+                                    className="inline-flex cursor-help rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-200"
+                                  >
                                     🔒 Supervisor Note
                                   </div>
                                 )}
