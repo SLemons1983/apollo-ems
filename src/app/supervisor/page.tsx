@@ -61,6 +61,25 @@ type AuditLogEntry = {
   details: string;
 };
 
+type SmsPreferenceRow = {
+  employee_id: string;
+  employee_email: string;
+  phone_e164: string;
+  sms_enabled: boolean;
+  notify_supervisor_messages: boolean;
+  consented_at: string | null;
+  opted_out_at: string | null;
+};
+
+type SmsRecipientMode =
+  | 'INDIVIDUAL'
+  | 'ALL_ACTIVE'
+  | 'ALL_ON_DUTY'
+  | 'FULL_TIME'
+  | 'PER_DIEM'
+  | 'PARAMEDICS'
+  | 'EMTS'
+  | 'SUPERVISORS';
 
 type CompanyAnnouncement = {
   id: string;
@@ -549,6 +568,13 @@ export default function SupervisorPage() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [authEmail, setAuthEmail] = useState('');
   const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
+  const [smsPreferences, setSmsPreferences] = useState<SmsPreferenceRow[]>([]);
+  const [smsPreferencesLoading, setSmsPreferencesLoading] = useState(true);
+  const [smsRecipientMode, setSmsRecipientMode] =
+    useState<SmsRecipientMode>('INDIVIDUAL');
+  const [smsRecipientEmployeeId, setSmsRecipientEmployeeId] = useState('');
+  const [smsMessageBody, setSmsMessageBody] = useState('');
+  const [smsAuditSearch, setSmsAuditSearch] = useState('');
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [inventorySupplyRooms, setInventorySupplyRooms] = useState<InventorySupplyRoom[]>([]);
@@ -797,6 +823,75 @@ export default function SupervisorPage() {
 
   const payrollLocked = payrollSubmission?.payPeriodKey === selectedPayPeriod.key;
 
+  const smsEligibleEmployeeIds = useMemo(
+    () => new Set(smsPreferences.map((preference) => preference.employee_id)),
+    [smsPreferences],
+  );
+
+  const smsEligibleEmployees = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.status.toLowerCase() === 'active' &&
+          smsEligibleEmployeeIds.has(employee.id),
+      ),
+    [employees, smsEligibleEmployeeIds],
+  );
+
+  const smsExcludedEmployeeCount = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          employee.status.toLowerCase() === 'active' &&
+          !smsEligibleEmployeeIds.has(employee.id),
+      ).length,
+    [employees, smsEligibleEmployeeIds],
+  );
+
+  const smsSelectedRecipientCount = useMemo(() => {
+    if (smsRecipientMode === 'INDIVIDUAL') {
+      return smsEligibleEmployees.some(
+        (employee) => employee.id === smsRecipientEmployeeId,
+      )
+        ? 1
+        : 0;
+    }
+
+    if (smsRecipientMode === 'ALL_ON_DUTY') {
+      return 0;
+    }
+
+    return smsEligibleEmployees.filter((employee) => {
+      const employeeType = employee.employeeType.toLowerCase();
+
+      if (smsRecipientMode === 'FULL_TIME') {
+        return employeeType.includes('full');
+      }
+
+      if (smsRecipientMode === 'PER_DIEM') {
+        return employeeType.includes('per');
+      }
+
+      if (smsRecipientMode === 'PARAMEDICS') {
+        return employee.role === 'Paramedic' || employee.scope === 'ALS';
+      }
+
+      if (smsRecipientMode === 'EMTS') {
+        return employee.role === 'EMT' || employee.scope === 'BLS';
+      }
+
+      if (smsRecipientMode === 'SUPERVISORS') {
+        return employee.role === 'Supervisor';
+      }
+
+      return true;
+    }).length;
+  }, [
+    smsEligibleEmployees,
+    smsRecipientEmployeeId,
+    smsRecipientMode,
+  ]);
+
   const currentEmployee = useMemo(() => {
     const normalizedAuthEmail = authEmail.trim().toLowerCase();
 
@@ -984,6 +1079,33 @@ export default function SupervisorPage() {
               })),
             );
           }
+        });
+
+      supabase
+        .from('employee_sms_preferences')
+        .select(
+          'employee_id,employee_email,phone_e164,sms_enabled,notify_supervisor_messages,consented_at,opted_out_at',
+        )
+        .then(({ data: smsPreferenceData, error: smsPreferenceError }) => {
+          if (smsPreferenceError) {
+            console.error(
+              'Failed to load employee SMS preferences:',
+              smsPreferenceError,
+            );
+            setSmsPreferences([]);
+          } else {
+            setSmsPreferences(
+              ((smsPreferenceData ?? []) as SmsPreferenceRow[]).filter(
+                (preference) =>
+                  preference.sms_enabled &&
+                  preference.notify_supervisor_messages &&
+                  Boolean(preference.phone_e164) &&
+                  !preference.opted_out_at,
+              ),
+            );
+          }
+
+          setSmsPreferencesLoading(false);
         });
 
       supabase
@@ -5823,6 +5945,236 @@ export default function SupervisorPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>,
+          )}
+
+          {renderTile(
+            'sms-notifications',
+            'SMS Notifications',
+            smsPreferencesLoading
+              ? 'Loading employee SMS consent records...'
+              : `${smsEligibleEmployees.length} employee${
+                  smsEligibleEmployees.length === 1 ? '' : 's'
+                } currently eligible for supervisor SMS messages.`,
+            <div className="space-y-5">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="text-sm font-bold text-blue-900">
+                  Outbound operational notifications only
+                </div>
+                <div className="mt-1 text-sm text-blue-800">
+                  Only supervisors may send SMS messages through ApolloEMS.
+                  Replies are not monitored and will not create conversations
+                  inside Apollo. Employees should not send patient information or
+                  emergency requests by text.
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <div className="text-sm font-bold text-amber-900">
+                  Twilio delivery setup pending
+                </div>
+                <div className="mt-1 text-sm text-amber-800">
+                  The interface is available for review, but sending remains
+                  disabled until the ApolloEMS phone number and secure Twilio
+                  credentials are connected.
+                </div>
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm font-bold text-slate-900">
+                    Compose SMS Notification
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                      Recipient Group
+                      <select
+                        value={smsRecipientMode}
+                        onChange={(event) => {
+                          setSmsRecipientMode(
+                            event.target.value as SmsRecipientMode,
+                          );
+                          setSmsRecipientEmployeeId('');
+                        }}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900 outline-none focus:border-slate-500"
+                      >
+                        <option value="INDIVIDUAL">Individual Employee</option>
+                        <option value="ALL_ACTIVE">
+                          All Eligible Employees
+                        </option>
+                        <option value="ALL_ON_DUTY">
+                          All On Duty
+                        </option>
+                        <option value="FULL_TIME">Full-Time Employees</option>
+                        <option value="PER_DIEM">Per-Diem Employees</option>
+                        <option value="PARAMEDICS">Paramedics / ALS</option>
+                        <option value="EMTS">EMTs / BLS</option>
+                        <option value="SUPERVISORS">Supervisors</option>
+                      </select>
+                    </label>
+
+                    {smsRecipientMode === 'INDIVIDUAL' && (
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                        Employee
+                        <select
+                          value={smsRecipientEmployeeId}
+                          onChange={(event) =>
+                            setSmsRecipientEmployeeId(event.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900 outline-none focus:border-slate-500"
+                        >
+                          <option value="">Select an eligible employee</option>
+                          {smsEligibleEmployees.map((employee) => (
+                            <option key={employee.id} value={employee.id}>
+                              {employee.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+
+                  {smsRecipientMode === 'ALL_ON_DUTY' && (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-800">
+                      All On Duty recipient calculation will be connected to the
+                      live schedule in the next phase. Vacation, Sick, and Leave
+                      assignments will be excluded.
+                    </div>
+                  )}
+
+                  <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Message
+                    <textarea
+                      value={smsMessageBody}
+                      onChange={(event) =>
+                        setSmsMessageBody(event.target.value.slice(0, 480))
+                      }
+                      rows={6}
+                      placeholder="Enter an operational notification..."
+                      className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-900 outline-none focus:border-slate-500"
+                    />
+                  </label>
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                    <span>
+                      {smsMessageBody.length}/480 characters
+                    </span>
+                    <span>
+                      Selected recipients: {smsSelectedRecipientCount}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Message Preview
+                    </div>
+                    <div className="mt-2 whitespace-pre-wrap text-sm text-slate-800">
+                      {smsMessageBody.trim() ||
+                        'Your SMS notification preview will appear here.'}
+                    </div>
+                    <div className="mt-3 border-t border-slate-200 pt-2 text-xs text-slate-500">
+                      ApolloEMS automated notification. Replies are not monitored.
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      disabled
+                      title="Twilio delivery setup is pending."
+                      className="cursor-not-allowed rounded-xl bg-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                    >
+                      Send SMS — Setup Pending
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">
+                      Recipient Readiness
+                    </div>
+
+                    <dl className="mt-3 space-y-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-600">Eligible</dt>
+                        <dd className="font-bold text-emerald-700">
+                          {smsPreferencesLoading
+                            ? '—'
+                            : smsEligibleEmployees.length}
+                        </dd>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-600">
+                          Missing consent or unavailable
+                        </dt>
+                        <dd className="font-bold text-amber-700">
+                          {smsPreferencesLoading
+                            ? '—'
+                            : smsExcludedEmployeeCount}
+                        </dd>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-600">
+                          Selected for this message
+                        </dt>
+                        <dd className="font-bold text-slate-900">
+                          {smsSelectedRecipientCount}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-3 text-xs text-slate-500">
+                      Apollo excludes employees who have not enabled SMS,
+                      disabled supervisor messages, opted out, or do not have a
+                      valid authorized mobile number.
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-900">
+                      Sending Rules
+                    </div>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                      <li>• Supervisor access only</li>
+                      <li>• Outbound notifications only</li>
+                      <li>• Consent-aware recipient filtering</li>
+                      <li>• No patient or protected health information</li>
+                      <li>• Every send recorded in the audit log</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      SMS Audit Log
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Sent messages will be retained with the supervisor,
+                      recipients, delivery status, and failure details.
+                    </div>
+                  </div>
+
+                  <input
+                    type="search"
+                    value={smsAuditSearch}
+                    onChange={(event) => setSmsAuditSearch(event.target.value)}
+                    placeholder="Search audit log..."
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 sm:w-72"
+                  />
+                </div>
+
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                  No SMS messages have been sent. Audit records will appear here
+                  after Twilio delivery is connected.
+                </div>
               </div>
             </div>,
           )}
