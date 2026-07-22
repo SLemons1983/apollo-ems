@@ -2677,22 +2677,42 @@ export default function SchedulePage() {
     });
   };
 
-  const handleRemoveExtraShift = (dateKey: string, extraId: string, label: string) => {
+  const handleRemoveExtraShift = async (dateKey: string, extraId: string, label: string) => {
     const confirmed = window.confirm(`Remove extra shift "${label}" from this day?`);
     if (!confirmed) {
       return;
     }
 
-    markUnsavedChanges(dateKey);
-    setScheduleDataSafely((current) => {
-      const next = cloneScheduleData(normalizeLoadedData(current));
-      if (!next[dateKey]) {
-        return current;
-      }
+    if (isSavingScheduleRef.current) {
+      return;
+    }
 
-      next[dateKey].extras = next[dateKey].extras.filter((item) => item.id !== extraId);
-      return next;
-    });
+    const previousSchedule = scheduleDataRef.current;
+    const next = cloneScheduleData(normalizeLoadedData(previousSchedule));
+    const day = next[dateKey];
+
+    if (!day || !day.extras.some((item) => item.id === extraId)) {
+      return;
+    }
+
+    day.extras = day.extras.filter((item) => item.id !== extraId);
+
+    markUnsavedChanges(dateKey);
+    scheduleDataRef.current = next;
+    setScheduleData(next);
+
+    const saved = await saveScheduleToSupabase();
+
+    if (saved) {
+      setExpandedShiftKey(null);
+      setPendingExpandedShiftKey(null);
+      return;
+    }
+
+    scheduleDataRef.current = previousSchedule;
+    setScheduleData(previousSchedule);
+    dirtyDatesRef.current.add(dateKey);
+    setHasUnsavedChanges(true);
   };
 
   const handleCopyPreviousDay = (dateKey: string, previousDateKey: string) => {
@@ -4729,7 +4749,7 @@ export default function SchedulePage() {
                           </button>
                         </div>
 
-                        <button type="button" onClick={() => handleRemoveExtraShift(selectedExtraShift.dateKey, extra.id, extra.label)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                        <button type="button" onClick={() => void handleRemoveExtraShift(selectedExtraShift.dateKey, extra.id, extra.label)} disabled={saveStatus.startsWith('Saving')} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60">
                           Remove Extra Shift
                         </button>
                       </div>
