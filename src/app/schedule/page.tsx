@@ -3984,7 +3984,8 @@ export default function SchedulePage() {
                           {renderEmployeeSlotEditor(
                             shift.employee1,
                             'Employee 1',
-                            true,
+                            isExpanded ||
+                              !['SICK', 'LEAVE', 'VACATION'].includes(shift.employee1.shiftType),
                             (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee1', field, value),
                             isExpanded,
                             slotEligibilityMaps.employee1,
@@ -3996,7 +3997,8 @@ export default function SchedulePage() {
                             renderEmployeeSlotEditor(
                               shift.employee2,
                               'Employee 2',
-                              true,
+                              isExpanded ||
+                                !['SICK', 'LEAVE', 'VACATION'].includes(shift.employee2.shiftType),
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee2', field, value),
                               isExpanded,
                               slotEligibilityMaps.employee2,
@@ -4008,7 +4010,9 @@ export default function SchedulePage() {
                             renderEmployeeSlotEditor(
                               shift.employee3,
                               'Employee 3',
-                              shift.showEmployee3 || Boolean(shift.employee3.employeeId),
+                              (shift.showEmployee3 || Boolean(shift.employee3.employeeId)) &&
+                                (isExpanded ||
+                                  !['SICK', 'LEAVE', 'VACATION'].includes(shift.employee3.shiftType)),
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee3', field, value),
                               isExpanded,
                               slotEligibilityMaps.employee3,
@@ -4019,7 +4023,9 @@ export default function SchedulePage() {
                             renderEmployeeSlotEditor(
                               shift.employee4,
                               'Employee 4',
-                              shift.visibleEmployeeSlots >= 4 || Boolean(shift.employee4.employeeId),
+                              (shift.visibleEmployeeSlots >= 4 || Boolean(shift.employee4.employeeId)) &&
+                                (isExpanded ||
+                                  !['SICK', 'LEAVE', 'VACATION'].includes(shift.employee4.shiftType)),
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee4', field, value),
                               isExpanded,
                               slotEligibilityMaps.employee4,
@@ -4031,7 +4037,9 @@ export default function SchedulePage() {
                             renderEmployeeSlotEditor(
                               shift.employee5,
                               'Employee 5',
-                              shift.visibleEmployeeSlots >= 5 || Boolean(shift.employee5.employeeId),
+                              (shift.visibleEmployeeSlots >= 5 || Boolean(shift.employee5.employeeId)) &&
+                                (isExpanded ||
+                                  !['SICK', 'LEAVE', 'VACATION'].includes(shift.employee5.shiftType)),
                               (field, value) => handleStandardSlotChange(dateKey, shiftName, 'employee5', field, value),
                               isExpanded,
                               slotEligibilityMaps.employee5,
@@ -4337,7 +4345,8 @@ export default function SchedulePage() {
                               {renderEmployeeSlotEditor(
                                 extra.employee1,
                                 'Employee 1',
-                                true,
+                                isExpanded ||
+                                  !['SICK', 'LEAVE', 'VACATION'].includes(extra.employee1.shiftType),
                                 (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee1', field, value),
                                 isExpanded,
                                 slotEligibilityMaps.employee1,
@@ -4349,7 +4358,8 @@ export default function SchedulePage() {
                                 renderEmployeeSlotEditor(
                                   extra.employee2,
                                   'Employee 2',
-                                  true,
+                                  isExpanded ||
+                                    !['SICK', 'LEAVE', 'VACATION'].includes(extra.employee2.shiftType),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee2', field, value),
                                   isExpanded,
                                   slotEligibilityMaps.employee2,
@@ -4361,7 +4371,9 @@ export default function SchedulePage() {
                                 renderEmployeeSlotEditor(
                                   extra.employee3,
                                   'Employee 3',
-                                  extra.showEmployee3 || Boolean(extra.employee3.employeeId),
+                                  (extra.showEmployee3 || Boolean(extra.employee3.employeeId)) &&
+                                    (isExpanded ||
+                                      !['SICK', 'LEAVE', 'VACATION'].includes(extra.employee3.shiftType)),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee3', field, value),
                                   isExpanded,
                                   slotEligibilityMaps.employee3,
@@ -4372,7 +4384,9 @@ export default function SchedulePage() {
                                 renderEmployeeSlotEditor(
                                   extra.employee4,
                                   'Employee 4',
-                                  extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId),
+                                  (extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId)) &&
+                                    (isExpanded ||
+                                      !['SICK', 'LEAVE', 'VACATION'].includes(extra.employee4.shiftType)),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee4', field, value),
                                   isExpanded,
                                   slotEligibilityMaps.employee4,
@@ -4384,7 +4398,9 @@ export default function SchedulePage() {
                                 renderEmployeeSlotEditor(
                                   extra.employee5,
                                   'Employee 5',
-                                  extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId),
+                                  (extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId)) &&
+                                    (isExpanded ||
+                                      !['SICK', 'LEAVE', 'VACATION'].includes(extra.employee5.shiftType)),
                                   (field, value) => handleExtraSlotChange(dateKey, extra.id, 'employee5', field, value),
                                   isExpanded,
                                   slotEligibilityMaps.employee5,
