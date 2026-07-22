@@ -87,6 +87,7 @@ Assigned Supervisor: ${assignedSupervisor || existingReport.assigned_supervisor 
 
 Thank you,
 ApolloEMS`,
+        allowSuppressedRecipients: true,
       });
     }
 

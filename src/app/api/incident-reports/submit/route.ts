@@ -167,6 +167,7 @@ Supervisor Instructions:
 2. Follow up with the employee if more information is needed.
 3. Document disposition and retain according to company policy.`,
         attachments,
+        allowSuppressedRecipients: true,
       })
     ));
 

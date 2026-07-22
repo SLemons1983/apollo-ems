@@ -4,6 +4,8 @@ const FROM_EMAIL =
   process.env.APOLLO_EMAIL_FROM ||
   'ApolloEMS Notifications <notifications@apolloems.org>';
 
+const SUPPRESSED_ROUTINE_RECIPIENTS = new Set(['russ@sscems.com']);
+
 export async function sendApolloEmail(params: {
   to: string;
   subject: string;
@@ -12,7 +14,22 @@ export async function sendApolloEmail(params: {
     filename: string;
     content: Buffer;
   }[];
+  allowSuppressedRecipients?: boolean;
 }) {
+  const recipients = params.to
+    .split(',')
+    .map((email) => email.trim())
+    .filter(Boolean)
+    .filter(
+      (email) =>
+        params.allowSuppressedRecipients ||
+        !SUPPRESSED_ROUTINE_RECIPIENTS.has(email.toLowerCase()),
+    );
+
+  if (recipients.length === 0) {
+    return { data: null, error: null, skipped: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -20,11 +37,6 @@ export async function sendApolloEmail(params: {
   }
 
   const resend = new Resend(apiKey);
-
-  const recipients = params.to
-    .split(',')
-    .map((email) => email.trim())
-    .filter(Boolean);
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
