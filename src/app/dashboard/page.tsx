@@ -1118,6 +1118,7 @@ export default function DashboardPage() {
   const [selectedVacationShift, setSelectedVacationShift] = useState<SelectedVacationShift | null>(null);
   const [vacationReason, setVacationReason] = useState('');
   const [vacationRequestStatus, setVacationRequestStatus] = useState('');
+  const [revokingVacationKey, setRevokingVacationKey] = useState('');
   const [smsPreferenceRow, setSmsPreferenceRow] = useState<SmsPreferenceRow | null>(null);
   const [smsCategoryPreferences, setSmsCategoryPreferences] =
     useState<SmsCategoryPreferences>({ ...DEFAULT_SMS_CATEGORY_PREFERENCES });
@@ -4312,6 +4313,122 @@ export default function DashboardPage() {
     setSelectedVacationShift(null);
   }
 
+  async function revokeApprovedVacation(params: {
+    dateKey: string;
+    shiftLabel: string;
+    startTime: string;
+    endTime: string;
+  }) {
+    if (!currentEmployee || revokingVacationKey) return;
+
+    const actionKey = `${params.dateKey}-${params.shiftLabel}-${params.startTime}-${params.endTime}`;
+    const confirmed = window.confirm(
+      `Revoke your approved vacation for ${params.shiftLabel} on ${params.dateKey}? You will be returned to the schedule. This can only be completed while the coverage shift is still open.`,
+    );
+    if (!confirmed) return;
+
+    setRevokingVacationKey(actionKey);
+    setVacationRequestStatus('Checking the vacation coverage shift...');
+
+    try {
+      const { data: requestRows, error: requestError } = await supabase
+        .from('vacation_requests')
+        .select('*')
+        .eq('employee_id', currentEmployee.id)
+        .eq('date_key', params.dateKey)
+        .eq('status', 'APPROVED')
+        .order('requested_at', { ascending: false })
+        .limit(1);
+
+      if (requestError) throw requestError;
+      const request = requestRows?.[0];
+      if (!request) {
+        window.alert('Apollo could not find the approved vacation request. Please contact a supervisor.');
+        return;
+      }
+
+      const { data: assignmentRows, error: assignmentError } = await supabase
+        .from('schedule_assignments')
+        .select('*')
+        .eq('date_key', params.dateKey);
+
+      if (assignmentError) throw assignmentError;
+
+      const vacationRow = (assignmentRows ?? []).find((row: any) =>
+        row.employee_id === currentEmployee.id &&
+        row.shift_type === 'VACATION' &&
+        row.start_time === params.startTime &&
+        row.end_time === params.endTime,
+      );
+
+      const coverageNote = `Vacation coverage for ${currentEmployee.name}`;
+      const taggedCoverageRows = (assignmentRows ?? []).filter((row: any) =>
+        row.note === coverageNote &&
+        row.start_time === params.startTime &&
+        row.end_time === params.endTime,
+      );
+      const openCoverageRow = taggedCoverageRows.find((row: any) => row.is_open_slot);
+
+      if (!vacationRow) {
+        window.alert('Apollo could not find your Vacation assignment. No schedule changes were made.');
+        return;
+      }
+
+      if (!openCoverageRow) {
+        const message = taggedCoverageRows.length > 0
+          ? 'This vacation can no longer be revoked automatically because the coverage shift has already been filled. Please contact a supervisor.'
+          : 'Apollo could not verify the original open coverage shift. Please contact a supervisor; no schedule changes were made.';
+        window.alert(message);
+        return;
+      }
+
+      const coverageIsExtra = String(openCoverageRow.shift_key ?? '').startsWith('EXTRA::');
+      const rowsToRestore = coverageIsExtra
+        ? (assignmentRows ?? []).filter((row: any) => row.shift_key === openCoverageRow.shift_key)
+        : [openCoverageRow];
+
+      const { error: restoreShiftError } = await supabase
+        .from('schedule_assignments')
+        .update({ shift_type: 'REGULAR', updated_at: new Date().toISOString() })
+        .eq('id', vacationRow.id);
+      if (restoreShiftError) throw restoreShiftError;
+
+      const coverageDelete = coverageIsExtra
+        ? supabase.from('schedule_assignments').delete().eq('date_key', params.dateKey).eq('shift_key', openCoverageRow.shift_key)
+        : supabase.from('schedule_assignments').delete().eq('id', openCoverageRow.id);
+      const { error: coverageDeleteError } = await coverageDelete;
+
+      if (coverageDeleteError) {
+        await supabase.from('schedule_assignments').update({ shift_type: 'VACATION' }).eq('id', vacationRow.id);
+        throw coverageDeleteError;
+      }
+
+      const { error: requestUpdateError } = await supabase
+        .from('vacation_requests')
+        .update({
+          status: 'DENIED',
+          supervisor_note: 'Approved vacation was revoked by the employee before the coverage shift was filled.',
+        })
+        .eq('id', request.id);
+
+      if (requestUpdateError) {
+        await supabase.from('schedule_assignments').upsert(rowsToRestore, { onConflict: 'id' });
+        await supabase.from('schedule_assignments').update({ shift_type: 'VACATION' }).eq('id', vacationRow.id);
+        throw requestUpdateError;
+      }
+
+      await reloadPublishedSchedule();
+      setVacationRequestStatus('Vacation revoked. You have been returned to the schedule.');
+      window.alert('Your vacation was revoked successfully, and you have been returned to the schedule.');
+    } catch (error) {
+      console.error('Failed to revoke approved vacation:', error);
+      setVacationRequestStatus('Vacation could not be revoked. No confirmed changes were made.');
+      window.alert('Apollo could not revoke this vacation. Please contact a supervisor.');
+    } finally {
+      setRevokingVacationKey('');
+    }
+  }
+
   function getMyTradeAssignments() {
     return dates.flatMap((date) => {
       const dateKey = toDateKey(date);
@@ -4482,9 +4599,12 @@ export default function DashboardPage() {
               <button
                 type="button"
                 key={`${dateKey}-${assignment.key}-${slot.employeeId}`}
-                disabled={isVacation}
+                disabled={isVacation && Boolean(revokingVacationKey)}
                 onClick={() => {
-                  if (isVacation) return;
+                  if (isVacation) {
+                    void revokeApprovedVacation({ dateKey, shiftLabel: assignment.label, startTime: slot.startTime, endTime: slot.endTime });
+                    return;
+                  }
                   setVacationRequestStatus('');
                   setSelectedVacationShift({
                     dateKey,
@@ -4497,7 +4617,7 @@ export default function DashboardPage() {
                 }}
                 className={`rounded-2xl border p-4 text-left shadow-sm transition ${
                   isVacation
-                    ? 'cursor-default border-violet-300 bg-violet-50 shadow-md'
+                    ? 'border-violet-300 bg-violet-50 shadow-md hover:-translate-y-0.5 hover:shadow-lg'
                     : 'hover:-translate-y-0.5 hover:shadow-md'
                 } ${
                   isToday
@@ -4524,9 +4644,10 @@ export default function DashboardPage() {
                 </div>
 
                 {isVacation && (
-                  <div className="mt-3 inline-flex rounded-full border border-violet-200 bg-violet-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-violet-800">
-                    Vacation
-                  </div>
+                  <>
+                    <div className="mt-3 inline-flex rounded-full border border-violet-200 bg-violet-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-violet-800">Vacation</div>
+                    <div className="mt-3 text-xs font-bold text-violet-700">{revokingVacationKey ? 'Checking coverage...' : 'Click to revoke vacation'}</div>
+                  </>
                 )}
 
                 {slot.note && (
@@ -4689,10 +4810,14 @@ export default function DashboardPage() {
                               return (
                                 <div
                                   key={`${assignment.key}-${slot.employeeId}-${index}`}
-                                  role={isCurrentEmployee && !isCurrentEmployeeVacation ? 'button' : undefined}
-                                  tabIndex={isCurrentEmployee && !isCurrentEmployeeVacation ? 0 : undefined}
+                                  role={isCurrentEmployee ? 'button' : undefined}
+                                  tabIndex={isCurrentEmployee ? 0 : undefined}
                                   onClick={() => {
-                                    if (!isCurrentEmployee || isCurrentEmployeeVacation) return;
+                                    if (!isCurrentEmployee) return;
+                                    if (isCurrentEmployeeVacation) {
+                                      void revokeApprovedVacation({ dateKey, shiftLabel: assignment.label, startTime: slot.startTime, endTime: slot.endTime });
+                                      return;
+                                    }
                                     setVacationRequestStatus('');
                                     setSelectedVacationShift({
                                       dateKey,
@@ -4704,7 +4829,7 @@ export default function DashboardPage() {
                                     });
                                   }}
                                   className={`rounded-lg border px-2.5 py-2 ${
-                                    isCurrentEmployee && !isCurrentEmployeeVacation
+                                    isCurrentEmployee
                                       ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200'
                                       : ''
                                   } ${
@@ -4732,9 +4857,10 @@ export default function DashboardPage() {
                                   )}
 
                                   {isCurrentEmployeeVacation && (
-                                    <div className="mt-1 inline-flex rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">
-                                      Vacation
-                                    </div>
+                                    <>
+                                      <div className="mt-1 inline-flex rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">Vacation</div>
+                                      <div className="mt-1 text-[11px] font-semibold text-violet-700">{revokingVacationKey ? 'Checking coverage...' : 'Click to revoke vacation'}</div>
+                                    </>
                                   )}
 
                                   {isCurrentEmployee && !isCurrentEmployeeVacation && (
