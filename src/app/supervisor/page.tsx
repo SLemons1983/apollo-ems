@@ -6099,18 +6099,6 @@ export default function SupervisorPage() {
                   smsEligibleEmployees.length === 1 ? '' : 's'
                 } currently eligible for supervisor SMS messages.`,
             <div className="space-y-5">
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <div className="text-sm font-bold text-blue-900">
-                  Outbound operational notifications only
-                </div>
-                <div className="mt-1 text-sm text-blue-800">
-                  Only supervisors may send SMS messages through ApolloEMS.
-                  Replies are not monitored and will not create conversations
-                  inside Apollo. Employees should not send patient information or
-                  emergency requests by text.
-                </div>
-              </div>
-
               <div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-bold text-slate-900">
@@ -6232,61 +6220,102 @@ export default function SupervisorPage() {
 
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <details className="group rounded-xl border border-slate-200 bg-white">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
                   <div>
                     <div className="text-sm font-bold text-slate-900">
                       SMS Audit Log
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Sent messages will be retained with the supervisor,
-                      recipients, delivery status, and failure details.
+                      Sent messages, recipients, delivery status, and failure details.
                     </div>
                   </div>
 
-                  <input
-                    type="search"
-                    value={smsAuditSearch}
-                    onChange={(event) => setSmsAuditSearch(event.target.value)}
-                    placeholder="Search audit log..."
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 sm:w-72"
-                  />
-                </div>
+                  <span className="shrink-0 text-sm font-semibold text-blue-700 group-open:hidden">
+                    Show Log
+                  </span>
+                  <span className="hidden shrink-0 text-sm font-semibold text-blue-700 group-open:inline">
+                    Hide Log
+                  </span>
+                </summary>
 
-                {smsAuditLoading ? (
-                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                    Loading SMS audit records…
+                <div className="border-t border-slate-200 p-4">
+                  <div className="flex justify-end">
+                    <input
+                      type="search"
+                      value={smsAuditSearch}
+                      onChange={(event) => setSmsAuditSearch(event.target.value)}
+                      placeholder="Search audit log..."
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 sm:w-72"
+                    />
                   </div>
-                ) : filteredSmsAuditRows.length === 0 ? (
-                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                    No matching SMS audit records.
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-3">
-                    {filteredSmsAuditRows.map((row) => (
-                      <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div>
-                            <div className="text-sm font-bold text-slate-900">
-                              {row.recipient_email}
+
+                  {smsAuditLoading ? (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                      Loading SMS audit records…
+                    </div>
+                  ) : filteredSmsAuditRows.length === 0 ? (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                      No matching SMS audit records.
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {filteredSmsAuditRows.map((row) => {
+                        const sender =
+                          employees.find(
+                            (employee) =>
+                              employee.id === row.sent_by_employee_id ||
+                              employee.email.trim().toLowerCase() ===
+                                row.sent_by_email.trim().toLowerCase(),
+                          )?.name ?? row.sent_by_email;
+
+                        const recipient =
+                          row.recipient_mode === 'INDIVIDUAL'
+                            ? employees.find(
+                                (employee) =>
+                                  employee.id === row.recipient_employee_id,
+                              )?.name ?? row.recipient_email
+                            : ({
+                                ALL_ACTIVE: 'All Employees',
+                                ALL_ON_DUTY: 'All On Duty',
+                                FULL_TIME: 'Full-Time Employees',
+                                PER_DIEM: 'Per-Diem Employees',
+                                PARAMEDICS: 'All Paramedics',
+                                EMTS: 'All EMTs',
+                                FULL_TIME_PARAMEDICS: 'Full-Time Paramedics',
+                                FULL_TIME_EMTS: 'Full-Time EMTs',
+                                PER_DIEM_PARAMEDICS: 'Per-Diem Paramedics',
+                                PER_DIEM_EMTS: 'Per-Diem EMTs',
+                                SUPERVISORS: 'Supervisors',
+                              } as Record<string, string>)[row.recipient_mode] ??
+                              row.recipient_mode.replaceAll('_', ' ');
+
+                        return (
+                          <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-bold text-slate-900">
+                                  {sender}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                  {new Date(row.sent_at).toLocaleString()} · Sent to {recipient}
+                                </div>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.delivery_status === 'SENT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {row.delivery_status}
+                              </span>
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {new Date(row.sent_at).toLocaleString()} · {row.recipient_mode.replaceAll('_', ' ')} · sent by {row.sent_by_email}
-                            </div>
+                            <div className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{row.message_body}</div>
+                            {row.error_message && (
+                              <div className="mt-2 text-xs text-red-700">{row.error_message}</div>
+                            )}
                           </div>
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.delivery_status === 'SENT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {row.delivery_status}
-                          </span>
-                        </div>
-                        <div className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{row.message_body}</div>
-                        {row.error_message && (
-                          <div className="mt-2 text-xs text-red-700">{row.error_message}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>,
           )}
 
