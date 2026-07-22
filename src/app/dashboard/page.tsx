@@ -269,28 +269,6 @@ type CompanyAnnouncement = {
   postedBy: string;
 };
 
-type ApolloMessageRecipient = {
-  employeeId: string;
-  deliveredAt: string;
-  readAt: string | null;
-};
-
-type ApolloMessage = {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  senderName: string;
-  senderRole: 'EMPLOYEE' | 'SUPERVISOR' | 'SYSTEM';
-  recipients: ApolloMessageRecipient[];
-  audienceLabel: string;
-  title: string;
-  body: string;
-  createdAt: string;
-  relatedType: 'TIMECARD_RETURNED' | 'GENERAL' | 'SCHEDULE' | 'URGENT';
-  relatedId?: string;
-  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
-};
-
 type TimecardPayType =
   | 'DAILY_OT_DT'
   | 'TWENTY_FOUR_HOUR'
@@ -1078,7 +1056,6 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = useState<ScheduleData>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
-  const [apolloMessages, setApolloMessages] = useState<ApolloMessage[]>([]);
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
@@ -1770,34 +1747,6 @@ export default function DashboardPage() {
         });
 
       supabase
-        .from('apollo_messages')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .then(({ data: messageData, error: messageError }) => {
-          if (messageError) {
-            console.error('Failed to load Apollo messages:', messageError);
-          } else {
-            setApolloMessages(
-              (messageData ?? []).map((row: any) => ({
-                id: row.id,
-                conversationId: row.conversation_id,
-                senderId: row.sender_id,
-                senderName: row.sender_name,
-                senderRole: row.sender_role,
-                recipients: row.recipients ?? [],
-                audienceLabel: row.audience_label,
-                title: row.title,
-                body: row.body,
-                createdAt: row.created_at,
-                relatedType: row.related_type ?? undefined,
-                relatedId: row.related_id ?? undefined,
-                priority: row.priority ?? 'NORMAL',
-              })),
-            );
-          }
-        });
-
-      supabase
         .from('system_config')
         .select('*')
         .eq('id', 'default')
@@ -2081,65 +2030,6 @@ export default function DashboardPage() {
 
 
 
-  async function refreshApolloMessages() {
-    const { data, error } = await supabase
-      .from('apollo_messages')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Apollo message refresh failed:', error);
-      return;
-    }
-
-    setApolloMessages(
-      (data ?? []).map((row: any) => ({
-        id: row.id,
-        conversationId: row.conversation_id,
-        senderId: row.sender_id,
-        senderName: row.sender_name,
-        senderRole: row.sender_role,
-        recipients: row.recipients ?? [],
-        audienceLabel: row.audience_label,
-        title: row.title,
-        body: row.body,
-        createdAt: row.created_at,
-        relatedType: row.related_type ?? undefined,
-        relatedId: row.related_id ?? undefined,
-        priority: row.priority ?? 'NORMAL',
-      })),
-    );
-  }
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-apollo-messages')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'apollo_messages',
-        },
-        async () => {
-          await refreshApolloMessages();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void refreshApolloMessages();
-    }, 10000);
-
-    return () => window.clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -2243,37 +2133,6 @@ export default function DashboardPage() {
           }
         });
     }
-  }
-
-  function saveApolloMessages(nextMessages: ApolloMessage[]) {
-    setApolloMessages(nextMessages);
-
-    const rows = nextMessages.map((message) => ({
-      id: message.id,
-      conversation_id: message.conversationId,
-      sender_id: message.senderId,
-      sender_name: message.senderName,
-      sender_role: message.senderRole,
-      recipients: message.recipients ?? [],
-      audience_label: message.audienceLabel,
-      title: message.title,
-      body: message.body,
-      created_at: message.createdAt,
-      related_type: message.relatedType ?? null,
-      related_id: message.relatedId ?? null,
-      priority: message.priority ?? 'NORMAL',
-      updated_at: new Date().toISOString(),
-    }));
-
-    supabase
-      .from('apollo_messages')
-      .upsert(rows, { onConflict: 'id' })
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to save Apollo messages:', error);
-          window.alert('Failed to save Apollo message.');
-        }
-      });
   }
 
   async function notifyEmployeesByEmail(params: {
@@ -4410,55 +4269,6 @@ export default function DashboardPage() {
     setSelectedTradeShiftKey('');
   }
 
-  async function respondToShiftTradeRequest(message: ApolloMessage, response: 'ACCEPT' | 'DECLINE') {
-    if (!currentEmployee || !message.relatedId) {
-      return;
-    }
-
-    const request = shiftTradeRequests.find((item) => item.id === message.relatedId);
-    if (!request) {
-      window.alert('Shift trade request was not found.');
-      return;
-    }
-
-    if (request.status !== 'PENDING_EMPLOYEE') {
-      window.alert('This shift trade request has already been reviewed.');
-      return;
-    }
-
-    if (request.targetEmployeeId !== currentEmployeeId) {
-      window.alert('You are not the target employee for this shift trade request.');
-      return;
-    }
-
-    const nextStatus: ShiftTradeRequest['status'] =
-      response === 'ACCEPT' ? 'PENDING_SUPERVISOR' : 'DECLINED_BY_EMPLOYEE';
-
-    const nextRequests = shiftTradeRequests.map((item) =>
-      item.id === request.id ? { ...item, status: nextStatus } : item,
-    );
-
-    const saved = await saveShiftTradeRequests(nextRequests);
-    if (!saved) {
-      return;
-    }
-
-    const body =
-      response === 'ACCEPT'
-        ? `${currentEmployee.name} accepted this shift trade request. It is now pending supervisor approval.`
-        : `${currentEmployee.name} declined this shift trade request.`;
-
-    const requestingEmployee = employees.find((employee) => employee.id === request.requestingEmployeeId);
-    if (requestingEmployee) {
-      await notifyEmployeesByEmail({
-        recipients: [requestingEmployee],
-        senderName: currentEmployee.name,
-        subject: 'ApolloEMS Shift Trade Update',
-        message: body,
-      });
-    }
-  }
-
   async function submitVacationRequest() {
     if (!currentEmployee || !selectedVacationShift) {
       return;
@@ -6250,7 +6060,7 @@ export default function DashboardPage() {
                         Notifications, you agree to receive recurring
                         operational text messages from ApolloEMS at the mobile
                         number shown above. Messages may include company
-                        announcements, Apollo message alerts, shift and
+                        announcements, operational alerts, shift and
                         shift-trade decisions, certification reminders,
                         timecard notifications, and supervisor operational
                         messages. Message frequency varies. Message and data
