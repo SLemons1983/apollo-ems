@@ -3628,7 +3628,13 @@ export default function SchedulePage() {
     const onDutyEmployees = getAssignmentRefsForDay(getDaySchedule(scheduleData, todayKey))
     .flatMap((assignment) =>
       getAssignedSlotsForAssignment(assignment.category, assignment.shift)
-        .filter((slot) => slot.employeeId)
+        .filter(
+          (slot) =>
+            slot.employeeId &&
+            slot.shiftType !== 'SICK' &&
+            slot.shiftType !== 'LEAVE' &&
+            slot.shiftType !== 'VACATION',
+        )
         .map((slot) => ({
           employeeName: getEmployeeById(slot.employeeId, employees)?.name ?? slot.employeeId,
           shiftLabel: assignment.label,
