@@ -1339,7 +1339,6 @@ export default function SchedulePage() {
   const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
-  const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showPendingShiftTradeRequests, setShowPendingShiftTradeRequests] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
@@ -1359,7 +1358,6 @@ export default function SchedulePage() {
   }
 
   function closeSchedulePanels() {
-    setShowPendingOpenShiftRequests(false);
     setShowPendingShiftTradeRequests(false);
     setShowSupervisorNotes(false);
     setShowOnDutyEmployees(false);
@@ -1914,7 +1912,79 @@ export default function SchedulePage() {
     if (error) {
       console.error('Failed to save open shift requests:', error);
       window.alert('Failed to save open shift requests.');
+      return false;
     }
+
+    return true;
+  }
+
+  async function resolveOpenShiftRequestsFromDropdown(
+    requestContext: { dateKey: string; shiftKey: string; shiftLabel: string },
+    assignedEmployeeId: string,
+  ) {
+    const matchingRequests = openShiftRequests.filter((request) => {
+      if (request.status !== 'PENDING' || request.dateKey !== requestContext.dateKey) {
+        return false;
+      }
+
+      return (
+        request.shiftKey === requestContext.shiftKey ||
+        request.shiftKey === requestContext.shiftKey.replace(/^standard-/, '') ||
+        request.shiftLabel === requestContext.shiftLabel
+      );
+    });
+
+    if (matchingRequests.length === 0) {
+      return;
+    }
+
+    const decisions = matchingRequests.map((request) => ({
+      request,
+      status: (request.employeeId === assignedEmployeeId ? 'APPROVED' : 'DENIED') as
+        | 'APPROVED'
+        | 'DENIED',
+    }));
+
+    const decisionById = new Map(decisions.map((decision) => [decision.request.id, decision.status]));
+    const nextRequests = openShiftRequests.map((request) => {
+      const status = decisionById.get(request.id);
+      if (!status) {
+        return request;
+      }
+
+      return {
+        ...request,
+        status,
+        supervisorNote:
+          status === 'APPROVED'
+            ? 'Automatically approved when the employee was assigned through the schedule dropdown.'
+            : 'Automatically denied when another employee was assigned through the schedule dropdown.',
+      };
+    });
+
+    const saved = await saveOpenShiftRequests(nextRequests);
+    if (!saved) {
+      setSaveStatus(
+        'Schedule saved, but open shift request decisions need supervisor attention.',
+      );
+      return;
+    }
+
+    await Promise.all(
+      decisions.map(({ request, status }) =>
+        sendOpenShiftDecisionNotifications(request, status),
+      ),
+    );
+
+    const approvedCount = decisions.filter(({ status }) => status === 'APPROVED').length;
+    const deniedCount = decisions.length - approvedCount;
+    setSaveStatus(
+      `Schedule saved. ${approvedCount > 0 ? 'Request approved' : 'No requester selected'}${
+        deniedCount > 0
+          ? `; ${deniedCount} other request${deniedCount === 1 ? '' : 's'} denied`
+          : ''
+      }. Notifications sent.`,
+    );
   }
 
   function findTradeSlot(schedule: ScheduleData, dateKey: string, shiftKey: string, employeeId: string) {
@@ -2855,6 +2925,19 @@ export default function SchedulePage() {
           setSaveStatus(
             'Action Required — assignment was restored because the schedule could not be saved.',
           );
+          return;
+        }
+
+        if (
+          requestContext &&
+          isOpenShiftSlot(previousEmployeeId) &&
+          nextEmployeeId &&
+          !isOpenShiftSlot(nextEmployeeId)
+        ) {
+          await resolveOpenShiftRequestsFromDropdown(
+            requestContext,
+            nextEmployeeId,
+          );
         }
       };
 
@@ -3520,81 +3603,6 @@ export default function SchedulePage() {
                           <button
                             type="button"
                             onClick={() => updateShiftTradeRequestStatus(request.id, 'APPROVED')}
-                            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
-                          >
-                            Approve
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-red-500 bg-red-50' : 'border-slate-500 bg-white'}`}>
-            <button
-              type="button"
-              onClick={() => {
-                const nextValue = !showPendingOpenShiftRequests;
-                closeSchedulePanels();
-                setShowPendingOpenShiftRequests(nextValue);
-              }}
-              className="flex w-full items-center justify-between gap-3 text-left"
-            >
-              <div>
-                <div className={`text-sm font-bold ${pendingOpenShiftRequests.length > 0 ? 'text-red-800' : 'text-slate-900'}`}>
-                  Pending Open Shift Requests
-                </div>
-                <div className={`mt-1 text-xs ${pendingOpenShiftRequests.length > 0 ? 'text-red-700' : 'text-slate-500'}`}>
-                  {pendingOpenShiftRequests.length > 0
-                    ? `${pendingOpenShiftRequests.length} request${pendingOpenShiftRequests.length === 1 ? '' : 's'} awaiting review.`
-                    : 'No pending open shift requests.'}
-                </div>
-              </div>
-              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-red-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                {showPendingOpenShiftRequests ? 'Hide Details' : 'Show Details'}
-              </span>
-            </button>
-
-            {showPendingOpenShiftRequests && (
-              <div className="mt-2 space-y-2">
-                {pendingOpenShiftRequests.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                    No pending open shift requests.
-                  </div>
-                ) : (
-                  pendingOpenShiftRequests.map((request) => (
-                    <div key={request.id} className="rounded-xl border border-red-200 bg-white p-4">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
-                          <div className="mt-1 text-sm text-slate-600">
-                            {request.shiftLabel} • {request.dateKey}
-                          </div>
-                          <div className="mt-1 text-xs text-slate-500">
-                            Requested {new Date(request.requestedAt).toLocaleString('en-US', {
-                              month: 'numeric',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateOpenShiftRequestStatus(request.id, 'DENIED')}
-                            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                          >
-                            Deny
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateOpenShiftRequestStatus(request.id, 'APPROVED')}
                             className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
                           >
                             Approve
