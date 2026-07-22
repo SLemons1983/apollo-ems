@@ -2847,6 +2847,17 @@ export default function DashboardPage() {
     const shiftLabel =
       saved?.shiftLabel || assignment?.label || '';
 
+    const scheduleControlledPayType =
+      slot?.shiftType === 'SICK' ||
+      slot?.shiftType === 'VACATION' ||
+      slot?.shiftType === 'LEAVE'
+        ? getDefaultPayType(
+            assignment?.label || shiftLabel,
+            scheduledHours,
+            slot.shiftType,
+          )
+        : null;
+
     const punchPair = shiftLabel
       ? getPunchPairForShift(dateKey, shiftLabel)
       : { clockIn: null, clockOut: null };
@@ -2863,6 +2874,7 @@ export default function DashboardPage() {
       id: saved?.id ?? rowKey,
       shiftLabel,
       payType:
+        scheduleControlledPayType ||
         saved?.payType ||
         getDefaultPayType(
           shiftLabel,
@@ -4464,12 +4476,15 @@ export default function DashboardPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {myAssignments.map(({ date, dateKey, assignment, slot }) => {
             const isToday = dateKey === toDateKey(new Date());
+            const isVacation = slot.shiftType === 'VACATION';
 
             return (
               <button
                 type="button"
                 key={`${dateKey}-${assignment.key}-${slot.employeeId}`}
+                disabled={isVacation}
                 onClick={() => {
+                  if (isVacation) return;
                   setVacationRequestStatus('');
                   setSelectedVacationShift({
                     dateKey,
@@ -4480,7 +4495,11 @@ export default function DashboardPage() {
                     endTime: slot.endTime,
                   });
                 }}
-                className={`rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                className={`rounded-2xl border p-4 text-left shadow-sm transition ${
+                  isVacation
+                    ? 'cursor-default border-violet-300 bg-violet-50 shadow-md'
+                    : 'hover:-translate-y-0.5 hover:shadow-md'
+                } ${
                   isToday
                     ? 'border-emerald-300 bg-emerald-50'
                     : 'border-slate-300 bg-white shadow-md hover:shadow-lg'
@@ -4504,13 +4523,21 @@ export default function DashboardPage() {
                   {slot.startTime} - {slot.endTime}
                 </div>
 
+                {isVacation && (
+                  <div className="mt-3 inline-flex rounded-full border border-violet-200 bg-violet-100 px-3 py-1 text-xs font-bold uppercase tracking-wide text-violet-800">
+                    Vacation
+                  </div>
+                )}
+
                 {slot.note && (
                   <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
                     {slot.note}
                   </div>
                 )}
 
-                <div className="mt-3 text-xs font-bold text-emerald-700">Click to request vacation</div>
+                {!isVacation && (
+                  <div className="mt-3 text-xs font-bold text-emerald-700">Click to request vacation</div>
+                )}
               </button>
             );
           })}
@@ -4645,6 +4672,8 @@ export default function DashboardPage() {
                             {assignment.slots.map((slot, index) => {
                               const isOpenSlot = isOpenShiftSlot(slot.employeeId);
                               const isCurrentEmployee = slot.employeeId === currentEmployeeId;
+                              const isCurrentEmployeeVacation =
+                                isCurrentEmployee && slot.shiftType === 'VACATION';
 
                               if (
                                 isOpenSlot &&
@@ -4660,10 +4689,10 @@ export default function DashboardPage() {
                               return (
                                 <div
                                   key={`${assignment.key}-${slot.employeeId}-${index}`}
-                                  role={isCurrentEmployee ? 'button' : undefined}
-                                  tabIndex={isCurrentEmployee ? 0 : undefined}
+                                  role={isCurrentEmployee && !isCurrentEmployeeVacation ? 'button' : undefined}
+                                  tabIndex={isCurrentEmployee && !isCurrentEmployeeVacation ? 0 : undefined}
                                   onClick={() => {
-                                    if (!isCurrentEmployee) return;
+                                    if (!isCurrentEmployee || isCurrentEmployeeVacation) return;
                                     setVacationRequestStatus('');
                                     setSelectedVacationShift({
                                       dateKey,
@@ -4675,9 +4704,13 @@ export default function DashboardPage() {
                                     });
                                   }}
                                   className={`rounded-lg border px-2.5 py-2 ${
-                                    isCurrentEmployee ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200' : ''
+                                    isCurrentEmployee && !isCurrentEmployeeVacation
+                                      ? 'cursor-pointer hover:ring-2 hover:ring-emerald-200'
+                                      : ''
                                   } ${
-                                    isCurrentEmployee
+                                    isCurrentEmployeeVacation
+                                      ? 'border-violet-300 bg-violet-50'
+                                      : isCurrentEmployee
                                       ? 'border-emerald-300 bg-emerald-50'
                                       : isOpenSlot
                                         ? getOpenSlotColorClasses(slot.employeeId)
@@ -4698,7 +4731,13 @@ export default function DashboardPage() {
                                     </div>
                                   )}
 
-                                  {isCurrentEmployee && (
+                                  {isCurrentEmployeeVacation && (
+                                    <div className="mt-1 inline-flex rounded-full border border-violet-200 bg-violet-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">
+                                      Vacation
+                                    </div>
+                                  )}
+
+                                  {isCurrentEmployee && !isCurrentEmployeeVacation && (
                                     <div className="mt-1 text-[11px] font-semibold text-emerald-700">
                                       Click to request vacation
                                     </div>
