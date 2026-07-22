@@ -179,6 +179,20 @@ type ShiftTradeRequest = {
   supervisorNote?: string;
 };
 
+type VacationRequest = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  dateKey: string;
+  shiftLabel: string;
+  startTime: string;
+  endTime: string;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  supervisorNote?: string;
+  requestedAt: string;
+};
+
 const STORAGE_KEY = 'apollo-schedule-page-v6';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
@@ -1339,6 +1353,8 @@ export default function SchedulePage() {
   const [saveStatus, setSaveStatus] = useState('Schedule loaded.');
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
+  const [vacationRequests, setVacationRequests] = useState<VacationRequest[]>([]);
+  const [showPendingVacationRequests, setShowPendingVacationRequests] = useState(false);
   const [showPendingShiftTradeRequests, setShowPendingShiftTradeRequests] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
@@ -1358,6 +1374,7 @@ export default function SchedulePage() {
   }
 
   function closeSchedulePanels() {
+    setShowPendingVacationRequests(false);
     setShowPendingShiftTradeRequests(false);
     setShowSupervisorNotes(false);
     setShowOnDutyEmployees(false);
@@ -1415,6 +1432,35 @@ export default function SchedulePage() {
           }
         } catch (openShiftError) {
           console.error('Failed to load open shift requests:', openShiftError);
+        }
+
+        try {
+          const { data: vacationData, error: vacationError } = await supabase
+            .from('vacation_requests')
+            .select('*')
+            .order('requested_at', { ascending: false });
+
+          if (vacationError) {
+            console.error('Failed to load vacation requests:', vacationError);
+          } else if (isActive) {
+            setVacationRequests(
+              (vacationData ?? []).map((row: any) => ({
+                id: row.id,
+                employeeId: row.employee_id,
+                employeeName: row.employee_name,
+                dateKey: row.date_key,
+                shiftLabel: row.shift_label,
+                startTime: row.start_time,
+                endTime: row.end_time,
+                reason: row.reason ?? '',
+                status: row.status,
+                supervisorNote: row.supervisor_note ?? undefined,
+                requestedAt: row.requested_at,
+              })),
+            );
+          }
+        } catch (vacationError) {
+          console.error('Failed to load vacation requests:', vacationError);
         }
 
         try {
@@ -1887,6 +1933,209 @@ export default function SchedulePage() {
       .filter((request) => request.status === 'PENDING_SUPERVISOR')
       .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
   }, [shiftTradeRequests]);
+
+  const pendingVacationRequests = useMemo(() => {
+    return vacationRequests
+      .filter((request) => request.status === 'PENDING')
+      .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
+  }, [vacationRequests]);
+
+  function applyApprovedVacationRequest(
+    current: ScheduleData,
+    request: VacationRequest,
+  ): { next: ScheduleData; applied: boolean } {
+    const next = cloneScheduleData(normalizeLoadedData(current));
+    const day = next[request.dateKey];
+    if (!day) return { next, applied: false };
+
+    const employee = employees.find((item) => item.id === request.employeeId);
+    if (!employee) return { next, applied: false };
+
+    const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+    let matchedShift: ShiftAssignment | ExtraShiftAssignment | null = null;
+    let matchedSlotKey: ScheduleSlotKey | null = null;
+
+    const matchingStandardNames = SHIFT_ORDER.filter(
+      (shiftName) => SHIFT_DISPLAY_NAMES[shiftName] === request.shiftLabel,
+    );
+    const standardNamesToSearch = matchingStandardNames.length > 0 ? matchingStandardNames : SHIFT_ORDER;
+
+    for (const shiftName of standardNamesToSearch) {
+      const shift = day.standard[shiftName];
+      const slotKey = slotKeys.find((key) => shift[key].employeeId === request.employeeId);
+      if (slotKey) {
+        matchedShift = shift;
+        matchedSlotKey = slotKey;
+        break;
+      }
+    }
+
+    if (!matchedShift) {
+      const matchingExtras = day.extras.filter((extra) => extra.label === request.shiftLabel);
+      const extrasToSearch = matchingExtras.length > 0 ? matchingExtras : day.extras;
+      for (const extra of extrasToSearch) {
+        const slotKey = slotKeys.find((key) => extra[key].employeeId === request.employeeId);
+        if (slotKey) {
+          matchedShift = extra;
+          matchedSlotKey = slotKey;
+          break;
+        }
+      }
+    }
+
+    if (!matchedShift || !matchedSlotKey) return { next, applied: false };
+
+    const vacationSlot = matchedShift[matchedSlotKey];
+    const coverageStartTime = vacationSlot.startTime || request.startTime || DEFAULT_START_TIME;
+    const coverageEndTime = vacationSlot.endTime || request.endTime || DEFAULT_END_TIME;
+    vacationSlot.shiftType = 'VACATION';
+
+    const openSlotId = employee.scope === 'BLS' ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+    const availableSlotKey = slotKeys.find((key) => !matchedShift![key].employeeId);
+
+    if (availableSlotKey) {
+      matchedShift[availableSlotKey] = {
+        employeeId: openSlotId,
+        startTime: coverageStartTime,
+        endTime: coverageEndTime,
+        note: `Vacation coverage for ${request.employeeName}`,
+        shiftType: 'REGULAR',
+      };
+      const slotNumber = slotKeys.indexOf(availableSlotKey) + 1;
+      matchedShift.visibleEmployeeSlots = Math.max(matchedShift.visibleEmployeeSlots, slotNumber);
+      matchedShift.showEmployee3 = matchedShift.visibleEmployeeSlots >= 3;
+    } else {
+      day.extras.push({
+        id: createExtraShiftId(),
+        label: `${request.shiftLabel} Vacation Coverage`,
+        category: 'UNIT',
+        employee1: {
+          employeeId: openSlotId,
+          startTime: coverageStartTime,
+          endTime: coverageEndTime,
+          note: `Vacation coverage for ${request.employeeName}`,
+          shiftType: 'REGULAR',
+        },
+        employee2: createEmptyEmployeeSlot(),
+        employee3: createEmptyEmployeeSlot(),
+        employee4: createEmptyEmployeeSlot(),
+        employee5: createEmptyEmployeeSlot(),
+        showEmployee3: false,
+        visibleEmployeeSlots: 2,
+        vehicle: '',
+        allowExtendedHours: false,
+        hiddenFromEmployees: false,
+        supervisorNote: `Created automatically for ${request.employeeName}'s approved vacation.`,
+      });
+    }
+
+    return { next, applied: true };
+  }
+
+  async function sendVacationDecisionNotifications(
+    request: VacationRequest,
+    status: 'APPROVED' | 'DENIED',
+  ) {
+    const employee = employees.find((item) => item.id === request.employeeId);
+    const title = status === 'APPROVED' ? 'Vacation request approved' : 'Vacation request denied';
+    const body = status === 'APPROVED'
+      ? `Your vacation request for ${request.shiftLabel} on ${request.dateKey} was approved. Your schedule has been updated.`
+      : `Your vacation request for ${request.shiftLabel} on ${request.dateKey} was denied. Please contact a supervisor if you have questions.`;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    const notifications: Promise<Response>[] = [];
+
+    if (employee?.email) {
+      notifications.push(fetch('/api/email/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: employee.email,
+          senderName: 'ApolloEMS Scheduling',
+          subject: title,
+          message: body,
+          notificationType: 'SCHEDULE',
+        }),
+      }));
+    }
+
+    if (accessToken) {
+      notifications.push(fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientMode: 'INDIVIDUAL',
+          recipientEmployeeId: request.employeeId,
+          messageBody: `ApolloEMS: ${body}`,
+        }),
+      }));
+    }
+
+    const results = await Promise.allSettled(notifications);
+    results.forEach((result) => {
+      if (result.status === 'rejected') {
+        console.error('Vacation decision notification failed:', result.reason);
+      } else if (!result.value.ok && result.value.status !== 400) {
+        console.error('Vacation decision notification was not accepted:', result.value.status);
+      }
+    });
+  }
+
+  async function updateVacationRequestStatus(requestId: string, status: 'APPROVED' | 'DENIED') {
+    const request = vacationRequests.find((item) => item.id === requestId);
+    if (!request) return;
+
+    const confirmed = window.confirm(
+      `${status === 'APPROVED' ? 'Approve' : 'Deny'} ${request.employeeName}'s vacation request for ${request.dateKey}?`,
+    );
+    if (!confirmed) return;
+
+    const previousSchedule = scheduleDataRef.current;
+    if (status === 'APPROVED') {
+      const result = applyApprovedVacationRequest(previousSchedule, request);
+      if (!result.applied) {
+        window.alert('Apollo could not find this employee on the requested date. No changes were made.');
+        return;
+      }
+
+      markUnsavedChanges(request.dateKey);
+      scheduleDataRef.current = result.next;
+      setScheduleDataSafely(result.next);
+      setSaveStatus('Saving approved vacation and coverage shift...');
+      const scheduleSaved = await saveScheduleToSupabase();
+      if (!scheduleSaved) return;
+    }
+
+    const supervisorNote = status === 'APPROVED'
+      ? 'Approved by supervisor. Assignment changed to Vacation and a coverage opening was created automatically.'
+      : 'Denied by supervisor.';
+    const { error } = await supabase
+      .from('vacation_requests')
+      .update({ status, supervisor_note: supervisorNote })
+      .eq('id', request.id);
+
+    if (error) {
+      console.error('Failed to update vacation request:', error);
+      if (status === 'APPROVED') {
+        markUnsavedChanges(request.dateKey);
+        scheduleDataRef.current = previousSchedule;
+        setScheduleDataSafely(previousSchedule);
+        await saveScheduleToSupabase();
+      }
+      window.alert('Vacation request could not be updated. The schedule was left unchanged.');
+      return;
+    }
+
+    setVacationRequests((current) => current.map((item) =>
+      item.id === request.id ? { ...item, status, supervisorNote } : item,
+    ));
+    await sendVacationDecisionNotifications(request, status);
+    setSaveStatus(
+      status === 'APPROVED'
+        ? 'Vacation approved, schedule updated, and employee notified.'
+        : 'Vacation request denied and employee notified.',
+    );
+  }
 
   async function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
     setOpenShiftRequests(nextRequests);
@@ -3542,6 +3791,78 @@ export default function SchedulePage() {
         </div>
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className={`rounded-xl border p-3 shadow-sm ${pendingVacationRequests.length > 0 ? 'border-sky-500 bg-sky-50' : 'border-slate-500 bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                const nextValue = !showPendingVacationRequests;
+                closeSchedulePanels();
+                setShowPendingVacationRequests(nextValue);
+              }}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className={`text-sm font-bold ${pendingVacationRequests.length > 0 ? 'text-sky-800' : 'text-slate-900'}`}>
+                  Pending Vacation Requests
+                </div>
+                <div className={`mt-1 text-xs ${pendingVacationRequests.length > 0 ? 'text-sky-700' : 'text-slate-500'}`}>
+                  {pendingVacationRequests.length > 0
+                    ? `${pendingVacationRequests.length} request${pendingVacationRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
+                    : 'No pending vacation requests.'}
+                </div>
+              </div>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingVacationRequests.length > 0 ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                {showPendingVacationRequests ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+
+            {showPendingVacationRequests && (
+              <div className="mt-2 space-y-2">
+                {pendingVacationRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No pending vacation requests.
+                  </div>
+                ) : (
+                  pendingVacationRequests.map((request) => (
+                    <div key={request.id} className="rounded-xl border border-sky-200 bg-white p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
+                          <div className="mt-1 text-sm text-slate-700">
+                            {request.shiftLabel} • {request.dateKey} • {request.startTime}-{request.endTime}
+                          </div>
+                          {request.reason && (
+                            <div className="mt-2 text-sm text-slate-600">Reason: {request.reason}</div>
+                          )}
+                          <div className="mt-1 text-xs text-slate-500">
+                            Requested {new Date(request.requestedAt).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void updateVacationRequestStatus(request.id, 'DENIED')}
+                            className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                          >
+                            Deny
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateVacationRequestStatus(request.id, 'APPROVED')}
+                            className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div className={`rounded-xl border p-3 shadow-sm ${pendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
