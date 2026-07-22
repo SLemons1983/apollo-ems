@@ -2431,7 +2431,12 @@ export default function SupervisorPage() {
   const builderWarnings = getBuilderWarnings();
 
   const incidentReportCategories = useMemo(() => {
-    return Array.from(new Set(incidentReports.map((report) => report.category).filter(Boolean))).sort();
+    return Array.from(new Set(
+      incidentReports
+        .filter((report) => report.category !== 'Check Request')
+        .map((report) => report.category)
+        .filter(Boolean),
+    )).sort();
   }, [incidentReports]);
 
   const incidentReportSupervisors = useMemo(() => {
@@ -2442,6 +2447,7 @@ export default function SupervisorPage() {
     const search = incidentReportSearch.trim().toLowerCase();
 
     return incidentReports.filter((report) => {
+      if (report.category === 'Check Request') return false;
       const assignedSupervisor = report.assigned_supervisor || 'Unassigned';
       const searchText = [
         report.incident_number,

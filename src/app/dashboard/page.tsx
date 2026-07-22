@@ -1112,6 +1112,10 @@ export default function DashboardPage() {
   const [incidentReportNarrative, setIncidentReportNarrative] = useState('');
   const [incidentReportStatus, setIncidentReportStatus] = useState('');
   const [isSubmittingIncidentReport, setIsSubmittingIncidentReport] = useState(false);
+  const [checkRequestAmount, setCheckRequestAmount] = useState('');
+  const [checkRequestReason, setCheckRequestReason] = useState('');
+  const [checkRequestStatus, setCheckRequestStatus] = useState('');
+  const [isSubmittingCheckRequest, setIsSubmittingCheckRequest] = useState(false);
   const [selectedPayPeriodKey, setSelectedPayPeriodKey] = useState('');
   const [mounted, setMounted] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
@@ -1396,6 +1400,69 @@ export default function DashboardPage() {
       setIncidentReportStatus('Unable to submit incident report. Please try again.');
     } finally {
       setIsSubmittingIncidentReport(false);
+    }
+  }
+
+  async function handleCheckRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!currentEmployee) {
+      setCheckRequestStatus('Unable to identify the logged-in employee.');
+      return;
+    }
+
+    const form = event.currentTarget;
+    const fileInput = form.elements.namedItem('checkRequestDocument') as HTMLInputElement | null;
+    const file = fileInput?.files?.[0];
+    const amount = Number(checkRequestAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setCheckRequestStatus('Enter a valid amount greater than $0.');
+      return;
+    }
+
+    if (!checkRequestReason.trim()) {
+      setCheckRequestStatus('Enter the reason for the request.');
+      return;
+    }
+
+    if (!file) {
+      setCheckRequestStatus('Upload the supporting document.');
+      return;
+    }
+
+    setIsSubmittingCheckRequest(true);
+    setCheckRequestStatus('Submitting check request...');
+
+    try {
+      const formData = new FormData();
+      formData.append('employeeName', currentEmployee.name);
+      formData.append('employeeEmail', currentEmployee.email || authEmail);
+      formData.append('amount', amount.toFixed(2));
+      formData.append('reason', checkRequestReason.trim());
+      formData.append('document', file);
+
+      const response = await fetch('/api/check-requests/submit', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || 'Check request submission failed.');
+      }
+
+      setCheckRequestAmount('');
+      setCheckRequestReason('');
+      form.reset();
+      setCheckRequestStatus('Check request submitted successfully.');
+    } catch (error) {
+      console.error('Check request submission failed:', error);
+      setCheckRequestStatus(
+        error instanceof Error ? error.message : 'Unable to submit check request. Please try again.',
+      );
+    } finally {
+      setIsSubmittingCheckRequest(false);
     }
   }
 
@@ -6534,7 +6601,6 @@ export default function DashboardPage() {
                   required
                 >
                   <option>General Incident Report</option>
-                <option>Check Request</option>
                 <option>Report Workplace Harassment and/or Violence</option>
                   <option>Vehicle/Equipment/Station Issue</option>
                 </select>
@@ -6605,25 +6671,88 @@ export default function DashboardPage() {
           {renderTile(
             'important-links',
             'Important Links',
-            'Quick access to company-approved external resources.',
-            <div className="grid gap-3 md:grid-cols-2">
-              {systemConfig.importantLinks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-                  No important links have been configured.
+            'Company forms and approved external resources.',
+            <div className="space-y-5">
+              <form className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4" onSubmit={handleCheckRequestSubmit}>
+                <div>
+                  <h3 className="font-bold text-slate-900">Check Request</h3>
+                  <p className="mt-1 text-sm text-slate-600">Submit a payment request with its supporting document.</p>
                 </div>
-              ) : (
-                systemConfig.importantLinks.map((link) => (
-                  <a
-                    key={link.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                    href={link.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {link.label}
-                  </a>
-                ))
-              )}
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Employee Name
+                    <input className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
+                  </label>
+                  <label className="text-xs font-semibold text-slate-600">
+                    Amount
+                    <div className="relative mt-1">
+                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">$</span>
+                      <input
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-7 pr-3 text-sm"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={checkRequestAmount}
+                        onChange={(event) => setCheckRequestAmount(event.target.value)}
+                        required
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <label className="block text-xs font-semibold text-slate-600">
+                  Reason for Request
+                  <textarea
+                    className="mt-1 min-h-[120px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                    value={checkRequestReason}
+                    onChange={(event) => setCheckRequestReason(event.target.value)}
+                    required
+                  />
+                </label>
+
+                <label className="block text-xs font-semibold text-slate-600">
+                  Supporting Document
+                  <input
+                    className="mt-1 w-full text-sm"
+                    type="file"
+                    name="checkRequestDocument"
+                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                    required
+                  />
+                </label>
+
+                {checkRequestStatus && <p className="text-sm font-semibold text-slate-700">{checkRequestStatus}</p>}
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingCheckRequest}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
+                >
+                  {isSubmittingCheckRequest ? 'Submitting...' : 'Submit Check Request'}
+                </button>
+              </form>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {systemConfig.importantLinks.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No external links have been configured.
+                  </div>
+                ) : (
+                  systemConfig.importantLinks.map((link) => (
+                    <a
+                      key={link.id}
+                      className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {link.label}
+                    </a>
+                  ))
+                )}
+              </div>
             </div>,
           )}
 
