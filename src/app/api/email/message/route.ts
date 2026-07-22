@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
       senderName,
       subject,
       message,
+      notificationType,
     } = body;
 
     if (!to || !subject || !message) {
@@ -19,11 +20,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isScheduleNotification = notificationType === 'SCHEDULE';
+
     await sendApolloEmail({
       to,
-      subject: `Apollo Message: ${subject}`,
-      text:
-`You received a new ApolloEMS message.
+      subject: isScheduleNotification ? `ApolloEMS: ${subject}` : `Apollo Message: ${subject}`,
+      text: isScheduleNotification
+        ? `You received an ApolloEMS schedule notification.
+
+${message}
+
+View your schedule:
+https://apolloems.org/dashboard`
+        : `You received a new ApolloEMS message.
 
 From: ${senderName}
 
