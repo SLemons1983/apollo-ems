@@ -2276,7 +2276,7 @@ export default function DashboardPage() {
       });
   }
 
-  async function notifyApolloMessageRecipients(params: {
+  async function notifyEmployeesByEmail(params: {
     recipients: EmployeeOption[];
     senderName: string;
     subject: string;
@@ -3760,42 +3760,8 @@ export default function DashboardPage() {
       timecard.id = returnedForThisPeriod.id;
     }
 
-    const createdAt = new Date().toISOString();
-    const supervisorRecipients = employees
-      .filter((employee) => employee.role === 'Supervisor' && employee.status !== 'Removed')
-      .map((employee) => ({
-        employeeId: employee.id,
-        deliveredAt: createdAt,
-        readAt: null,
-      }));
-
-    const supervisorMessage: ApolloMessage | null =
-      supervisorRecipients.length > 0
-        ? {
-            id: `timecard-submitted-${timecard.id}`,
-            conversationId: `timecard-submitted-${timecard.id}`,
-            senderId: currentEmployeeId,
-            senderName: timecard.employeeName,
-            senderRole: 'EMPLOYEE',
-            recipients: supervisorRecipients,
-            audienceLabel: 'Supervisors',
-            title: 'Timecard Submitted for Review',
-            body: `${timecard.employeeName} submitted a timecard for the pay period ${formatShortDate(
-              new Date(timecard.payPeriodStart),
-            )} to ${formatShortDate(new Date(timecard.payPeriodEnd))}.`,
-            createdAt,
-            relatedType: 'GENERAL',
-            relatedId: timecard.id,
-            priority: 'IMPORTANT',
-          }
-        : null;
-
     try {
       await saveSubmittedTimecard(timecard);
-
-      if (supervisorMessage) {
-        saveApolloMessages([supervisorMessage, ...apolloMessages]);
-      }
 
       setShowTimecardSubmitConfirmation(false);
       setTimecardStatus('Timecard submitted for supervisor review.');
@@ -4423,35 +4389,10 @@ export default function DashboardPage() {
 
     if (!selectedTarget.isOpenSlot && selectedTarget.slot.employeeId) {
       const targetEmployee = employees.find((employee) => employee.id === selectedTarget.slot.employeeId);
-      const createdAt = new Date().toISOString();
       const messageBody = `${currentEmployee.name} would like to trade their ${selectedShift.assignment.label} shift on ${selectedShift.dateKey} (${selectedShift.slot.startTime}-${selectedShift.slot.endTime}) with your ${selectedTarget.assignment.label} shift on ${selectedTarget.dateKey} (${selectedTarget.slot.startTime}-${selectedTarget.slot.endTime}).\n\nPlease review this shift trade request. Accept/decline buttons will be added in the next phase.`;
 
-      const tradeMessage: ApolloMessage = {
-        id: `message-shift-trade-${request.id}`,
-        conversationId: `shift-trade-${request.id}`,
-        senderId: currentEmployeeId,
-        senderName: currentEmployee.name,
-        senderRole: 'EMPLOYEE',
-        recipients: [
-          {
-            employeeId: selectedTarget.slot.employeeId,
-            deliveredAt: createdAt,
-            readAt: null,
-          },
-        ],
-        audienceLabel: targetEmployee?.name ?? 'Employee',
-        title: 'Shift Trade Request',
-        body: messageBody,
-        createdAt,
-        relatedType: 'SCHEDULE',
-        relatedId: request.id,
-        priority: 'IMPORTANT',
-      };
-
-      saveApolloMessages([tradeMessage, ...apolloMessages]);
-
       if (targetEmployee) {
-        await notifyApolloMessageRecipients({
+        await notifyEmployeesByEmail({
           recipients: [targetEmployee],
           senderName: currentEmployee.name,
           subject: 'ApolloEMS Shift Trade Request',
@@ -4502,39 +4443,14 @@ export default function DashboardPage() {
       return;
     }
 
-    const createdAt = new Date().toISOString();
     const body =
       response === 'ACCEPT'
         ? `${currentEmployee.name} accepted this shift trade request. It is now pending supervisor approval.`
         : `${currentEmployee.name} declined this shift trade request.`;
 
-    const reply: ApolloMessage = {
-      id: `message-shift-trade-response-${request.id}-${Date.now()}`,
-      conversationId: message.conversationId,
-      senderId: currentEmployeeId,
-      senderName: currentEmployee.name,
-      senderRole: 'EMPLOYEE',
-      recipients: [
-        {
-          employeeId: request.requestingEmployeeId,
-          deliveredAt: createdAt,
-          readAt: null,
-        },
-      ],
-      audienceLabel: request.requestingEmployeeName,
-      title: 'Shift Trade Request',
-      body,
-      createdAt,
-      relatedType: 'SCHEDULE',
-      relatedId: request.id,
-      priority: 'IMPORTANT',
-    };
-
-    saveApolloMessages([reply, ...apolloMessages]);
-
     const requestingEmployee = employees.find((employee) => employee.id === request.requestingEmployeeId);
     if (requestingEmployee) {
-      await notifyApolloMessageRecipients({
+      await notifyEmployeesByEmail({
         recipients: [requestingEmployee],
         senderName: currentEmployee.name,
         subject: 'ApolloEMS Shift Trade Update',
