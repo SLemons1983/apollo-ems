@@ -85,6 +85,22 @@ type SmsRecipientMode =
   | 'PER_DIEM_EMTS'
   | 'SUPERVISORS';
 
+type SmsAuditRow = {
+  id: string;
+  sent_at: string;
+  sent_by_employee_id: string;
+  sent_by_email: string;
+  recipient_employee_id: string;
+  recipient_email: string;
+  recipient_phone_e164: string;
+  recipient_mode: string;
+  message_body: string;
+  delivery_status: 'SENT' | 'FAILED';
+  twilio_message_sid: string | null;
+  error_code: string | null;
+  error_message: string | null;
+};
+
 type CompanyAnnouncement = {
   id: string;
   title: string;
@@ -579,6 +595,10 @@ export default function SupervisorPage() {
   const [smsRecipientEmployeeId, setSmsRecipientEmployeeId] = useState('');
   const [smsMessageBody, setSmsMessageBody] = useState('');
   const [smsAuditSearch, setSmsAuditSearch] = useState('');
+  const [smsAuditRows, setSmsAuditRows] = useState<SmsAuditRow[]>([]);
+  const [smsAuditLoading, setSmsAuditLoading] = useState(true);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSendStatus, setSmsSendStatus] = useState('');
   const [systemConfig, setSystemConfig] = useState<SystemConfig>(getDefaultSystemConfig());
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [inventorySupplyRooms, setInventorySupplyRooms] = useState<InventorySupplyRoom[]>([]);
@@ -852,7 +872,7 @@ export default function SupervisorPage() {
     }
 
     if (smsRecipientMode === 'ALL_ON_DUTY') {
-      return 0;
+      return null;
     }
 
     return smsEligibleEmployees.filter((employee) => {
@@ -917,6 +937,106 @@ export default function SupervisorPage() {
     return employees.find((employee) => employee.email.trim().toLowerCase() === normalizedAuthEmail) ?? null;
   }, [authEmail, employees]);
 
+  const filteredSmsAuditRows = useMemo(() => {
+    const search = smsAuditSearch.trim().toLowerCase();
+    if (!search) return smsAuditRows;
+
+    return smsAuditRows.filter((row) =>
+      [
+        row.sent_by_email,
+        row.recipient_email,
+        row.recipient_phone_e164,
+        row.recipient_mode,
+        row.message_body,
+        row.delivery_status,
+        row.error_message ?? '',
+      ].some((value) => value.toLowerCase().includes(search)),
+    );
+  }, [smsAuditRows, smsAuditSearch]);
+
+  async function loadSmsAuditRows() {
+    setSmsAuditLoading(true);
+    const { data, error } = await supabase
+      .from('sms_notification_audit')
+      .select('*')
+      .order('sent_at', { ascending: false })
+      .limit(250);
+
+    if (error) {
+      console.error('Failed to load SMS audit records:', error);
+    } else {
+      setSmsAuditRows((data ?? []) as SmsAuditRow[]);
+    }
+    setSmsAuditLoading(false);
+  }
+
+  async function sendSmsNotification() {
+    const messageBody = smsMessageBody.trim();
+    if (!messageBody) {
+      window.alert('Enter a message before sending.');
+      return;
+    }
+    if (smsRecipientMode === 'INDIVIDUAL' && !smsRecipientEmployeeId) {
+      window.alert('Select an eligible employee.');
+      return;
+    }
+    if (smsSelectedRecipientCount === 0) {
+      window.alert('No SMS-eligible recipients were found for that selection.');
+      return;
+    }
+
+    const audience =
+      smsRecipientMode === 'INDIVIDUAL'
+        ? smsEligibleEmployees.find(
+            (employee) => employee.id === smsRecipientEmployeeId,
+          )?.name ?? 'the selected employee'
+        : smsRecipientMode.replaceAll('_', ' ').toLowerCase();
+
+    if (!window.confirm(`Send this SMS notification to ${audience}?`)) return;
+
+    setSmsSending(true);
+    setSmsSendStatus('');
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('Your session expired. Sign in again.');
+
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          recipientMode: smsRecipientMode,
+          recipientEmployeeId:
+            smsRecipientMode === 'INDIVIDUAL'
+              ? smsRecipientEmployeeId
+              : null,
+          messageBody,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'SMS delivery failed.');
+      }
+
+      setSmsSendStatus(
+        `${result.sent} sent${result.failed ? `, ${result.failed} failed` : ''}.`,
+      );
+      setSmsMessageBody('');
+      await loadSmsAuditRows();
+    } catch (error) {
+      setSmsSendStatus(
+        error instanceof Error ? error.message : 'SMS delivery failed.',
+      );
+    } finally {
+      setSmsSending(false);
+    }
+  }
+
   useEffect(() => {
     let isMounted = true;
 
@@ -946,7 +1066,13 @@ export default function SupervisorPage() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);  useEffect(() => {
+  }, []);
+
+  useEffect(() => {
+    if (authEmail) void loadSmsAuditRows();
+  }, [authEmail]);
+
+  useEffect(() => {
     try {
       supabase
         .from('company_announcements')
@@ -5985,17 +6111,6 @@ export default function SupervisorPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-                <div className="text-sm font-bold text-amber-900">
-                  Twilio delivery setup pending
-                </div>
-                <div className="mt-1 text-sm text-amber-800">
-                  The interface is available for review, but sending remains
-                  disabled until the ApolloEMS phone number and secure Twilio
-                  credentials are connected.
-                </div>
-              </div>
-
               <div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-bold text-slate-900">
@@ -6060,10 +6175,9 @@ export default function SupervisorPage() {
                   </div>
 
                   {smsRecipientMode === 'ALL_ON_DUTY' && (
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-white p-3 text-sm text-amber-800">
-                      All On Duty recipient calculation will be connected to the
-                      live schedule in the next phase. Vacation, Sick, and Leave
-                      assignments will be excluded.
+                    <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3 text-sm text-blue-800">
+                      Recipients are calculated from the live schedule when you
+                      send. Vacation, Sick, and Leave assignments are excluded.
                     </div>
                   )}
 
@@ -6085,20 +6199,35 @@ export default function SupervisorPage() {
                       {smsMessageBody.length}/480 characters
                     </span>
                     <span>
-                      Selected recipients: {smsSelectedRecipientCount}
+                      Selected recipients:{' '}
+                      {smsSelectedRecipientCount === null
+                        ? 'Calculated when sent'
+                        : smsSelectedRecipientCount}
                     </span>
                   </div>
 
                   <div className="mt-4 flex justify-end">
                     <button
                       type="button"
-                      disabled
-                      title="Twilio delivery setup is pending."
-                      className="cursor-not-allowed rounded-xl bg-slate-300 px-4 py-2 text-sm font-semibold text-slate-600"
+                      onClick={() => void sendSmsNotification()}
+                      disabled={
+                        smsSending ||
+                        !smsMessageBody.trim() ||
+                        (smsRecipientMode === 'INDIVIDUAL' &&
+                          !smsRecipientEmployeeId) ||
+                        smsSelectedRecipientCount === 0
+                      }
+                      className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600"
                     >
-                      Send SMS — Setup Pending
+                      {smsSending ? 'Sending…' : 'Send SMS'}
                     </button>
                   </div>
+
+                  {smsSendStatus && (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      {smsSendStatus}
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -6124,10 +6253,39 @@ export default function SupervisorPage() {
                   />
                 </div>
 
-                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
-                  No SMS messages have been sent. Audit records will appear here
-                  after Twilio delivery is connected.
-                </div>
+                {smsAuditLoading ? (
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                    Loading SMS audit records…
+                  </div>
+                ) : filteredSmsAuditRows.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-600">
+                    No matching SMS audit records.
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {filteredSmsAuditRows.map((row) => (
+                      <div key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-bold text-slate-900">
+                              {row.recipient_email}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {new Date(row.sent_at).toLocaleString()} · {row.recipient_mode.replaceAll('_', ' ')} · sent by {row.sent_by_email}
+                            </div>
+                          </div>
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${row.delivery_status === 'SENT' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {row.delivery_status}
+                          </span>
+                        </div>
+                        <div className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{row.message_body}</div>
+                        {row.error_message && (
+                          <div className="mt-2 text-xs text-red-700">{row.error_message}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>,
           )}
