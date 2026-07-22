@@ -3237,7 +3237,12 @@ export default function SchedulePage() {
 
         return slotKeys.flatMap((slotKey) => {
           const slot = shift[slotKey];
-          if (!slot?.employeeId || (slot.shiftType !== 'SICK' && slot.shiftType !== 'LEAVE')) {
+          if (
+            !slot?.employeeId ||
+            (slot.shiftType !== 'SICK' &&
+              slot.shiftType !== 'LEAVE' &&
+              slot.shiftType !== 'VACATION')
+          ) {
             return [];
           }
 
@@ -3245,7 +3250,12 @@ export default function SchedulePage() {
             id: `${assignment.key}-${slotKey}-${slot.employeeId}`,
             employeeName: getEmployeeById(slot.employeeId, employees)?.name ?? slot.employeeId,
             shiftLabel: assignment.label,
-            status: slot.shiftType === 'SICK' ? 'Sick' : 'Leave',
+            status:
+              slot.shiftType === 'SICK'
+                ? 'Sick'
+                : slot.shiftType === 'VACATION'
+                  ? 'Vacation'
+                  : 'Leave',
           }];
         });
       });
@@ -3358,7 +3368,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="schedule-page min-h-screen bg-slate-200 px-4 py-6 md:px-6">
+    <div className="schedule-page bg-slate-200 px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
         <div className="mb-6 rounded-2xl border border-slate-400 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -3670,7 +3680,7 @@ export default function SchedulePage() {
             <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border border-blue-800 bg-blue-200 px-3 py-2 font-semibold text-blue-950">Open ALS shift</div>
               <div className="rounded-xl border border-red-800 bg-red-200 px-3 py-2 font-semibold text-red-950">Open BLS shift</div>
-              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Sick / Leave employee</div>
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Sick / Leave / Vacation employee</div>
               <div className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">⭐ Employee requested this open shift</div>
               <div className="rounded-xl border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-800">⚠ Scheduling warning</div>
               <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 font-semibold text-sky-800">📝 Employee-visible note</div>
@@ -3756,7 +3766,7 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div ref={scheduleScrollRef} className="max-h-[78vh] overflow-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
+        <div ref={scheduleScrollRef} className="overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
           <div key={visiblePayPeriodStartKey} className={`grid ${visibleScheduleWeek === 'ALL' ? 'min-w-[3330px] grid-cols-[110px_repeat(14,minmax(230px,1fr))]' : 'min-w-[1500px] grid-cols-[110px_repeat(7,minmax(195px,1fr))]'}`}>
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
               
@@ -3789,10 +3799,20 @@ export default function SchedulePage() {
                       <div className="text-sm font-semibold text-slate-900">{formatDayLabel(date)}</div>
                     </div>
 
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleAddShift(dateKey)}
+                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
+                      >
+                        Add Shift
+                      </button>
+                    </div>
+
                     {unavailableEmployees.length > 0 && (
                       <details className="rounded-lg border border-amber-300 bg-amber-50 text-left">
                         <summary className="cursor-pointer px-2 py-1.5 text-xs font-bold text-amber-900">
-                          Sick / Leave ({unavailableEmployees.length})
+                          Sick / Leave / Vacation ({unavailableEmployees.length})
                         </summary>
                         <div className="space-y-1 border-t border-amber-200 px-2 py-2">
                           {unavailableEmployees.map((item) => (
@@ -3804,16 +3824,6 @@ export default function SchedulePage() {
                         </div>
                       </details>
                     )}
-
-                    <div className="flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAddShift(dateKey)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-slate-800"
-                      >
-                        Add Shift
-                      </button>
-                    </div>
                   </div>
                 </div>
               );
@@ -3839,37 +3849,18 @@ export default function SchedulePage() {
                     shift,
                   };
 
+                  const sharedEligibilityMap = Object.fromEntries(
+                    employees.map((employee) => [
+                      employee.id,
+                      getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
+                    ]),
+                  ) as Record<string, EligibilityResult>;
                   const slotEligibilityMaps = {
-                    employee1: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                    employee2: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                    employee3: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                                        employee4: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
-                    employee5: Object.fromEntries(
-                      employees.map((employee) => [
-                        employee.id,
-                        getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                      ]),
-                    ) as Record<string, EligibilityResult>,
+                    employee1: sharedEligibilityMap,
+                    employee2: sharedEligibilityMap,
+                    employee3: sharedEligibilityMap,
+                    employee4: sharedEligibilityMap,
+                    employee5: sharedEligibilityMap,
                   };
 
                   const payPeriodHoursMap = Object.fromEntries(
@@ -3937,12 +3928,6 @@ export default function SchedulePage() {
                               {staffingLevel}
                             </div>
 
-                            {!isExpanded && (
-                              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                                Click to Edit
-                              </div>
-                            )}
-
                             {shift.hiddenFromEmployees && (
                               <div className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                                 Hidden
@@ -3985,6 +3970,12 @@ export default function SchedulePage() {
                             )}
                           </div>
                         </div>
+
+                        {!isExpanded && (
+                          <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                            Click to Edit
+                          </div>
+                        )}
 
                         <div
           className="space-y-2"
@@ -4224,36 +4215,18 @@ export default function SchedulePage() {
                           shift: extra,
                         };
 
+                        const sharedEligibilityMap = Object.fromEntries(
+                          employees.map((employee) => [
+                            employee.id,
+                            getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
+                          ]),
+                        ) as Record<string, EligibilityResult>;
                         const slotEligibilityMaps = {
-                          employee1: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                          employee2: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                          employee3: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,                          employee4: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
-                          employee5: Object.fromEntries(
-                            employees.map((employee) => [
-                              employee.id,
-                              getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                            ]),
-                          ) as Record<string, EligibilityResult>,
+                          employee1: sharedEligibilityMap,
+                          employee2: sharedEligibilityMap,
+                          employee3: sharedEligibilityMap,
+                          employee4: sharedEligibilityMap,
+                          employee5: sharedEligibilityMap,
                         };
 
                         const payPeriodHoursMap = Object.fromEntries(
@@ -4307,12 +4280,6 @@ export default function SchedulePage() {
                                     {staffingLevel}
                                   </div>
 
-                                  {!isExpanded && (
-                                    <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                                      Click to Edit
-                                    </div>
-                                  )}
-
                                   {extra.hiddenFromEmployees && (
                                     <div className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                                       Hidden
@@ -4355,6 +4322,12 @@ export default function SchedulePage() {
                                   )}
                                 </div>
                               </div>
+
+                              {!isExpanded && (
+                                <div className="mt-2 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                  Click to Edit
+                                </div>
+                              )}
                             </div>
 
                             <div
