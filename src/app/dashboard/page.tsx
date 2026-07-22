@@ -1104,14 +1104,6 @@ export default function DashboardPage() {
   const [compensationDateKey, setCompensationDateKey] = useState('');
   const [compensationType, setCompensationType] =
     useState<'LDT_STIPEND' | 'MEAL_PAY'>('LDT_STIPEND');
-  const [messageRecipientMode, setMessageRecipientMode] = useState('SUPERVISORS');
-  const [messageRecipientEmployeeId, setMessageRecipientEmployeeId] = useState('');
-  const [messageSubject, setMessageSubject] = useState('');
-  const [messageBody, setMessageBody] = useState('');
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [replyBody, setReplyBody] = useState('');
-  const [hideReadMessages, setHideReadMessages] = useState(false);
-  const [messageSearch, setMessageSearch] = useState('');
   const [timecardStatus, setTimecardStatus] = useState('');
   const [showTimecardSubmitConfirmation, setShowTimecardSubmitConfirmation] = useState(false);
   const [isSubmittingTimecard, setIsSubmittingTimecard] = useState(false);
@@ -2253,58 +2245,6 @@ export default function DashboardPage() {
     }
   }
 
-  const currentEmployeeMessages = useMemo(() => {
-    return apolloMessages
-      .filter((message) => message.senderId === currentEmployeeId || message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [apolloMessages]);
-
-  const unreadMessageCount = currentEmployeeMessages.filter(
-    (message) => message.senderId !== currentEmployeeId && message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId && !recipient.readAt),
-  ).length;
-
-  const conversations = useMemo(() => {
-    const grouped = new Map<string, ApolloMessage[]>();
-
-    currentEmployeeMessages.forEach((message) => {
-      const list = grouped.get(message.conversationId) ?? [];
-      list.push(message);
-      grouped.set(message.conversationId, list);
-    });
-
-    return Array.from(grouped.entries())
-      .map(([conversationId, messages]) => ({
-        conversationId,
-        messages: messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-        latest: messages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0],
-        unreadCount: messages.filter(
-          (message) => message.senderId !== currentEmployeeId && message.recipients.some((recipient) => recipient.employeeId === currentEmployeeId && !recipient.readAt),
-        ).length,
-      }))
-      .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
-  }, [currentEmployeeMessages]);
-
-  const filteredConversations = useMemo(() => {
-    const search = messageSearch.trim().toLowerCase();
-
-    return conversations.filter((conversation) => {
-      if (hideReadMessages && conversation.unreadCount === 0) return false;
-      if (!search) return true;
-
-      return [
-        conversation.conversationId,
-        conversation.latest.title,
-        conversation.latest.body,
-        conversation.latest.senderName,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(search);
-    });
-  }, [conversations, hideReadMessages, messageSearch]);
-
-  const selectedConversation = filteredConversations.find((conversation) => conversation.conversationId === selectedConversationId) ?? filteredConversations[0] ?? null;
-
   function saveApolloMessages(nextMessages: ApolloMessage[]) {
     setApolloMessages(nextMessages);
 
@@ -2334,61 +2274,6 @@ export default function DashboardPage() {
           window.alert('Failed to save Apollo message.');
         }
       });
-  }
-
-  function markConversationRead(conversationId: string) {
-    const now = new Date().toISOString();
-    const updated = apolloMessages.map((message) => {
-      if (message.conversationId !== conversationId) return message;
-      return {
-        ...message,
-        recipients: message.recipients.map((recipient) =>
-          recipient.employeeId === currentEmployeeId && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
-        ),
-      };
-    });
-
-    saveApolloMessages(updated);
-  }
-
-  function markMessagesRead() {
-    const now = new Date().toISOString();
-    const updated = apolloMessages.map((message) => ({
-      ...message,
-      recipients: message.recipients.map((recipient) =>
-        recipient.employeeId === currentEmployeeId && !recipient.readAt ? { ...recipient, readAt: now } : recipient,
-      ),
-    }));
-
-    saveApolloMessages(updated);
-  }
-
-  function getMessageStatus(message: ApolloMessage): string {
-    if (message.senderId !== currentEmployeeId) {
-      const mine = message.recipients.find((recipient) => recipient.employeeId === currentEmployeeId);
-      return mine?.readAt ? 'Read' : 'Delivered';
-    }
-
-    const recipientCount = message.recipients.length;
-    const readCount = message.recipients.filter((recipient) => recipient.readAt).length;
-    if (recipientCount > 0 && readCount === recipientCount) return 'Read';
-    if (message.recipients.some((recipient) => recipient.deliveredAt)) return 'Delivered';
-    return 'Sent';
-  }
-
-  function getRecipientEmployeesForMode(mode: string): EmployeeOption[] {
-    const activeEmployees = employees.filter((employee) => employee.status?.toLowerCase() !== 'removed');
-    if (mode === 'SUPERVISORS') {
-      return activeEmployees.filter((employee) => employee.role === 'Supervisor');
-    }
-    if (mode === 'INDIVIDUAL') {
-      return activeEmployees.filter((employee) => employee.id === messageRecipientEmployeeId);
-    }
-    if (mode === 'FULLTIME') return activeEmployees.filter((employee) => employee.employeeType.toLowerCase().includes('full'));
-    if (mode === 'PERDIEM') return activeEmployees.filter((employee) => employee.employeeType.toLowerCase().includes('per'));
-    if (mode === 'PARAMEDIC') return activeEmployees.filter((employee) => employee.role === 'Paramedic' || employee.scope === 'ALS');
-    if (mode === 'EMT') return activeEmployees.filter((employee) => employee.role === 'EMT' || employee.scope === 'BLS');
-    return activeEmployees;
   }
 
   async function notifyApolloMessageRecipients(params: {
@@ -2431,134 +2316,6 @@ export default function DashboardPage() {
         console.error('Some employee Apollo email notifications failed:', failed);
       }
     });
-  }
-
-  async function sendEmployeeMessage() {
-    if (!messageSubject.trim() || !messageBody.trim()) {
-      window.alert('Enter a subject and message before sending.');
-      return;
-    }
-
-    const recipients =
-      messageRecipientMode === 'SUPERVISORS'
-        ? getRecipientEmployeesForMode(messageRecipientMode)
-        : getRecipientEmployeesForMode(messageRecipientMode).filter((employee) => employee.id !== currentEmployeeId);
-    if (recipients.length === 0 && messageRecipientMode !== 'SUPERVISORS') {
-      window.alert('No recipients were found for that selection.');
-      return;
-    }
-
-    const createdAt = new Date().toISOString();
-    const finalRecipients = recipients;
-
-    const message: ApolloMessage = {
-      id: `message-${Date.now()}`,
-      conversationId: `conversation-${Date.now()}`,
-      senderId: currentEmployeeId,
-      senderName: currentEmployee?.name ?? 'Employee',
-      senderRole: 'EMPLOYEE',
-      recipients: finalRecipients.map((employee) => ({
-        employeeId: employee.id,
-        deliveredAt: createdAt,
-        readAt: null,
-      })),
-      audienceLabel: messageRecipientMode === 'INDIVIDUAL' ? finalRecipients[0]?.name ?? 'Individual' : messageRecipientMode.replace('_', ' '),
-      title: messageSubject.trim(),
-      body: messageBody.trim(),
-      createdAt,
-      relatedType: messageRecipientMode === 'SUPERVISORS' ? 'GENERAL' : 'GENERAL',
-      priority: 'NORMAL',
-    };
-
-    saveApolloMessages([message, ...apolloMessages]);
-
-    console.log(
-      'Apollo employee email recipients:',
-      finalRecipients.map((employee) => ({
-        id: employee.id,
-        name: employee.name,
-        email: employee.email,
-        role: employee.role,
-      })),
-    );
-
-    window.alert(
-      `Apollo debug recipients: ${finalRecipients
-        .map((employee) => `${employee.name} <${employee.email || 'NO EMAIL'}> [${employee.role}]`)
-        .join(', ') || 'NONE'}`
-    );
-
-    await notifyApolloMessageRecipients({
-      recipients: finalRecipients,
-      senderName: currentEmployee?.name ?? 'Employee',
-      subject: message.title,
-      message: message.body,
-    });
-
-    setMessageSubject('');
-    setMessageBody('');
-    setMessageRecipientEmployeeId('');
-    setMessageRecipientMode('SUPERVISORS');
-    setSelectedConversationId(message.conversationId);
-  }
-
-  async function sendEmployeeReply() {
-    if (!selectedConversation || !replyBody.trim()) {
-      return;
-    }
-
-    const createdAt = new Date().toISOString();
-    const existingParticipantIds = Array.from(
-      new Set([
-        ...selectedConversation.messages.map((message) => message.senderId),
-        ...selectedConversation.messages.flatMap((message) => message.recipients.map((recipient) => recipient.employeeId)),
-      ]),
-    );
-
-    const recipientIds = existingParticipantIds.filter((id) => id !== currentEmployeeId);
-    const reply: ApolloMessage = {
-      id: `message-${Date.now()}`,
-      conversationId: selectedConversation.conversationId,
-      senderId: currentEmployeeId,
-      senderName: currentEmployee?.name ?? 'Employee',
-      senderRole: 'EMPLOYEE',
-      recipients: recipientIds.map((employeeId) => ({
-        employeeId,
-        deliveredAt: createdAt,
-        readAt: null,
-      })),
-      audienceLabel: selectedConversation.latest.audienceLabel,
-      title: selectedConversation.latest.title,
-      body: replyBody.trim(),
-      createdAt,
-      relatedType: selectedConversation.latest.relatedType,
-      relatedId: selectedConversation.latest.relatedId,
-      priority: selectedConversation.latest.priority,
-    };
-
-    saveApolloMessages([reply, ...apolloMessages]);
-
-    const replyRecipientEmployees = employees.filter((employee) => {
-      if (recipientIds.includes(employee.id)) {
-        return true;
-      }
-
-      if (recipientIds.includes(CURRENT_SUPERVISOR_ID) && employee.role === 'Supervisor') {
-        return true;
-      }
-
-      return false;
-    });
-
-    await notifyApolloMessageRecipients({
-      recipients: replyRecipientEmployees,
-      senderName: currentEmployee?.name ?? 'Employee',
-      subject: reply.title,
-      message: reply.body,
-    });
-
-    setReplyBody('');
-    setSelectedConversationId(selectedConversation.conversationId);
   }
 
   const assignmentsByDate = useMemo(() => {
