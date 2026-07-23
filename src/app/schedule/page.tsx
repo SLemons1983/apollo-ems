@@ -889,6 +889,15 @@ function formatShortDate(date: Date): string {
   });
 }
 
+function formatTileDate(dateKey: string): string {
+  return parseDateKey(dateKey).toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  });
+}
+
 function formatPayPeriodOptionLabel(payPeriod: PayPeriodInfo, year: number): string {
   return `${year} · Pay Period ${payPeriod.number} (${formatShortDate(payPeriod.start)} - ${formatShortDate(payPeriod.end)})`;
 }
@@ -3636,6 +3645,7 @@ export default function SchedulePage() {
             slot.shiftType !== 'VACATION',
         )
         .map((slot) => ({
+          dateKey: todayKey,
           employeeName: getEmployeeById(slot.employeeId, employees)?.name ?? slot.employeeId,
           shiftLabel: assignment.label,
           vehicle: assignment.shift.vehicle || 'No vehicle assigned',
@@ -3835,7 +3845,7 @@ export default function SchedulePage() {
                         <div>
                           <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
                           <div className="mt-1 text-sm text-slate-700">
-                            {request.shiftLabel} • {request.dateKey} • {request.startTime}-{request.endTime}
+                            {request.shiftLabel} • {formatTileDate(request.dateKey)} • {request.startTime}-{request.endTime}
                           </div>
                           {request.reason && (
                             <div className="mt-2 text-sm text-slate-600">Reason: {request.reason}</div>
@@ -3907,10 +3917,10 @@ export default function SchedulePage() {
                         <div>
                           <div className="text-sm font-bold text-slate-900">{request.requestingEmployeeName}</div>
                           <div className="mt-1 text-sm text-slate-700">
-                            Wants to trade {request.requestingShiftLabel} • {request.requestingDateKey}
+                            Wants to trade {request.requestingShiftLabel} • {formatTileDate(request.requestingDateKey)}
                           </div>
                           <div className="mt-1 text-sm text-slate-700">
-                            For {request.targetIsOpenShift ? 'Open Shift' : request.targetEmployeeName ?? 'Employee'} • {request.targetShiftLabel} • {request.targetDateKey}
+                            For {request.targetIsOpenShift ? 'Open Shift' : request.targetEmployeeName ?? 'Employee'} • {request.targetShiftLabel} • {formatTileDate(request.targetDateKey)}
                           </div>
                           <div className="mt-1 text-xs text-slate-500">
                             {request.requestingStartTime ?? '--'}-{request.requestingEndTime ?? '--'}
@@ -4072,7 +4082,7 @@ export default function SchedulePage() {
                       )}
                     </div>
                     <div className="mt-1 text-xs text-slate-600">{item.shiftLabel} • {item.vehicle}</div>
-                    <div className="mt-1 text-xs font-semibold text-red-700">{item.dateKey} • {item.startTime} - {item.endTime}</div>
+                    <div className="mt-1 text-xs font-semibold text-red-700">{formatTileDate(item.dateKey)} • {item.startTime} - {item.endTime}</div>
 
                     <select
                       value=""
@@ -4113,6 +4123,7 @@ export default function SchedulePage() {
                   <div key={`${item.employeeName}-${item.shiftLabel}-${item.startTime}-${item.endTime}`} className="rounded-xl border border-emerald-200 bg-white p-3">
                     <div className="text-sm font-bold text-slate-900">{item.employeeName}</div>
                     <div className="mt-1 text-xs text-slate-600">{item.shiftLabel} • {item.vehicle}</div>
+                    <div className="mt-1 text-xs font-semibold text-emerald-700">{formatTileDate(item.dateKey)}</div>
                     <div className="mt-1 text-xs font-semibold text-emerald-700">{item.startTime} - {item.endTime}</div>
                   </div>
                 ))
