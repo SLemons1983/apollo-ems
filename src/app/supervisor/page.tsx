@@ -6507,6 +6507,29 @@ export default function SupervisorPage() {
           )}
 
           {renderTile(
+            'analytics-reports',
+            'Analytics & Reports',
+            'Review workforce hours, attendance, staffing, payroll exceptions, and certification compliance.',
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">
+                Turn Apollo data into operational insight
+              </div>
+
+              <div className="mt-1 text-xs text-slate-600">
+                Select a reporting period, filter employees, review company totals,
+                drill down to individual employees, and export reports.
+              </div>
+
+              <a
+                href="/supervisor/analytics"
+                className="mt-4 inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
+              >
+                Open Analytics & Reports
+              </a>
+            </div>,
+          )}
+
+          {renderTile(
             'timecard-review',
             'Timecard Review',
             pendingTimecards.length > 0
