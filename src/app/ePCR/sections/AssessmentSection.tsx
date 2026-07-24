@@ -279,218 +279,82 @@ export default function AssessmentSection({
     });
   }
 
-  const [consciousnessAssessment, setConsciousnessAssessment] =
-    useState<ConsciousnessAssessmentForm>({
-      avpu: '',
-      orientation: '',
+  function setClinicalAssessmentValue<
+    Key extends keyof AssessmentForm['clinical'],
+  >(
+    key: Key,
+    nextValue: SetStateAction<AssessmentForm['clinical'][Key]>,
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentValue = current.clinical[key];
+      const resolvedValue =
+        typeof nextValue === 'function'
+          ? (
+              nextValue as (
+                value: AssessmentForm['clinical'][Key],
+              ) => AssessmentForm['clinical'][Key]
+            )(currentValue)
+          : nextValue;
+
+      return {
+        ...current,
+        clinical: {
+          ...current.clinical,
+          [key]: resolvedValue,
+        },
+      };
     });
+  }
 
-  const [clinicalHistory, setClinicalHistory] = useState<ClinicalHistoryForm>({
-    eventsLeadingToIllness: '',
-    additionalHistoryNotes: '',
-  });
+  const consciousnessAssessment = assessmentForm.clinical.consciousness;
+  const clinicalHistory = assessmentForm.clinical.history;
+  const painAssessment = assessmentForm.clinical.pain;
+  const primaryAssessment = assessmentForm.clinical.primary;
+  const gcsAssessment = assessmentForm.clinical.gcs;
+  const gfastAssessment = assessmentForm.clinical.gfast;
+  const extremityAssessment = assessmentForm.clinical.extremity;
+  const traumaAssessment = assessmentForm.clinical.trauma;
+  const reassessment = assessmentForm.clinical.reassessment;
+  const revisedTraumaScore = assessmentForm.clinical.revisedTraumaScore;
+  const respiratoryAssessment = assessmentForm.clinical.respiratory;
+  const alocAssessment = assessmentForm.clinical.aloc;
 
-  const [painAssessment, setPainAssessment] = useState<PainAssessmentForm>({
-    painPresent: '',
-    painScaleType: '',
-    numericPainScore: '',
-    facesPainScore: '',
-    onset: '',
-    provocation: '',
-    quality: '',
-    radiation: '',
-    time: '',
-  });
-
-  const [primaryAssessment, setPrimaryAssessment] =
-    useState<PrimaryAssessmentForm>({
-      generalImpression: '',
-      levelOfConsciousness: '',
-      airway: '',
-      breathing: '',
-      circulation: '',
-      disability: '',
-      exposure: '',
-      gcsEyes: '',
-      gcsVerbal: '',
-      gcsMotor: '',
-      pupils: '',
-      skinColor: '',
-      skinTemperature: '',
-      skinCondition: '',
-      lifeThreats: '',
-      transportPriority: '',
-    });
-
-  const [gcsAssessment, setGcsAssessment] = useState<GcsAssessmentForm>({
-    eyes: '',
-    verbal: '',
-    motor: '',
-  });
-
-  const [gfastAssessment, setGfastAssessment] = useState<GfastAssessmentForm>({
-    gaze: '',
-    face: '',
-    arms: '',
-    speech: '',
-    time: '',
-    bloodGlucose: '',
-  });
-
-  const emptyExtremityAssessment: ExtremityCmsTpAssessment = {
-    selected: false,
-    circulation: '',
-    motor: '',
-    sensation: '',
-    tenderness: '',
-    pulses: '',
-    skin: '',
-    capillaryRefill: '',
-    notes: '',
-  };
-
-  const [extremityAssessment, setExtremityAssessment] =
-    useState<ExtremityAssessmentForm>({
-      rightArm: { ...emptyExtremityAssessment },
-      leftArm: { ...emptyExtremityAssessment },
-      rightLeg: { ...emptyExtremityAssessment },
-      leftLeg: { ...emptyExtremityAssessment },
-    });
-
-  const emptyTraumaFindings = {
-    deformity: false,
-    contusions: false,
-    abrasions: false,
-    puncturesPenetrations: false,
-    burns: false,
-    tenderness: false,
-    lacerations: false,
-    swelling: false,
-  };
-
-  const emptyTraumaCms: TraumaCmsAssessment = {
-    circulation: '',
-    motor: '',
-    sensation: '',
-  };
-
-  const [traumaAssessment, setTraumaAssessment] =
-    useState<TraumaAssessmentForm>({
-      regions: {
-        head: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        face: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        neck: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        chest: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        abdomen: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        pelvis: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        back: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        rightArm: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        leftArm: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        rightLeg: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-        leftLeg: {
-          selected: false,
-          findings: { ...emptyTraumaFindings },
-          cms: { ...emptyTraumaCms },
-        },
-      },
-    });
-
-  const [reassessment, setReassessment] = useState<ReassessmentForm>({
-    reason: '',
-    patientCondition: '',
-    mentalStatus: '',
-    airwayBreathing: '',
-    circulation: '',
-    painChange: '',
-    interventionsResponse: '',
-    transportPriority: '',
-    notes: '',
-  });
-
-  const [revisedTraumaScore, setRevisedTraumaScore] =
-    useState<RevisedTraumaScoreForm>({
-      respiratoryRate: '',
-      systolicBloodPressure: '',
-      notes: '',
-    });
-
-  const [respiratoryAssessment, setRespiratoryAssessment] =
-    useState<RespiratoryAssessmentForm>({
-      respiratoryEffort: '',
-      airwayPatency: '',
-      breathSoundsLeft: '',
-      breathSoundsRight: '',
-      accessoryMuscleUse: '',
-      cough: '',
-      currentRespiratorySupport: '',
-      observedResponse: '',
-      pastmedProvocation: '',
-      pastmedAssociatedSymptoms: '',
-      pastmedSputum: '',
-      pastmedTriggers: '',
-      pastmedMedicalHistory: '',
-      pastmedExerciseTolerance: '',
-      pastmedDuration: '',
-      notes: '',
-    });
-
-  const [alocAssessment, setAlocAssessment] = useState<AlocAssessmentForm>({
-    currentMentalStatus: '',
-    orientation: '',
-    speech: '',
-    pupils: '',
-    bloodGlucose: '',
-    alcohol: '',
-    epilepsy: '',
-    insulin: '',
-    overdose: '',
-    uremia: '',
-    trauma: '',
-    infection: '',
-    psych: '',
-    stroke: '',
-    notes: '',
-  });
+  const setConsciousnessAssessment = (
+    value: SetStateAction<ConsciousnessAssessmentForm>,
+  ) => setClinicalAssessmentValue('consciousness', value);
+  const setClinicalHistory = (
+    value: SetStateAction<ClinicalHistoryForm>,
+  ) => setClinicalAssessmentValue('history', value);
+  const setPainAssessment = (
+    value: SetStateAction<PainAssessmentForm>,
+  ) => setClinicalAssessmentValue('pain', value);
+  const setPrimaryAssessment = (
+    value: SetStateAction<PrimaryAssessmentForm>,
+  ) => setClinicalAssessmentValue('primary', value);
+  const setGcsAssessment = (
+    value: SetStateAction<GcsAssessmentForm>,
+  ) => setClinicalAssessmentValue('gcs', value);
+  const setGfastAssessment = (
+    value: SetStateAction<GfastAssessmentForm>,
+  ) => setClinicalAssessmentValue('gfast', value);
+  const setExtremityAssessment = (
+    value: SetStateAction<ExtremityAssessmentForm>,
+  ) => setClinicalAssessmentValue('extremity', value);
+  const setTraumaAssessment = (
+    value: SetStateAction<TraumaAssessmentForm>,
+  ) => setClinicalAssessmentValue('trauma', value);
+  const setReassessment = (
+    value: SetStateAction<ReassessmentForm>,
+  ) => setClinicalAssessmentValue('reassessment', value);
+  const setRevisedTraumaScore = (
+    value: SetStateAction<RevisedTraumaScoreForm>,
+  ) => setClinicalAssessmentValue('revisedTraumaScore', value);
+  const setRespiratoryAssessment = (
+    value: SetStateAction<RespiratoryAssessmentForm>,
+  ) => setClinicalAssessmentValue('respiratory', value);
+  const setAlocAssessment = (
+    value: SetStateAction<AlocAssessmentForm>,
+  ) => setClinicalAssessmentValue('aloc', value);
 
 
   function getTaskProgress(taskId: string) {

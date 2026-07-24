@@ -4,6 +4,18 @@ import {
   createEmptyDcapBtlsFindings,
   type DcapBtlsFindings,
 } from './dcapBtls';
+import type { AlocAssessmentForm } from '../components/assessment/cards/AlocAssessmentCard';
+import type { ClinicalHistoryForm } from '../components/assessment/cards/ClinicalHistoryCard';
+import type { ConsciousnessAssessmentForm } from '../components/assessment/cards/ConsciousnessAssessmentCard';
+import type { ExtremityAssessmentForm } from '../components/assessment/cards/ExtremityAssessmentCard';
+import type { GcsAssessmentForm } from '../components/assessment/cards/GcsAssessmentCard';
+import type { GfastAssessmentForm } from '../components/assessment/cards/GfastAssessmentCard';
+import type { PainAssessmentForm } from '../components/assessment/cards/PainAssessmentCard';
+import type { PrimaryAssessmentForm } from '../components/assessment/cards/PrimaryAssessmentCard';
+import type { ReassessmentForm } from '../components/assessment/cards/ReassessmentCard';
+import type { RespiratoryAssessmentForm } from '../components/assessment/cards/RespiratoryAssessmentCard';
+import type { RevisedTraumaScoreForm } from '../components/assessment/cards/RevisedTraumaScoreCard';
+import type { TraumaAssessmentForm } from '../components/assessment/cards/TraumaAssessmentCard';
 
 export type ApolloBodyRegionSelection = Record<ApolloBodyRegionKey, boolean>;
 
@@ -64,7 +76,23 @@ export type AssessmentBodyMapForm = {
   subregionFindings: AssessmentBodySubRegionFindings;
 };
 
+export type AssessmentClinicalForm = {
+  consciousness: ConsciousnessAssessmentForm;
+  history: ClinicalHistoryForm;
+  pain: PainAssessmentForm;
+  primary: PrimaryAssessmentForm;
+  gcs: GcsAssessmentForm;
+  gfast: GfastAssessmentForm;
+  extremity: ExtremityAssessmentForm;
+  trauma: TraumaAssessmentForm;
+  reassessment: ReassessmentForm;
+  revisedTraumaScore: RevisedTraumaScoreForm;
+  respiratory: RespiratoryAssessmentForm;
+  aloc: AlocAssessmentForm;
+};
+
 export type AssessmentForm = {
+  clinical: AssessmentClinicalForm;
   bodyMap: AssessmentBodyMapForm;
 };
 
@@ -365,6 +393,184 @@ export function markEntireAssessmentBodyUnremarkable(
 
 export function createDefaultAssessmentForm(): AssessmentForm {
   return {
+    clinical: {
+      consciousness: {
+        avpu: '',
+        orientation: '',
+      },
+      history: {
+        eventsLeadingToIllness: '',
+        additionalHistoryNotes: '',
+      },
+      pain: {
+        painPresent: '',
+        painScaleType: '',
+        numericPainScore: '',
+        facesPainScore: '',
+        onset: '',
+        provocation: '',
+        quality: '',
+        radiation: '',
+        time: '',
+      },
+      primary: {
+        generalImpression: '',
+        levelOfConsciousness: '',
+        airway: '',
+        breathing: '',
+        circulation: '',
+        disability: '',
+        exposure: '',
+        gcsEyes: '',
+        gcsVerbal: '',
+        gcsMotor: '',
+        pupils: '',
+        skinColor: '',
+        skinTemperature: '',
+        skinCondition: '',
+        lifeThreats: '',
+        transportPriority: '',
+      },
+      gcs: {
+        eyes: '',
+        verbal: '',
+        motor: '',
+      },
+      gfast: {
+        gaze: '',
+        face: '',
+        arms: '',
+        speech: '',
+        time: '',
+        bloodGlucose: '',
+      },
+      extremity: {
+        rightArm: {
+          selected: false,
+          circulation: '',
+          motor: '',
+          sensation: '',
+          tenderness: '',
+          pulses: '',
+          skin: '',
+          capillaryRefill: '',
+          notes: '',
+        },
+        leftArm: {
+          selected: false,
+          circulation: '',
+          motor: '',
+          sensation: '',
+          tenderness: '',
+          pulses: '',
+          skin: '',
+          capillaryRefill: '',
+          notes: '',
+        },
+        rightLeg: {
+          selected: false,
+          circulation: '',
+          motor: '',
+          sensation: '',
+          tenderness: '',
+          pulses: '',
+          skin: '',
+          capillaryRefill: '',
+          notes: '',
+        },
+        leftLeg: {
+          selected: false,
+          circulation: '',
+          motor: '',
+          sensation: '',
+          tenderness: '',
+          pulses: '',
+          skin: '',
+          capillaryRefill: '',
+          notes: '',
+        },
+      },
+      trauma: {
+        regions: Object.fromEntries(
+          (
+            Object.keys(
+              createEmptyBodyRegionSelection(),
+            ) as ApolloBodyRegionKey[]
+          ).map((region) => [
+            region,
+            {
+              selected: false,
+              findings: {
+                deformity: false,
+                contusions: false,
+                abrasions: false,
+                puncturesPenetrations: false,
+                burns: false,
+                tenderness: false,
+                lacerations: false,
+                swelling: false,
+              },
+              cms: {
+                circulation: '',
+                motor: '',
+                sensation: '',
+              },
+            },
+          ]),
+        ) as TraumaAssessmentForm['regions'],
+      },
+      reassessment: {
+        reason: '',
+        patientCondition: '',
+        mentalStatus: '',
+        airwayBreathing: '',
+        circulation: '',
+        painChange: '',
+        interventionsResponse: '',
+        transportPriority: '',
+        notes: '',
+      },
+      revisedTraumaScore: {
+        respiratoryRate: '',
+        systolicBloodPressure: '',
+        notes: '',
+      },
+      respiratory: {
+        respiratoryEffort: '',
+        airwayPatency: '',
+        breathSoundsLeft: '',
+        breathSoundsRight: '',
+        accessoryMuscleUse: '',
+        cough: '',
+        currentRespiratorySupport: '',
+        observedResponse: '',
+        pastmedProvocation: '',
+        pastmedAssociatedSymptoms: '',
+        pastmedSputum: '',
+        pastmedTriggers: '',
+        pastmedMedicalHistory: '',
+        pastmedExerciseTolerance: '',
+        pastmedDuration: '',
+        notes: '',
+      },
+      aloc: {
+        currentMentalStatus: '',
+        orientation: '',
+        speech: '',
+        pupils: '',
+        bloodGlucose: '',
+        alcohol: '',
+        epilepsy: '',
+        insulin: '',
+        overdose: '',
+        uremia: '',
+        trauma: '',
+        infection: '',
+        psych: '',
+        stroke: '',
+        notes: '',
+      },
+    },
     bodyMap: {
       currentFocus: '',
       selectedRegions: createEmptyBodyRegionSelection(),
