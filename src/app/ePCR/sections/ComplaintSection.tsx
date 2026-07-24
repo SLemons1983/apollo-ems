@@ -61,6 +61,26 @@ function toggleCodedSelection(current: CodedSelection[], value: CodedSelection) 
     : [...current, value];
 }
 
+function normalizeClinicalDescription(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function codedSelectionsMatch(
+  left: CodedSelection | null,
+  right: CodedSelection | null,
+) {
+  if (!left || !right) return false;
+
+  if (left.code && right.code) {
+    return left.code === right.code;
+  }
+
+  return (
+    normalizeClinicalDescription(left.description) ===
+    normalizeClinicalDescription(right.description)
+  );
+}
+
 export default function ComplaintSection({
   complaintForm,
   updateComplaintForm,
@@ -165,7 +185,23 @@ export default function ComplaintSection({
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.primaryImpression}
-            onChange={(value) => updateComplaintForm('primaryImpression', value)}
+            excludedValues={
+              complaintForm.secondaryImpression
+                ? [complaintForm.secondaryImpression]
+                : []
+            }
+            onChange={(value) => {
+              updateComplaintForm('primaryImpression', value);
+
+              if (
+                codedSelectionsMatch(
+                  value,
+                  complaintForm.secondaryImpression,
+                )
+              ) {
+                updateComplaintForm('secondaryImpression', null);
+              }
+            }}
           />
 
           <ClinicalCombobox
@@ -173,9 +209,23 @@ export default function ComplaintSection({
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.secondaryImpression}
-            onChange={(value) =>
-              updateComplaintForm('secondaryImpression', value)
+            excludedValues={
+              complaintForm.primaryImpression
+                ? [complaintForm.primaryImpression]
+                : []
             }
+            onChange={(value) => {
+              updateComplaintForm('secondaryImpression', value);
+
+              if (
+                codedSelectionsMatch(
+                  value,
+                  complaintForm.primaryImpression,
+                )
+              ) {
+                updateComplaintForm('primaryImpression', null);
+              }
+            }}
           />
 
           <ClinicalCombobox
@@ -183,7 +233,19 @@ export default function ComplaintSection({
             listType="symptom"
             category={complaintForm.clinicalCategory}
             value={complaintForm.primarySymptom}
-            onChange={(value) => updateComplaintForm('primarySymptom', value)}
+            excludedValues={complaintForm.otherAssociatedSymptoms}
+            onChange={(value) => {
+              updateComplaintForm('primarySymptom', value);
+
+              if (value) {
+                updateComplaintForm(
+                  'otherAssociatedSymptoms',
+                  complaintForm.otherAssociatedSymptoms.filter(
+                    (symptom) => !codedSelectionsMatch(symptom, value),
+                  ),
+                );
+              }
+            }}
           />
 
           <div className="md:col-span-2">
@@ -192,8 +254,20 @@ export default function ComplaintSection({
               listType="symptom"
               category={complaintForm.clinicalCategory}
               value={null}
+              excludedValues={[
+                ...(complaintForm.primarySymptom
+                  ? [complaintForm.primarySymptom]
+                  : []),
+                ...complaintForm.otherAssociatedSymptoms,
+              ]}
               onChange={(value) => {
-                if (!value) return;
+                if (
+                  !value ||
+                  codedSelectionsMatch(value, complaintForm.primarySymptom)
+                ) {
+                  return;
+                }
+
                 updateComplaintForm(
                   'otherAssociatedSymptoms',
                   toggleCodedSelection(
@@ -221,7 +295,7 @@ export default function ComplaintSection({
                     }
                     className="rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
                   >
-                    ✓ {symptom.code} — {symptom.description}
+                    ✓ {symptom.description}
                   </button>
                 ))}
               </div>

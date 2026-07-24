@@ -13,23 +13,52 @@ type ClinicalComboboxProps = {
   listType: ClinicalListType;
   category?: string;
   value: CodedSelection | null;
+  excludedValues?: CodedSelection[];
   onChange: (value: CodedSelection | null) => void;
 };
+
+function normalizeDescription(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function selectionsMatch(
+  left: CodedSelection | ClinicalOption,
+  right: CodedSelection,
+) {
+  if (left.code && right.code) {
+    return left.code === right.code;
+  }
+
+  const leftDescription =
+    'description' in left ? left.description : left.suggestedLabel;
+
+  return (
+    normalizeDescription(leftDescription) ===
+    normalizeDescription(right.description)
+  );
+}
 
 export default function ClinicalCombobox({
   label,
   listType,
   category,
   value,
+  excludedValues = [],
   onChange,
 }: ClinicalComboboxProps) {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
 
-  const results = useMemo(
-    () => searchClinicalOptions(listType, searchText, category),
-    [category, listType, searchText],
-  );
+  const results = useMemo(() => {
+    const options = searchClinicalOptions(listType, searchText, category);
+
+    return options.filter(
+      (option) =>
+        !excludedValues.some((excludedValue) =>
+          selectionsMatch(option, excludedValue),
+        ),
+    );
+  }, [category, excludedValues, listType, searchText]);
 
   function selectOption(option: ClinicalOption | null) {
     onChange(toCodedSelection(option));
@@ -85,9 +114,6 @@ export default function ClinicalCombobox({
                 className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-800 hover:bg-slate-100"
               >
                 <span className="font-semibold">{option.suggestedLabel}</span>
-                <span className="mt-1 block text-xs text-slate-500">
-                  {option.code} · {option.category}
-                </span>
               </button>
             ))}
 
