@@ -65,7 +65,7 @@ export default function ComplaintSection({
   complaintForm,
   updateComplaintForm,
 }: ComplaintSectionProps) {
-  const [expandedCard, setExpandedCard] = useState('Complaint');
+  const [expandedCard, setExpandedCard] = useState('Chief Complaint & History');
 
   function toggleCard(cardTitle: string) {
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
@@ -76,7 +76,6 @@ export default function ComplaintSection({
     complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
-    complaintForm.emsConditionCode,
     complaintForm.primarySymptom,
     complaintForm.otherAssociatedSymptoms.length > 0 ? 'selected' : '',
     complaintForm.symptomsBeganDateTime,
@@ -123,11 +122,11 @@ export default function ComplaintSection({
   return (
     <div className="space-y-4">
       <PCRCard
-        title="Complaint"
+        title="Chief Complaint & History"
         completedFields={complaintFields.filter(Boolean).length}
         totalFields={complaintFields.length}
-        expanded={expandedCard === 'Complaint'}
-        onToggle={() => toggleCard('Complaint')}
+        expanded={expandedCard === 'Chief Complaint & History'}
+        onToggle={() => toggleCard('Chief Complaint & History')}
       >
         <div className="grid gap-5 md:grid-cols-2">
           <label className="block md:col-span-2">
@@ -156,14 +155,13 @@ export default function ComplaintSection({
               updateComplaintForm('clinicalCategory', value);
               updateComplaintForm('primaryImpression', null);
               updateComplaintForm('secondaryImpression', null);
-              updateComplaintForm('emsConditionCode', null);
               updateComplaintForm('primarySymptom', null);
               updateComplaintForm('otherAssociatedSymptoms', []);
             }}
           />
 
           <ClinicalCombobox
-            label="Primary Impression"
+            label="Clinical Differential"
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.primaryImpression}
@@ -171,21 +169,13 @@ export default function ComplaintSection({
           />
 
           <ClinicalCombobox
-            label="Secondary Impression"
+            label="Secondary Differential"
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.secondaryImpression}
             onChange={(value) =>
               updateComplaintForm('secondaryImpression', value)
             }
-          />
-
-          <ClinicalCombobox
-            label="EMS Condition Code"
-            listType="conditionCode"
-            category={complaintForm.clinicalCategory}
-            value={complaintForm.emsConditionCode}
-            onChange={(value) => updateComplaintForm('emsConditionCode', value)}
           />
 
           <ClinicalCombobox
@@ -198,7 +188,7 @@ export default function ComplaintSection({
 
           <div className="md:col-span-2">
             <ClinicalCombobox
-              label="Other Associated Symptoms"
+              label="Associated Symptoms"
               listType="symptom"
               category={complaintForm.clinicalCategory}
               value={null}
@@ -240,7 +230,7 @@ export default function ComplaintSection({
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
-              Date and Time Symptoms Began
+              Symptom Onset
             </span>
             <input
               type="datetime-local"
@@ -257,7 +247,7 @@ export default function ComplaintSection({
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
-              Date and Time Patient Last Seen Normal
+              Last Known Well
             </span>
             <input
               type="datetime-local"
