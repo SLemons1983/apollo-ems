@@ -86,6 +86,8 @@ export default function ComplaintSection({
   updateComplaintForm,
 }: ComplaintSectionProps) {
   const [expandedCard, setExpandedCard] = useState('Chief Complaint & History');
+  const [associatedSymptomDraft, setAssociatedSymptomDraft] =
+    useState<CodedSelection | null>(null);
 
   function toggleCard(cardTitle: string) {
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
@@ -177,6 +179,7 @@ export default function ComplaintSection({
               updateComplaintForm('secondaryImpression', null);
               updateComplaintForm('primarySymptom', null);
               updateComplaintForm('otherAssociatedSymptoms', []);
+              setAssociatedSymptomDraft(null);
             }}
           />
 
@@ -244,39 +247,58 @@ export default function ComplaintSection({
                     (symptom) => !codedSelectionsMatch(symptom, value),
                   ),
                 );
+
+                if (codedSelectionsMatch(associatedSymptomDraft, value)) {
+                  setAssociatedSymptomDraft(null);
+                }
               }
             }}
           />
 
           <div className="md:col-span-2">
-            <ClinicalCombobox
-              label="Associated Symptoms"
-              listType="symptom"
-              category={complaintForm.clinicalCategory}
-              value={null}
-              excludedValues={[
-                ...(complaintForm.primarySymptom
-                  ? [complaintForm.primarySymptom]
-                  : []),
-                ...complaintForm.otherAssociatedSymptoms,
-              ]}
-              onChange={(value) => {
-                if (
-                  !value ||
-                  codedSelectionsMatch(value, complaintForm.primarySymptom)
-                ) {
-                  return;
-                }
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <ClinicalCombobox
+                label="Associated Symptom"
+                listType="symptom"
+                category={complaintForm.clinicalCategory}
+                value={associatedSymptomDraft}
+                excludedValues={[
+                  ...(complaintForm.primarySymptom
+                    ? [complaintForm.primarySymptom]
+                    : []),
+                  ...complaintForm.otherAssociatedSymptoms,
+                ]}
+                onChange={setAssociatedSymptomDraft}
+              />
 
-                updateComplaintForm(
-                  'otherAssociatedSymptoms',
-                  toggleCodedSelection(
-                    complaintForm.otherAssociatedSymptoms,
-                    value,
-                  ),
-                );
-              }}
-            />
+              <button
+                type="button"
+                disabled={!associatedSymptomDraft}
+                onClick={() => {
+                  if (!associatedSymptomDraft) return;
+
+                  const alreadySelected =
+                    complaintForm.otherAssociatedSymptoms.some((symptom) =>
+                      codedSelectionsMatch(
+                        symptom,
+                        associatedSymptomDraft,
+                      ),
+                    );
+
+                  if (!alreadySelected) {
+                    updateComplaintForm('otherAssociatedSymptoms', [
+                      ...complaintForm.otherAssociatedSymptoms,
+                      associatedSymptomDraft,
+                    ]);
+                  }
+
+                  setAssociatedSymptomDraft(null);
+                }}
+                className="rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+              >
+                Add Associated Symptom
+              </button>
+            </div>
 
             {complaintForm.otherAssociatedSymptoms.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -287,15 +309,16 @@ export default function ComplaintSection({
                     onClick={() =>
                       updateComplaintForm(
                         'otherAssociatedSymptoms',
-                        toggleCodedSelection(
-                          complaintForm.otherAssociatedSymptoms,
-                          symptom,
+                        complaintForm.otherAssociatedSymptoms.filter(
+                          (item) => !codedSelectionsMatch(item, symptom),
                         ),
                       )
                     }
-                    className="rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50"
+                    title={`Remove ${symptom.description}`}
                   >
-                    ✓ {symptom.description}
+                    {symptom.description}
+                    <span className="ml-2 text-slate-400">×</span>
                   </button>
                 ))}
               </div>
