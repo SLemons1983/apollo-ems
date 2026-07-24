@@ -3,6 +3,7 @@
 import {
   ChangeEvent,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -44,6 +45,42 @@ export default function EPCRClient() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedSection, setExpandedSection] = useState<string>('');
   const [fileStatus, setFileStatus] = useState('');
+  const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
+  const [quickToolsOpen, setQuickToolsOpen] = useState(false);
+  const [mobileDrawer, setMobileDrawer] = useState<
+    'patient-summary' | 'quick-tools' | null
+  >(null);
+
+  useEffect(() => {
+    const savedPatientSummary = window.localStorage.getItem(
+      'apollo-epcr-patient-summary-open',
+    );
+    const savedQuickTools = window.localStorage.getItem(
+      'apollo-epcr-quick-tools-open',
+    );
+
+    if (savedPatientSummary !== null) {
+      setPatientSummaryOpen(savedPatientSummary === 'true');
+    }
+
+    if (savedQuickTools !== null) {
+      setQuickToolsOpen(savedQuickTools === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      'apollo-epcr-patient-summary-open',
+      String(patientSummaryOpen),
+    );
+  }, [patientSummaryOpen]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      'apollo-epcr-quick-tools-open',
+      String(quickToolsOpen),
+    );
+  }, [quickToolsOpen]);
 
   const [callForm, setCallForm] = useState<CallForm>(() =>
     createDefaultCallForm(),
@@ -585,88 +622,315 @@ export default function EPCRClient() {
 
         <PCRProgress sections={progressSections} />
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
-          <PatientHandoffRail
-            callForm={callForm}
-            patientForm={patientForm}
-            complaintForm={complaintForm}
-          />
+        <div className="mb-4 flex items-center justify-between gap-3 xl:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileDrawer('patient-summary')}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            ☰ Patient Summary
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileDrawer('quick-tools')}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+          >
+            Quick Tools ☰
+          </button>
+        </div>
 
-          <div className="min-w-0 space-y-4">
-            {sections.map((section) => {
-            const sectionProgress = progressSections.find(
-              (progressSection) => progressSection.title === section,
-            ) ?? {
-              title: section,
-              completedFields: 0,
-              totalFields: 1,
-            };
-
-            return (
-              <PCRSection
-                key={section}
-                title={section}
-                completedFields={sectionProgress.completedFields}
-                totalFields={sectionProgress.totalFields}
-                expanded={expandedSection === section}
-                onToggle={() =>
-                  setExpandedSection(
-                    expandedSection === section ? '' : section,
-                  )
-                }
-              >
-                {section === 'Call' ? (
-                  <CallSection
-                    callForm={callForm}
-                    setCallForm={setCallForm}
-                    updateCallForm={updateCallForm}
-                  />
-                ) : section === 'Patient' ? (
-                  <PatientSection
-                    patientForm={patientForm}
-                    callForm={callForm}
-                    setPatientForm={setPatientForm}
-                    updatePatientForm={updatePatientForm}
-                  />
-                ) : section === 'Complaint' ? (
-                  <ComplaintSection
-                    complaintForm={complaintForm}
-                    updateComplaintForm={updateComplaintForm}
-                  />
-                ) : section === 'Assessment' ? (
-                  <AssessmentSection
-                    assessmentForm={assessmentForm}
-                    onAssessmentFormChange={setAssessmentForm}
-                    patientForm={patientForm}
-                    providerScope={
-                      callForm.crewMembers.find(
-                        (member) => member.isDocumentingPcr,
-                      )?.certification === 'Paramedic'
-                        ? 'ALS'
-                        : 'BLS'
-                    }
-                    clinicalCategory={complaintForm.clinicalCategory}
-                    suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
-                    possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
-                    behavioralHold={
-                      complaintForm.patientPlacedOn5150Hold === 'Yes'
-                    }
-                    cardiacArrest={
-                      complaintForm.cardiacArrest !== '' &&
-                      complaintForm.cardiacArrest !== 'No'
-                    }
-                    onProgressChange={handleAssessmentProgressChange}
-                  />
-                ) : (
-                  <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
-                    {section} cards will be added here.
+        <div
+          className="grid items-start gap-4 transition-all duration-300"
+          style={{
+            gridTemplateColumns: `minmax(0, 1fr)`,
+          }}
+        >
+          <div
+            className="hidden items-start gap-4 xl:grid"
+            style={{
+              gridTemplateColumns: `${
+                patientSummaryOpen ? 'minmax(280px, 320px)' : '52px'
+              } minmax(0, 1fr) ${
+                quickToolsOpen ? 'minmax(280px, 320px)' : '52px'
+              }`,
+            }}
+          >
+            <aside className="sticky top-4 min-w-0">
+              {patientSummaryOpen ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
+                  <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                        Live Clinical Summary
+                      </p>
+                      <h2 className="font-bold">Patient Handoff</h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPatientSummaryOpen(false)}
+                      className="rounded-lg border border-white/20 px-2.5 py-1.5 font-bold hover:bg-white/10"
+                      aria-label="Collapse patient summary"
+                    >
+                      ◀
+                    </button>
                   </div>
-                )}
-              </PCRSection>
-            );
+                  <div className="p-3">
+                    <PatientHandoffRail
+                      callForm={callForm}
+                      patientForm={patientForm}
+                      complaintForm={complaintForm}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPatientSummaryOpen(true)}
+                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-2 py-4 shadow-md hover:bg-slate-50"
+                  aria-label="Expand patient summary"
+                >
+                  <span className="font-black">▶</span>
+                  <span
+                    className="text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    Patient Summary
+                  </span>
+                </button>
+              )}
+            </aside>
+
+            <div className="min-w-0 space-y-4">
+              {sections.map((section) => {
+                const sectionProgress = progressSections.find(
+                  (progressSection) => progressSection.title === section,
+                ) ?? { title: section, completedFields: 0, totalFields: 1 };
+
+                return (
+                  <PCRSection
+                    key={section}
+                    title={section}
+                    completedFields={sectionProgress.completedFields}
+                    totalFields={sectionProgress.totalFields}
+                    expanded={expandedSection === section}
+                    onToggle={() =>
+                      setExpandedSection(
+                        expandedSection === section ? '' : section,
+                      )
+                    }
+                  >
+                    {section === 'Call' ? (
+                      <CallSection
+                        callForm={callForm}
+                        setCallForm={setCallForm}
+                        updateCallForm={updateCallForm}
+                      />
+                    ) : section === 'Patient' ? (
+                      <PatientSection
+                        patientForm={patientForm}
+                        callForm={callForm}
+                        setPatientForm={setPatientForm}
+                        updatePatientForm={updatePatientForm}
+                      />
+                    ) : section === 'Complaint' ? (
+                      <ComplaintSection
+                        complaintForm={complaintForm}
+                        updateComplaintForm={updateComplaintForm}
+                      />
+                    ) : section === 'Assessment' ? (
+                      <AssessmentSection
+                        assessmentForm={assessmentForm}
+                        onAssessmentFormChange={setAssessmentForm}
+                        patientForm={patientForm}
+                        providerScope={
+                          callForm.crewMembers.find(
+                            (member) => member.isDocumentingPcr,
+                          )?.certification === 'Paramedic'
+                            ? 'ALS'
+                            : 'BLS'
+                        }
+                        clinicalCategory={complaintForm.clinicalCategory}
+                        suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
+                        possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
+                        behavioralHold={complaintForm.patientPlacedOn5150Hold === 'Yes'}
+                        cardiacArrest={
+                          complaintForm.cardiacArrest !== '' &&
+                          complaintForm.cardiacArrest !== 'No'
+                        }
+                        onProgressChange={handleAssessmentProgressChange}
+                      />
+                    ) : (
+                      <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+                        {section} cards will be added here.
+                      </div>
+                    )}
+                  </PCRSection>
+                );
+              })}
+            </div>
+
+            <aside className="sticky top-4 min-w-0">
+              {quickToolsOpen ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
+                  <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                    <button
+                      type="button"
+                      onClick={() => setQuickToolsOpen(false)}
+                      className="rounded-lg border border-white/20 px-2.5 py-1.5 font-bold hover:bg-white/10"
+                      aria-label="Collapse quick tools"
+                    >
+                      ▶
+                    </button>
+                    <div className="text-right">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                        Clinical Utilities
+                      </p>
+                      <h2 className="font-bold">Quick Tools</h2>
+                    </div>
+                  </div>
+                  <div className="space-y-3 p-4">
+                    {[
+                      ['Quick Vitals', 'Rapidly add a new vital-sign set without leaving the current section.'],
+                      ['Dosing Calculator', 'Weight-based medication and infusion calculations.'],
+                      ['Clinical Timer', 'Track CPR, stroke, medication, contraction, or procedure times.'],
+                    ].map(([title, description]) => (
+                      <div key={title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                          <h3 className="font-bold text-slate-900">{title}</h3>
+                          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                            Coming Soon
+                          </span>
+                        </div>
+                        <p className="text-sm leading-6 text-slate-600">{description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setQuickToolsOpen(true)}
+                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-2 py-4 shadow-md hover:bg-slate-50"
+                  aria-label="Expand quick tools"
+                >
+                  <span className="font-black">◀</span>
+                  <span
+                    className="text-xs font-bold uppercase tracking-[0.16em]"
+                    style={{ writingMode: 'vertical-rl' }}
+                  >
+                    Quick Tools
+                  </span>
+                </button>
+              )}
+            </aside>
+          </div>
+
+          <div className="min-w-0 space-y-4 xl:hidden">
+            {sections.map((section) => {
+              const sectionProgress = progressSections.find(
+                (progressSection) => progressSection.title === section,
+              ) ?? { title: section, completedFields: 0, totalFields: 1 };
+
+              return (
+                <PCRSection
+                  key={section}
+                  title={section}
+                  completedFields={sectionProgress.completedFields}
+                  totalFields={sectionProgress.totalFields}
+                  expanded={expandedSection === section}
+                  onToggle={() =>
+                    setExpandedSection(expandedSection === section ? '' : section)
+                  }
+                >
+                  {section === 'Call' ? (
+                    <CallSection callForm={callForm} setCallForm={setCallForm} updateCallForm={updateCallForm} />
+                  ) : section === 'Patient' ? (
+                    <PatientSection patientForm={patientForm} callForm={callForm} setPatientForm={setPatientForm} updatePatientForm={updatePatientForm} />
+                  ) : section === 'Complaint' ? (
+                    <ComplaintSection complaintForm={complaintForm} updateComplaintForm={updateComplaintForm} />
+                  ) : section === 'Assessment' ? (
+                    <AssessmentSection
+                      assessmentForm={assessmentForm}
+                      onAssessmentFormChange={setAssessmentForm}
+                      patientForm={patientForm}
+                      providerScope={callForm.crewMembers.find((member) => member.isDocumentingPcr)?.certification === 'Paramedic' ? 'ALS' : 'BLS'}
+                      clinicalCategory={complaintForm.clinicalCategory}
+                      suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
+                      possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
+                      behavioralHold={complaintForm.patientPlacedOn5150Hold === 'Yes'}
+                      cardiacArrest={complaintForm.cardiacArrest !== '' && complaintForm.cardiacArrest !== 'No'}
+                      onProgressChange={handleAssessmentProgressChange}
+                    />
+                  ) : (
+                    <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
+                      {section} cards will be added here.
+                    </div>
+                  )}
+                </PCRSection>
+              );
             })}
           </div>
         </div>
+
+        {mobileDrawer && (
+          <div className="fixed inset-0 z-50 xl:hidden">
+            <button
+              type="button"
+              aria-label="Close drawer"
+              onClick={() => setMobileDrawer(null)}
+              className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+            />
+            <aside
+              className={`absolute inset-y-0 w-[min(92vw,360px)] overflow-y-auto bg-slate-100 shadow-2xl ${
+                mobileDrawer === 'patient-summary' ? 'left-0' : 'right-0'
+              }`}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                    {mobileDrawer === 'patient-summary' ? 'Live Clinical Summary' : 'Clinical Utilities'}
+                  </p>
+                  <h2 className="text-lg font-bold">
+                    {mobileDrawer === 'patient-summary' ? 'Patient Handoff' : 'Quick Tools'}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileDrawer(null)}
+                  className="rounded-lg border border-white/20 px-3 py-2 font-bold hover:bg-white/10"
+                  aria-label="Close drawer"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4">
+                {mobileDrawer === 'patient-summary' ? (
+                  <PatientHandoffRail
+                    callForm={callForm}
+                    patientForm={patientForm}
+                    complaintForm={complaintForm}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {['Quick Vitals', 'Dosing Calculator', 'Clinical Timer'].map((tool) => (
+                      <div key={tool} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <h3 className="font-bold text-slate-900">{tool}</h3>
+                          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                            Coming Soon
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600">
+                          This Quick Tool will be added in a future phase.
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </div>
+        )}
       </div>
     </main>
   );
