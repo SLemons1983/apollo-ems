@@ -62,7 +62,6 @@ const ppeOptions = [
 const crewCertificationOptions: CrewMember['certification'][] = [
   'EMT',
   'Paramedic',
-  'Trainee/Student',
 ];
 
 const crewRoleOptions: CrewMember['role'][] = [
