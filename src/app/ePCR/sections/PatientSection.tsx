@@ -180,6 +180,10 @@ export default function PatientSection({
   const nkdaSelected =
     patientForm.medicationAllergies.trim().toUpperCase() === 'NKDA';
 
+  const noEnvironmentalAllergiesSelected =
+    patientForm.environmentalAllergies.trim().toUpperCase() ===
+    'NO ENVIRONMENTAL ALLERGIES';
+
   const belongingsFields = [
     patientForm.patientEffects,
     patientForm.patientEffectsLeftWith,
@@ -211,6 +215,15 @@ export default function PatientSection({
     setPatientForm((current) => ({
       ...current,
       medicationAllergies: nkdaSelected ? '' : 'NKDA',
+    }));
+  }
+
+  function toggleNoEnvironmentalAllergies() {
+    setPatientForm((current) => ({
+      ...current,
+      environmentalAllergies: noEnvironmentalAllergiesSelected
+        ? ''
+        : 'No Environmental Allergies',
     }));
   }
 
@@ -687,28 +700,48 @@ export default function PatientSection({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {[
-            ['medicationAllergies', 'Medication Allergies'],
-            ['environmentalAllergies', 'Environmental Allergies'],
-          ].map(([field, label]) => (
-            <label key={field} className="block">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">
-                {label}
-              </span>
-              <textarea
-                value={patientForm[field as keyof PatientForm] as string}
-                onChange={(event) =>
-                  updateAllergy(
-                    field as
-                      | 'medicationAllergies'
-                      | 'environmentalAllergies',
-                    event.target.value,
-                  )
-                }
-                className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-              />
-            </label>
-          ))}
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Medication Allergies
+            </span>
+            <textarea
+              value={patientForm.medicationAllergies}
+              onChange={(event) =>
+                updateAllergy('medicationAllergies', event.target.value)
+              }
+              className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+            />
+          </label>
+
+          <div>
+            <span className="mb-1 block text-sm font-semibold text-slate-700">
+              Environmental Allergies
+            </span>
+            <button
+              type="button"
+              aria-pressed={noEnvironmentalAllergiesSelected}
+              onClick={toggleNoEnvironmentalAllergies}
+              className={`mb-2 w-full rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                noEnvironmentalAllergiesSelected
+                  ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100'
+              }`}
+            >
+              {noEnvironmentalAllergiesSelected
+                ? '✓ No Environmental Allergies'
+                : 'No Environmental Allergies'}
+            </button>
+            <textarea
+              value={patientForm.environmentalAllergies}
+              onChange={(event) =>
+                updateAllergy('environmentalAllergies', event.target.value)
+              }
+              className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Entering an environmental allergy replaces this selection.
+            </p>
+          </div>
         </div>
       </PCRCard>
 
