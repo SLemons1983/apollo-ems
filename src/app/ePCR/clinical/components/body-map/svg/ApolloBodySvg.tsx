@@ -6,8 +6,8 @@ import type {
   ApolloBodyRegionStatus,
   ApolloBodyView,
 } from '../bodyMapTypes';
-import { bodySvgFront } from './bodySvgFront';
-import { bodySvgBack } from './bodySvgBack';
+import { bodySvgFront, bodySvgFrontLayout } from './bodySvgFront';
+import { bodySvgBack, bodySvgBackLayout } from './bodySvgBack';
 
 type ApolloBodySvgProps = {
   view: ApolloBodyView;
@@ -27,16 +27,13 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
     props.view === 'front'
       ? bodySvgFront[illustrationSex]
       : bodySvgBack[illustrationSex];
+  const layout =
+    props.view === 'front'
+      ? bodySvgFrontLayout[illustrationSex]
+      : bodySvgBackLayout[illustrationSex];
   const imageHref = isFemale
     ? '/epcr/body-map/apollo-body-female.png'
     : '/epcr/body-map/apollo-body-male.png';
-  const imagePlacement = isFemale
-    ? props.view === 'front'
-      ? { x: -3, y: 0, width: 1264, height: 900 }
-      : { x: -643, y: 0, width: 1264, height: 900 }
-    : props.view === 'front'
-      ? { x: -95, y: 0, width: 1350, height: 900 }
-      : { x: -684, y: 0, width: 1350, height: 900 };
 
   if (regions.length === 0) {
     return <ApolloBodyFigure {...props} />;
@@ -45,7 +42,7 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-300 bg-gradient-to-b from-white to-slate-50 p-2 shadow-inner sm:p-4">
       <svg
-        viewBox="0 0 600 900"
+        viewBox={layout.viewBox}
         role="img"
         aria-label={`Apollo body map ${props.view} view`}
         className="mx-auto h-auto w-full max-w-md"
@@ -56,20 +53,31 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
           </filter>
         </defs>
 
-        <rect x="0" y="0" width="600" height="900" rx="32" fill="#ffffff" />
         <image
           href={imageHref}
-          x={imagePlacement.x}
-          y={imagePlacement.y}
-          width={imagePlacement.width}
-          height={imagePlacement.height}
-          preserveAspectRatio="none"
+          x="0"
+          y="0"
+          width={layout.canvasWidth}
+          height={layout.canvasHeight}
           aria-hidden="true"
           pointerEvents="none"
         />
 
+        <defs>
+          {regions.map((region, index) =>
+            region.clip ? (
+              <clipPath
+                key={`${region.id}-clip`}
+                id={`body-region-clip-${illustrationSex}-${props.view}-${index}`}
+              >
+                <rect {...region.clip} />
+              </clipPath>
+            ) : null,
+          )}
+        </defs>
+
         <g>
-        {regions.map((region) => {
+        {regions.map((region, index) => {
           const selected = props.selectedRegions[region.id];
           const status = props.regionStatuses[region.id];
           const hasClinicalData =
@@ -124,6 +132,11 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
               aria-pressed={selected}
               aria-label={region.label}
               className="cursor-pointer transition"
+              clipPath={
+                region.clip
+                  ? `url(#body-region-clip-${illustrationSex}-${props.view}-${index})`
+                  : undefined
+              }
               style={{
                 transition: 'fill 160ms ease, stroke 160ms ease, stroke-width 160ms ease',
                 outline: 'none',
