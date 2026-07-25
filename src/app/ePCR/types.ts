@@ -76,6 +76,10 @@ export type PatientForm = {
   patientEffectsLeftWith: string;
   patientEffectsLeftWithOther: string;
   disposition: string;
+  transportedTo: string;
+  refusalType: string;
+  obviousDeathCriteria: string;
+  basisForPronouncement: string;
   dispositionExplanation: string;
 };
 

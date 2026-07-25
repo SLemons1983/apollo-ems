@@ -43,6 +43,93 @@ const dispositionOptions = [
   'Canceled by Other Agency at Scene',
 ];
 
+const transportedToOptions = [
+  'AMC Bakersfield',
+  'AMC Hanford',
+  'AMC Reedley',
+  'AMC Selma',
+  'AMC Tulare',
+  'Clovis Community Medical Center',
+  'Community Regional Medical Center',
+  'CSC Adult',
+  'CSC Youth',
+  'Doctors Medical Center',
+  'Emanuel Medical Center',
+  'John C. Fremont Hospital',
+  'Kaiser Permanente Modesto Medical Center',
+  'Kaweah Health Medical Center',
+  'Madera Community Hospital',
+  'Memorial Hospital Los Banos',
+  'Memorial Medical Center',
+  'Merced College Hospital',
+  'Mercy Medical Center Merced',
+  'Saint Agnes Medical Center',
+  'Sierra View Medical Center',
+  'VA Medical Center',
+  'Valley Children’s Hospital',
+];
+
+const refusalTypeOptions = [
+  'Refused All Assessment and Treatment',
+  'Refused Assessment',
+  'Refused Specific Treatment',
+  'Refused Ambulance Transport',
+  'Refused Recommended Destination',
+  'Refused After Receiving Treatment',
+  'Refused Against Medical Advice',
+];
+
+const obviousDeathCriteriaOptions = [
+  'Advanced Decomposition',
+  'Decapitation',
+  'Incineration',
+  'Injuries Incompatible With Life',
+  'Massive Destruction of the Brain',
+  'Massive Destruction of the Heart or Thorax',
+  'Rigor Mortis',
+  'Transection of the Torso',
+  'Other Obvious Death Finding',
+];
+
+const basisForPronouncementOptions = [
+  'Obvious Death Criteria Met',
+  'Resuscitation Attempted and Terminated',
+  'Valid DNR/POLST Honored',
+  'Hospice or Comfort-Care Patient',
+  'Medical-Control Order',
+  'Other',
+];
+
+const turnoverExplanationOptions = [
+  'Care Transferred to ALS Ambulance',
+  'Care Transferred to BLS Ambulance',
+  'Care Transferred to Critical Care Transport Team',
+  'Care Transferred to Fire Department Personnel',
+  'Care Transferred to Flight Medical Crew',
+  'Care Transferred to Law Enforcement',
+  'Care Transferred to Another EMS Agency',
+  'Care Transferred to Another Unit From the Same Agency',
+  'Care Transferred to On-Scene Healthcare Provider',
+  'Care Transferred to Specialty Response Team',
+  'Other Authorized Transfer of Care',
+];
+
+const canceledExplanationOptions = [
+  'Another EMS Unit Handling the Patient',
+  'EMS Evaluation Not Requested',
+  'False or Accidental Activation',
+  'Incident Resolved Before EMS Arrival',
+  'No Patient Found',
+  'No Reported Injury or Illness',
+  'Patient Left Before EMS Arrival',
+  'Request Was a Duplicate Assignment',
+  'Scene Determined Safe With No EMS Need',
+  'Standby Assignment Completed',
+  'Transporting Unit Already on Scene',
+  'Unable to Locate Reported Incident',
+  'Other',
+];
+
 type PatientSectionProps = {
   patientForm: PatientForm;
   callForm: CallForm;
@@ -114,6 +201,38 @@ function UnableButton({
     >
       Unable to Complete
     </button>
+  );
+}
+
+function OutcomeSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-semibold text-slate-700">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+      >
+        <option value=""></option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -194,6 +313,18 @@ export default function PatientSection({
 
   const outcomeFields = [
     patientForm.disposition,
+    ...(patientForm.disposition === 'Transported'
+      ? [patientForm.transportedTo]
+      : []),
+    ...(patientForm.disposition === 'RMCT'
+      ? [patientForm.refusalType]
+      : []),
+    ...(patientForm.disposition === 'Obvious Death'
+      ? [patientForm.obviousDeathCriteria]
+      : []),
+    ...(patientForm.disposition === 'Death Pronounced at Scene'
+      ? [patientForm.basisForPronouncement]
+      : []),
     ...(patientForm.disposition === 'Turnover Patient Care at Scene' ||
     patientForm.disposition === 'Canceled by Other Agency at Scene'
       ? [patientForm.dispositionExplanation]
@@ -232,6 +363,18 @@ export default function PatientSection({
     value: string,
   ) {
     updatePatientForm(field, value);
+  }
+
+  function updateDisposition(value: string) {
+    setPatientForm((current) => ({
+      ...current,
+      disposition: value,
+      transportedTo: '',
+      refusalType: '',
+      obviousDeathCriteria: '',
+      basisForPronouncement: '',
+      dispositionExplanation: '',
+    }));
   }
 
   return (
@@ -821,9 +964,7 @@ export default function PatientSection({
             </span>
             <select
               value={patientForm.disposition}
-              onChange={(event) =>
-                updatePatientForm('disposition', event.target.value)
-              }
+              onChange={(event) => updateDisposition(event.target.value)}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
             >
               <option value=""></option>
@@ -835,25 +976,61 @@ export default function PatientSection({
             </select>
           </label>
 
+          {patientForm.disposition === 'Transported' && (
+            <OutcomeSelect
+              label="Transported To"
+              value={patientForm.transportedTo}
+              options={transportedToOptions}
+              onChange={(value) => updatePatientForm('transportedTo', value)}
+            />
+          )}
+
+          {patientForm.disposition === 'RMCT' && (
+            <OutcomeSelect
+              label="Refusal Type"
+              value={patientForm.refusalType}
+              options={refusalTypeOptions}
+              onChange={(value) => updatePatientForm('refusalType', value)}
+            />
+          )}
+
+          {patientForm.disposition === 'Obvious Death' && (
+            <OutcomeSelect
+              label="Criteria"
+              value={patientForm.obviousDeathCriteria}
+              options={obviousDeathCriteriaOptions}
+              onChange={(value) =>
+                updatePatientForm('obviousDeathCriteria', value)
+              }
+            />
+          )}
+
+          {patientForm.disposition === 'Death Pronounced at Scene' && (
+            <OutcomeSelect
+              label="Basis for Pronouncement"
+              value={patientForm.basisForPronouncement}
+              options={basisForPronouncementOptions}
+              onChange={(value) =>
+                updatePatientForm('basisForPronouncement', value)
+              }
+            />
+          )}
+
           {(patientForm.disposition === 'Turnover Patient Care at Scene' ||
             patientForm.disposition ===
               'Canceled by Other Agency at Scene') && (
-            <label className="block">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">
-                Disposition Explanation
-              </span>
-              <input
-                type="text"
-                value={patientForm.dispositionExplanation}
-                onChange={(event) =>
-                  updatePatientForm(
-                    'dispositionExplanation',
-                    event.target.value,
-                  )
-                }
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-              />
-            </label>
+            <OutcomeSelect
+              label="Disposition Explanation"
+              value={patientForm.dispositionExplanation}
+              options={
+                patientForm.disposition === 'Turnover Patient Care at Scene'
+                  ? turnoverExplanationOptions
+                  : canceledExplanationOptions
+              }
+              onChange={(value) =>
+                updatePatientForm('dispositionExplanation', value)
+              }
+            />
           )}
         </div>
       </PCRCard>

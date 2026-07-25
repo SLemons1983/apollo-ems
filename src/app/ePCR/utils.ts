@@ -145,6 +145,10 @@ export function createDefaultPatientForm(): PatientForm {
     patientEffectsLeftWith: '',
     patientEffectsLeftWithOther: '',
     disposition: '',
+    transportedTo: '',
+    refusalType: '',
+    obviousDeathCriteria: '',
+    basisForPronouncement: '',
     dispositionExplanation: '',
   };
 }
@@ -222,6 +226,18 @@ export function getPatientRequiredFields(patientForm: PatientForm) {
       ? [patientForm.patientEffectsLeftWithOther]
       : []),
     patientForm.disposition,
+    ...(patientForm.disposition === 'Transported'
+      ? [patientForm.transportedTo]
+      : []),
+    ...(patientForm.disposition === 'RMCT'
+      ? [patientForm.refusalType]
+      : []),
+    ...(patientForm.disposition === 'Obvious Death'
+      ? [patientForm.obviousDeathCriteria]
+      : []),
+    ...(patientForm.disposition === 'Death Pronounced at Scene'
+      ? [patientForm.basisForPronouncement]
+      : []),
     ...(patientForm.disposition === 'Turnover Patient Care at Scene' ||
     patientForm.disposition === 'Canceled by Other Agency at Scene'
       ? [patientForm.dispositionExplanation]

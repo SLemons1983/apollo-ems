@@ -273,6 +273,18 @@ export default function EPCRClient() {
       title: 'Patient Outcome',
       completedFields: [
         patientForm.disposition,
+        ...(patientForm.disposition === 'Transported'
+          ? [patientForm.transportedTo]
+          : []),
+        ...(patientForm.disposition === 'RMCT'
+          ? [patientForm.refusalType]
+          : []),
+        ...(patientForm.disposition === 'Obvious Death'
+          ? [patientForm.obviousDeathCriteria]
+          : []),
+        ...(patientForm.disposition === 'Death Pronounced at Scene'
+          ? [patientForm.basisForPronouncement]
+          : []),
         ...(patientForm.disposition === 'Turnover Patient Care at Scene' ||
         patientForm.disposition === 'Canceled by Other Agency at Scene'
           ? [patientForm.dispositionExplanation]
@@ -280,7 +292,11 @@ export default function EPCRClient() {
       ].filter(Boolean).length,
       totalFields:
         1 +
-        (patientForm.disposition === 'Turnover Patient Care at Scene' ||
+        (patientForm.disposition === 'Transported' ||
+        patientForm.disposition === 'RMCT' ||
+        patientForm.disposition === 'Obvious Death' ||
+        patientForm.disposition === 'Death Pronounced at Scene' ||
+        patientForm.disposition === 'Turnover Patient Care at Scene' ||
         patientForm.disposition === 'Canceled by Other Agency at Scene'
           ? 1
           : 0),
