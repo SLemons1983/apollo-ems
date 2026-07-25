@@ -41,6 +41,53 @@ const sections = [
   'Signatures',
 ];
 
+function mergeAssessmentWithDefaults(
+  uploadedAssessment: unknown,
+): AssessmentForm {
+  function mergeValue(defaultValue: unknown, uploadedValue: unknown): unknown {
+    if (Array.isArray(defaultValue)) {
+      return Array.isArray(uploadedValue) ? uploadedValue : defaultValue;
+    }
+
+    if (
+      defaultValue !== null &&
+      typeof defaultValue === 'object' &&
+      !Array.isArray(defaultValue)
+    ) {
+      const uploadedRecord =
+        uploadedValue !== null &&
+        typeof uploadedValue === 'object' &&
+        !Array.isArray(uploadedValue)
+          ? (uploadedValue as Record<string, unknown>)
+          : {};
+
+      const mergedRecord: Record<string, unknown> = {
+        ...uploadedRecord,
+      };
+
+      Object.entries(defaultValue as Record<string, unknown>).forEach(
+        ([key, nestedDefault]) => {
+          mergedRecord[key] = mergeValue(
+            nestedDefault,
+            uploadedRecord[key],
+          );
+        },
+      );
+
+      return mergedRecord;
+    }
+
+    return typeof uploadedValue === typeof defaultValue
+      ? uploadedValue
+      : defaultValue;
+  }
+
+  return mergeValue(
+    createDefaultAssessmentForm(),
+    uploadedAssessment,
+  ) as AssessmentForm;
+}
+
 export default function EPCRClient() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedSection, setExpandedSection] = useState<string>('');
@@ -252,7 +299,7 @@ export default function EPCRClient() {
         patientForm.medicationAllergies,
         patientForm.environmentalAllergies,
       ].filter(Boolean).length,
-      totalFields: 3,
+      totalFields: 2,
     },
     {
       title: 'Patient Belongings',
@@ -490,6 +537,7 @@ export default function EPCRClient() {
         call: callForm,
         patient: patientForm,
         complaint: complaintForm,
+        assessment: assessmentForm,
       },
     };
 
@@ -525,10 +573,12 @@ export default function EPCRClient() {
           call?: CallForm;
           patient?: PatientForm;
           complaint?: ComplaintForm;
+          assessment?: AssessmentForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
         complaintForm?: ComplaintForm;
+        assessmentForm?: AssessmentForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
@@ -538,6 +588,8 @@ export default function EPCRClient() {
         parsed.chart?.complaint ??
         parsed.complaintForm ??
         createDefaultComplaintForm();
+      const uploadedAssessmentForm =
+        parsed.chart?.assessment ?? parsed.assessmentForm;
 
       if (
         parsed.fileType !== 'ApolloEMS Mock ePCR' ||
@@ -582,6 +634,9 @@ export default function EPCRClient() {
         ...createDefaultComplaintForm(),
         ...uploadedComplaintForm,
       });
+      setAssessmentForm(
+        mergeAssessmentWithDefaults(uploadedAssessmentForm),
+      );
       setExpandedSection(parsed.expandedSection || 'Call');
       setFileStatus('PCR uploaded successfully.');
     } catch (error) {
