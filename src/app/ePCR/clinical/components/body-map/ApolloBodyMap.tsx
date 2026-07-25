@@ -15,6 +15,7 @@ import type {
 } from './bodyMapTypes';
 
 type ApolloBodyMapProps = {
+  patientSex?: string;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   focusedRegion?: ApolloBodyRegionKey | '';
   onRegionClick: (region: ApolloBodyRegionKey) => void;
@@ -24,6 +25,7 @@ type ApolloBodyMapProps = {
 };
 
 export default function ApolloBodyMap({
+  patientSex = '',
   selectedRegions,
   focusedRegion = '',
   onRegionClick,
@@ -61,6 +63,7 @@ export default function ApolloBodyMap({
             </div>
             <ApolloBodySvg
               view={view}
+              patientSex={patientSex}
               selectedRegions={selectedRegions}
               regionStatuses={combinedRegionStatuses}
               activeRegion={hoveredRegion || focusedRegion || null}

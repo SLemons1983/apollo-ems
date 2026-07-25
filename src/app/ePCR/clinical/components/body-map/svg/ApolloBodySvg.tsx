@@ -11,6 +11,7 @@ import { bodySvgBack } from './bodySvgBack';
 
 type ApolloBodySvgProps = {
   view: ApolloBodyView;
+  patientSex?: string;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   regionStatuses: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
   activeRegion: ApolloBodyRegionKey | null;
@@ -21,6 +22,17 @@ type ApolloBodySvgProps = {
 
 export default function ApolloBodySvg(props: ApolloBodySvgProps) {
   const regions = props.view === 'front' ? bodySvgFront : bodySvgBack;
+  const isFemale = props.patientSex?.trim().toLowerCase() === 'female';
+  const imageHref = isFemale
+    ? '/epcr/body-map/apollo-body-female.png'
+    : '/epcr/body-map/apollo-body-male.png';
+  const imagePlacement = isFemale
+    ? props.view === 'front'
+      ? { x: -3, y: 0, width: 1264, height: 900 }
+      : { x: -643, y: 0, width: 1264, height: 900 }
+    : props.view === 'front'
+      ? { x: -95, y: 0, width: 1350, height: 900 }
+      : { x: -684, y: 0, width: 1350, height: 900 };
 
   if (regions.length === 0) {
     return <ApolloBodyFigure {...props} />;
@@ -38,16 +50,21 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
           <filter id={`body-shadow-${props.view}`} x="-20%" y="-20%" width="140%" height="140%">
             <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#0f172a" floodOpacity="0.10" />
           </filter>
-          <linearGradient id={`body-rest-${props.view}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffffff" />
-            <stop offset="100%" stopColor="#f1f5f9" />
-          </linearGradient>
         </defs>
 
-        <rect x="0" y="0" width="600" height="900" rx="32" fill="#f8fafc" />
-        <ellipse cx="300" cy="887" rx="104" ry="9" fill="#cbd5e1" opacity="0.45" />
+        <rect x="0" y="0" width="600" height="900" rx="32" fill="#ffffff" />
+        <image
+          href={imageHref}
+          x={imagePlacement.x}
+          y={imagePlacement.y}
+          width={imagePlacement.width}
+          height={imagePlacement.height}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          pointerEvents="none"
+        />
 
-        <g filter={`url(#body-shadow-${props.view})`}>
+        <g>
         {regions.map((region) => {
           const selected = props.selectedRegions[region.id];
           const status = props.regionStatuses[region.id];
@@ -60,16 +77,16 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
 
           const fill =
             assessmentState === 'unremarkable'
-              ? '#dcfce7'
+              ? 'rgba(34, 197, 94, 0.30)'
               : assessmentState === 'abnormal'
-                ? '#fee2e2'
+                ? 'rgba(239, 68, 68, 0.30)'
                 : assessmentState === 'noted'
-                  ? '#fef3c7'
+                  ? 'rgba(245, 158, 11, 0.30)'
                   : selected
-                    ? '#dbeafe'
+                    ? 'rgba(59, 130, 246, 0.28)'
                     : hasClinicalData
-                      ? '#fffbeb'
-                      : `url(#body-rest-${props.view})`;
+                      ? 'rgba(245, 158, 11, 0.22)'
+                      : 'rgba(255, 255, 255, 0.001)';
 
           const stroke =
             active
@@ -82,7 +99,7 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
                     ? '#d97706'
                     : selected
                       ? '#2563eb'
-                      : '#64748b';
+                      : 'transparent';
 
           return (
             <path
@@ -91,7 +108,7 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
               fill={fill}
               stroke={stroke}
               strokeWidth={
-                active || assessmentState || selected ? 4 : 2
+                active || assessmentState || selected ? 4 : 0
               }
               onClick={() => props.onRegionClick(region.id)}
               onMouseEnter={() => props.onFocusRegion(region.id)}
@@ -110,41 +127,6 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
             />
           );
         })}
-        </g>
-
-        <g
-          aria-hidden="true"
-          fill="none"
-          stroke="#94a3b8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-          opacity="0.52"
-          pointerEvents="none"
-        >
-          {props.view === 'front' ? (
-            <>
-              <path d="M270 126 C279 121 288 121 296 125 M304 125 C312 121 321 121 330 126" />
-              <path d="M300 132 L297 164 L304 166" />
-              <path d="M283 187 C294 193 306 193 317 187" />
-              <path d="M241 318 C270 303 330 303 359 318" />
-              <path d="M300 307 L300 422" />
-              <path d="M272 448 C281 459 319 459 328 448" />
-              <circle cx="300" cy="491" r="3" fill="#94a3b8" stroke="none" />
-              <path d="M257 665 C270 649 285 644 300 646 C315 644 330 649 343 665" />
-              <path d="M222 785 C239 793 259 793 281 787 M319 787 C341 793 361 793 378 785" />
-            </>
-          ) : (
-            <>
-              <path d="M258 111 C275 96 325 96 342 111" />
-              <path d="M300 292 L300 568" />
-              <path d="M239 324 C262 304 281 298 300 300 C319 298 338 304 361 324" />
-              <path d="M246 379 C269 392 331 392 354 379" />
-              <path d="M250 520 C271 507 329 507 350 520" />
-              <path d="M257 665 C270 649 285 644 300 646 C315 644 330 649 343 665" />
-              <path d="M222 785 C239 793 259 793 281 787 M319 787 C341 793 361 793 378 785" />
-            </>
-          )}
         </g>
 
         {regions.map((region) => {
