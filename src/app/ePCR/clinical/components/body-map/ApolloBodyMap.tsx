@@ -12,7 +12,6 @@ import type {
   ApolloBodyMapMode,
   ApolloBodyRegionKey,
   ApolloBodyRegionStatus,
-  ApolloBodyView,
 } from './bodyMapTypes';
 
 type ApolloBodyMapProps = {
@@ -32,7 +31,6 @@ export default function ApolloBodyMap({
   regionStatuses = {},
   clinicalOverlays = [],
 }: ApolloBodyMapProps) {
-  const [view, setView] = useState<ApolloBodyView>('front');
   const [hoveredRegion, setHoveredRegion] =
     useState<ApolloBodyRegionKey | null>(null);
 
@@ -50,37 +48,29 @@ export default function ApolloBodyMap({
             {modeConfig.title}
           </h4>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            Tap the area you need to assess. Use Front and Back to change views.
+            Tap the area you need to assess on the front or back view.
           </p>
-        </div>
-
-        <div className="flex overflow-hidden rounded-lg border border-slate-300 bg-white text-sm font-bold">
-          {(['front', 'back'] satisfies ApolloBodyView[]).map((bodyView) => (
-            <button
-              key={bodyView}
-              type="button"
-              onClick={() => setView(bodyView)}
-              className={`px-4 py-2 capitalize transition ${
-                view === bodyView
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-white text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              {bodyView}
-            </button>
-          ))}
         </div>
       </div>
 
-      <ApolloBodySvg
-        view={view}
-        selectedRegions={selectedRegions}
-        regionStatuses={combinedRegionStatuses}
-        activeRegion={hoveredRegion || focusedRegion || null}
-        onRegionClick={onRegionClick}
-        onFocusRegion={setHoveredRegion}
-        onBlurRegion={() => setHoveredRegion(null)}
-      />
+      <div className="grid grid-cols-2 gap-2 sm:gap-4">
+        {(['front', 'back'] as const).map((view) => (
+          <div key={view} className="min-w-0">
+            <div className="mb-2 text-center text-xs font-black uppercase tracking-wide text-slate-600">
+              {view}
+            </div>
+            <ApolloBodySvg
+              view={view}
+              selectedRegions={selectedRegions}
+              regionStatuses={combinedRegionStatuses}
+              activeRegion={hoveredRegion || focusedRegion || null}
+              onRegionClick={onRegionClick}
+              onFocusRegion={setHoveredRegion}
+              onBlurRegion={() => setHoveredRegion(null)}
+            />
+          </div>
+        ))}
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
         <span><span className="text-blue-600">●</span> Selected</span>

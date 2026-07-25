@@ -1378,7 +1378,7 @@ export default function AssessmentSection({
           Apollo Clinical Intelligence
         </h3>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
             <div className="text-xs font-bold uppercase text-slate-500">
               Assessment Mode
