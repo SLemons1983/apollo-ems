@@ -20,6 +20,8 @@ import {
   createDefaultAssessmentForm,
   type AssessmentForm,
 } from '../clinical/assessment/assessmentForm';
+import { determineAssessmentMode } from '../clinical/engine/assessment';
+import { getCcemsaGfastConsiderations } from '../clinical/engine/protocols/ccemsaStroke';
 import {
   createDefaultCallForm,
   createDefaultComplaintForm,
@@ -150,6 +152,36 @@ export default function EPCRClient() {
       totalFields: number;
     }[],
   });
+
+  const documentingProviderCertification =
+    callForm.crewMembers.find((member) => member.isDocumentingPcr)
+      ?.certification;
+  const documentingProviderScope =
+    documentingProviderCertification === 'Paramedic' ? 'ALS' : 'BLS';
+  const assessmentMode = determineAssessmentMode({
+    clinicalCategory: complaintForm.clinicalCategory,
+    suspectedStroke: complaintForm.suspectedStrokeCva === 'Yes',
+    possibleTrauma: complaintForm.possibleInjuryTrauma === 'Yes',
+    behavioralHold: complaintForm.patientPlacedOn5150Hold === 'Yes',
+    cardiacArrest:
+      complaintForm.cardiacArrest !== '' &&
+      complaintForm.cardiacArrest !== 'No',
+  });
+  const hasGfastDocumentation = Object.values(
+    assessmentForm.clinical.gfast,
+  ).some(Boolean);
+  const clinicalIntelligenceFeedback =
+    callForm.lemsa === 'CCEMSA' &&
+    (complaintForm.suspectedStrokeCva === 'Yes' || hasGfastDocumentation)
+      ? getCcemsaGfastConsiderations({
+          gaze: assessmentForm.clinical.gfast.gaze,
+          face: assessmentForm.clinical.gfast.face,
+          arms: assessmentForm.clinical.gfast.arms,
+          speech: assessmentForm.clinical.gfast.speech,
+          lastKnownNormal: assessmentForm.clinical.gfast.time,
+          bloodGlucose: assessmentForm.clinical.gfast.bloodGlucose,
+        })
+      : [];
 
   const callRequiredFields = useMemo(
     () => getCallRequiredFields(callForm),
@@ -817,13 +849,7 @@ export default function EPCRClient() {
                         onAssessmentFormChange={setAssessmentForm}
                         patientForm={patientForm}
                         onPatientChange={updatePatientForm}
-                        providerScope={
-                          callForm.crewMembers.find(
-                            (member) => member.isDocumentingPcr,
-                          )?.certification === 'Paramedic'
-                            ? 'ALS'
-                            : 'BLS'
-                        }
+                        providerScope={documentingProviderScope}
                         clinicalCategory={complaintForm.clinicalCategory}
                         suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
                         possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
@@ -929,7 +955,7 @@ export default function EPCRClient() {
                       onAssessmentFormChange={setAssessmentForm}
                       patientForm={patientForm}
                       onPatientChange={updatePatientForm}
-                      providerScope={callForm.crewMembers.find((member) => member.isDocumentingPcr)?.certification === 'Paramedic' ? 'ALS' : 'BLS'}
+                      providerScope={documentingProviderScope}
                       clinicalCategory={complaintForm.clinicalCategory}
                       suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
                       possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
@@ -947,6 +973,71 @@ export default function EPCRClient() {
             })}
           </div>
         </div>
+
+        <footer className="sticky bottom-0 z-30 mt-6 rounded-t-2xl border border-amber-300 bg-amber-50/95 shadow-[0_-8px_24px_rgba(15,23,42,0.14)] backdrop-blur">
+          <div className="border-b border-amber-200 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-black text-amber-950">
+                Apollo Clinical Intelligence
+              </h2>
+              <span className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                {callForm.lemsa
+                  ? `${callForm.lemsa} protocols selected`
+                  : 'Select a LEMSA to enable protocol guidance'}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                  Assessment Mode
+                </div>
+                <div className="text-sm font-bold capitalize text-slate-900">
+                  {assessmentMode.replace('-', ' ')}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                  Clinical Category
+                </div>
+                <div className="text-sm font-bold text-slate-900">
+                  {complaintForm.clinicalCategory || 'Not Yet Selected'}
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                  Documenting Provider Scope
+                </div>
+                <div className="text-sm font-bold text-slate-900">
+                  {documentingProviderScope}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="max-h-36 overflow-y-auto px-4 py-3">
+            {!callForm.lemsa ? (
+              <p className="text-sm font-semibold text-amber-900">
+                No protocol references are active. Select the applicable LEMSA
+                in Crew Information.
+              </p>
+            ) : clinicalIntelligenceFeedback.length > 0 ? (
+              <div className="space-y-1.5">
+                {clinicalIntelligenceFeedback.map((feedback) => (
+                  <p key={feedback} className="text-sm text-amber-950">
+                    • {feedback}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm font-semibold text-amber-900">
+                {callForm.lemsa === 'Merced County'
+                  ? 'Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment.'
+                  : 'No protocol-specific feedback is active for the current documentation.'}
+              </p>
+            )}
+          </div>
+        </footer>
 
         {mobileDrawer && (
           <div className="fixed inset-0 z-50 xl:hidden">

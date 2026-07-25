@@ -27,7 +27,6 @@ import {
   type AssessmentCmsTpField,
 } from '../clinical/assessment/assessmentForm';
 import {
-  determineAssessmentMode,
   getAdditionalAssessmentTasksForContext,
   getAssessmentTasksForContext,
 } from '../clinical/engine/assessment';
@@ -52,6 +51,9 @@ import ExtremityAssessmentCard, {
   type ExtremityCmsTpAssessment,
   type ExtremityKey,
 } from '../clinical/components/assessment/cards/ExtremityAssessmentCard';
+import EcgAssessmentCard, {
+  type EcgAssessmentForm,
+} from '../clinical/components/assessment/cards/EcgAssessmentCard';
 import PainAssessmentCard, {
   type PainAssessmentForm,
 } from '../clinical/components/assessment/cards/PainAssessmentCard';
@@ -191,8 +193,6 @@ export default function AssessmentSection({
     behavioralHold,
     cardiacArrest,
   };
-
-  const mode = determineAssessmentMode(context);
 
   const suggestedAssessmentTasks = useMemo(
     () => getAssessmentTasksForContext(context),
@@ -341,6 +341,7 @@ export default function AssessmentSection({
   const revisedTraumaScore = assessmentForm.clinical.revisedTraumaScore;
   const respiratoryAssessment = assessmentForm.clinical.respiratory;
   const alocAssessment = assessmentForm.clinical.aloc;
+  const ecgAssessment = assessmentForm.clinical.ecg;
 
   const setConsciousnessAssessment = (
     value: SetStateAction<ConsciousnessAssessmentForm>,
@@ -378,6 +379,9 @@ export default function AssessmentSection({
   const setAlocAssessment = (
     value: SetStateAction<AlocAssessmentForm>,
   ) => setClinicalAssessmentValue('aloc', value);
+  const setEcgAssessment = (
+    value: SetStateAction<EcgAssessmentForm>,
+  ) => setClinicalAssessmentValue('ecg', value);
 
 
   function getTaskProgress(taskId: string) {
@@ -531,6 +535,17 @@ export default function AssessmentSection({
     if (taskId === 'reassessment') {
       const completed = Object.values(reassessment).filter(Boolean).length;
       return { completed, total: Object.keys(reassessment).length };
+    }
+
+    if (taskId === 'ecg-assessment') {
+      return {
+        completed:
+          ecgAssessment.fourLeadInterpretation ||
+          ecgAssessment.twelveLeadInterpretation
+            ? 1
+            : 0,
+        total: 1,
+      };
     }
 
     return { completed: 0, total: 1 };
@@ -1216,6 +1231,16 @@ export default function AssessmentSection({
     }));
   }
 
+  function updateEcgAssessment(
+    field: keyof EcgAssessmentForm,
+    fieldValue: string,
+  ) {
+    setEcgAssessment((current) => ({
+      ...current,
+      [field]: fieldValue,
+    }));
+  }
+
 
   useEffect(() => {
     const taskProgress = suggestedAssessmentTasks
@@ -1233,6 +1258,15 @@ export default function AssessmentSection({
           totalFields: progress.total,
         };
       });
+
+    if (providerScope === 'ALS') {
+      const ecgProgress = getTaskProgress('ecg-assessment');
+      taskProgress.push({
+        title: 'ECG Assessment',
+        completedFields: ecgProgress.completed,
+        totalFields: ecgProgress.total,
+      });
+    }
 
     onProgressChange({
       completedFields: taskProgress.reduce(
@@ -1258,6 +1292,8 @@ export default function AssessmentSection({
     traumaAssessment,
     revisedTraumaScore,
     reassessment,
+    ecgAssessment,
+    providerScope,
     onProgressChange,
   ]);
 
@@ -1469,6 +1505,15 @@ export default function AssessmentSection({
       );
     }
 
+    if (taskId === 'ecg-assessment') {
+      return (
+        <EcgAssessmentCard
+          value={ecgAssessment}
+          onChange={updateEcgAssessment}
+        />
+      );
+    }
+
     return (
       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
         {title} workflow coming next.
@@ -1478,41 +1523,6 @@ export default function AssessmentSection({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-slate-50 p-5">
-        <h3 className="text-xl font-bold text-slate-900">
-          Apollo Clinical Intelligence
-        </h3>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <div>
-            <div className="text-xs font-bold uppercase text-slate-500">
-              Assessment Mode
-            </div>
-            <div className="text-lg font-semibold capitalize text-slate-900">
-              {mode.replace('-', ' ')}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-xs font-bold uppercase text-slate-500">
-              Clinical Category
-            </div>
-            <div className="text-lg font-semibold text-slate-900">
-              {clinicalCategory || 'Not Yet Selected'}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-xs font-bold uppercase text-slate-500">
-              Documenting Provider Scope
-            </div>
-            <div className="text-lg font-semibold text-slate-900">
-              {providerScope}
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
         <div className="mb-4">
           <h3 className="text-lg font-black text-blue-950">
@@ -1941,6 +1951,21 @@ export default function AssessmentSection({
         </div>
 
         <div className="space-y-4">
+          {providerScope === 'ALS' && (
+            <PCRCard
+              title="ECG Assessment"
+              completedFields={getTaskProgress('ecg-assessment').completed}
+              totalFields={getTaskProgress('ecg-assessment').total}
+              expanded={expandedTaskId === 'ecg-assessment'}
+              onToggle={() =>
+                setExpandedTaskId(
+                  expandedTaskId === 'ecg-assessment' ? '' : 'ecg-assessment',
+                )
+              }
+            >
+              {renderTaskContent('ecg-assessment', 'ECG Assessment')}
+            </PCRCard>
+          )}
           {suggestedTasks.map((task) => {
             const progress = getTaskProgress(task.id);
 

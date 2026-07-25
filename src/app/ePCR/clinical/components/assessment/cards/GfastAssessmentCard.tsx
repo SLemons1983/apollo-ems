@@ -2,7 +2,6 @@
 
 import {
   calculateCcemsaGfastScore,
-  getCcemsaGfastConsiderations,
 } from '../../../engine/protocols/ccemsaStroke';
 
 type GfastAssessmentForm = {
@@ -71,20 +70,11 @@ export default function GfastAssessmentCard({
     bloodGlucose: value.bloodGlucose,
   });
 
-  const considerations = getCcemsaGfastConsiderations({
-    gaze: value.gaze,
-    face: value.face,
-    arms: value.arms,
-    speech: value.speech,
-    lastKnownNormal: value.time,
-    bloodGlucose: value.bloodGlucose,
-  });
-
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-slate-300 bg-slate-50 p-4">
         <div className="text-xs font-bold uppercase text-slate-500">
-          CCEMSA GFAST Score
+          GFAST Score
         </div>
         <div className="mt-1 text-4xl font-black text-slate-900">{score}</div>
         <p className="mt-2 text-sm text-slate-600">
@@ -162,18 +152,6 @@ export default function GfastAssessmentCard({
         </div>
       ))}
 
-      <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-        <h4 className="font-bold text-amber-900">
-          Apollo Clinical Intelligence
-        </h4>
-        <div className="mt-3 space-y-2">
-          {considerations.map((consideration) => (
-            <p key={consideration} className="text-sm text-amber-900">
-              • {consideration}
-            </p>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

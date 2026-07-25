@@ -8,6 +8,7 @@ import type { AlocAssessmentForm } from '../components/assessment/cards/AlocAsse
 import type { ClinicalHistoryForm } from '../components/assessment/cards/ClinicalHistoryCard';
 import type { ConsciousnessAssessmentForm } from '../components/assessment/cards/ConsciousnessAssessmentCard';
 import type { ExtremityAssessmentForm } from '../components/assessment/cards/ExtremityAssessmentCard';
+import type { EcgAssessmentForm } from '../components/assessment/cards/EcgAssessmentCard';
 import type { GcsAssessmentForm } from '../components/assessment/cards/GcsAssessmentCard';
 import type { GfastAssessmentForm } from '../components/assessment/cards/GfastAssessmentCard';
 import type { PainAssessmentForm } from '../components/assessment/cards/PainAssessmentCard';
@@ -89,6 +90,7 @@ export type AssessmentClinicalForm = {
   revisedTraumaScore: RevisedTraumaScoreForm;
   respiratory: RespiratoryAssessmentForm;
   aloc: AlocAssessmentForm;
+  ecg: EcgAssessmentForm;
 };
 
 export type AssessmentForm = {
@@ -443,6 +445,11 @@ export function createDefaultAssessmentForm(): AssessmentForm {
         speech: '',
         time: '',
         bloodGlucose: '',
+      },
+      ecg: {
+        fourLeadInterpretation: '',
+        twelveLeadInterpretation: '',
+        abnormalFindings: '',
       },
       extremity: {
         rightArm: {
