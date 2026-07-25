@@ -191,7 +191,9 @@ export default function AssessmentSection({
   const suggestedTasks = useMemo(
     () =>
       getAssessmentTasksForContext(context).filter(
-        (task) => task.id !== 'extremity-assessment',
+        (task) =>
+          task.id !== 'extremity-assessment' &&
+          task.id !== 'trauma-assessment',
       ),
     [
       clinicalCategory,
@@ -205,7 +207,9 @@ export default function AssessmentSection({
   const additionalTasks = useMemo(
     () =>
       getAdditionalAssessmentTasksForContext(context).filter(
-        (task) => task.id !== 'extremity-assessment',
+        (task) =>
+          task.id !== 'extremity-assessment' &&
+          task.id !== 'trauma-assessment',
       ),
     [
       clinicalCategory,

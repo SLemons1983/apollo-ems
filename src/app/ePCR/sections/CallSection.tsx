@@ -70,6 +70,8 @@ const crewRoleOptions: CrewMember['role'][] = [
   'Observer-Non Care Giver',
 ];
 
+const lemsaOptions = ['CCEMSA', 'Merced County'];
+
 type CallSectionProps = {
   callForm: CallForm;
   setCallForm: Dispatch<SetStateAction<CallForm>>;
@@ -215,6 +217,7 @@ export default function CallSection({
 
   const crewCompletedFields = [
     callForm.respondingUnitNumber,
+    callForm.lemsa,
     callForm.crewMembers.length > 0 &&
     callForm.crewMembers.every(
       (member) => member.name && member.certification && member.role,
@@ -272,7 +275,7 @@ export default function CallSection({
                         <PCRCard
                           title="Dispatch Information"
                           completedFields={dispatchCompletedFields}
-                          totalFields={3}
+                          totalFields={4}
                           expanded={expandedCard === 'Dispatch Information'}
                           onToggle={() => toggleCard('Dispatch Information')}
                         >
@@ -364,6 +367,26 @@ export default function CallSection({
                               className="w-full rounded-r-lg border border-slate-300 px-3 py-2 text-slate-900"
                             />
                           </div>
+                        </label>
+
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-semibold text-slate-700">
+                            LEMSA
+                          </span>
+                          <select
+                            value={callForm.lemsa}
+                            onChange={(event) =>
+                              updateCallForm('lemsa', event.target.value)
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+                          >
+                            <option value=""></option>
+                            {lemsaOptions.map((lemsa) => (
+                              <option key={lemsa} value={lemsa}>
+                                {lemsa}
+                              </option>
+                            ))}
+                          </select>
                         </label>
 
                         <div className="block md:col-span-2">

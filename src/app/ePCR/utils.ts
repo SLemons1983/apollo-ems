@@ -19,6 +19,7 @@ export function createDefaultCallForm(): CallForm {
     emsIncidentNumber: '',
     dispatchedPriority: '',
     respondingUnitNumber: '',
+    lemsa: '',
     respondingCrew: '',
     pcrDocumentedBy: '',
     crewMembers: [
@@ -65,6 +66,7 @@ export function getCallRequiredFields(callForm: CallForm) {
     callForm.emsIncidentNumber,
     callForm.dispatchedPriority,
     callForm.respondingUnitNumber,
+    callForm.lemsa,
     callForm.crewMembers.length > 0 &&
     callForm.crewMembers.every(
       (member) => member.name && member.certification && member.role,

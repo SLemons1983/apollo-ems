@@ -11,6 +11,7 @@ export type CallForm = {
   emsIncidentNumber: string;
   dispatchedPriority: string;
   respondingUnitNumber: string;
+  lemsa: string;
   respondingCrew: string;
   pcrDocumentedBy: string;
   crewMembers: CrewMember[];

@@ -317,6 +317,7 @@ export default function EPCRClient() {
       title: 'Crew Information',
       completedFields: [
         callForm.respondingUnitNumber,
+        callForm.lemsa,
         callForm.crewMembers.length > 0 &&
         callForm.crewMembers.every(
           (member) => member.name && member.certification && member.role,
@@ -327,7 +328,7 @@ export default function EPCRClient() {
           ? 'documentor-selected'
           : '',
       ].filter(Boolean).length,
-      totalFields: 3,
+      totalFields: 4,
     },
     {
       title: 'Response Information',
@@ -547,7 +548,9 @@ export default function EPCRClient() {
       }
 
       setCallForm({
+        ...createDefaultCallForm(),
         ...uploadedCallForm,
+        lemsa: uploadedCallForm.lemsa ?? '',
         crewMembers:
           uploadedCallForm.crewMembers && uploadedCallForm.crewMembers.length > 0
             ? uploadedCallForm.crewMembers
