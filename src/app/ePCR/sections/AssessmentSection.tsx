@@ -140,6 +140,12 @@ const cmsTpFields: {
   },
 ];
 
+const integratedBodyMapTaskIds = new Set([
+  'pain-assessment',
+  'gfast-stroke-assessment',
+  'respiratory-assessment',
+]);
+
 type AssessmentSectionProps = {
   assessmentForm: AssessmentForm;
   onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
@@ -188,13 +194,8 @@ export default function AssessmentSection({
 
   const mode = determineAssessmentMode(context);
 
-  const suggestedTasks = useMemo(
-    () =>
-      getAssessmentTasksForContext(context).filter(
-        (task) =>
-          task.id !== 'extremity-assessment' &&
-          task.id !== 'trauma-assessment',
-      ),
+  const suggestedAssessmentTasks = useMemo(
+    () => getAssessmentTasksForContext(context),
     [
       clinicalCategory,
       suspectedStroke,
@@ -204,12 +205,24 @@ export default function AssessmentSection({
     ],
   );
 
+  const suggestedTasks = useMemo(
+    () =>
+      suggestedAssessmentTasks.filter(
+        (task) =>
+          task.id !== 'extremity-assessment' &&
+          task.id !== 'trauma-assessment' &&
+          !integratedBodyMapTaskIds.has(task.id),
+      ),
+    [suggestedAssessmentTasks],
+  );
+
   const additionalTasks = useMemo(
     () =>
       getAdditionalAssessmentTasksForContext(context).filter(
         (task) =>
           task.id !== 'extremity-assessment' &&
-          task.id !== 'trauma-assessment',
+          task.id !== 'trauma-assessment' &&
+          !integratedBodyMapTaskIds.has(task.id),
       ),
     [
       clinicalCategory,
@@ -220,6 +233,8 @@ export default function AssessmentSection({
     ],
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
+  const [expandedRegionalAssessmentId, setExpandedRegionalAssessmentId] =
+    useState('');
   const [expandedBodySubregionId, setExpandedBodySubregionId] =
     useState('');
   const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
@@ -1159,6 +1174,7 @@ export default function AssessmentSection({
   function openAssessmentForBodyRegion(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegion(region);
     setExpandedBodySubregionId('');
+    setExpandedRegionalAssessmentId('');
   }
 
   function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
@@ -1202,15 +1218,21 @@ export default function AssessmentSection({
 
 
   useEffect(() => {
-    const taskProgress = suggestedTasks.map((task) => {
-      const progress = getTaskProgress(task.id);
+    const taskProgress = suggestedAssessmentTasks
+      .filter(
+        (task) =>
+          task.id !== 'extremity-assessment' &&
+          task.id !== 'trauma-assessment',
+      )
+      .map((task) => {
+        const progress = getTaskProgress(task.id);
 
-      return {
-        title: task.title,
-        completedFields: progress.completed,
-        totalFields: progress.total,
-      };
-    });
+        return {
+          title: task.title,
+          completedFields: progress.completed,
+          totalFields: progress.total,
+        };
+      });
 
     onProgressChange({
       completedFields: taskProgress.reduce(
@@ -1224,17 +1246,96 @@ export default function AssessmentSection({
       tasks: taskProgress,
     });
   }, [
-    suggestedTasks,
+    suggestedAssessmentTasks,
     primaryAssessment,
     clinicalHistory,
+    consciousnessAssessment,
     painAssessment,
     gcsAssessment,
     gfastAssessment,
+    respiratoryAssessment,
+    alocAssessment,
     traumaAssessment,
     revisedTraumaScore,
     reassessment,
     onProgressChange,
   ]);
+
+  function getIntegratedAssessmentPresentation(taskId: string) {
+    const progress = getTaskProgress(taskId);
+
+    if (progress.completed >= progress.total) {
+      return {
+        label: 'Complete',
+        badgeClass: 'bg-emerald-100 text-emerald-800',
+        progress,
+      };
+    }
+
+    if (progress.completed > 0) {
+      return {
+        label: 'In Progress',
+        badgeClass: 'bg-amber-100 text-amber-800',
+        progress,
+      };
+    }
+
+    return {
+      label: 'Not Started',
+      badgeClass: 'bg-slate-100 text-slate-600',
+      progress,
+    };
+  }
+
+  function renderIntegratedRegionalAssessment(
+    taskId: string,
+    title: string,
+    description: string,
+  ) {
+    const presentation = getIntegratedAssessmentPresentation(taskId);
+    const expanded = expandedRegionalAssessmentId === taskId;
+
+    return (
+      <div className="overflow-hidden rounded-xl border border-indigo-200 bg-indigo-50">
+        <button
+          type="button"
+          onClick={() =>
+            setExpandedRegionalAssessmentId((current) =>
+              current === taskId ? '' : taskId,
+            )
+          }
+          className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+        >
+          <div>
+            <div className="text-sm font-black text-indigo-950">{title}</div>
+            <p className="mt-1 text-xs font-semibold text-indigo-800">
+              {description}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-3">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-black uppercase ${presentation.badgeClass}`}
+            >
+              {presentation.label}
+              {presentation.progress.total > 1
+                ? ` ${presentation.progress.completed}/${presentation.progress.total}`
+                : ''}
+            </span>
+            <span className="text-lg font-black text-indigo-700">
+              {expanded ? '−' : '+'}
+            </span>
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="border-t border-indigo-200 bg-white p-4">
+            {renderTaskContent(taskId, title)}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   function renderTaskContent(taskId: string, title: string) {
     if (taskId === 'primary-assessment') {
@@ -1555,12 +1656,45 @@ export default function AssessmentSection({
                                   }));
                                   setSelectedAssessmentRegion('');
                                   setExpandedBodySubregionId('');
+                                  setExpandedRegionalAssessmentId('');
                                 }}
                                 className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-black uppercase tracking-wide text-slate-700 hover:bg-slate-50"
                               >
                                 Remove Region
                               </button>
                             </div>
+                          </div>
+
+                          <div className="mb-5 space-y-3">
+                            <div>
+                              <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                Region-Specific Assessments
+                              </div>
+                              <p className="mt-1 text-xs font-semibold text-slate-500">
+                                Open only the clinical assessment needed for this
+                                focused region.
+                              </p>
+                            </div>
+
+                            {renderIntegratedRegionalAssessment(
+                              'pain-assessment',
+                              'Pain Assessment / OPQRST',
+                              `Document pain associated with the ${getClinicalDisplayName(region).toLowerCase()} region.`,
+                            )}
+
+                            {region === 'head' &&
+                              renderIntegratedRegionalAssessment(
+                                'gfast-stroke-assessment',
+                                'Stroke Assessment / GFAST',
+                                'Complete the neurological stroke screen from the focused Head assessment.',
+                              )}
+
+                            {region === 'chest' &&
+                              renderIntegratedRegionalAssessment(
+                                'respiratory-assessment',
+                                'Respiratory Assessment / PASTMED',
+                                'Document respiratory findings and focused respiratory history.',
+                              )}
                           </div>
 
                           <div className="space-y-3">
