@@ -177,6 +177,9 @@ export default function PatientSection({
     patientForm.environmentalAllergies,
   ];
 
+  const nkdaSelected =
+    patientForm.medicationAllergies.trim().toUpperCase() === 'NKDA';
+
   const belongingsFields = [
     patientForm.patientEffects,
     patientForm.patientEffectsLeftWith,
@@ -202,6 +205,20 @@ export default function PatientSection({
       patientZip: callForm.incidentZip,
       unablePatientAddress: false,
     }));
+  }
+
+  function toggleNkda() {
+    setPatientForm((current) => ({
+      ...current,
+      medicationAllergies: nkdaSelected ? '' : 'NKDA',
+    }));
+  }
+
+  function updateAllergy(
+    field: 'medicationAllergies' | 'environmentalAllergies',
+    value: string,
+  ) {
+    updatePatientForm(field, value);
   }
 
   return (
@@ -651,6 +668,24 @@ export default function PatientSection({
         expanded={expandedCard === 'Allergies'}
         onToggle={() => toggleCard('Allergies')}
       >
+        <div className="mb-4">
+          <button
+            type="button"
+            aria-pressed={nkdaSelected}
+            onClick={toggleNkda}
+            className={`w-full rounded-xl border px-4 py-3 text-sm font-bold transition md:w-auto ${
+              nkdaSelected
+                ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100'
+            }`}
+          >
+            {nkdaSelected ? '✓ NKDA — No Known Drug Allergies' : 'NKDA — No Known Drug Allergies'}
+          </button>
+          <p className="mt-2 text-xs text-slate-500">
+            Selecting NKDA clears any documented medication allergies.
+          </p>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2">
           {[
             ['medicationAllergies', 'Medication Allergies'],
@@ -663,8 +698,10 @@ export default function PatientSection({
               <textarea
                 value={patientForm[field as keyof PatientForm] as string}
                 onChange={(event) =>
-                  updatePatientForm(
-                    field as keyof PatientForm,
+                  updateAllergy(
+                    field as
+                      | 'medicationAllergies'
+                      | 'environmentalAllergies',
                     event.target.value,
                   )
                 }
