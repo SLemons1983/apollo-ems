@@ -11,6 +11,7 @@ import {
 import PCRProgress from './PCRProgress';
 import PCRSection from './PCRSection';
 import PatientHandoffRail from './PatientHandoffRail';
+import QuickToolsPanel from './QuickToolsPanel';
 import AssessmentSection from '../sections/AssessmentSection';
 import CallSection from '../sections/CallSection';
 import ComplaintSection from '../sections/ComplaintSection';
@@ -20,6 +21,10 @@ import {
   createDefaultAssessmentForm,
   type AssessmentForm,
 } from '../clinical/assessment/assessmentForm';
+import type {
+  ReassessmentForm,
+  ReassessmentRecord,
+} from '../clinical/components/assessment/cards/ReassessmentCard';
 import { determineAssessmentMode } from '../clinical/engine/assessment';
 import { getCcemsaGfastConsiderations } from '../clinical/engine/protocols/ccemsaStroke';
 import {
@@ -84,10 +89,46 @@ function mergeAssessmentWithDefaults(
       : defaultValue;
   }
 
-  return mergeValue(
+  const merged = mergeValue(
     createDefaultAssessmentForm(),
     uploadedAssessment,
   ) as AssessmentForm;
+
+  const uploadedClinical =
+    uploadedAssessment !== null &&
+    typeof uploadedAssessment === 'object' &&
+    !Array.isArray(uploadedAssessment) &&
+    (uploadedAssessment as { clinical?: unknown }).clinical !== null &&
+    typeof (uploadedAssessment as { clinical?: unknown }).clinical === 'object'
+      ? ((uploadedAssessment as { clinical: Record<string, unknown> }).clinical)
+      : {};
+  const legacyReassessment = uploadedClinical.reassessment as
+    | Partial<ReassessmentForm>
+    | undefined;
+  const uploadedReassessments = uploadedClinical.reassessments;
+
+  if (
+    !Array.isArray(uploadedReassessments) &&
+    legacyReassessment &&
+    Object.entries(legacyReassessment).some(
+      ([key, value]) => key !== 'assessedAt' && Boolean(value),
+    )
+  ) {
+    const migratedAt = new Date().toISOString();
+    merged.clinical.reassessments = [
+      {
+        ...merged.clinical.reassessment,
+        assessedAt:
+          legacyReassessment.assessedAt || migratedAt.slice(0, 16),
+        id: `legacy-reassessment-${Date.now()}`,
+        createdAt: migratedAt,
+      } as ReassessmentRecord,
+    ];
+    merged.clinical.reassessment =
+      createDefaultAssessmentForm().clinical.reassessment;
+  }
+
+  return merged;
 }
 
 export default function EPCRClient() {
@@ -914,22 +955,11 @@ export default function EPCRClient() {
                       <h2 className="font-bold">Quick Tools</h2>
                     </div>
                   </div>
-                  <div className="space-y-3 p-4">
-                    {[
-                      ['Quick Vitals', 'Rapidly add a new vital-sign set without leaving the current section.'],
-                      ['Dosing Calculator', 'Weight-based medication and infusion calculations.'],
-                      ['Clinical Timer', 'Track CPR, stroke, medication, contraction, or procedure times.'],
-                    ].map(([title, description]) => (
-                      <div key={title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="mb-2 flex items-start justify-between gap-3">
-                          <h3 className="font-bold text-slate-900">{title}</h3>
-                          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                            Coming Soon
-                          </span>
-                        </div>
-                        <p className="text-sm leading-6 text-slate-600">{description}</p>
-                      </div>
-                    ))}
+                  <div className="p-4">
+                    <QuickToolsPanel
+                      assessmentForm={assessmentForm}
+                      onAssessmentFormChange={setAssessmentForm}
+                    />
                   </div>
                 </div>
               ) : (
@@ -1130,21 +1160,10 @@ export default function EPCRClient() {
                     complaintForm={complaintForm}
                   />
                 ) : (
-                  <div className="space-y-3">
-                    {['Quick Vitals', 'Dosing Calculator', 'Clinical Timer'].map((tool) => (
-                      <div key={tool} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-2 flex items-center justify-between gap-3">
-                          <h3 className="font-bold text-slate-900">{tool}</h3>
-                          <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                            Coming Soon
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-600">
-                          This Quick Tool will be added in a future phase.
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                  <QuickToolsPanel
+                    assessmentForm={assessmentForm}
+                    onAssessmentFormChange={setAssessmentForm}
+                  />
                 )}
               </div>
             </aside>

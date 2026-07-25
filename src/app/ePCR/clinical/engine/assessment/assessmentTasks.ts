@@ -78,10 +78,4 @@ export const assessmentTasks: AssessmentTask[] = [
     title: 'Neonate Assessment / APGAR',
     mode: ['ob', 'pediatric'],
   },
-  {
-    id: 'reassessment',
-    title: 'Reassessment',
-    mode: ['medical', 'trauma', 'cardiac-arrest', 'stroke', 'behavioral', 'ob', 'pediatric'],
-    alwaysShow: true,
-  },
 ];

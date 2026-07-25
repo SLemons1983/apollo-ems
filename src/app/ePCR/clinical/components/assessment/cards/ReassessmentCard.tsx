@@ -1,6 +1,7 @@
 'use client';
 
 type ReassessmentForm = {
+  assessedAt: string;
   reason: string;
   patientCondition: string;
   mentalStatus: string;
@@ -12,9 +13,17 @@ type ReassessmentForm = {
   notes: string;
 };
 
+type ReassessmentRecord = ReassessmentForm & {
+  id: string;
+  createdAt: string;
+};
+
 type ReassessmentCardProps = {
   value: ReassessmentForm;
   onChange: (field: keyof ReassessmentForm, value: string) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saveDisabled?: boolean;
 };
 
 const reassessmentGroups: {
@@ -67,6 +76,9 @@ const reassessmentGroups: {
 export default function ReassessmentCard({
   value,
   onChange,
+  onSave,
+  onCancel,
+  saveDisabled = false,
 }: ReassessmentCardProps) {
   return (
     <div className="space-y-5">
@@ -78,6 +90,18 @@ export default function ReassessmentCard({
           Document patient condition changes, treatment response, and updated priority.
         </div>
       </div>
+
+      <label className="block">
+        <span className="mb-2 block text-sm font-bold uppercase tracking-wide text-slate-600">
+          Reassessment Date and Time
+        </span>
+        <input
+          type="datetime-local"
+          value={value.assessedAt}
+          onChange={(event) => onChange('assessedAt', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm"
+        />
+      </label>
 
       {reassessmentGroups.map((group) => (
         <div key={group.field}>
@@ -119,8 +143,43 @@ export default function ReassessmentCard({
           className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm"
         />
       </label>
+
+      <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saveDisabled}
+          className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          Save Reassessment
+        </button>
+      </div>
     </div>
   );
 }
 
-export type { ReassessmentForm };
+export function createEmptyReassessmentForm(
+  assessedAt = '',
+): ReassessmentForm {
+  return {
+    assessedAt,
+    reason: '',
+    patientCondition: '',
+    mentalStatus: '',
+    airwayBreathing: '',
+    circulation: '',
+    painChange: '',
+    interventionsResponse: '',
+    transportPriority: '',
+    notes: '',
+  };
+}
+
+export type { ReassessmentForm, ReassessmentRecord };

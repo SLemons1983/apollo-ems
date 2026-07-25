@@ -60,9 +60,6 @@ import PainAssessmentCard, {
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
-import ReassessmentCard, {
-  type ReassessmentForm,
-} from '../clinical/components/assessment/cards/ReassessmentCard';
 import RevisedTraumaScoreCard, {
   type RevisedTraumaScoreForm,
 } from '../clinical/components/assessment/cards/RevisedTraumaScoreCard';
@@ -211,6 +208,7 @@ export default function AssessmentSection({
         (task) =>
           task.id !== 'primary-assessment' &&
           task.id !== 'history-taking' &&
+          task.id !== 'reassessment' &&
           task.id !== 'extremity-assessment' &&
           task.id !== 'trauma-assessment' &&
           !integratedBodyMapTaskIds.has(task.id),
@@ -224,6 +222,7 @@ export default function AssessmentSection({
         (task) =>
           task.id !== 'extremity-assessment' &&
           task.id !== 'trauma-assessment' &&
+          task.id !== 'reassessment' &&
           !integratedBodyMapTaskIds.has(task.id),
       ),
     [
@@ -339,7 +338,6 @@ export default function AssessmentSection({
   const gfastAssessment = assessmentForm.clinical.gfast;
   const extremityAssessment = assessmentForm.clinical.extremity;
   const traumaAssessment = assessmentForm.clinical.trauma;
-  const reassessment = assessmentForm.clinical.reassessment;
   const revisedTraumaScore = assessmentForm.clinical.revisedTraumaScore;
   const respiratoryAssessment = assessmentForm.clinical.respiratory;
   const alocAssessment = assessmentForm.clinical.aloc;
@@ -369,9 +367,6 @@ export default function AssessmentSection({
   const setTraumaAssessment = (
     value: SetStateAction<TraumaAssessmentForm>,
   ) => setClinicalAssessmentValue('trauma', value);
-  const setReassessment = (
-    value: SetStateAction<ReassessmentForm>,
-  ) => setClinicalAssessmentValue('reassessment', value);
   const setRevisedTraumaScore = (
     value: SetStateAction<RevisedTraumaScoreForm>,
   ) => setClinicalAssessmentValue('revisedTraumaScore', value);
@@ -534,10 +529,6 @@ export default function AssessmentSection({
       };
     }
 
-    if (taskId === 'reassessment') {
-      const completed = Object.values(reassessment).filter(Boolean).length;
-      return { completed, total: Object.keys(reassessment).length };
-    }
 
     if (taskId === 'ecg-assessment') {
       return {
@@ -713,15 +704,6 @@ export default function AssessmentSection({
     }));
   }
 
-  function updateReassessment(
-    field: keyof ReassessmentForm,
-    fieldValue: string,
-  ) {
-    setReassessment((current) => ({
-      ...current,
-      [field]: fieldValue,
-    }));
-  }
 
   function getAssessmentTaskForBodyRegion(region: ApolloBodyRegionKey) {
     if (isAssessmentExtremityRegion(region)) {
@@ -1298,7 +1280,6 @@ export default function AssessmentSection({
     alocAssessment,
     traumaAssessment,
     revisedTraumaScore,
-    reassessment,
     ecgAssessment,
     providerScope,
     onProgressChange,
@@ -1503,14 +1484,6 @@ export default function AssessmentSection({
       );
     }
 
-    if (taskId === 'reassessment') {
-      return (
-        <ReassessmentCard
-          value={reassessment}
-          onChange={updateReassessment}
-        />
-      );
-    }
 
     if (taskId === 'ecg-assessment') {
       return (

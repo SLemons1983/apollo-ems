@@ -13,7 +13,11 @@ import type { GcsAssessmentForm } from '../components/assessment/cards/GcsAssess
 import type { GfastAssessmentForm } from '../components/assessment/cards/GfastAssessmentCard';
 import type { PainAssessmentForm } from '../components/assessment/cards/PainAssessmentCard';
 import type { PrimaryAssessmentForm } from '../components/assessment/cards/PrimaryAssessmentCard';
-import type { ReassessmentForm } from '../components/assessment/cards/ReassessmentCard';
+import {
+  createEmptyReassessmentForm,
+  type ReassessmentForm,
+  type ReassessmentRecord,
+} from '../components/assessment/cards/ReassessmentCard';
 import type { RespiratoryAssessmentForm } from '../components/assessment/cards/RespiratoryAssessmentCard';
 import type { RevisedTraumaScoreForm } from '../components/assessment/cards/RevisedTraumaScoreCard';
 import type { TraumaAssessmentForm } from '../components/assessment/cards/TraumaAssessmentCard';
@@ -87,6 +91,7 @@ export type AssessmentClinicalForm = {
   extremity: ExtremityAssessmentForm;
   trauma: TraumaAssessmentForm;
   reassessment: ReassessmentForm;
+  reassessments: ReassessmentRecord[];
   revisedTraumaScore: RevisedTraumaScoreForm;
   respiratory: RespiratoryAssessmentForm;
   aloc: AlocAssessmentForm;
@@ -527,17 +532,8 @@ export function createDefaultAssessmentForm(): AssessmentForm {
           ]),
         ) as TraumaAssessmentForm['regions'],
       },
-      reassessment: {
-        reason: '',
-        patientCondition: '',
-        mentalStatus: '',
-        airwayBreathing: '',
-        circulation: '',
-        painChange: '',
-        interventionsResponse: '',
-        transportPriority: '',
-        notes: '',
-      },
+      reassessment: createEmptyReassessmentForm(),
+      reassessments: [],
       revisedTraumaScore: {
         respiratoryRate: '',
         systolicBloodPressure: '',

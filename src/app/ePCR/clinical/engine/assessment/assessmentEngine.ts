@@ -109,7 +109,6 @@ export function getAdditionalAssessmentTasksForContext(
       'trauma-assessment',
       'pain-assessment',
       'gfast-stroke-assessment',
-      'reassessment',
     ];
 
     const firstPriority = priorityOrder.indexOf(firstTask.id);
