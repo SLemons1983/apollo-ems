@@ -359,8 +359,19 @@ export default function AssessmentSection({
 
   function getTaskProgress(taskId: string) {
     if (taskId === 'primary-assessment') {
-      const completed = Object.values(primaryAssessment).filter(Boolean).length;
-      return { completed, total: Object.keys(primaryAssessment).length };
+      const primarySurveyFields = [
+        primaryAssessment.generalImpression,
+        primaryAssessment.airway,
+        primaryAssessment.breathing,
+        primaryAssessment.circulation,
+        primaryAssessment.disability,
+        primaryAssessment.exposure,
+      ];
+
+      return {
+        completed: primarySurveyFields.filter(Boolean).length,
+        total: primarySurveyFields.length,
+      };
     }
 
     if (taskId === 'consciousness-assessment') {
@@ -544,6 +555,18 @@ export default function AssessmentSection({
     setPrimaryAssessment((current) => ({
       ...current,
       [field]: fieldValue,
+    }));
+  }
+
+  function markPrimarySurveyUnremarkable() {
+    setPrimaryAssessment((current) => ({
+      ...current,
+      generalImpression: 'Stable',
+      airway: 'Patent',
+      breathing: 'Normal',
+      circulation: 'Adequate',
+      disability: 'No Deficit Noted',
+      exposure: 'No Major Findings',
     }));
   }
 
@@ -1264,6 +1287,7 @@ export default function AssessmentSection({
         <PrimaryAssessmentCard
           value={primaryAssessment}
           onChange={updatePrimaryAssessment}
+          onMarkUnremarkable={markPrimarySurveyUnremarkable}
         />
       );
     }
