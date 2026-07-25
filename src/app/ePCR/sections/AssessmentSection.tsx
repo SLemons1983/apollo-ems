@@ -33,6 +33,7 @@ import {
 } from '../clinical/engine/assessment';
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
+  type EditablePatientHistoryField,
 } from '../clinical/components/assessment/cards/ClinicalHistoryCard';
 import AlocAssessmentCard, {
   type AlocAssessmentForm,
@@ -143,6 +144,10 @@ type AssessmentSectionProps = {
   assessmentForm: AssessmentForm;
   onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
   patientForm: PatientForm;
+  onPatientChange: (
+    field: EditablePatientHistoryField,
+    value: string,
+  ) => void;
   providerScope: 'BLS' | 'ALS';
   clinicalCategory: string;
   suspectedStroke: boolean;
@@ -164,6 +169,7 @@ export default function AssessmentSection({
   assessmentForm,
   onAssessmentFormChange,
   patientForm,
+  onPatientChange,
   providerScope,
   clinicalCategory,
   suspectedStroke,
@@ -380,8 +386,10 @@ export default function AssessmentSection({
     }
 
     if (taskId === 'history-taking') {
-      const completed = Object.values(clinicalHistory).filter(Boolean).length;
-      return { completed, total: Object.keys(clinicalHistory).length };
+      return {
+        completed: clinicalHistory.eventsLeadingToIllness ? 1 : 0,
+        total: 1,
+      };
     }
 
     if (taskId === 'pain-assessment') {
@@ -1307,6 +1315,7 @@ export default function AssessmentSection({
           value={clinicalHistory}
           patientForm={patientForm}
           onChange={updateClinicalHistory}
+          onPatientChange={onPatientChange}
         />
       );
     }

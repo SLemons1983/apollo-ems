@@ -742,6 +742,7 @@ export default function EPCRClient() {
                         assessmentForm={assessmentForm}
                         onAssessmentFormChange={setAssessmentForm}
                         patientForm={patientForm}
+                        onPatientChange={updatePatientForm}
                         providerScope={
                           callForm.crewMembers.find(
                             (member) => member.isDocumentingPcr,
@@ -853,6 +854,7 @@ export default function EPCRClient() {
                       assessmentForm={assessmentForm}
                       onAssessmentFormChange={setAssessmentForm}
                       patientForm={patientForm}
+                      onPatientChange={updatePatientForm}
                       providerScope={callForm.crewMembers.find((member) => member.isDocumentingPcr)?.certification === 'Paramedic' ? 'ALS' : 'BLS'}
                       clinicalCategory={complaintForm.clinicalCategory}
                       suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
