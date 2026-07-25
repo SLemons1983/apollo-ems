@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import ApolloBodySvg from './svg/ApolloBodySvg';
-import ApolloBodyOverlayBadge from './ApolloBodyOverlayBadge';
-import { apolloBodyRegions, type ApolloBodyRegionDefinition } from './bodyMapData';
 import { apolloBodyMapModeConfig } from './bodyMapModeConfig';
 import {
   buildBodyRegionStatusesFromClinicalOverlays,
@@ -19,92 +17,29 @@ import type {
 
 type ApolloBodyMapProps = {
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
+  focusedRegion?: ApolloBodyRegionKey | '';
   onRegionClick: (region: ApolloBodyRegionKey) => void;
   mode?: ApolloBodyMapMode;
   regionStatuses?: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
   clinicalOverlays?: ApolloClinicalOverlay[];
 };
 
-const clinicalGroupLabels: Record<ApolloBodyRegionDefinition['clinicalGroup'], string> = {
-  'head-neck': 'Head / Neck',
-  torso: 'Torso',
-  'abdomen-pelvis': 'Abdomen / Pelvis',
-  'upper-extremity': 'Upper Extremities',
-  'lower-extremity': 'Lower Extremities',
-  posterior: 'Posterior',
-};
-
-const clinicalGroupOrder: ApolloBodyRegionDefinition['clinicalGroup'][] = [
-  'head-neck',
-  'torso',
-  'abdomen-pelvis',
-  'upper-extremity',
-  'lower-extremity',
-  'posterior',
-];
-
-function getGroupedRegions(regions: ApolloBodyRegionDefinition[]) {
-  return clinicalGroupOrder
-    .map((group) => ({
-      group,
-      label: clinicalGroupLabels[group],
-      regions: regions.filter((region) => region.clinicalGroup === group),
-    }))
-    .filter((group) => group.regions.length > 0);
-}
-
-function getOverlayTypeLabel(type: string) {
-  return type
-    .split('-')
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 export default function ApolloBodyMap({
   selectedRegions,
+  focusedRegion = '',
   onRegionClick,
   mode = 'assessment',
   regionStatuses = {},
   clinicalOverlays = [],
 }: ApolloBodyMapProps) {
   const [view, setView] = useState<ApolloBodyView>('front');
-  const [activeRegion, setActiveRegion] = useState<ApolloBodyRegionKey | null>(
-    null,
-  );
+  const [hoveredRegion, setHoveredRegion] =
+    useState<ApolloBodyRegionKey | null>(null);
 
   const modeConfig = apolloBodyMapModeConfig[mode];
-  const overlayRegionStatuses =
-    buildBodyRegionStatusesFromClinicalOverlays(clinicalOverlays);
   const combinedRegionStatuses = mergeBodyRegionStatuses(
     regionStatuses,
-    overlayRegionStatuses,
-  );
-
-  const selectedRegionList = apolloBodyRegions.filter(
-    (region) => selectedRegions[region.field],
-  );
-
-  const groupedSelectedRegions = getGroupedRegions(selectedRegionList);
-
-  const activeRegionDefinition = activeRegion
-    ? apolloBodyRegions.find((region) => region.field === activeRegion)
-    : null;
-
-  const activeStatus = activeRegion ? combinedRegionStatuses[activeRegion] : undefined;
-
-  const selectedOverlaySummary = selectedRegionList.flatMap((region) =>
-    (combinedRegionStatuses[region.field]?.overlays ?? []).map((overlay) => ({
-      region,
-      overlay,
-    })),
-  );
-
-  const groupedOverlaySummary = selectedOverlaySummary.reduce(
-    (groups, item) => ({
-      ...groups,
-      [item.overlay.type]: [...(groups[item.overlay.type] ?? []), item],
-    }),
-    {} as Record<string, typeof selectedOverlaySummary>,
+    buildBodyRegionStatusesFromClinicalOverlays(clinicalOverlays),
   );
 
   return (
@@ -115,7 +50,7 @@ export default function ApolloBodyMap({
             {modeConfig.title}
           </h4>
           <p className="mt-1 text-xs font-semibold text-slate-500">
-            {modeConfig.instructions}
+            Tap the area you need to assess. Use Front and Back to change views.
           </p>
         </div>
 
@@ -137,194 +72,21 @@ export default function ApolloBodyMap({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-        <ApolloBodySvg
-          view={view}
-          selectedRegions={selectedRegions}
-          regionStatuses={combinedRegionStatuses}
-          activeRegion={activeRegion}
-          onRegionClick={onRegionClick}
-          onFocusRegion={setActiveRegion}
-          onBlurRegion={() => setActiveRegion(null)}
-        />
+      <ApolloBodySvg
+        view={view}
+        selectedRegions={selectedRegions}
+        regionStatuses={combinedRegionStatuses}
+        activeRegion={hoveredRegion || focusedRegion || null}
+        onRegionClick={onRegionClick}
+        onFocusRegion={setHoveredRegion}
+        onBlurRegion={() => setHoveredRegion(null)}
+      />
 
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="min-h-[178px] rounded-lg border border-slate-200 bg-white p-3">
-            <div className="text-xs font-black uppercase tracking-wide text-slate-500">
-              Current Focus
-            </div>
-            <div className="mt-1 text-sm font-black text-slate-900">
-              {activeRegionDefinition?.label || 'None'}
-            </div>
-
-            <div className="mt-2 grid gap-2 text-xs font-bold text-slate-600">
-              <div className="rounded-lg bg-slate-50 px-2 py-1">
-                Group:{' '}
-                {activeRegionDefinition
-                  ? clinicalGroupLabels[activeRegionDefinition.clinicalGroup]
-                  : '—'}
-              </div>
-              <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
-                Laterality: {activeRegionDefinition?.laterality || '—'}
-              </div>
-              <div className="rounded-lg bg-slate-50 px-2 py-1 capitalize">
-                View: {activeRegionDefinition?.view || '—'}
-              </div>
-            </div>
-
-            <div className="mt-2 min-h-[18px] text-xs font-bold text-amber-700">
-              {activeStatus?.note || ''}
-            </div>
-
-            <div className="mt-2 flex min-h-[26px] flex-wrap gap-1">
-              {activeStatus?.overlays?.map((overlay) => (
-                <ApolloBodyOverlayBadge
-                  key={`${activeRegion}-${overlay.type}-${overlay.label}`}
-                  overlay={overlay}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-black text-slate-900">
-                Selected Regions
-              </div>
-              <div className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700">
-                {selectedRegionList.length}
-              </div>
-            </div>
-
-            {groupedSelectedRegions.length > 0 ? (
-              <div className="mt-3 space-y-3">
-                {groupedSelectedRegions.map((group) => (
-                  <div
-                    key={group.group}
-                    className="rounded-xl border border-slate-200 bg-white p-3"
-                  >
-                    <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
-                      <span>{group.label}</span>
-                      <span>{group.regions.length}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {group.regions.map((region) => {
-                        const status = combinedRegionStatuses[region.field];
-                        const findingCount = status?.findingCount ?? 0;
-
-                        return (
-                          <button
-                            key={region.field}
-                            type="button"
-                            onMouseEnter={() => setActiveRegion(region.field)}
-                            onMouseLeave={() => setActiveRegion(null)}
-                            onFocus={() => setActiveRegion(region.field)}
-                            onBlur={() => setActiveRegion(null)}
-                            onClick={() => onRegionClick(region.field)}
-                            className={`w-full rounded-lg border bg-white px-3 py-2 text-left text-sm font-semibold hover:bg-blue-50 ${
-                              findingCount > 0
-                                ? 'border-amber-300 text-amber-950'
-                                : 'border-blue-200 text-blue-950'
-                            }`}
-                          >
-                            <span className="flex items-center justify-between gap-2">
-                              <span>{region.label}</span>
-                              <span>✓</span>
-                            </span>
-
-                            {status?.note && (
-                              <span className="mt-1 block text-xs font-bold text-slate-600">
-                                {status.note}
-                              </span>
-                            )}
-
-                            {status?.overlays && status.overlays.length > 0 && (
-                              <span className="mt-2 flex flex-wrap gap-1">
-                                {status.overlays.map((overlay) => (
-                                  <ApolloBodyOverlayBadge
-                                    key={`${region.field}-${overlay.type}-${overlay.label}`}
-                                    overlay={overlay}
-                                  />
-                                ))}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-sm font-semibold text-slate-500">
-                {modeConfig.emptyState}
-              </div>
-            )}
-          </div>
-
-          {selectedOverlaySummary.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
-                <span>Clinical Overlay Summary</span>
-                <span>{selectedOverlaySummary.length}</span>
-              </div>
-
-              <div className="space-y-3">
-                {Object.entries(groupedOverlaySummary).map(
-                  ([overlayType, items]) => (
-                    <div key={overlayType}>
-                      <div className="mb-1 text-xs font-black uppercase tracking-wide text-slate-500">
-                        {getOverlayTypeLabel(overlayType)}
-                      </div>
-
-                      <div className="space-y-1">
-                        {items.map((item) => (
-                          <div
-                            key={`${item.region.field}-${item.overlay.type}-${item.overlay.label}-${item.overlay.count ?? 'none'}`}
-                            className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700"
-                          >
-                            <span className="text-slate-900">
-                              {item.region.label}:
-                            </span>{' '}
-                            {item.overlay.value || item.overlay.label}
-                            {item.overlay.count !== undefined &&
-                              item.overlay.count > 0 && (
-                                <span> ({item.overlay.count})</span>
-                              )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ),
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="border-t border-slate-200 pt-4">
-            <div className="text-xs font-black uppercase tracking-wide text-slate-600">
-              Mode
-            </div>
-            <div className="mt-1 rounded-full bg-white px-3 py-2 text-sm font-bold capitalize text-slate-800">
-              {mode}
-            </div>
-          </div>
-
-          <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs font-semibold leading-5 text-slate-600">
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-3 w-3 rounded-full border border-blue-500 bg-blue-100" />
-              <span>{modeConfig.selectedLegend}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-3 w-3 rounded-full border border-amber-500 bg-amber-100" />
-              <span>{modeConfig.clinicalDataLegend}</span>
-            </div>
-            <div className="pt-2 text-slate-500">
-              {modeConfig.tip}
-            </div>
-          </div>
-        </div>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+        <span><span className="text-blue-600">●</span> Selected</span>
+        <span><span className="text-amber-500">●</span> In Progress</span>
+        <span><span className="text-emerald-600">●</span> Unremarkable</span>
+        <span><span className="text-red-600">●</span> Abnormal</span>
       </div>
     </div>
   );

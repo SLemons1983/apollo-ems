@@ -216,8 +216,6 @@ export default function AssessmentSection({
     ],
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
-  const [expandedBodyRegion, setExpandedBodyRegion] =
-    useState<ApolloBodyRegionKey | ''>('');
   const [expandedBodySubregionId, setExpandedBodySubregionId] =
     useState('');
   const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
@@ -888,56 +886,6 @@ export default function AssessmentSection({
     };
   }
 
-  function getBodyRegionQueueStatus(region: ApolloBodyRegionKey) {
-    const regionStatus =
-      getBodyRegionAssessmentStatusFromSubregions(
-        assessmentForm.bodyMap.subregionFindings[region],
-      );
-
-    if (regionStatus === 'unremarkable') {
-      return {
-        label: 'Unremarkable',
-        dotClass: 'text-emerald-600',
-        chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-        statusClass: 'text-emerald-700',
-      };
-    }
-
-    if (regionStatus === 'abnormal') {
-      return {
-        label: 'Abnormal Findings Documented',
-        dotClass: 'text-red-600',
-        chipClass: 'border-red-200 bg-red-50 text-red-900',
-        statusClass: 'text-red-700',
-      };
-    }
-
-    if (regionStatus === 'complete') {
-      return {
-        label: 'Complete',
-        dotClass: 'text-emerald-600',
-        chipClass: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-        statusClass: 'text-emerald-700',
-      };
-    }
-
-    if (regionStatus === 'in-progress') {
-      return {
-        label: 'In Progress',
-        dotClass: 'text-amber-500',
-        chipClass: 'border-amber-200 bg-amber-50 text-amber-900',
-        statusClass: 'text-amber-700',
-      };
-    }
-
-    return {
-      label: 'Not Assessed',
-      dotClass: 'text-blue-600',
-      chipClass: 'border-blue-200 bg-blue-50 text-blue-900',
-      statusClass: 'text-blue-700',
-    };
-  }
-
   function toggleBodyRegionDcapBtlsFinding(
     region: ApolloBodyRegionKey,
     finding: DcapBtlsFindingKey,
@@ -1206,18 +1154,13 @@ export default function AssessmentSection({
 
   function openAssessmentForBodyRegion(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegion(region);
-
-    const targetTaskId = getAssessmentTaskForBodyRegion(region);
-
-    if (targetTaskId) {
-      setExpandedTaskId(targetTaskId);
-    }
+    setExpandedBodySubregionId('');
   }
 
   function handleAssessmentBodyRegionClick(region: ApolloBodyRegionKey) {
     setSelectedAssessmentRegions((current) => ({
       ...current,
-      [region]: !current[region],
+      [region]: true,
     }));
 
     openAssessmentForBodyRegion(region);
@@ -1468,11 +1411,11 @@ export default function AssessmentSection({
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
         <div className="mb-4">
           <h3 className="text-lg font-black text-blue-950">
-            Body Map Assessment Navigator
+            Physical Assessment
           </h3>
           <p className="mt-1 text-sm font-semibold text-blue-900">
-            Select an anatomical region to open the most relevant assessment workflow.
-            Apollo routes the clinician to the assessment area without making clinical decisions.
+            If the exam is normal, complete it in one tap. Otherwise, tap the
+            affected region and document only what you find.
           </p>
         </div>
 
@@ -1504,46 +1447,23 @@ export default function AssessmentSection({
             }}
             className="rounded-lg border border-emerald-500 bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-700"
           >
-            Mark Entire Body Unremarkable
+            Mark Physical Assessment Unremarkable
           </button>
         </div>
 
         <ApolloBodyMap
           mode="assessment"
           selectedRegions={selectedAssessmentRegions}
+          focusedRegion={selectedAssessmentRegion}
           regionStatuses={assessmentBodyRegionStatuses}
           onRegionClick={handleAssessmentBodyRegionClick}
         />
 
-        <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
-          <div className="mb-2 text-xs font-black uppercase tracking-wide text-blue-800">
-            Assessment Queue
-          </div>
-
-          <div className="mb-3 text-sm text-slate-600">
-            Regions selected on the Body Map become your active assessment queue.
-            Complete each assessment as you perform your head-to-toe exam.
-          </div>
-
-          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-950">
-            Current Focus:{' '}
-            {selectedAssessmentRegion
-              ? getClinicalDisplayName(selectedAssessmentRegion)
-              : 'None'}
-          </div>
-
-          {Object.entries(selectedAssessmentRegions).some(
-            ([, selected]) => selected,
-          ) && (
+        {selectedAssessmentRegion &&
+          selectedAssessmentRegions[selectedAssessmentRegion] && (
+          <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
             <div className="mb-4 space-y-3">
-              {(
-                Object.keys(
-                  selectedAssessmentRegions,
-                ) as ApolloBodyRegionKey[]
-              )
-                .filter(
-                  (region) => selectedAssessmentRegions[region],
-                )
+              {[selectedAssessmentRegion]
                 .map((region) => {
                   const regionSubregions =
                     assessmentForm.bodyMap.subregionFindings[region];
@@ -1558,8 +1478,7 @@ export default function AssessmentSection({
                       regionStatus,
                     );
 
-                  const regionExpanded =
-                    expandedBodyRegion === region;
+                  const regionExpanded = true;
 
                   return (
                     <div
@@ -1568,13 +1487,7 @@ export default function AssessmentSection({
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectedAssessmentRegion(region);
-                          setExpandedBodyRegion((current) =>
-                            current === region ? '' : region,
-                          );
-                          setExpandedBodySubregionId('');
-                        }}
+                        onClick={() => setSelectedAssessmentRegion(region)}
                         className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
                       >
                         <div>
@@ -1594,8 +1507,8 @@ export default function AssessmentSection({
                           </div>
                         </div>
 
-                        <span className="text-xl font-black text-slate-500">
-                          {regionExpanded ? '−' : '+'}
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-black uppercase text-blue-800">
+                          Focused Region
                         </span>
                       </button>
 
@@ -1612,21 +1525,38 @@ export default function AssessmentSection({
                               </p>
                             </div>
 
-                            <button
-                              type="button"
-                              onClick={() => {
-                                onAssessmentFormChange((current) =>
-                                  markAssessmentRegionUnremarkable(
-                                    current,
-                                    region,
-                                  ),
-                                );
-                                setExpandedBodySubregionId('');
-                              }}
-                              className="rounded-lg border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-emerald-700"
-                            >
-                              Mark All Unremarkable
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onAssessmentFormChange((current) =>
+                                    markAssessmentRegionUnremarkable(
+                                      current,
+                                      region,
+                                    ),
+                                  );
+                                  setExpandedBodySubregionId('');
+                                }}
+                                className="rounded-lg border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-emerald-700"
+                              >
+                                Mark Region Unremarkable
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAssessmentRegions((current) => ({
+                                    ...current,
+                                    [region]: false,
+                                  }));
+                                  setSelectedAssessmentRegion('');
+                                  setExpandedBodySubregionId('');
+                                }}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-black uppercase tracking-wide text-slate-700 hover:bg-slate-50"
+                              >
+                                Remove Region
+                              </button>
+                            </div>
                           </div>
 
                           <div className="space-y-3">
@@ -1863,108 +1793,8 @@ export default function AssessmentSection({
                   );
                 })}
             </div>
-          )}
-
-          {Object.entries(selectedAssessmentRegions).filter(([, selected]) => selected)
-            .length > 0 ? (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(selectedAssessmentRegions)
-                  .filter(([, selected]) => selected)
-                  .map(([region]) => {
-                    const typedRegion = region as ApolloBodyRegionKey;
-                    const queueStatus = getBodyRegionQueueStatus(typedRegion);
-
-                    return (
-                      <button
-                        key={region}
-                        type="button"
-                        onClick={() => openAssessmentForBodyRegion(typedRegion)}
-                        className={`flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase hover:opacity-90 ${queueStatus.chipClass}`}
-                      >
-                        <span className={queueStatus.dotClass}>●</span>
-
-                        {getClinicalDisplayName(typedRegion)}
-
-                        <span className={queueStatus.statusClass}>
-                          {queueStatus.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const selectedRegions = (
-                    Object.keys(
-                      selectedAssessmentRegions,
-                    ) as ApolloBodyRegionKey[]
-                  ).filter(
-                    (region) => selectedAssessmentRegions[region],
-                  );
-
-                  onAssessmentFormChange((current) =>
-                    selectedRegions.reduce(
-                      (updated, region) =>
-                        markAssessmentRegionUnremarkable(
-                          updated,
-                          region,
-                        ),
-                      current,
-                    ),
-                  );
-
-                  setExpandedBodySubregionId('');
-                }}
-                className="mr-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
-              >
-                Mark Selected Unremarkable
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedAssessmentRegion('');
-                  setSelectedAssessmentRegions({
-                    head: false,
-                    face: false,
-                    neck: false,
-                    chest: false,
-                    abdomen: false,
-                    pelvis: false,
-                    back: false,
-                    rightArm: false,
-                    leftArm: false,
-                    rightLeg: false,
-                    leftLeg: false,
-                  });
-                  setBodyRegionUnremarkable({
-                    head: false,
-                    face: false,
-                    neck: false,
-                    chest: false,
-                    abdomen: false,
-                    pelvis: false,
-                    back: false,
-                    rightArm: false,
-                    leftArm: false,
-                    rightLeg: false,
-                    leftLeg: false,
-                  });
-                }}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-black uppercase text-slate-700 hover:bg-slate-50"
-              >
-                Clear Selected Regions
-              </button>
-            </div>
-          ) : (
-            <div className="text-sm font-semibold text-slate-500">
-              No body regions selected yet.
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div>
