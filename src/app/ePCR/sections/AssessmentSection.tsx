@@ -209,6 +209,8 @@ export default function AssessmentSection({
     () =>
       suggestedAssessmentTasks.filter(
         (task) =>
+          task.id !== 'primary-assessment' &&
+          task.id !== 'history-taking' &&
           task.id !== 'extremity-assessment' &&
           task.id !== 'trauma-assessment' &&
           !integratedBodyMapTaskIds.has(task.id),
@@ -540,6 +542,7 @@ export default function AssessmentSection({
     if (taskId === 'ecg-assessment') {
       return {
         completed:
+          ecgAssessment.notIndicated ||
           ecgAssessment.fourLeadInterpretation ||
           ecgAssessment.twelveLeadInterpretation
             ? 1
@@ -1233,11 +1236,15 @@ export default function AssessmentSection({
 
   function updateEcgAssessment(
     field: keyof EcgAssessmentForm,
-    fieldValue: string,
+    fieldValue: EcgAssessmentForm[keyof EcgAssessmentForm],
   ) {
     setEcgAssessment((current) => ({
       ...current,
       [field]: fieldValue,
+      ...(field === 'fourLeadInterpretation' ||
+      field === 'twelveLeadInterpretation'
+        ? { notIndicated: false }
+        : {}),
     }));
   }
 
@@ -1523,6 +1530,44 @@ export default function AssessmentSection({
 
   return (
     <div className="space-y-6">
+      <div>
+        <div className="mb-3 rounded-lg bg-blue-100 px-4 py-3 text-sm font-bold uppercase tracking-wide text-blue-900">
+          Initial Assessment and History
+        </div>
+
+        <div className="space-y-4">
+          {[
+            {
+              id: 'primary-assessment',
+              title: 'Primary Assessment',
+            },
+            {
+              id: 'history-taking',
+              title: 'History Assessment / SAMPLE',
+            },
+          ].map((task) => {
+            const progress = getTaskProgress(task.id);
+
+            return (
+              <PCRCard
+                key={task.id}
+                title={task.title}
+                completedFields={progress.completed}
+                totalFields={progress.total}
+                expanded={expandedTaskId === task.id}
+                onToggle={() =>
+                  setExpandedTaskId(
+                    expandedTaskId === task.id ? '' : task.id,
+                  )
+                }
+              >
+                {renderTaskContent(task.id, task.title)}
+              </PCRCard>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
         <div className="mb-4">
           <h3 className="text-lg font-black text-blue-950">

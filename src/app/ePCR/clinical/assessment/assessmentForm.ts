@@ -447,6 +447,7 @@ export function createDefaultAssessmentForm(): AssessmentForm {
         bloodGlucose: '',
       },
       ecg: {
+        notIndicated: false,
         fourLeadInterpretation: '',
         twelveLeadInterpretation: '',
         abnormalFindings: '',

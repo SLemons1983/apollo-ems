@@ -1,6 +1,7 @@
 'use client';
 
 type EcgAssessmentForm = {
+  notIndicated: boolean;
   fourLeadInterpretation: string;
   twelveLeadInterpretation: string;
   abnormalFindings: string;
@@ -8,7 +9,10 @@ type EcgAssessmentForm = {
 
 type EcgAssessmentCardProps = {
   value: EcgAssessmentForm;
-  onChange: (field: keyof EcgAssessmentForm, value: string) => void;
+  onChange: (
+    field: keyof EcgAssessmentForm,
+    value: EcgAssessmentForm[keyof EcgAssessmentForm],
+  ) => void;
 };
 
 const fourLeadRhythms = [
@@ -52,8 +56,55 @@ export default function EcgAssessmentCard({
   value,
   onChange,
 }: EcgAssessmentCardProps) {
+  const hasDocumentedInterpretation = Boolean(
+    value.fourLeadInterpretation || value.twelveLeadInterpretation,
+  );
+
   return (
     <div className="space-y-4">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${
+          value.notIndicated
+            ? 'border-emerald-300 bg-emerald-50'
+            : 'border-slate-200 bg-slate-50'
+        }`}
+      >
+        <div>
+          <div className="text-sm font-black uppercase tracking-wide text-slate-800">
+            ECG Assessment Applicability
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-600">
+            Use this when neither cardiac monitoring nor a 12-lead ECG is
+            clinically indicated.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onChange('notIndicated', !value.notIndicated)}
+          disabled={hasDocumentedInterpretation}
+          className={`rounded-lg border px-4 py-2 text-xs font-black uppercase tracking-wide transition ${
+            value.notIndicated
+              ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
+              : hasDocumentedInterpretation
+                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
+          }`}
+        >
+          {value.notIndicated
+            ? '✓ ECG Assessment Not Indicated'
+            : 'ECG Assessment Not Indicated'}
+        </button>
+      </div>
+
+      {value.notIndicated && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+          ECG assessment documented as not indicated. Select the button again
+          to document an ECG.
+        </div>
+      )}
+
+      <fieldset disabled={value.notIndicated} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-1 block text-sm font-semibold text-slate-700">
@@ -108,6 +159,7 @@ export default function EcgAssessmentCard({
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
         />
       </label>
+      </fieldset>
     </div>
   );
 }
