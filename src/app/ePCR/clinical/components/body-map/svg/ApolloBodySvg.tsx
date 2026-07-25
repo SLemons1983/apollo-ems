@@ -21,8 +21,12 @@ type ApolloBodySvgProps = {
 };
 
 export default function ApolloBodySvg(props: ApolloBodySvgProps) {
-  const regions = props.view === 'front' ? bodySvgFront : bodySvgBack;
   const isFemale = props.patientSex?.trim().toLowerCase() === 'female';
+  const illustrationSex = isFemale ? 'female' : 'male';
+  const regions =
+    props.view === 'front'
+      ? bodySvgFront[illustrationSex]
+      : bodySvgBack[illustrationSex];
   const imageHref = isFemale
     ? '/epcr/body-map/apollo-body-female.png'
     : '/epcr/body-map/apollo-body-male.png';

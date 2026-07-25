@@ -5,3 +5,5 @@ export type ApolloBodySvgRegion = {
   path: string;
   label: string;
 };
+
+export type ApolloBodySvgSex = 'male' | 'female';
