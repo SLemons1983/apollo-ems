@@ -96,6 +96,12 @@ export default function EPCRClient() {
   const [fileStatus, setFileStatus] = useState('');
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
+  const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
+    useState(true);
+  const [
+    clinicalIntelligencePreferenceLoaded,
+    setClinicalIntelligencePreferenceLoaded,
+  ] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<
     'patient-summary' | 'quick-tools' | null
   >(null);
@@ -107,6 +113,9 @@ export default function EPCRClient() {
     const savedQuickTools = window.localStorage.getItem(
       'apollo-epcr-quick-tools-open',
     );
+    const savedClinicalIntelligence = window.localStorage.getItem(
+      'apollo-epcr-clinical-intelligence-open',
+    );
 
     if (savedPatientSummary !== null) {
       setPatientSummaryOpen(savedPatientSummary === 'true');
@@ -115,6 +124,12 @@ export default function EPCRClient() {
     if (savedQuickTools !== null) {
       setQuickToolsOpen(savedQuickTools === 'true');
     }
+
+    if (savedClinicalIntelligence !== null) {
+      setClinicalIntelligenceOpen(savedClinicalIntelligence === 'true');
+    }
+
+    setClinicalIntelligencePreferenceLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -130,6 +145,17 @@ export default function EPCRClient() {
       String(quickToolsOpen),
     );
   }, [quickToolsOpen]);
+
+  useEffect(() => {
+    if (!clinicalIntelligencePreferenceLoaded) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      'apollo-epcr-clinical-intelligence-open',
+      String(clinicalIntelligenceOpen),
+    );
+  }, [clinicalIntelligenceOpen, clinicalIntelligencePreferenceLoaded]);
 
   const [callForm, setCallForm] = useState<CallForm>(() =>
     createDefaultCallForm(),
@@ -975,68 +1001,95 @@ export default function EPCRClient() {
         </div>
 
         <footer className="sticky bottom-0 z-30 mt-6 rounded-t-2xl border border-amber-300 bg-amber-50/95 shadow-[0_-8px_24px_rgba(15,23,42,0.14)] backdrop-blur">
-          <div className="border-b border-amber-200 px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-black text-amber-950">
+          <button
+            type="button"
+            onClick={() =>
+              setClinicalIntelligenceOpen((currentOpen) => !currentOpen)
+            }
+            aria-expanded={clinicalIntelligenceOpen}
+            aria-controls="apollo-clinical-intelligence-content"
+            className={`flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-amber-100/70 ${
+              clinicalIntelligenceOpen ? 'border-b border-amber-200' : ''
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="text-sm font-black text-amber-800"
+              >
+                {clinicalIntelligenceOpen ? '▼' : '▲'}
+              </span>
+              <span className="font-black text-amber-950">
                 Apollo Clinical Intelligence
-              </h2>
+              </span>
+            </span>
+            <span className="flex items-center gap-3">
               <span className="text-xs font-bold uppercase tracking-wide text-amber-800">
                 {callForm.lemsa
                   ? `${callForm.lemsa} protocols selected`
                   : 'Select a LEMSA to enable protocol guidance'}
               </span>
-            </div>
+              <span className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                {clinicalIntelligenceOpen ? 'Collapse' : 'Expand'}
+              </span>
+            </span>
+          </button>
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                  Assessment Mode
-                </div>
-                <div className="text-sm font-bold capitalize text-slate-900">
-                  {assessmentMode.replace('-', ' ')}
+          {clinicalIntelligenceOpen && (
+            <div id="apollo-clinical-intelligence-content">
+              <div className="border-b border-amber-200 px-4 py-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                      Assessment Mode
+                    </div>
+                    <div className="text-sm font-bold capitalize text-slate-900">
+                      {assessmentMode.replace('-', ' ')}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                      Clinical Category
+                    </div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {complaintForm.clinicalCategory || 'Not Yet Selected'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
+                      Documenting Provider Scope
+                    </div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {documentingProviderScope}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                  Clinical Category
-                </div>
-                <div className="text-sm font-bold text-slate-900">
-                  {complaintForm.clinicalCategory || 'Not Yet Selected'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                  Documenting Provider Scope
-                </div>
-                <div className="text-sm font-bold text-slate-900">
-                  {documentingProviderScope}
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div className="max-h-36 overflow-y-auto px-4 py-3">
-            {!callForm.lemsa ? (
-              <p className="text-sm font-semibold text-amber-900">
-                No protocol references are active. Select the applicable LEMSA
-                in Crew Information.
-              </p>
-            ) : clinicalIntelligenceFeedback.length > 0 ? (
-              <div className="space-y-1.5">
-                {clinicalIntelligenceFeedback.map((feedback) => (
-                  <p key={feedback} className="text-sm text-amber-950">
-                    • {feedback}
+              <div className="max-h-36 overflow-y-auto px-4 py-3">
+                {!callForm.lemsa ? (
+                  <p className="text-sm font-semibold text-amber-900">
+                    No protocol references are active. Select the applicable
+                    LEMSA in Crew Information.
                   </p>
-                ))}
+                ) : clinicalIntelligenceFeedback.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {clinicalIntelligenceFeedback.map((feedback) => (
+                      <p key={feedback} className="text-sm text-amber-950">
+                        • {feedback}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm font-semibold text-amber-900">
+                    {callForm.lemsa === 'Merced County'
+                      ? 'Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment.'
+                      : 'No protocol-specific feedback is active for the current documentation.'}
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-sm font-semibold text-amber-900">
-                {callForm.lemsa === 'Merced County'
-                  ? 'Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment.'
-                  : 'No protocol-specific feedback is active for the current documentation.'}
-              </p>
-            )}
-          </div>
+            </div>
+          )}
         </footer>
 
         {mobileDrawer && (
