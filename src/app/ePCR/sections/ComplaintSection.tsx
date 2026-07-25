@@ -4,6 +4,7 @@ import { useState } from 'react';
 import PCRCard from '../components/PCRCard';
 import ClinicalCategoryPicker from '../clinical/components/ClinicalCategoryPicker';
 import ClinicalCombobox from '../clinical/components/ClinicalCombobox';
+import type { ClinicalOption } from '../clinical/engine';
 import type { CodedSelection, ComplaintForm } from '../types';
 import { commonDrugOptions } from '../reference/drugs';
 
@@ -40,6 +41,14 @@ const drugAlcoholIndicationOptions = [
 ];
 
 const workRelatedOptions = ['Yes', 'No', 'Unknown'];
+
+const noneClinicalOption: ClinicalOption = {
+  code: 'NONE',
+  category: 'All',
+  sourceLabel: 'None',
+  suggestedLabel: 'None',
+  note: 'No secondary differential or associated symptom documented.',
+};
 
 type ComplaintSectionProps = {
   complaintForm: ComplaintForm;
@@ -85,7 +94,7 @@ export default function ComplaintSection({
   complaintForm,
   updateComplaintForm,
 }: ComplaintSectionProps) {
-  const [expandedCard, setExpandedCard] = useState('Chief Complaint & History');
+  const [expandedCard, setExpandedCard] = useState('Chief Complaint');
   const [associatedSymptomDraft, setAssociatedSymptomDraft] =
     useState<CodedSelection | null>(null);
 
@@ -99,7 +108,6 @@ export default function ComplaintSection({
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
     complaintForm.primarySymptom,
-    complaintForm.otherAssociatedSymptoms.length > 0 ? 'selected' : '',
     complaintForm.symptomsBeganDateTime,
     complaintForm.lastSeenNormalDateTime,
   ];
@@ -144,16 +152,16 @@ export default function ComplaintSection({
   return (
     <div className="space-y-4">
       <PCRCard
-        title="Chief Complaint & History"
+        title="Chief Complaint"
         completedFields={complaintFields.filter(Boolean).length}
         totalFields={complaintFields.length}
-        expanded={expandedCard === 'Chief Complaint & History'}
-        onToggle={() => toggleCard('Chief Complaint & History')}
+        expanded={expandedCard === 'Chief Complaint'}
+        onToggle={() => toggleCard('Chief Complaint')}
       >
         <div className="grid gap-5 md:grid-cols-2">
           <label className="block md:col-span-2">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
-              Chief Complaint
+              Patient&apos;s Chief Complaint
             </span>
 
             <input
@@ -212,6 +220,7 @@ export default function ComplaintSection({
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.secondaryImpression}
+            additionalOptions={[noneClinicalOption]}
             excludedValues={
               complaintForm.primaryImpression
                 ? [complaintForm.primaryImpression]
@@ -262,6 +271,7 @@ export default function ComplaintSection({
                 listType="symptom"
                 category={complaintForm.clinicalCategory}
                 value={associatedSymptomDraft}
+                additionalOptions={[noneClinicalOption]}
                 excludedValues={[
                   ...(complaintForm.primarySymptom
                     ? [complaintForm.primarySymptom]
@@ -277,6 +287,7 @@ export default function ComplaintSection({
                 onClick={() => {
                   if (!associatedSymptomDraft) return;
 
+                  const selectedNone = associatedSymptomDraft.code === 'NONE';
                   const alreadySelected =
                     complaintForm.otherAssociatedSymptoms.some((symptom) =>
                       codedSelectionsMatch(
@@ -286,10 +297,17 @@ export default function ComplaintSection({
                     );
 
                   if (!alreadySelected) {
-                    updateComplaintForm('otherAssociatedSymptoms', [
-                      ...complaintForm.otherAssociatedSymptoms,
-                      associatedSymptomDraft,
-                    ]);
+                    updateComplaintForm(
+                      'otherAssociatedSymptoms',
+                      selectedNone
+                        ? [associatedSymptomDraft]
+                        : [
+                            ...complaintForm.otherAssociatedSymptoms.filter(
+                              (symptom) => symptom.code !== 'NONE',
+                            ),
+                            associatedSymptomDraft,
+                          ],
+                    );
                   }
 
                   setAssociatedSymptomDraft(null);

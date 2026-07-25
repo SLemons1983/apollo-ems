@@ -275,7 +275,7 @@ export default function CallSection({
                         <PCRCard
                           title="Dispatch Information"
                           completedFields={dispatchCompletedFields}
-                          totalFields={4}
+                          totalFields={3}
                           expanded={expandedCard === 'Dispatch Information'}
                           onToggle={() => toggleCard('Dispatch Information')}
                         >

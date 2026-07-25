@@ -14,6 +14,7 @@ type ClinicalComboboxProps = {
   category?: string;
   value: CodedSelection | null;
   excludedValues?: CodedSelection[];
+  additionalOptions?: ClinicalOption[];
   onChange: (value: CodedSelection | null) => void;
 };
 
@@ -48,10 +49,14 @@ export default function ClinicalCombobox({
   category,
   value,
   excludedValues = [],
+  additionalOptions = [],
   onChange,
 }: ClinicalComboboxProps) {
   const options = useMemo(() => {
-    const results = searchClinicalOptions(listType, '', category);
+    const results = [
+      ...additionalOptions,
+      ...searchClinicalOptions(listType, '', category),
+    ];
 
     return results.filter(
       (option) =>
@@ -59,7 +64,7 @@ export default function ClinicalCombobox({
           selectionsMatch(option, excludedValue),
         ),
     );
-  }, [category, excludedValues, listType]);
+  }, [additionalOptions, category, excludedValues, listType]);
 
   const selectedValue = useMemo(() => {
     if (!value) return '';

@@ -27,6 +27,7 @@ type HistoryFieldProps = {
   value: string;
   placeholder: string;
   rows?: number;
+  inputType?: 'text' | 'datetime-local';
   onChange: (value: string) => void;
   quickChoice?: {
     label: string;
@@ -39,6 +40,7 @@ function HistoryField({
   value,
   placeholder,
   rows = 2,
+  inputType = 'text',
   onChange,
   quickChoice,
 }: HistoryFieldProps) {
@@ -81,13 +83,22 @@ function HistoryField({
         </button>
       ) : null}
 
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={rows}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400"
-      />
+      {inputType === 'datetime-local' ? (
+        <input
+          type="datetime-local"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+        />
+      ) : (
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          rows={rows}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400"
+        />
+      )}
     </div>
   );
 }
@@ -178,6 +189,7 @@ export default function ClinicalHistoryCard({
             label="Last Oral Intake"
             value={patientForm.lastOralIntake}
             placeholder="Enter last oral intake or document unknown"
+            inputType="datetime-local"
             onChange={(nextValue) =>
               onPatientChange('lastOralIntake', nextValue)
             }

@@ -274,12 +274,11 @@ export function createDefaultComplaintForm(): ComplaintForm {
 
 export function getComplaintRequiredFields(complaintForm: ComplaintForm) {
   return [
+    complaintForm.chiefComplaint,
     complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
     complaintForm.secondaryImpression,
-    complaintForm.emsConditionCode,
     complaintForm.primarySymptom,
-    complaintForm.otherAssociatedSymptoms.length > 0 ? 'selected' : '',
     complaintForm.symptomsBeganDateTime,
     complaintForm.lastSeenNormalDateTime,
     complaintForm.patientAcuity,
