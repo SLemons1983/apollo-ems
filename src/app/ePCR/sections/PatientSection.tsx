@@ -681,29 +681,25 @@ export default function PatientSection({
         expanded={expandedCard === 'Allergies'}
         onToggle={() => toggleCard('Allergies')}
       >
-        <div className="mb-4">
-          <button
-            type="button"
-            aria-pressed={nkdaSelected}
-            onClick={toggleNkda}
-            className={`w-full rounded-xl border px-4 py-3 text-sm font-bold transition md:w-auto ${
-              nkdaSelected
-                ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
-                : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100'
-            }`}
-          >
-            {nkdaSelected ? '✓ NKDA — No Known Drug Allergies' : 'NKDA — No Known Drug Allergies'}
-          </button>
-          <p className="mt-2 text-xs text-slate-500">
-            Selecting NKDA clears any documented medication allergies.
-          </p>
-        </div>
-
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
+          <div>
             <span className="mb-1 block text-sm font-semibold text-slate-700">
               Medication Allergies
             </span>
+            <button
+              type="button"
+              aria-pressed={nkdaSelected}
+              onClick={toggleNkda}
+              className={`mb-2 w-full rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                nkdaSelected
+                  ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:border-emerald-500 hover:bg-emerald-100'
+              }`}
+            >
+              {nkdaSelected
+                ? '✓ NKDA — No Known Drug Allergies'
+                : 'NKDA — No Known Drug Allergies'}
+            </button>
             <textarea
               value={patientForm.medicationAllergies}
               onChange={(event) =>
@@ -711,7 +707,10 @@ export default function PatientSection({
               }
               className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
             />
-          </label>
+            <p className="mt-2 text-xs text-slate-500">
+              Entering a medication allergy replaces this selection.
+            </p>
+          </div>
 
           <div>
             <span className="mb-1 block text-sm font-semibold text-slate-700">
