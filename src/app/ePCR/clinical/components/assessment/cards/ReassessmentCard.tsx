@@ -109,7 +109,7 @@ export default function ReassessmentCard({
             {group.label}
           </h4>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {group.options.map((option) => {
               const selected = value[group.field] === option;
 
@@ -118,7 +118,7 @@ export default function ReassessmentCard({
                   key={option}
                   type="button"
                   onClick={() => onChange(group.field, selected ? '' : option)}
-                  className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                  className={`min-w-0 whitespace-normal break-words rounded-xl border px-4 py-3 text-left text-sm font-semibold leading-snug transition ${
                     selected
                       ? 'border-slate-900 bg-slate-900 text-white'
                       : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
