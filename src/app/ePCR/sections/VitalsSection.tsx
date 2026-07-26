@@ -11,6 +11,7 @@ import type {
 import {
   createEmptyVitalSet,
   toLocalDateTimeValue,
+  updateVitalDraftField,
 } from '../clinical/vitals/vitals';
 
 type VitalsSectionProps = {
@@ -115,11 +116,7 @@ export default function VitalsSection({
     setVitalsForm((current) => ({
       ...current,
       draft: {
-        ...current.draft,
-        [field]: value,
-        ...(field === 'bloodPressureMethod' && value === 'Palpated'
-          ? { diastolic: '' }
-          : {}),
+        ...updateVitalDraftField(current.draft, field, value),
       },
     }));
   }
@@ -249,7 +246,7 @@ export default function VitalsSection({
                   <Metric label="SpO₂ %" value={set.spo2} previous={previous?.spo2} abnormal={isAbnormal('spo2', set.spo2, patientAge)} />
                   <Metric label="ETCO₂" value={set.etco2} previous={previous?.etco2} abnormal={set.etco2 ? isAbnormal('etco2', set.etco2, patientAge) : false} />
                   <Metric label="GCS" value={set.gcs} previous={previous?.gcs} abnormal={isAbnormal('gcs', set.gcs, patientAge)} />
-                  <Metric label="Temperature °F" value={set.temperature} previous={previous?.temperature} abnormal={isAbnormal('temperature', set.temperature, patientAge)} />
+                  <Metric label="Temperature °F / °C" value={set.temperature ? `${set.temperature} / ${set.temperatureCelsius || ((Number(set.temperature) - 32) * (5 / 9)).toFixed(1)}` : ''} previous={previous?.temperature} abnormal={set.temperature ? isAbnormal('temperature', set.temperature, patientAge) : false} />
                   <Metric label="SpCO % (Optional)" value={set.spco} previous={previous?.spco} abnormal={set.spco ? isAbnormal('spco', set.spco, patientAge) : false} />
                 </div>
 
@@ -257,7 +254,7 @@ export default function VitalsSection({
                   <div><strong>Pulse:</strong> {set.pulseQuality}</div>
                   <div><strong>Breathing:</strong> {set.respiratoryQuality}</div>
                   <div><strong>Skin:</strong> {set.skinColor}, {set.skinTemperature}, {set.skinMoisture}</div>
-                  <div><strong>Temperature route:</strong> {set.temperatureRoute}</div>
+                  <div><strong>Temperature route:</strong> {set.temperatureRoute || 'Not documented'}</div>
                   {(set.oxygenDevice || set.oxygenFlow || set.cardiacRhythm) && (
                     <div className="sm:col-span-2 lg:col-span-4 text-slate-600">
                       <strong>Context:</strong> {[set.oxygenDevice, set.oxygenFlow, set.cardiacRhythm].filter(Boolean).join(' · ')}
@@ -272,4 +269,3 @@ export default function VitalsSection({
     </div>
   );
 }
-

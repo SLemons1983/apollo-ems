@@ -20,6 +20,7 @@ import type {
 } from '../clinical/vitals/vitals';
 import {
   createEmptyVitalSet,
+  updateVitalDraftField,
   toLocalDateTimeValue as vitalTimeValue,
 } from '../clinical/vitals/vitals';
 
@@ -143,11 +144,7 @@ export default function QuickToolsPanel({
     onVitalsFormChange((current) => ({
       ...current,
       draft: {
-        ...current.draft,
-        [field]: value,
-        ...(field === 'bloodPressureMethod' && value === 'Palpated'
-          ? { diastolic: '' }
-          : {}),
+        ...updateVitalDraftField(current.draft, field, value),
       },
     }));
   }
