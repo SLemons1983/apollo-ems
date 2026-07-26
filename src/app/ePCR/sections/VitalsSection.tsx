@@ -12,6 +12,10 @@ import {
   createEmptyVitalSet,
   toLocalDateTimeValue,
   updateVitalDraftField,
+  getAciVitalAlerts,
+  getCategoricalVitalAssessment,
+  getNumericVitalAssessment,
+  type VitalAssessment,
 } from '../clinical/vitals/vitals';
 
 type VitalsSectionProps = {
@@ -31,35 +35,6 @@ function formatTime(value: string) {
 function numberValue(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getRange(
-  field: 'systolic' | 'heartRate' | 'respiratoryRate' | 'spo2' | 'etco2' | 'gcs' | 'temperature' | 'spco',
-  age: number | null,
-) {
-  const pediatric = age !== null && age < 13;
-  const ranges = {
-    systolic: pediatric ? [70, 120] : [90, 180],
-    heartRate: pediatric ? [70, 140] : [60, 100],
-    respiratoryRate: pediatric ? [18, 30] : [12, 20],
-    spo2: [94, 100],
-    etco2: [35, 45],
-    gcs: [15, 15],
-    temperature: [96.8, 100.4],
-    spco: [0, 3],
-  };
-  return ranges[field];
-}
-
-function isAbnormal(
-  field: Parameters<typeof getRange>[0],
-  value: string,
-  age: number | null,
-) {
-  const numeric = numberValue(value);
-  if (numeric === null) return false;
-  const [minimum, maximum] = getRange(field, age);
-  return numeric < minimum || numeric > maximum;
 }
 
 function Trend({
@@ -85,20 +60,65 @@ function Metric({
   label,
   value,
   previous,
-  abnormal,
+  assessment,
 }: {
   label: string;
   value: string;
   previous?: string;
-  abnormal?: boolean;
+  assessment?: VitalAssessment | null;
 }) {
+  const styles = {
+    normal: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+    mild: 'border-yellow-300 bg-yellow-50 text-yellow-900',
+    moderate: 'border-orange-300 bg-orange-50 text-orange-900',
+    critical: 'border-red-400 bg-red-50 text-red-900',
+  };
   return (
-    <div className={`rounded-lg border px-3 py-2 ${abnormal ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50'}`}>
+    <div title={assessment?.explanation} className={`rounded-lg border px-3 py-2 ${assessment ? styles[assessment.severity] : 'border-slate-200 bg-slate-50 text-slate-900'}`}>
       <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 flex items-center justify-between gap-2 text-lg font-black ${abnormal ? 'text-red-800' : 'text-slate-900'}`}>
+      <div className="mt-1 flex items-center justify-between gap-2 text-lg font-black">
         <span>{value || '—'}</span>
         <Trend current={value} previous={previous} />
       </div>
+      {assessment && assessment.severity !== 'normal' && (
+        <div className="mt-1 text-[11px] font-bold">{assessment.label}</div>
+      )}
+    </div>
+  );
+}
+
+const severityRank = { normal: 0, mild: 1, moderate: 2, critical: 3 };
+
+function highestAssessment(
+  ...items: Array<VitalAssessment | null>
+): VitalAssessment | null {
+  return items.reduce<VitalAssessment | null>(
+    (highest, item) =>
+      item && (!highest || severityRank[item.severity] > severityRank[highest.severity])
+        ? item
+        : highest,
+    null,
+  );
+}
+
+function Finding({ label, value }: { label: string; value: string }) {
+  const result = getCategoricalVitalAssessment(value);
+  const styles = {
+    normal: 'border-emerald-300 bg-emerald-50 text-emerald-900',
+    mild: 'border-yellow-300 bg-yellow-50 text-yellow-900',
+    moderate: 'border-orange-300 bg-orange-50 text-orange-900',
+    critical: 'border-red-400 bg-red-50 text-red-900',
+  };
+  return (
+    <div
+      title={result?.explanation}
+      className={`rounded-lg border px-3 py-2 ${result ? styles[result.severity] : 'border-slate-200 bg-slate-50 text-slate-900'}`}
+    >
+      <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 font-black">{value || '—'}</div>
+      {result && result.severity !== 'normal' && (
+        <div className="mt-1 text-[11px] font-bold">{result.label}</div>
+      )}
     </div>
   );
 }
@@ -226,6 +246,13 @@ export default function VitalsSection({
                 ? previous.systolic
                 : previous.systolic
               : undefined;
+            const alerts = getAciVitalAlerts(set, patientAge);
+            const bloodPressureAssessment = highestAssessment(
+              getNumericVitalAssessment('systolic', set.systolic, patientAge),
+              set.bloodPressureMethod === 'Auscultated'
+                ? getNumericVitalAssessment('diastolic', set.diastolic, patientAge)
+                : null,
+            );
 
             return (
               <article key={set.id} className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
@@ -240,27 +267,39 @@ export default function VitalsSection({
                 </header>
 
                 <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <Metric label={`BP (${set.bloodPressureMethod})`} value={bp} previous={previousBp} abnormal={isAbnormal('systolic', set.systolic, patientAge)} />
-                  <Metric label="Pulse" value={set.heartRate} previous={previous?.heartRate} abnormal={isAbnormal('heartRate', set.heartRate, patientAge)} />
-                  <Metric label="Respirations" value={set.respiratoryRate} previous={previous?.respiratoryRate} abnormal={isAbnormal('respiratoryRate', set.respiratoryRate, patientAge)} />
-                  <Metric label="SpO₂ %" value={set.spo2} previous={previous?.spo2} abnormal={isAbnormal('spo2', set.spo2, patientAge)} />
-                  <Metric label="ETCO₂" value={set.etco2} previous={previous?.etco2} abnormal={set.etco2 ? isAbnormal('etco2', set.etco2, patientAge) : false} />
-                  <Metric label="GCS" value={set.gcs} previous={previous?.gcs} abnormal={isAbnormal('gcs', set.gcs, patientAge)} />
-                  <Metric label="Temperature °F / °C" value={set.temperature ? `${set.temperature} / ${set.temperatureCelsius || ((Number(set.temperature) - 32) * (5 / 9)).toFixed(1)}` : ''} previous={previous?.temperature} abnormal={set.temperature ? isAbnormal('temperature', set.temperature, patientAge) : false} />
-                  <Metric label="SpCO % (Optional)" value={set.spco} previous={previous?.spco} abnormal={set.spco ? isAbnormal('spco', set.spco, patientAge) : false} />
+                  <Metric label={`BP (${set.bloodPressureMethod})`} value={bp} previous={previousBp} assessment={bloodPressureAssessment} />
+                  <Metric label="Pulse" value={set.heartRate} previous={previous?.heartRate} assessment={getNumericVitalAssessment('heartRate', set.heartRate, patientAge)} />
+                  <Metric label="Respirations" value={set.respiratoryRate} previous={previous?.respiratoryRate} assessment={getNumericVitalAssessment('respiratoryRate', set.respiratoryRate, patientAge)} />
+                  <Metric label="SpO₂ %" value={set.spo2} previous={previous?.spo2} assessment={getNumericVitalAssessment('spo2', set.spo2, patientAge)} />
+                  <Metric label="ETCO₂" value={set.etco2} previous={previous?.etco2} assessment={getNumericVitalAssessment('etco2', set.etco2, patientAge)} />
+                  <Metric label="GCS" value={set.gcs} previous={previous?.gcs} assessment={getNumericVitalAssessment('gcs', set.gcs, patientAge)} />
+                  <Metric label="Temperature °F / °C" value={set.temperature ? `${set.temperature} / ${set.temperatureCelsius || ((Number(set.temperature) - 32) * (5 / 9)).toFixed(1)}` : ''} previous={previous?.temperature} assessment={getNumericVitalAssessment('temperature', set.temperature, patientAge)} />
+                  <Metric label="SpCO % (Optional)" value={set.spco} previous={previous?.spco} assessment={getNumericVitalAssessment('spco', set.spco, patientAge)} />
                 </div>
 
-                <div className="grid gap-3 border-t border-slate-200 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <div><strong>Pulse:</strong> {set.pulseQuality}</div>
-                  <div><strong>Breathing:</strong> {set.respiratoryQuality}</div>
-                  <div><strong>Skin:</strong> {set.skinColor}, {set.skinTemperature}, {set.skinMoisture}</div>
-                  <div><strong>Temperature route:</strong> {set.temperatureRoute || 'Not documented'}</div>
+                <div className="grid gap-2 border-t border-slate-200 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                  <Finding label="Pulse Quality" value={set.pulseQuality} />
+                  <Finding label="Respiratory Quality" value={set.respiratoryQuality} />
+                  <Finding label="Skin Color" value={set.skinColor} />
+                  <Finding label="Skin Temperature" value={set.skinTemperature} />
+                  <Finding label="Skin Moisture" value={set.skinMoisture} />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-2 lg:col-span-5"><strong>Temperature route:</strong> {set.temperatureRoute || 'Not documented'}</div>
                   {(set.oxygenDevice || set.oxygenFlow || set.cardiacRhythm) && (
-                    <div className="sm:col-span-2 lg:col-span-4 text-slate-600">
+                    <div className="sm:col-span-2 lg:col-span-5 text-slate-600">
                       <strong>Context:</strong> {[set.oxygenDevice, set.oxygenFlow, set.cardiacRhythm].filter(Boolean).join(' · ')}
                     </div>
                   )}
                 </div>
+                {alerts.length > 0 && (
+                  <div className="space-y-2 border-t border-indigo-200 bg-indigo-50 px-4 py-3">
+                    <div className="text-xs font-black uppercase tracking-wide text-indigo-900">Apollo Clinical Intelligence</div>
+                    {alerts.map((alert) => (
+                      <div key={alert.id} className={`rounded-lg border px-3 py-2 text-sm ${alert.severity === 'critical' ? 'border-red-300 bg-red-50 text-red-900' : 'border-orange-300 bg-orange-50 text-orange-900'}`}>
+                        <strong>{alert.severity === 'critical' ? '🔴' : '🟠'} {alert.label}:</strong> {alert.explanation}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </article>
             );
           })}

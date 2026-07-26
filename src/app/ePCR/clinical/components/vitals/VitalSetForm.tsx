@@ -8,6 +8,8 @@ import {
   getVitalRequiredValues,
   getVitalFieldError,
   getVitalValidationErrors,
+  getNumericVitalAssessment,
+  getCategoricalVitalAssessment,
   isVitalSetComplete,
   toLocalDateTimeValue,
 } from '../../vitals/vitals';
@@ -21,9 +23,10 @@ type VitalSetFormProps = {
   onCancel: () => void;
 };
 
-const pulseQualities = ['Strong', 'Weak', 'Bounding', 'Thready', 'Irregular'];
+const pulseQualities = ['Strong', 'Normal', 'Slightly weak', 'Weak', 'Bounding', 'Thready', 'Absent'];
 const respiratoryQualities = [
   'Normal',
+  'Slightly labored',
   'Shallow',
   'Labored',
   'Agonal',
@@ -36,9 +39,9 @@ const temperatureRoutes = [
   'Axillary',
   'Rectal',
 ];
-const skinColors = ['Normal', 'Pale', 'Cyanotic', 'Flushed', 'Jaundiced'];
+const skinColors = ['Pink', 'Appropriate for ethnicity', 'Pale', 'Flushed', 'Jaundiced', 'Cyanotic', 'Mottled', 'Ashen'];
 const skinTemperatures = ['Warm', 'Cool', 'Cold', 'Hot'];
-const skinMoistures = ['Dry', 'Moist', 'Diaphoretic'];
+const skinMoistures = ['Dry', 'Moist', 'Diaphoretic', 'Profuse diaphoresis'];
 const oxygenDevices = [
   'Room Air',
   'Nasal Cannula',
@@ -80,6 +83,12 @@ const inputClass =
   'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100';
 const invalidInputClass =
   'border-red-400 bg-red-50 text-red-950 focus:border-red-500 focus:ring-red-100';
+const severityClasses = {
+  normal: 'border-emerald-400 bg-emerald-50 text-emerald-950 focus:border-emerald-500 focus:ring-emerald-100',
+  mild: 'border-yellow-400 bg-yellow-50 text-yellow-950 focus:border-yellow-500 focus:ring-yellow-100',
+  moderate: 'border-orange-400 bg-orange-50 text-orange-950 focus:border-orange-500 focus:ring-orange-100',
+  critical: 'border-red-500 bg-red-50 text-red-950 focus:border-red-600 focus:ring-red-100',
+};
 
 export default function VitalSetForm({
   value,
@@ -95,8 +104,23 @@ export default function VitalSetForm({
     (item) => item.trim() !== '',
   ).length;
   const validationErrors = getVitalValidationErrors(value);
-  const numericClass = (field: keyof VitalSetDraft) =>
-    `${inputClass} ${getVitalFieldError(value, field) ? invalidInputClass : ''}`;
+  const assessmentFor = (field: Parameters<typeof getNumericVitalAssessment>[0]) =>
+    getNumericVitalAssessment(field, value[field], null);
+  const numericClass = (field: keyof VitalSetDraft) => {
+    const error = getVitalFieldError(value, field);
+    const assessment = field === 'temperatureCelsius'
+      ? assessmentFor('temperature')
+      : ['systolic', 'diastolic', 'heartRate', 'respiratoryRate', 'spo2', 'spco', 'etco2', 'temperature', 'gcs'].includes(field)
+        ? assessmentFor(field as Parameters<typeof getNumericVitalAssessment>[0])
+        : null;
+    return `${inputClass} ${error ? invalidInputClass : assessment ? severityClasses[assessment.severity] : ''}`;
+  };
+  const selectClass = (field: 'pulseQuality' | 'respiratoryQuality' | 'skinColor' | 'skinTemperature' | 'skinMoisture') => {
+    const finding = getCategoricalVitalAssessment(value[field]);
+    return `${inputClass} ${finding ? severityClasses[finding.severity] : ''}`;
+  };
+  const findingTitle = (field: 'pulseQuality' | 'respiratoryQuality' | 'skinColor' | 'skinTemperature' | 'skinMoisture') =>
+    getCategoricalVitalAssessment(value[field])?.explanation;
 
   return (
     <div className="space-y-5">
@@ -208,8 +232,9 @@ export default function VitalSetForm({
         <Field label="Pulse Quality" required>
           <select
             value={value.pulseQuality}
+            title={findingTitle('pulseQuality')}
             onChange={(event) => onChange('pulseQuality', event.target.value)}
-            className={inputClass}
+            className={selectClass('pulseQuality')}
           >
             <option value="">Select</option>
             {pulseQualities.map((option) => <option key={option}>{option}</option>)}
@@ -233,10 +258,11 @@ export default function VitalSetForm({
         <Field label="Respiratory Quality" required>
           <select
             value={value.respiratoryQuality}
+            title={findingTitle('respiratoryQuality')}
             onChange={(event) =>
               onChange('respiratoryQuality', event.target.value)
             }
-            className={inputClass}
+            className={selectClass('respiratoryQuality')}
           >
             <option value="">Select</option>
             {respiratoryQualities.map((option) => <option key={option}>{option}</option>)}
@@ -333,8 +359,9 @@ export default function VitalSetForm({
         <Field label="Skin Color" required>
           <select
             value={value.skinColor}
+            title={findingTitle('skinColor')}
             onChange={(event) => onChange('skinColor', event.target.value)}
-            className={inputClass}
+            className={selectClass('skinColor')}
           >
             <option value="">Select</option>
             {skinColors.map((option) => <option key={option}>{option}</option>)}
@@ -344,10 +371,11 @@ export default function VitalSetForm({
         <Field label="Skin Temperature" required>
           <select
             value={value.skinTemperature}
+            title={findingTitle('skinTemperature')}
             onChange={(event) =>
               onChange('skinTemperature', event.target.value)
             }
-            className={inputClass}
+            className={selectClass('skinTemperature')}
           >
             <option value="">Select</option>
             {skinTemperatures.map((option) => <option key={option}>{option}</option>)}
@@ -357,8 +385,9 @@ export default function VitalSetForm({
         <Field label="Skin Moisture" required>
           <select
             value={value.skinMoisture}
+            title={findingTitle('skinMoisture')}
             onChange={(event) => onChange('skinMoisture', event.target.value)}
-            className={inputClass}
+            className={selectClass('skinMoisture')}
           >
             <option value="">Select</option>
             {skinMoistures.map((option) => <option key={option}>{option}</option>)}
