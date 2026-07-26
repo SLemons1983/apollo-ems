@@ -354,6 +354,52 @@ export function getCategoricalVitalAssessment(value: string) {
   return categoricalSeverity[value] ?? null;
 }
 
+const vitalSeverityRank: Record<VitalSeverity, number> = {
+  normal: 0,
+  mild: 1,
+  moderate: 2,
+  critical: 3,
+};
+
+export function getVitalSetAssessment(
+  vital: VitalSetDraft,
+  patientAge: number | null,
+): VitalAssessment | null {
+  const assessments = [
+    getNumericVitalAssessment('systolic', vital.systolic, patientAge),
+    vital.bloodPressureMethod === 'Auscultated'
+      ? getNumericVitalAssessment('diastolic', vital.diastolic, patientAge)
+      : null,
+    getNumericVitalAssessment('heartRate', vital.heartRate, patientAge),
+    getNumericVitalAssessment(
+      'respiratoryRate',
+      vital.respiratoryRate,
+      patientAge,
+    ),
+    getNumericVitalAssessment('spo2', vital.spo2, patientAge),
+    getNumericVitalAssessment('spco', vital.spco, patientAge),
+    getNumericVitalAssessment('etco2', vital.etco2, patientAge),
+    getNumericVitalAssessment('gcs', vital.gcs, patientAge),
+    getNumericVitalAssessment('temperature', vital.temperature, patientAge),
+    getCategoricalVitalAssessment(vital.pulseQuality),
+    getCategoricalVitalAssessment(vital.respiratoryQuality),
+    getCategoricalVitalAssessment(vital.skinColor),
+    getCategoricalVitalAssessment(vital.skinTemperature),
+    getCategoricalVitalAssessment(vital.skinMoisture),
+  ];
+
+  return assessments.reduce<VitalAssessment | null>(
+    (highest, current) =>
+      current &&
+      (!highest ||
+        vitalSeverityRank[current.severity] >
+          vitalSeverityRank[highest.severity])
+        ? current
+        : highest,
+    null,
+  );
+}
+
 export function getAciVitalAlerts(
   vital: VitalSetDraft,
   patientAge: number | null,

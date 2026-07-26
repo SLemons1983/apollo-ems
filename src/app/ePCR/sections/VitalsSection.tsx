@@ -1,6 +1,12 @@
 'use client';
 
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import VitalSetForm from '../clinical/components/vitals/VitalSetForm';
 import type {
   ProviderScope,
@@ -12,9 +18,9 @@ import {
   createEmptyVitalSet,
   toLocalDateTimeValue,
   updateVitalDraftField,
-  getAciVitalAlerts,
   getCategoricalVitalAssessment,
   getNumericVitalAssessment,
+  getVitalSetAssessment,
   type VitalAssessment,
 } from '../clinical/vitals/vitals';
 
@@ -130,7 +136,30 @@ export default function VitalsSection({
   patientAge,
 }: VitalsSectionProps) {
   const [editorOpen, setEditorOpen] = useState(false);
+  const [expandedSetIds, setExpandedSetIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const sets = vitalsForm.sets;
+  const knownSetIds = useRef(new Set(sets.map((set) => set.id)));
+
+  useEffect(() => {
+    const currentIds = new Set(sets.map((set) => set.id));
+    const addedIds = sets
+      .map((set) => set.id)
+      .filter((setId) => !knownSetIds.current.has(setId));
+
+    if (addedIds.length > 0) {
+      setExpandedSetIds((current) => {
+        const next = new Set(
+          [...current].filter((setId) => currentIds.has(setId)),
+        );
+        addedIds.forEach((setId) => next.add(setId));
+        return next;
+      });
+    }
+
+    knownSetIds.current = currentIds;
+  }, [sets]);
 
   function updateDraft(field: keyof VitalSetDraft, value: string) {
     setVitalsForm((current) => ({
@@ -187,7 +216,20 @@ export default function VitalsSection({
       draft: createEmptyVitalSet(),
       sets: [...current.sets, record],
     }));
+    setExpandedSetIds((current) => new Set(current).add(record.id));
     setEditorOpen(false);
+  }
+
+  function toggleSet(setId: string) {
+    setExpandedSetIds((current) => {
+      const next = new Set(current);
+      if (next.has(setId)) {
+        next.delete(setId);
+      } else {
+        next.add(setId);
+      }
+      return next;
+    });
   }
 
   return (
@@ -246,7 +288,8 @@ export default function VitalsSection({
                 ? previous.systolic
                 : previous.systolic
               : undefined;
-            const alerts = getAciVitalAlerts(set, patientAge);
+            const expanded = expandedSetIds.has(set.id);
+            const setAssessment = getVitalSetAssessment(set, patientAge);
             const bloodPressureAssessment = highestAssessment(
               getNumericVitalAssessment('systolic', set.systolic, patientAge),
               set.bloodPressureMethod === 'Auscultated'
@@ -254,19 +297,76 @@ export default function VitalsSection({
                 : null,
             );
 
-            return (
-              <article key={set.id} className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
-                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                  <div>
-                    <h4 className="font-black text-slate-900">Vital Set #{index + 1}</h4>
-                    <p className="text-xs font-semibold text-slate-500">{formatTime(set.recordedAt)}</p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${set.source === 'Device Imported' ? 'bg-sky-100 text-sky-800' : 'bg-slate-200 text-slate-700'}`}>
-                    {set.source}
-                  </span>
-                </header>
+            const cardStyles = {
+              normal: 'border-emerald-300',
+              mild: 'border-yellow-300',
+              moderate: 'border-orange-400',
+              critical: 'border-red-400',
+            };
+            const headerStyles = {
+              normal: 'border-emerald-200 bg-emerald-50 text-emerald-950',
+              mild: 'border-yellow-200 bg-yellow-50 text-yellow-950',
+              moderate: 'border-orange-300 bg-orange-50 text-orange-950',
+              critical: 'border-red-300 bg-red-50 text-red-950',
+            };
+            const compactSummary = [
+              `BP ${bp}`,
+              `HR ${set.heartRate || '—'}`,
+              `RR ${set.respiratoryRate || '—'}`,
+              `SpO₂ ${set.spo2 ? `${set.spo2}%` : '—'}`,
+            ].join(' · ');
 
-                <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            return (
+              <article
+                key={set.id}
+                className={`overflow-hidden rounded-xl border bg-white shadow-sm ${
+                  setAssessment
+                    ? cardStyles[setAssessment.severity]
+                    : 'border-slate-300'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleSet(set.id)}
+                  aria-expanded={expanded}
+                  aria-controls={`vital-set-${set.id}`}
+                  className={`flex w-full flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-left transition hover:brightness-[0.98] ${
+                    setAssessment
+                      ? headerStyles[setAssessment.severity]
+                      : 'border-slate-200 bg-slate-50 text-slate-950'
+                  }`}
+                >
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-black">Vital Set #{index + 1}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+                        set.source === 'Device Imported'
+                          ? 'bg-sky-100 text-sky-800'
+                          : 'bg-white/80 text-slate-700'
+                      }`}>
+                        {set.source}
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-xs font-semibold opacity-70">
+                      {formatTime(set.recordedAt)}
+                    </span>
+                    <span className="mt-1 block text-xs font-bold sm:text-sm">
+                      {compactSummary}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wide opacity-70">
+                      {setAssessment?.severity ?? 'Not classified'}
+                    </span>
+                    <span aria-hidden="true" className="text-sm font-black">
+                      {expanded ? '▲' : '▼'}
+                    </span>
+                  </span>
+                </button>
+
+                {expanded && (
+                  <div id={`vital-set-${set.id}`}>
+                    <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Metric label={`BP (${set.bloodPressureMethod})`} value={bp} previous={previousBp} assessment={bloodPressureAssessment} />
                   <Metric label="Pulse" value={set.heartRate} previous={previous?.heartRate} assessment={getNumericVitalAssessment('heartRate', set.heartRate, patientAge)} />
                   <Metric label="Respirations" value={set.respiratoryRate} previous={previous?.respiratoryRate} assessment={getNumericVitalAssessment('respiratoryRate', set.respiratoryRate, patientAge)} />
@@ -275,9 +375,9 @@ export default function VitalsSection({
                   <Metric label="GCS" value={set.gcs} previous={previous?.gcs} assessment={getNumericVitalAssessment('gcs', set.gcs, patientAge)} />
                   <Metric label="Temperature °F / °C" value={set.temperature ? `${set.temperature} / ${set.temperatureCelsius || ((Number(set.temperature) - 32) * (5 / 9)).toFixed(1)}` : ''} previous={previous?.temperature} assessment={getNumericVitalAssessment('temperature', set.temperature, patientAge)} />
                   <Metric label="SpCO % (Optional)" value={set.spco} previous={previous?.spco} assessment={getNumericVitalAssessment('spco', set.spco, patientAge)} />
-                </div>
+                    </div>
 
-                <div className="grid gap-2 border-t border-slate-200 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid gap-2 border-t border-slate-200 px-4 py-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                   <Finding label="Pulse Quality" value={set.pulseQuality} />
                   <Finding label="Respiratory Quality" value={set.respiratoryQuality} />
                   <Finding label="Skin Color" value={set.skinColor} />
@@ -289,15 +389,7 @@ export default function VitalsSection({
                       <strong>Context:</strong> {[set.oxygenDevice, set.oxygenFlow, set.cardiacRhythm].filter(Boolean).join(' · ')}
                     </div>
                   )}
-                </div>
-                {alerts.length > 0 && (
-                  <div className="space-y-2 border-t border-indigo-200 bg-indigo-50 px-4 py-3">
-                    <div className="text-xs font-black uppercase tracking-wide text-indigo-900">Apollo Clinical Intelligence</div>
-                    {alerts.map((alert) => (
-                      <div key={alert.id} className={`rounded-lg border px-3 py-2 text-sm ${alert.severity === 'critical' ? 'border-red-300 bg-red-50 text-red-900' : 'border-orange-300 bg-orange-50 text-orange-900'}`}>
-                        <strong>{alert.severity === 'critical' ? '🔴' : '🟠'} {alert.label}:</strong> {alert.explanation}
-                      </div>
-                    ))}
+                    </div>
                   </div>
                 )}
               </article>

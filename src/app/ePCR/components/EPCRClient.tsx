@@ -38,6 +38,7 @@ import {
 } from '../utils';
 import {
   createDefaultVitalsForm,
+  getAciVitalAlerts,
   getVitalsProgress,
   mergeVitalsWithDefaults,
   type VitalsForm,
@@ -262,7 +263,7 @@ export default function EPCRClient() {
   const hasGfastDocumentation = Object.values(
     assessmentForm.clinical.gfast,
   ).some(Boolean);
-  const clinicalIntelligenceFeedback =
+  const protocolClinicalIntelligenceFeedback =
     callForm.lemsa === 'CCEMSA' &&
     (complaintForm.suspectedStrokeCva === 'Yes' || hasGfastDocumentation)
       ? getCcemsaGfastConsiderations({
@@ -274,6 +275,25 @@ export default function EPCRClient() {
           bloodGlucose: assessmentForm.clinical.gfast.bloodGlucose,
         })
       : [];
+  const vitalClinicalIntelligenceFeedback = useMemo(
+    () =>
+      vitalsForm.sets.flatMap((vitalSet, index) =>
+        getAciVitalAlerts(vitalSet, patientAge).map((alert) => ({
+          id: `vital-${vitalSet.id}-${alert.id}`,
+          severity: alert.severity,
+          message: `Vital Set #${index + 1}: ${alert.label} — ${alert.explanation}`,
+        })),
+      ),
+    [patientAge, vitalsForm.sets],
+  );
+  const clinicalIntelligenceFeedback = [
+    ...protocolClinicalIntelligenceFeedback.map((message, index) => ({
+      id: `protocol-${index}-${message}`,
+      severity: 'protocol' as const,
+      message,
+    })),
+    ...vitalClinicalIntelligenceFeedback,
+  ];
 
   const callRequiredFields = useMemo(
     () => getCallRequiredFields(callForm),
@@ -1163,16 +1183,37 @@ export default function EPCRClient() {
               </div>
 
               <div className="max-h-36 overflow-y-auto px-4 py-3">
-                {!callForm.lemsa ? (
+                {!callForm.lemsa &&
+                vitalClinicalIntelligenceFeedback.length === 0 ? (
                   <p className="text-sm font-semibold text-amber-900">
                     No protocol references are active. Select the applicable
                     LEMSA in Crew Information.
                   </p>
                 ) : clinicalIntelligenceFeedback.length > 0 ? (
                   <div className="space-y-1.5">
+                    {!callForm.lemsa && (
+                      <p className="text-sm font-semibold text-amber-900">
+                        No protocol references are active. Select the applicable
+                        LEMSA in Crew Information.
+                      </p>
+                    )}
                     {clinicalIntelligenceFeedback.map((feedback) => (
-                      <p key={feedback} className="text-sm text-amber-950">
-                        • {feedback}
+                      <p
+                        key={feedback.id}
+                        className={
+                          feedback.severity === 'critical'
+                            ? 'text-sm font-semibold text-red-900'
+                            : feedback.severity === 'moderate'
+                              ? 'text-sm font-semibold text-orange-900'
+                              : 'text-sm text-amber-950'
+                        }
+                      >
+                        {feedback.severity === 'critical'
+                          ? '🔴'
+                          : feedback.severity === 'moderate'
+                            ? '🟠'
+                            : '•'}{' '}
+                        {feedback.message}
                       </p>
                     ))}
                   </div>
