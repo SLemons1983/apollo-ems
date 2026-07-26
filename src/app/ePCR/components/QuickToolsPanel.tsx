@@ -30,8 +30,6 @@ type QuickToolsPanelProps = {
   vitalsForm: VitalsForm;
   onVitalsFormChange: Dispatch<SetStateAction<VitalsForm>>;
   providerScope: ProviderScope;
-  treatmentCount: number;
-  onAddTreatment: () => void;
 };
 
 function toLocalDateTimeValue(date = new Date()) {
@@ -55,8 +53,6 @@ export default function QuickToolsPanel({
   vitalsForm,
   onVitalsFormChange,
   providerScope,
-  treatmentCount,
-  onAddTreatment,
 }: QuickToolsPanelProps) {
   const [reassessmentOpen, setReassessmentOpen] = useState(false);
   const [vitalsOpen, setVitalsOpen] = useState(false);
@@ -282,24 +278,6 @@ export default function QuickToolsPanel({
             />
           </div>
         )}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-emerald-200 bg-white">
-        <button
-          type="button"
-          onClick={onAddTreatment}
-          className="flex w-full items-start justify-between gap-3 p-4 text-left hover:bg-emerald-50"
-        >
-          <div>
-            <h3 className="font-bold text-slate-900">Add Treatment</h3>
-            <p className="mt-1 text-sm leading-5 text-slate-600">
-              Open the protocol-guided treatment workflow and document care immediately.
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800">
-            {treatmentCount}
-          </span>
-        </button>
       </div>
 
       {[

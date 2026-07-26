@@ -16,7 +16,6 @@ import AssessmentSection from '../sections/AssessmentSection';
 import CallSection from '../sections/CallSection';
 import ComplaintSection from '../sections/ComplaintSection';
 import PatientSection from '../sections/PatientSection';
-import TreatmentsSection from '../sections/TreatmentsSection';
 import VitalsSection from '../sections/VitalsSection';
 import type { CallForm, ComplaintForm, PatientForm } from '../types';
 import {
@@ -44,13 +43,6 @@ import {
   mergeVitalsWithDefaults,
   type VitalsForm,
 } from '../clinical/vitals/vitals';
-import {
-  createDefaultTreatmentsForm,
-  getTreatmentAlerts,
-  getTreatmentsProgress,
-  mergeTreatmentsWithDefaults,
-  type TreatmentsForm,
-} from '../clinical/treatments/treatments';
 
 const sections = [
   'Call',
@@ -229,10 +221,6 @@ export default function EPCRClient() {
   const [vitalsForm, setVitalsForm] = useState<VitalsForm>(() =>
     createDefaultVitalsForm(),
   );
-  const [treatmentsForm, setTreatmentsForm] = useState<TreatmentsForm>(() =>
-    createDefaultTreatmentsForm(),
-  );
-  const [quickAddTreatmentRequest, setQuickAddTreatmentRequest] = useState(0);
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
     totalFields: 0,
@@ -298,10 +286,6 @@ export default function EPCRClient() {
       ),
     [patientAge, vitalsForm.sets],
   );
-  const treatmentClinicalIntelligenceFeedback = useMemo(
-    () => getTreatmentAlerts(treatmentsForm),
-    [treatmentsForm],
-  );
   const clinicalIntelligenceFeedback = [
     ...protocolClinicalIntelligenceFeedback.map((message, index) => ({
       id: `protocol-${index}-${message}`,
@@ -309,7 +293,6 @@ export default function EPCRClient() {
       message,
     })),
     ...vitalClinicalIntelligenceFeedback,
-    ...treatmentClinicalIntelligenceFeedback,
   ];
 
   const callRequiredFields = useMemo(
@@ -651,7 +634,6 @@ export default function EPCRClient() {
     vitalsForm,
     documentingProviderScope,
   );
-  const treatmentsProgress = getTreatmentsProgress(treatmentsForm);
 
   const progressSections = [
     {
@@ -690,18 +672,6 @@ export default function EPCRClient() {
         },
       ],
     },
-    {
-      title: 'Treatments',
-      completedFields: treatmentsProgress.completedFields,
-      totalFields: treatmentsProgress.totalFields,
-      tasks: [
-        {
-          title: 'Protocol and Treatment Documentation',
-          completedFields: treatmentsProgress.completedFields,
-          totalFields: treatmentsProgress.totalFields,
-        },
-      ],
-    },
     ...sections
       .filter(
         (section) =>
@@ -709,8 +679,7 @@ export default function EPCRClient() {
           section !== 'Patient' &&
           section !== 'Complaint' &&
           section !== 'Assessment' &&
-          section !== 'Vitals' &&
-          section !== 'Treatments',
+          section !== 'Vitals',
       )
       .map((section) => ({
         title: section,
@@ -731,7 +700,6 @@ export default function EPCRClient() {
         complaint: complaintForm,
         assessment: assessmentForm,
         vitals: vitalsForm,
-        treatments: treatmentsForm,
       },
     };
 
@@ -769,14 +737,12 @@ export default function EPCRClient() {
           complaint?: ComplaintForm;
           assessment?: AssessmentForm;
           vitals?: VitalsForm;
-          treatments?: TreatmentsForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
         complaintForm?: ComplaintForm;
         assessmentForm?: AssessmentForm;
         vitalsForm?: VitalsForm;
-        treatmentsForm?: TreatmentsForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
@@ -790,8 +756,6 @@ export default function EPCRClient() {
         parsed.chart?.assessment ?? parsed.assessmentForm;
       const uploadedVitalsForm =
         parsed.chart?.vitals ?? parsed.vitalsForm;
-      const uploadedTreatmentsForm =
-        parsed.chart?.treatments ?? parsed.treatmentsForm;
 
       if (
         parsed.fileType !== 'ApolloEMS Mock ePCR' ||
@@ -840,9 +804,6 @@ export default function EPCRClient() {
         mergeAssessmentWithDefaults(uploadedAssessmentForm),
       );
       setVitalsForm(mergeVitalsWithDefaults(uploadedVitalsForm));
-      setTreatmentsForm(
-        mergeTreatmentsWithDefaults(uploadedTreatmentsForm),
-      );
       setExpandedSection(parsed.expandedSection || 'Call');
       setFileStatus('PCR uploaded successfully.');
     } catch (error) {
@@ -1042,19 +1003,6 @@ export default function EPCRClient() {
                         providerScope={documentingProviderScope}
                         patientAge={patientAge}
                       />
-                    ) : section === 'Treatments' ? (
-                      <TreatmentsSection
-                        treatmentsForm={treatmentsForm}
-                        setTreatmentsForm={setTreatmentsForm}
-                        patientForm={patientForm}
-                        complaintForm={complaintForm}
-                        documentingProviderName={
-                          callForm.crewMembers.find(
-                            (member) => member.isDocumentingPcr,
-                          )?.name ?? callForm.pcrDocumentedBy
-                        }
-                        quickAddRequest={quickAddTreatmentRequest}
-                      />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
                         {section} cards will be added here.
@@ -1091,11 +1039,6 @@ export default function EPCRClient() {
                       vitalsForm={vitalsForm}
                       onVitalsFormChange={setVitalsForm}
                       providerScope={documentingProviderScope}
-                      treatmentCount={treatmentsForm.records.length}
-                      onAddTreatment={() => {
-                        setExpandedSection('Treatments');
-                        setQuickAddTreatmentRequest((request) => request + 1);
-                      }}
                     />
                   </div>
                 </div>
@@ -1161,19 +1104,6 @@ export default function EPCRClient() {
                       setVitalsForm={setVitalsForm}
                       providerScope={documentingProviderScope}
                       patientAge={patientAge}
-                    />
-                  ) : section === 'Treatments' ? (
-                    <TreatmentsSection
-                      treatmentsForm={treatmentsForm}
-                      setTreatmentsForm={setTreatmentsForm}
-                      patientForm={patientForm}
-                      complaintForm={complaintForm}
-                      documentingProviderName={
-                        callForm.crewMembers.find(
-                          (member) => member.isDocumentingPcr,
-                        )?.name ?? callForm.pcrDocumentedBy
-                      }
-                      quickAddRequest={quickAddTreatmentRequest}
                     />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
@@ -1345,12 +1275,6 @@ export default function EPCRClient() {
                     vitalsForm={vitalsForm}
                     onVitalsFormChange={setVitalsForm}
                     providerScope={documentingProviderScope}
-                    treatmentCount={treatmentsForm.records.length}
-                    onAddTreatment={() => {
-                      setExpandedSection('Treatments');
-                      setQuickAddTreatmentRequest((request) => request + 1);
-                      setMobileDrawer(null);
-                    }}
                   />
                 )}
               </div>
