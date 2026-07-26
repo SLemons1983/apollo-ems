@@ -11,10 +11,24 @@ import ReassessmentCard, {
   type ReassessmentRecord,
 } from '../clinical/components/assessment/cards/ReassessmentCard';
 import type { AssessmentForm } from '../clinical/assessment/assessmentForm';
+import VitalSetForm from '../clinical/components/vitals/VitalSetForm';
+import type {
+  ProviderScope,
+  VitalSetDraft,
+  VitalSetRecord,
+  VitalsForm,
+} from '../clinical/vitals/vitals';
+import {
+  createEmptyVitalSet,
+  toLocalDateTimeValue as vitalTimeValue,
+} from '../clinical/vitals/vitals';
 
 type QuickToolsPanelProps = {
   assessmentForm: AssessmentForm;
   onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
+  vitalsForm: VitalsForm;
+  onVitalsFormChange: Dispatch<SetStateAction<VitalsForm>>;
+  providerScope: ProviderScope;
 };
 
 function toLocalDateTimeValue(date = new Date()) {
@@ -35,8 +49,12 @@ function formatReassessmentTime(value: string) {
 export default function QuickToolsPanel({
   assessmentForm,
   onAssessmentFormChange,
+  vitalsForm,
+  onVitalsFormChange,
+  providerScope,
 }: QuickToolsPanelProps) {
   const [reassessmentOpen, setReassessmentOpen] = useState(false);
+  const [vitalsOpen, setVitalsOpen] = useState(false);
   const reassessmentDraft = assessmentForm.clinical.reassessment;
   const reassessments = assessmentForm.clinical.reassessments;
 
@@ -112,6 +130,51 @@ export default function QuickToolsPanel({
     reassessmentDraft.transportPriority,
   ];
   const saveDisabled = requiredValues.some((value) => !value);
+
+  function openNewVitals() {
+    onVitalsFormChange((current) => ({
+      ...current,
+      draft: createEmptyVitalSet(vitalTimeValue()),
+    }));
+    setVitalsOpen(true);
+  }
+
+  function updateVitalDraft(field: keyof VitalSetDraft, value: string) {
+    onVitalsFormChange((current) => ({
+      ...current,
+      draft: {
+        ...current.draft,
+        [field]: value,
+        ...(field === 'bloodPressureMethod' && value === 'Palpated'
+          ? { diastolic: '' }
+          : {}),
+      },
+    }));
+  }
+
+  function cancelVitals() {
+    onVitalsFormChange((current) => ({
+      ...current,
+      draft: createEmptyVitalSet(),
+    }));
+    setVitalsOpen(false);
+  }
+
+  function saveVitals() {
+    const record: VitalSetRecord = {
+      ...vitalsForm.draft,
+      id:
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `vital-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    };
+    onVitalsFormChange((current) => ({
+      draft: createEmptyVitalSet(),
+      sets: [...current.sets, record],
+    }));
+    setVitalsOpen(false);
+  }
 
   return (
     <div className="space-y-3">
@@ -190,8 +253,37 @@ export default function QuickToolsPanel({
         </div>
       )}
 
+      <div className="overflow-hidden rounded-xl border border-sky-200 bg-white">
+        <button
+          type="button"
+          onClick={vitalsOpen ? () => setVitalsOpen(false) : openNewVitals}
+          className="flex w-full items-start justify-between gap-3 p-4 text-left hover:bg-sky-50"
+        >
+          <div>
+            <h3 className="font-bold text-slate-900">Quick Vitals</h3>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              Add a complete vital-sign set directly to the central Vitals timeline.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-800">
+            {vitalsForm.sets.length}
+          </span>
+        </button>
+        {vitalsOpen && (
+          <div className="border-t border-sky-200 p-4">
+            <VitalSetForm
+              value={vitalsForm.draft}
+              providerScope={providerScope}
+              compact
+              onChange={updateVitalDraft}
+              onSave={saveVitals}
+              onCancel={cancelVitals}
+            />
+          </div>
+        )}
+      </div>
+
       {[
-        ['Quick Vitals', 'Rapidly add a new vital-sign set without leaving the current section.'],
         ['Dosing Calculator', 'Weight-based medication and infusion calculations.'],
         ['Clinical Timer', 'Track CPR, stroke, medication, contraction, or procedure times.'],
       ].map(([title, description]) => (

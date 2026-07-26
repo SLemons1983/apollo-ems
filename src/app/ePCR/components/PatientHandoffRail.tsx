@@ -4,11 +4,13 @@ import type {
   PatientForm,
 } from '../types';
 import { calculatePatientAge } from '../utils';
+import type { VitalsForm } from '../clinical/vitals/vitals';
 
 type PatientHandoffRailProps = {
   callForm: CallForm;
   patientForm: PatientForm;
   complaintForm: ComplaintForm;
+  vitalsForm: VitalsForm;
 };
 
 function displayValue(
@@ -153,7 +155,9 @@ export default function PatientHandoffRail({
   callForm,
   patientForm,
   complaintForm,
+  vitalsForm,
 }: PatientHandoffRailProps) {
+  const latestVitals = vitalsForm.sets[vitalsForm.sets.length - 1];
   return (
     <aside className="lg:sticky lg:top-4 lg:self-start">
       <div className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
@@ -253,9 +257,25 @@ export default function PatientHandoffRail({
             Last Set of Vitals
           </div>
 
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm font-semibold text-slate-500">
-            No vitals documented
-          </div>
+          {latestVitals ? (
+            <div className="grid grid-cols-2 gap-2">
+              <ScoreTile
+                label="BP"
+                value={
+                  latestVitals.bloodPressureMethod === 'Palpated'
+                    ? `${latestVitals.systolic}/P`
+                    : `${latestVitals.systolic}/${latestVitals.diastolic}`
+                }
+              />
+              <ScoreTile label="Pulse" value={latestVitals.heartRate} />
+              <ScoreTile label="Resp" value={latestVitals.respiratoryRate} />
+              <ScoreTile label="SpO₂" value={`${latestVitals.spo2}%`} />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm font-semibold text-slate-500">
+              No vitals documented
+            </div>
+          )}
         </div>
       </div>
     </aside>

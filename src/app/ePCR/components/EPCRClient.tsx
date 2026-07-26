@@ -16,6 +16,7 @@ import AssessmentSection from '../sections/AssessmentSection';
 import CallSection from '../sections/CallSection';
 import ComplaintSection from '../sections/ComplaintSection';
 import PatientSection from '../sections/PatientSection';
+import VitalsSection from '../sections/VitalsSection';
 import type { CallForm, ComplaintForm, PatientForm } from '../types';
 import {
   createDefaultAssessmentForm,
@@ -35,6 +36,12 @@ import {
   getComplaintRequiredFields,
   getPatientRequiredFields,
 } from '../utils';
+import {
+  createDefaultVitalsForm,
+  getVitalsProgress,
+  mergeVitalsWithDefaults,
+  type VitalsForm,
+} from '../clinical/vitals/vitals';
 
 const sections = [
   'Call',
@@ -210,6 +217,9 @@ export default function EPCRClient() {
   const [assessmentForm, setAssessmentForm] = useState<AssessmentForm>(() =>
     createDefaultAssessmentForm(),
   );
+  const [vitalsForm, setVitalsForm] = useState<VitalsForm>(() =>
+    createDefaultVitalsForm(),
+  );
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
     totalFields: 0,
@@ -225,6 +235,21 @@ export default function EPCRClient() {
       ?.certification;
   const documentingProviderScope =
     documentingProviderCertification === 'Paramedic' ? 'ALS' : 'BLS';
+  const patientAge = useMemo(() => {
+    if (!patientForm.dateOfBirth) return null;
+    const birthDate = new Date(`${patientForm.dateOfBirth}T00:00:00`);
+    if (Number.isNaN(birthDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDifference < 0 ||
+      (monthDifference === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age -= 1;
+    }
+    return Math.max(age, 0);
+  }, [patientForm.dateOfBirth]);
   const assessmentMode = determineAssessmentMode({
     clinicalCategory: complaintForm.clinicalCategory,
     suspectedStroke: complaintForm.suspectedStrokeCva === 'Yes',
@@ -585,6 +610,11 @@ export default function EPCRClient() {
     },
   ];
 
+  const vitalsProgress = getVitalsProgress(
+    vitalsForm,
+    documentingProviderScope,
+  );
+
   const progressSections = [
     {
       title: 'Call',
@@ -610,13 +640,26 @@ export default function EPCRClient() {
       totalFields: assessmentProgress.totalFields || 1,
       tasks: assessmentProgress.tasks,
     },
+    {
+      title: 'Vitals',
+      completedFields: vitalsProgress.completedFields,
+      totalFields: vitalsProgress.totalFields,
+      tasks: [
+        {
+          title: 'Required Vital Sets',
+          completedFields: vitalsProgress.completedFields,
+          totalFields: vitalsProgress.totalFields,
+        },
+      ],
+    },
     ...sections
       .filter(
         (section) =>
           section !== 'Call' &&
           section !== 'Patient' &&
           section !== 'Complaint' &&
-          section !== 'Assessment',
+          section !== 'Assessment' &&
+          section !== 'Vitals',
       )
       .map((section) => ({
         title: section,
@@ -636,6 +679,7 @@ export default function EPCRClient() {
         patient: patientForm,
         complaint: complaintForm,
         assessment: assessmentForm,
+        vitals: vitalsForm,
       },
     };
 
@@ -672,11 +716,13 @@ export default function EPCRClient() {
           patient?: PatientForm;
           complaint?: ComplaintForm;
           assessment?: AssessmentForm;
+          vitals?: VitalsForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
         complaintForm?: ComplaintForm;
         assessmentForm?: AssessmentForm;
+        vitalsForm?: VitalsForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
@@ -688,6 +734,8 @@ export default function EPCRClient() {
         createDefaultComplaintForm();
       const uploadedAssessmentForm =
         parsed.chart?.assessment ?? parsed.assessmentForm;
+      const uploadedVitalsForm =
+        parsed.chart?.vitals ?? parsed.vitalsForm;
 
       if (
         parsed.fileType !== 'ApolloEMS Mock ePCR' ||
@@ -735,6 +783,7 @@ export default function EPCRClient() {
       setAssessmentForm(
         mergeAssessmentWithDefaults(uploadedAssessmentForm),
       );
+      setVitalsForm(mergeVitalsWithDefaults(uploadedVitalsForm));
       setExpandedSection(parsed.expandedSection || 'Call');
       setFileStatus('PCR uploaded successfully.');
     } catch (error) {
@@ -851,6 +900,7 @@ export default function EPCRClient() {
                       callForm={callForm}
                       patientForm={patientForm}
                       complaintForm={complaintForm}
+                      vitalsForm={vitalsForm}
                     />
                   </div>
                 </div>
@@ -926,6 +976,13 @@ export default function EPCRClient() {
                         }
                         onProgressChange={handleAssessmentProgressChange}
                       />
+                    ) : section === 'Vitals' ? (
+                      <VitalsSection
+                        vitalsForm={vitalsForm}
+                        setVitalsForm={setVitalsForm}
+                        providerScope={documentingProviderScope}
+                        patientAge={patientAge}
+                      />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
                         {section} cards will be added here.
@@ -959,6 +1016,9 @@ export default function EPCRClient() {
                     <QuickToolsPanel
                       assessmentForm={assessmentForm}
                       onAssessmentFormChange={setAssessmentForm}
+                      vitalsForm={vitalsForm}
+                      onVitalsFormChange={setVitalsForm}
+                      providerScope={documentingProviderScope}
                     />
                   </div>
                 </div>
@@ -1017,6 +1077,13 @@ export default function EPCRClient() {
                       behavioralHold={complaintForm.patientPlacedOn5150Hold === 'Yes'}
                       cardiacArrest={complaintForm.cardiacArrest !== '' && complaintForm.cardiacArrest !== 'No'}
                       onProgressChange={handleAssessmentProgressChange}
+                    />
+                  ) : section === 'Vitals' ? (
+                    <VitalsSection
+                      vitalsForm={vitalsForm}
+                      setVitalsForm={setVitalsForm}
+                      providerScope={documentingProviderScope}
+                      patientAge={patientAge}
                     />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
@@ -1158,11 +1225,15 @@ export default function EPCRClient() {
                     callForm={callForm}
                     patientForm={patientForm}
                     complaintForm={complaintForm}
+                    vitalsForm={vitalsForm}
                   />
                 ) : (
                   <QuickToolsPanel
                     assessmentForm={assessmentForm}
                     onAssessmentFormChange={setAssessmentForm}
+                    vitalsForm={vitalsForm}
+                    onVitalsFormChange={setVitalsForm}
+                    providerScope={documentingProviderScope}
                   />
                 )}
               </div>
