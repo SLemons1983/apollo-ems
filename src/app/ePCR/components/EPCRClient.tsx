@@ -13,12 +13,19 @@ import PCRSection from "./PCRSection";
 import PatientHandoffRail from "./PatientHandoffRail";
 import QuickToolsPanel from "./QuickToolsPanel";
 import AssessmentSection from "../sections/AssessmentSection";
+import BillingSection from "../sections/BillingSection";
 import CallSection from "../sections/CallSection";
 import ComplaintSection from "../sections/ComplaintSection";
 import PatientSection from "../sections/PatientSection";
 import TreatmentsSection from "../sections/TreatmentsSection";
 import VitalsSection from "../sections/VitalsSection";
 import type { CallForm, ComplaintForm, PatientForm } from "../types";
+import {
+  createDefaultBillingForm,
+  getBillingProgress,
+  mergeBillingWithDefaults,
+  type BillingForm,
+} from "../clinical/billing/billing";
 import {
   createDefaultAssessmentForm,
   type AssessmentForm,
@@ -226,6 +233,9 @@ export default function EPCRClient() {
   );
   const [treatmentsForm, setTreatmentsForm] = useState<TreatmentsForm>(() =>
     createDefaultTreatmentsForm(),
+  );
+  const [billingForm, setBillingForm] = useState<BillingForm>(() =>
+    createDefaultBillingForm(),
   );
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
@@ -635,6 +645,7 @@ export default function EPCRClient() {
     documentingProviderScope,
   );
   const treatmentsProgress = getTreatmentsProgress(treatmentsForm);
+  const billingProgress = getBillingProgress(billingForm);
 
   const progressSections = [
     {
@@ -685,6 +696,18 @@ export default function EPCRClient() {
         },
       ],
     },
+    {
+      title: "Billing Information",
+      completedFields: billingProgress.completedFields,
+      totalFields: billingProgress.totalFields,
+      tasks: [
+        {
+          title: "Billing Information",
+          completedFields: billingProgress.completedFields,
+          totalFields: billingProgress.totalFields,
+        },
+      ],
+    },
     ...sections
       .filter(
         (section) =>
@@ -693,7 +716,8 @@ export default function EPCRClient() {
           section !== "Complaint" &&
           section !== "Assessment" &&
           section !== "Vitals" &&
-          section !== "Treatments",
+          section !== "Treatments" &&
+          section !== "Billing Information",
       )
       .map((section) => ({
         title: section,
@@ -715,6 +739,7 @@ export default function EPCRClient() {
         assessment: assessmentForm,
         vitals: vitalsForm,
         treatments: treatmentsForm,
+        billing: billingForm,
       },
     };
 
@@ -753,6 +778,7 @@ export default function EPCRClient() {
           assessment?: AssessmentForm;
           vitals?: VitalsForm;
           treatments?: TreatmentsForm;
+          billing?: BillingForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
@@ -760,6 +786,7 @@ export default function EPCRClient() {
         assessmentForm?: AssessmentForm;
         vitalsForm?: VitalsForm;
         treatmentsForm?: TreatmentsForm;
+        billingForm?: BillingForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
@@ -776,6 +803,7 @@ export default function EPCRClient() {
       const uploadedVitalsForm = parsed.chart?.vitals ?? parsed.vitalsForm;
       const uploadedTreatmentsForm =
         parsed.chart?.treatments ?? parsed.treatmentsForm;
+      const uploadedBillingForm = parsed.chart?.billing ?? parsed.billingForm;
 
       if (
         parsed.fileType !== "ApolloEMS Mock ePCR" ||
@@ -824,6 +852,7 @@ export default function EPCRClient() {
       setAssessmentForm(mergeAssessmentWithDefaults(uploadedAssessmentForm));
       setVitalsForm(mergeVitalsWithDefaults(uploadedVitalsForm));
       setTreatmentsForm(mergeTreatmentsWithDefaults(uploadedTreatmentsForm));
+      setBillingForm(mergeBillingWithDefaults(uploadedBillingForm));
       setExpandedSection(parsed.expandedSection || "Call");
       setFileStatus("PCR uploaded successfully.");
     } catch (error) {
@@ -1039,6 +1068,11 @@ export default function EPCRClient() {
                         providerScope={documentingProviderScope}
                         crewMembers={callForm.crewMembers}
                       />
+                    ) : section === "Billing Information" ? (
+                      <BillingSection
+                        billingForm={billingForm}
+                        setBillingForm={setBillingForm}
+                      />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
                         {section} cards will be added here.
@@ -1172,6 +1206,11 @@ export default function EPCRClient() {
                       setTreatmentsForm={setTreatmentsForm}
                       providerScope={documentingProviderScope}
                       crewMembers={callForm.crewMembers}
+                    />
+                  ) : section === "Billing Information" ? (
+                    <BillingSection
+                      billingForm={billingForm}
+                      setBillingForm={setBillingForm}
                     />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
