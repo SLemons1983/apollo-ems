@@ -2601,6 +2601,29 @@ export default function SchedulePage() {
     return dates;
   }, [dates, visibleScheduleWeek]);
 
+  const visiblePayPeriodEndKey = toDateKey(visiblePayPeriod.end);
+  const isDateInSelectedPayPeriod = (dateKey: string) =>
+    dateKey >= visiblePayPeriodStartKey && dateKey <= visiblePayPeriodEndKey;
+
+  const selectedPayPeriodPendingOpenShiftRequests = useMemo(
+    () => pendingOpenShiftRequests.filter((request) => isDateInSelectedPayPeriod(request.dateKey)),
+    [pendingOpenShiftRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
+  );
+
+  const selectedPayPeriodPendingVacationRequests = useMemo(
+    () => pendingVacationRequests.filter((request) => isDateInSelectedPayPeriod(request.dateKey)),
+    [pendingVacationRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
+  );
+
+  const selectedPayPeriodPendingShiftTradeRequests = useMemo(
+    () => pendingShiftTradeRequests.filter(
+      (request) =>
+        isDateInSelectedPayPeriod(request.requestingDateKey) ||
+        isDateInSelectedPayPeriod(request.targetDateKey),
+    ),
+    [pendingShiftTradeRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
+  );
+
   const goToCurrentPayPeriod = () => {
     setAnchorDate(getGlobalPayPeriodStart(new Date()));
     setPayPeriodReady(true);
@@ -3575,7 +3598,7 @@ export default function SchedulePage() {
   }
 
   function getPendingRequestNames(dateKey: string, assignmentKey: string, shiftLabel: string) {
-    return pendingOpenShiftRequests
+    return selectedPayPeriodPendingOpenShiftRequests
       .filter((request) =>
         request.dateKey === dateKey &&
         (request.shiftKey === assignmentKey ||
@@ -3675,7 +3698,19 @@ export default function SchedulePage() {
     const query = employeeSearchQuery.trim().toLowerCase();
     if (!query) return [];
 
-    const results: Array<{ id: string; employeeName: string; dateKey: string; shiftLabel: string; expandedKey: string }> = [];
+    const results: Array<{
+      id: string;
+      employeeName: string;
+      dateKey: string;
+      shiftLabel: string;
+      categoryLabel: string;
+      shiftTypeLabel: string;
+      startTime: string;
+      endTime: string;
+      hours: number;
+      vehicle: string;
+      expandedKey: string;
+    }> = [];
     for (const date of dates) {
       const dateKey = toDateKey(date);
       const day = getDaySchedule(scheduleData, dateKey);
@@ -3683,13 +3718,22 @@ export default function SchedulePage() {
       for (const shiftName of SHIFT_ORDER) {
         const shift = day.standard[shiftName];
         (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
-          const employee = getEmployeeById(shift[slotKey].employeeId, employees);
+          const slot = shift[slotKey];
+          const employee = getEmployeeById(slot.employeeId, employees);
           if (employee?.name.toLowerCase().includes(query)) {
             results.push({
               id: `${dateKey}-${shiftName}-${slotKey}-${employee.id}`,
               employeeName: employee.name,
               dateKey,
               shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+              categoryLabel: UNIT_SHIFTS.has(shiftName) ? 'Unit' : 'Supervisor',
+              shiftTypeLabel: slot.shiftType === 'REGULAR'
+                ? 'Regular'
+                : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              hours: calculateSlotHours(slot.startTime, slot.endTime),
+              vehicle: shift.vehicle || 'No vehicle assigned',
               expandedKey: `${shiftName}-${dateKey}`,
             });
           }
@@ -3698,13 +3742,22 @@ export default function SchedulePage() {
 
       day.extras.forEach((extra) => {
         (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
-          const employee = getEmployeeById(extra[slotKey].employeeId, employees);
+          const slot = extra[slotKey];
+          const employee = getEmployeeById(slot.employeeId, employees);
           if (employee?.name.toLowerCase().includes(query)) {
             results.push({
               id: `${dateKey}-${extra.id}-${slotKey}-${employee.id}`,
               employeeName: employee.name,
               dateKey,
               shiftLabel: extra.label,
+              categoryLabel: extra.category === 'SUPERVISOR' ? 'Supervisor' : 'Unit',
+              shiftTypeLabel: slot.shiftType === 'REGULAR'
+                ? 'Regular'
+                : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              hours: calculateSlotHours(slot.startTime, slot.endTime),
+              vehicle: extra.vehicle || 'No vehicle assigned',
               expandedKey: `extra-${extra.id}-${dateKey}`,
             });
           }
@@ -3803,7 +3856,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-violet-500 bg-violet-50' : 'border-slate-500 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${selectedPayPeriodPendingOpenShiftRequests.length > 0 ? 'border-violet-500 bg-violet-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3814,28 +3867,28 @@ export default function SchedulePage() {
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className={`text-sm font-bold ${pendingOpenShiftRequests.length > 0 ? 'text-violet-800' : 'text-slate-900'}`}>
+                <div className={`text-sm font-bold ${selectedPayPeriodPendingOpenShiftRequests.length > 0 ? 'text-violet-800' : 'text-slate-900'}`}>
                   Pending Open Shift Requests
                 </div>
-                <div className={`mt-1 text-xs ${pendingOpenShiftRequests.length > 0 ? 'text-violet-700' : 'text-slate-500'}`}>
-                  {pendingOpenShiftRequests.length > 0
-                    ? `${pendingOpenShiftRequests.length} request${pendingOpenShiftRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
+                <div className={`mt-1 text-xs ${selectedPayPeriodPendingOpenShiftRequests.length > 0 ? 'text-violet-700' : 'text-slate-500'}`}>
+                  {selectedPayPeriodPendingOpenShiftRequests.length > 0
+                    ? `${selectedPayPeriodPendingOpenShiftRequests.length} request${selectedPayPeriodPendingOpenShiftRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
                     : 'No pending open shift requests.'}
                 </div>
               </div>
-              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-violet-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${selectedPayPeriodPendingOpenShiftRequests.length > 0 ? 'bg-violet-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showPendingOpenShiftRequests ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showPendingOpenShiftRequests && (
               <div className="mt-2 space-y-2">
-                {pendingOpenShiftRequests.length === 0 ? (
+                {selectedPayPeriodPendingOpenShiftRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No pending open shift requests.
                   </div>
                 ) : (
-                  pendingOpenShiftRequests.map((request) => (
+                  selectedPayPeriodPendingOpenShiftRequests.map((request) => (
                     <div key={request.id} className="rounded-xl border border-violet-200 bg-white p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -3863,7 +3916,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingVacationRequests.length > 0 ? 'border-sky-500 bg-sky-50' : 'border-slate-500 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${selectedPayPeriodPendingVacationRequests.length > 0 ? 'border-sky-500 bg-sky-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3874,28 +3927,28 @@ export default function SchedulePage() {
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className={`text-sm font-bold ${pendingVacationRequests.length > 0 ? 'text-sky-800' : 'text-slate-900'}`}>
+                <div className={`text-sm font-bold ${selectedPayPeriodPendingVacationRequests.length > 0 ? 'text-sky-800' : 'text-slate-900'}`}>
                   Pending Vacation Requests
                 </div>
-                <div className={`mt-1 text-xs ${pendingVacationRequests.length > 0 ? 'text-sky-700' : 'text-slate-500'}`}>
-                  {pendingVacationRequests.length > 0
-                    ? `${pendingVacationRequests.length} request${pendingVacationRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
+                <div className={`mt-1 text-xs ${selectedPayPeriodPendingVacationRequests.length > 0 ? 'text-sky-700' : 'text-slate-500'}`}>
+                  {selectedPayPeriodPendingVacationRequests.length > 0
+                    ? `${selectedPayPeriodPendingVacationRequests.length} request${selectedPayPeriodPendingVacationRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
                     : 'No pending vacation requests.'}
                 </div>
               </div>
-              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingVacationRequests.length > 0 ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${selectedPayPeriodPendingVacationRequests.length > 0 ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showPendingVacationRequests ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showPendingVacationRequests && (
               <div className="mt-2 space-y-2">
-                {pendingVacationRequests.length === 0 ? (
+                {selectedPayPeriodPendingVacationRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No pending vacation requests.
                   </div>
                 ) : (
-                  pendingVacationRequests.map((request) => (
+                  selectedPayPeriodPendingVacationRequests.map((request) => (
                     <div key={request.id} className="rounded-xl border border-sky-200 bg-white p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -3935,7 +3988,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${pendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
+          <div className={`rounded-xl border p-3 shadow-sm ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -3946,28 +3999,28 @@ export default function SchedulePage() {
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <div>
-                <div className={`text-sm font-bold ${pendingShiftTradeRequests.length > 0 ? 'text-amber-800' : 'text-slate-900'}`}>
+                <div className={`text-sm font-bold ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'text-amber-800' : 'text-slate-900'}`}>
                   Pending Shift Trade Requests
                 </div>
-                <div className={`mt-1 text-xs ${pendingShiftTradeRequests.length > 0 ? 'text-amber-700' : 'text-slate-500'}`}>
-                  {pendingShiftTradeRequests.length > 0
-                    ? `${pendingShiftTradeRequests.length} trade${pendingShiftTradeRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
+                <div className={`mt-1 text-xs ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'text-amber-700' : 'text-slate-500'}`}>
+                  {selectedPayPeriodPendingShiftTradeRequests.length > 0
+                    ? `${selectedPayPeriodPendingShiftTradeRequests.length} trade${selectedPayPeriodPendingShiftTradeRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
                     : 'No pending shift trade requests.'}
                 </div>
               </div>
-              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingShiftTradeRequests.length > 0 ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'bg-amber-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
                 {showPendingShiftTradeRequests ? 'Hide Details' : 'Show Details'}
               </span>
             </button>
 
             {showPendingShiftTradeRequests && (
               <div className="mt-2 space-y-2">
-                {pendingShiftTradeRequests.length === 0 ? (
+                {selectedPayPeriodPendingShiftTradeRequests.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
                     No pending shift trade requests.
                   </div>
                 ) : (
-                  pendingShiftTradeRequests.map((request) => (
+                  selectedPayPeriodPendingShiftTradeRequests.map((request) => (
                     <div key={request.id} className="rounded-xl border border-amber-200 bg-white p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -4117,8 +4170,13 @@ export default function SchedulePage() {
                     }}
                     className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-left text-xs transition hover:bg-slate-100"
                   >
-                    <span className="font-bold text-slate-900">{result.employeeName}</span>
-                    <span className="ml-2 text-slate-600">{formatTileDate(result.dateKey)} • {result.shiftLabel}</span>
+                    <span className="block font-bold text-slate-900">{result.employeeName}</span>
+                    <span className="mt-1 block text-slate-700">
+                      {formatTileDate(result.dateKey)} • {result.shiftLabel} • {result.categoryLabel}
+                    </span>
+                    <span className="mt-1 block text-slate-600">
+                      {result.shiftTypeLabel} • {result.startTime}-{result.endTime} • {formatHours(result.hours)} hours • {result.vehicle}
+                    </span>
                   </button>
                 ))}
                 {employeeSearchResults.length === 0 && (
