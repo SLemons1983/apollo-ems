@@ -4223,15 +4223,26 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div ref={scheduleScrollRef} className="max-w-full overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
-          <div key={visiblePayPeriodStartKey} className={`grid w-full ${visibleScheduleWeek === 'ALL' ? 'min-w-[2480px] grid-cols-[100px_repeat(14,minmax(170px,1fr))]' : 'min-w-[1470px] grid-cols-[100px_repeat(7,minmax(195px,1fr))]'}`}>
+        <div ref={scheduleScrollRef} className="space-y-6">
+          {(visibleScheduleWeek === 'ALL'
+            ? [dates.slice(0, 7), dates.slice(7, 14)]
+            : [visibleDates]
+          ).map((gridDates, gridIndex) => (
+            <section key={`${visiblePayPeriodStartKey}-${gridIndex}`} className="space-y-2">
+              {visibleScheduleWeek === 'ALL' && (
+                <div className="px-1 text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {gridIndex === 0 ? 'Week 1' : 'Week 2'}
+                </div>
+              )}
+              <div className="max-w-full overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
+                <div className="grid min-w-[1470px] grid-cols-[100px_repeat(7,minmax(195px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
               
             </div>
 
-            {visibleDates.map((date, index) => {
+            {gridDates.map((date, index) => {
               const dateKey = toDateKey(date);
-              const previousDateKey = index > 0 ? toDateKey(dates[index - 1]) : '';
+              const previousDateKey = index > 0 ? toDateKey(gridDates[index - 1]) : '';
               const unavailableEmployees = getUnavailableEmployeesForDate(dateKey);
 
               const isToday = todayKey === dateKey;
@@ -4294,7 +4305,7 @@ export default function SchedulePage() {
                   </div>
                 </div>
 
-                {visibleDates.map((date) => {
+                {gridDates.map((date) => {
                   const dateKey = toDateKey(date);
                   const day = getDaySchedule(scheduleData, dateKey);
                   const shift = day.standard[shiftName];
@@ -4642,7 +4653,7 @@ export default function SchedulePage() {
               </div>
             </div>
 
-            {visibleDates.map((date) => {
+            {gridDates.map((date) => {
               const dateKey = toDateKey(date);
               const day = getDaySchedule(scheduleData, dateKey);
               const isTodayColumn = todayKey === dateKey;
@@ -4994,7 +5005,10 @@ export default function SchedulePage() {
                 </div>
               );
             })}
-          </div>
+                </div>
+              </div>
+            </section>
+          ))}
         </div>
       </div>
       {expandedShiftKey && pendingExpandedShiftKey === null && (
