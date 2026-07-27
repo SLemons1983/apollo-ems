@@ -4223,8 +4223,8 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div ref={scheduleScrollRef} className="overflow-x-hidden rounded-2xl border border-slate-500 bg-white shadow-sm">
-          <div key={visiblePayPeriodStartKey} className={`grid w-full ${visibleScheduleWeek === 'ALL' ? 'grid-cols-[100px_repeat(14,minmax(0,1fr))]' : 'grid-cols-[100px_repeat(7,minmax(0,1fr))]'}`}>
+        <div ref={scheduleScrollRef} className="max-w-full overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
+          <div key={visiblePayPeriodStartKey} className={`grid w-full ${visibleScheduleWeek === 'ALL' ? 'min-w-[2480px] grid-cols-[100px_repeat(14,minmax(170px,1fr))]' : 'min-w-[1470px] grid-cols-[100px_repeat(7,minmax(195px,1fr))]'}`}>
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
               
             </div>
