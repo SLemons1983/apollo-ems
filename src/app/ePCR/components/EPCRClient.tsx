@@ -1037,6 +1037,7 @@ export default function EPCRClient() {
                         treatmentsForm={treatmentsForm}
                         setTreatmentsForm={setTreatmentsForm}
                         providerScope={documentingProviderScope}
+                        crewMembers={callForm.crewMembers}
                       />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
@@ -1170,6 +1171,7 @@ export default function EPCRClient() {
                       treatmentsForm={treatmentsForm}
                       setTreatmentsForm={setTreatmentsForm}
                       providerScope={documentingProviderScope}
+                      crewMembers={callForm.crewMembers}
                     />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
