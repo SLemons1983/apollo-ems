@@ -16,7 +16,7 @@ import {
   type TreatmentRecord,
   type TreatmentsForm,
 } from "../clinical/treatments/treatments";
-import { ccemsaProtocolPack } from "../reference/protocols/ccemsa/manifest";
+import { ccemsaProtocolPack } from "../reference/ccemsa/manifest";
 
 type Props = {
   treatmentsForm: TreatmentsForm;
@@ -154,7 +154,7 @@ export default function TreatmentsSection({
     const query = protocolSearch.trim().toLowerCase();
     if (!query) return ccemsaProtocolPack.protocols;
     return ccemsaProtocolPack.protocols.filter((protocol) =>
-      `${protocol.id} ${protocol.title} ${protocol.category}`
+      `${protocol.number} ${protocol.title} ${protocol.source} ${protocol.level}`
         .toLowerCase()
         .includes(query),
     );
@@ -169,7 +169,7 @@ export default function TreatmentsSection({
     const ranked = ccemsaProtocolPack.protocols
       .map((protocol) => {
         const searchable =
-          `${protocol.id} ${protocol.title} ${protocol.category}`.toLowerCase();
+          `${protocol.number} ${protocol.title} ${protocol.source} ${protocol.level}`.toLowerCase();
         const score = clues.reduce((total, clue) => {
           const normalized = clue.trim().toLowerCase();
           return (
@@ -654,7 +654,12 @@ export default function TreatmentsSection({
                   ACI recommendation
                 </span>
                 <p className="truncate text-sm font-bold text-indigo-950">
-                  {aciRecommendedProtocol.id} — {aciRecommendedProtocol.title}
+                  {aciRecommendedProtocol.number} —{" "}
+                  {aciRecommendedProtocol.title}
+                  <span className="ml-2 text-xs font-semibold text-indigo-700">
+                    {aciRecommendedProtocol.source} •{" "}
+                    {aciRecommendedProtocol.level}
+                  </span>
                 </p>
               </div>
               <button
@@ -662,7 +667,7 @@ export default function TreatmentsSection({
                 onClick={() =>
                   addProtocol(
                     aciRecommendedProtocol.id,
-                    `${aciRecommendedProtocol.id} — ${aciRecommendedProtocol.title}`,
+                    `${aciRecommendedProtocol.number} — ${aciRecommendedProtocol.title}`,
                   )
                 }
                 className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-black text-white hover:bg-indigo-800"
@@ -676,7 +681,7 @@ export default function TreatmentsSection({
           <Field
             label="Search Protocols"
             value={protocolSearch}
-            placeholder="Protocol number, title, or category"
+            placeholder="Protocol number, title, source, or level"
             onChange={setProtocolSearch}
           />
           <label className="space-y-1">
@@ -688,7 +693,10 @@ export default function TreatmentsSection({
                   (item) => item.id === event.target.value,
                 );
                 if (!protocol) return;
-                addProtocol(protocol.id, `${protocol.id} — ${protocol.title}`);
+                addProtocol(
+                  protocol.id,
+                  `${protocol.number} — ${protocol.title} (${protocol.source}${protocol.level === "All" ? "" : ` ${protocol.level}`})`,
+                );
                 setProtocolSearch("");
               }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold"
@@ -700,7 +708,8 @@ export default function TreatmentsSection({
               </option>
               {protocolOptions.map((protocol) => (
                 <option key={protocol.id} value={protocol.id}>
-                  {protocol.id} — {protocol.title}
+                  {protocol.number} — {protocol.title} • {protocol.source}
+                  {protocol.level === "All" ? "" : ` ${protocol.level}`}
                 </option>
               ))}
             </select>
@@ -709,22 +718,39 @@ export default function TreatmentsSection({
 
         {treatmentsForm.selectedProtocols.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {treatmentsForm.selectedProtocols.map((protocol) => (
-              <span
-                key={protocol.id}
-                className="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 py-1 pl-3 pr-1 text-xs font-bold text-emerald-900"
-              >
-                <span className="truncate">{protocol.name}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleProtocol(protocol.id, protocol.name)}
-                  className="rounded-full px-2 py-0.5 text-emerald-800 hover:bg-emerald-200"
-                  aria-label={`Remove ${protocol.name}`}
+            {treatmentsForm.selectedProtocols.map((protocol) => {
+              const catalogProtocol = ccemsaProtocolPack.protocols.find(
+                (item) => item.id === protocol.id,
+              );
+              return (
+                <span
+                  key={protocol.id}
+                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 py-1 pl-3 pr-1 text-xs font-bold text-emerald-900"
                 >
-                  ×
-                </button>
-              </span>
-            ))}
+                  {catalogProtocol?.pdf ? (
+                    <a
+                      href={catalogProtocol.pdf}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate underline decoration-emerald-300 underline-offset-2 hover:text-emerald-700"
+                      title="Open protocol PDF"
+                    >
+                      {protocol.name}
+                    </a>
+                  ) : (
+                    <span className="truncate">{protocol.name}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => toggleProtocol(protocol.id, protocol.name)}
+                    className="rounded-full px-2 py-0.5 text-emerald-800 hover:bg-emerald-200"
+                    aria-label={`Remove ${protocol.name}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
