@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   ChangeEvent,
@@ -7,27 +7,28 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react';
-import PCRProgress from './PCRProgress';
-import PCRSection from './PCRSection';
-import PatientHandoffRail from './PatientHandoffRail';
-import QuickToolsPanel from './QuickToolsPanel';
-import AssessmentSection from '../sections/AssessmentSection';
-import CallSection from '../sections/CallSection';
-import ComplaintSection from '../sections/ComplaintSection';
-import PatientSection from '../sections/PatientSection';
-import VitalsSection from '../sections/VitalsSection';
-import type { CallForm, ComplaintForm, PatientForm } from '../types';
+} from "react";
+import PCRProgress from "./PCRProgress";
+import PCRSection from "./PCRSection";
+import PatientHandoffRail from "./PatientHandoffRail";
+import QuickToolsPanel from "./QuickToolsPanel";
+import AssessmentSection from "../sections/AssessmentSection";
+import CallSection from "../sections/CallSection";
+import ComplaintSection from "../sections/ComplaintSection";
+import PatientSection from "../sections/PatientSection";
+import TreatmentsSection from "../sections/TreatmentsSection";
+import VitalsSection from "../sections/VitalsSection";
+import type { CallForm, ComplaintForm, PatientForm } from "../types";
 import {
   createDefaultAssessmentForm,
   type AssessmentForm,
-} from '../clinical/assessment/assessmentForm';
+} from "../clinical/assessment/assessmentForm";
 import type {
   ReassessmentForm,
   ReassessmentRecord,
-} from '../clinical/components/assessment/cards/ReassessmentCard';
-import { determineAssessmentMode } from '../clinical/engine/assessment';
-import { getCcemsaGfastConsiderations } from '../clinical/engine/protocols/ccemsaStroke';
+} from "../clinical/components/assessment/cards/ReassessmentCard";
+import { determineAssessmentMode } from "../clinical/engine/assessment";
+import { getCcemsaGfastConsiderations } from "../clinical/engine/protocols/ccemsaStroke";
 import {
   createDefaultCallForm,
   createDefaultComplaintForm,
@@ -35,25 +36,31 @@ import {
   getCallRequiredFields,
   getComplaintRequiredFields,
   getPatientRequiredFields,
-} from '../utils';
+} from "../utils";
 import {
   createDefaultVitalsForm,
   getAciVitalAlerts,
   getVitalsProgress,
   mergeVitalsWithDefaults,
   type VitalsForm,
-} from '../clinical/vitals/vitals';
+} from "../clinical/vitals/vitals";
+import {
+  createDefaultTreatmentsForm,
+  getTreatmentsProgress,
+  mergeTreatmentsWithDefaults,
+  type TreatmentsForm,
+} from "../clinical/treatments/treatments";
 
 const sections = [
-  'Call',
-  'Patient',
-  'Complaint',
-  'Assessment',
-  'Vitals',
-  'Treatments',
-  'Billing Information',
-  'Narrative',
-  'Signatures',
+  "Call",
+  "Patient",
+  "Complaint",
+  "Assessment",
+  "Vitals",
+  "Treatments",
+  "Billing Information",
+  "Narrative",
+  "Signatures",
 ];
 
 function mergeAssessmentWithDefaults(
@@ -66,12 +73,12 @@ function mergeAssessmentWithDefaults(
 
     if (
       defaultValue !== null &&
-      typeof defaultValue === 'object' &&
+      typeof defaultValue === "object" &&
       !Array.isArray(defaultValue)
     ) {
       const uploadedRecord =
         uploadedValue !== null &&
-        typeof uploadedValue === 'object' &&
+        typeof uploadedValue === "object" &&
         !Array.isArray(uploadedValue)
           ? (uploadedValue as Record<string, unknown>)
           : {};
@@ -82,10 +89,7 @@ function mergeAssessmentWithDefaults(
 
       Object.entries(defaultValue as Record<string, unknown>).forEach(
         ([key, nestedDefault]) => {
-          mergedRecord[key] = mergeValue(
-            nestedDefault,
-            uploadedRecord[key],
-          );
+          mergedRecord[key] = mergeValue(nestedDefault, uploadedRecord[key]);
         },
       );
 
@@ -104,11 +108,11 @@ function mergeAssessmentWithDefaults(
 
   const uploadedClinical =
     uploadedAssessment !== null &&
-    typeof uploadedAssessment === 'object' &&
+    typeof uploadedAssessment === "object" &&
     !Array.isArray(uploadedAssessment) &&
     (uploadedAssessment as { clinical?: unknown }).clinical !== null &&
-    typeof (uploadedAssessment as { clinical?: unknown }).clinical === 'object'
-      ? ((uploadedAssessment as { clinical: Record<string, unknown> }).clinical)
+    typeof (uploadedAssessment as { clinical?: unknown }).clinical === "object"
+      ? (uploadedAssessment as { clinical: Record<string, unknown> }).clinical
       : {};
   const legacyReassessment = uploadedClinical.reassessment as
     | Partial<ReassessmentForm>
@@ -119,15 +123,14 @@ function mergeAssessmentWithDefaults(
     !Array.isArray(uploadedReassessments) &&
     legacyReassessment &&
     Object.entries(legacyReassessment).some(
-      ([key, value]) => key !== 'assessedAt' && Boolean(value),
+      ([key, value]) => key !== "assessedAt" && Boolean(value),
     )
   ) {
     const migratedAt = new Date().toISOString();
     merged.clinical.reassessments = [
       {
         ...merged.clinical.reassessment,
-        assessedAt:
-          legacyReassessment.assessedAt || migratedAt.slice(0, 16),
+        assessedAt: legacyReassessment.assessedAt || migratedAt.slice(0, 16),
         id: `legacy-reassessment-${Date.now()}`,
         createdAt: migratedAt,
       } as ReassessmentRecord,
@@ -141,8 +144,8 @@ function mergeAssessmentWithDefaults(
 
 export default function EPCRClient() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string>('');
-  const [fileStatus, setFileStatus] = useState('');
+  const [expandedSection, setExpandedSection] = useState<string>("");
+  const [fileStatus, setFileStatus] = useState("");
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
@@ -152,30 +155,30 @@ export default function EPCRClient() {
     setClinicalIntelligencePreferenceLoaded,
   ] = useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<
-    'patient-summary' | 'quick-tools' | null
+    "patient-summary" | "quick-tools" | null
   >(null);
 
   useEffect(() => {
     const savedPatientSummary = window.localStorage.getItem(
-      'apollo-epcr-patient-summary-open',
+      "apollo-epcr-patient-summary-open",
     );
     const savedQuickTools = window.localStorage.getItem(
-      'apollo-epcr-quick-tools-open',
+      "apollo-epcr-quick-tools-open",
     );
     const savedClinicalIntelligence = window.localStorage.getItem(
-      'apollo-epcr-clinical-intelligence-open',
+      "apollo-epcr-clinical-intelligence-open",
     );
 
     if (savedPatientSummary !== null) {
-      setPatientSummaryOpen(savedPatientSummary === 'true');
+      setPatientSummaryOpen(savedPatientSummary === "true");
     }
 
     if (savedQuickTools !== null) {
-      setQuickToolsOpen(savedQuickTools === 'true');
+      setQuickToolsOpen(savedQuickTools === "true");
     }
 
     if (savedClinicalIntelligence !== null) {
-      setClinicalIntelligenceOpen(savedClinicalIntelligence === 'true');
+      setClinicalIntelligenceOpen(savedClinicalIntelligence === "true");
     }
 
     setClinicalIntelligencePreferenceLoaded(true);
@@ -183,14 +186,14 @@ export default function EPCRClient() {
 
   useEffect(() => {
     window.localStorage.setItem(
-      'apollo-epcr-patient-summary-open',
+      "apollo-epcr-patient-summary-open",
       String(patientSummaryOpen),
     );
   }, [patientSummaryOpen]);
 
   useEffect(() => {
     window.localStorage.setItem(
-      'apollo-epcr-quick-tools-open',
+      "apollo-epcr-quick-tools-open",
       String(quickToolsOpen),
     );
   }, [quickToolsOpen]);
@@ -201,7 +204,7 @@ export default function EPCRClient() {
     }
 
     window.localStorage.setItem(
-      'apollo-epcr-clinical-intelligence-open',
+      "apollo-epcr-clinical-intelligence-open",
       String(clinicalIntelligenceOpen),
     );
   }, [clinicalIntelligenceOpen, clinicalIntelligencePreferenceLoaded]);
@@ -221,6 +224,9 @@ export default function EPCRClient() {
   const [vitalsForm, setVitalsForm] = useState<VitalsForm>(() =>
     createDefaultVitalsForm(),
   );
+  const [treatmentsForm, setTreatmentsForm] = useState<TreatmentsForm>(() =>
+    createDefaultTreatmentsForm(),
+  );
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
     totalFields: 0,
@@ -231,11 +237,11 @@ export default function EPCRClient() {
     }[],
   });
 
-  const documentingProviderCertification =
-    callForm.crewMembers.find((member) => member.isDocumentingPcr)
-      ?.certification;
+  const documentingProviderCertification = callForm.crewMembers.find(
+    (member) => member.isDocumentingPcr,
+  )?.certification;
   const documentingProviderScope =
-    documentingProviderCertification === 'Paramedic' ? 'ALS' : 'BLS';
+    documentingProviderCertification === "Paramedic" ? "ALS" : "BLS";
   const patientAge = useMemo(() => {
     if (!patientForm.dateOfBirth) return null;
     const birthDate = new Date(`${patientForm.dateOfBirth}T00:00:00`);
@@ -253,19 +259,19 @@ export default function EPCRClient() {
   }, [patientForm.dateOfBirth]);
   const assessmentMode = determineAssessmentMode({
     clinicalCategory: complaintForm.clinicalCategory,
-    suspectedStroke: complaintForm.suspectedStrokeCva === 'Yes',
-    possibleTrauma: complaintForm.possibleInjuryTrauma === 'Yes',
-    behavioralHold: complaintForm.patientPlacedOn5150Hold === 'Yes',
+    suspectedStroke: complaintForm.suspectedStrokeCva === "Yes",
+    possibleTrauma: complaintForm.possibleInjuryTrauma === "Yes",
+    behavioralHold: complaintForm.patientPlacedOn5150Hold === "Yes",
     cardiacArrest:
-      complaintForm.cardiacArrest !== '' &&
-      complaintForm.cardiacArrest !== 'No',
+      complaintForm.cardiacArrest !== "" &&
+      complaintForm.cardiacArrest !== "No",
   });
   const hasGfastDocumentation = Object.values(
     assessmentForm.clinical.gfast,
   ).some(Boolean);
   const protocolClinicalIntelligenceFeedback =
-    callForm.lemsa === 'CCEMSA' &&
-    (complaintForm.suspectedStrokeCva === 'Yes' || hasGfastDocumentation)
+    callForm.lemsa === "CCEMSA" &&
+    (complaintForm.suspectedStrokeCva === "Yes" || hasGfastDocumentation)
       ? getCcemsaGfastConsiderations({
           gaze: assessmentForm.clinical.gfast.gaze,
           face: assessmentForm.clinical.gfast.face,
@@ -289,7 +295,7 @@ export default function EPCRClient() {
   const clinicalIntelligenceFeedback = [
     ...protocolClinicalIntelligenceFeedback.map((message, index) => ({
       id: `protocol-${index}-${message}`,
-      severity: 'protocol' as const,
+      severity: "protocol" as const,
       message,
     })),
     ...vitalClinicalIntelligenceFeedback,
@@ -379,8 +385,8 @@ export default function EPCRClient() {
     value:
       | string
       | string[]
-      | ComplaintForm['primaryImpression']
-      | ComplaintForm['otherAssociatedSymptoms'],
+      | ComplaintForm["primaryImpression"]
+      | ComplaintForm["otherAssociatedSymptoms"],
   ) {
     setComplaintForm((current) => {
       const next = {
@@ -388,16 +394,14 @@ export default function EPCRClient() {
         [field]: value,
       };
 
-      if (field === 'patientAcuity') {
+      if (field === "patientAcuity") {
         const acuity = value as string;
         const isTrauma =
-          acuity === 'Non STAT Trauma' || acuity === 'STAT Trauma';
-        const isCardiacArrest = acuity === 'Cardiac Arrest';
+          acuity === "Non STAT Trauma" || acuity === "STAT Trauma";
+        const isCardiacArrest = acuity === "Cardiac Arrest";
 
-        next.possibleInjuryTrauma = isTrauma ? 'Yes' : '';
-        next.cardiacArrest = isCardiacArrest
-          ? 'Yes, Prior to EMS Contact'
-          : '';
+        next.possibleInjuryTrauma = isTrauma ? "Yes" : "";
+        next.cardiacArrest = isCardiacArrest ? "Yes, Prior to EMS Contact" : "";
       }
 
       return next;
@@ -406,29 +410,29 @@ export default function EPCRClient() {
 
   const patientProgressTasks = [
     {
-      title: 'Patient Demographics',
+      title: "Patient Demographics",
       completedFields: [
         patientForm.unablePatientName
-          ? 'unable'
+          ? "unable"
           : patientForm.firstName && patientForm.lastName,
-        patientForm.unableDateOfBirth ? 'unable' : patientForm.dateOfBirth,
-        patientForm.unableAge ? 'unable' : patientForm.dateOfBirth,
+        patientForm.unableDateOfBirth ? "unable" : patientForm.dateOfBirth,
+        patientForm.unableAge ? "unable" : patientForm.dateOfBirth,
         patientForm.unablePatientAddress
-          ? 'unable'
+          ? "unable"
           : patientForm.patientStreet &&
             patientForm.patientCity &&
             patientForm.patientZip,
-        patientForm.unableGender ? 'unable' : patientForm.gender,
-        patientForm.unablePhoneNumber ? 'unable' : patientForm.phoneNumber,
+        patientForm.unableGender ? "unable" : patientForm.gender,
+        patientForm.unablePhoneNumber ? "unable" : patientForm.phoneNumber,
         patientForm.unableSocialSecurityNumber
-          ? 'unable'
+          ? "unable"
           : patientForm.socialSecurityNumber,
-        patientForm.unableRace ? 'unable' : patientForm.race,
+        patientForm.unableRace ? "unable" : patientForm.race,
       ].filter(Boolean).length,
       totalFields: 8,
     },
     {
-      title: 'Medical Information',
+      title: "Medical Information",
       completedFields: [
         patientForm.medicalHistory,
         patientForm.surgicalHistory,
@@ -438,7 +442,7 @@ export default function EPCRClient() {
       totalFields: 4,
     },
     {
-      title: 'Allergies',
+      title: "Allergies",
       completedFields: [
         patientForm.medicationAllergies,
         patientForm.environmentalAllergies,
@@ -446,49 +450,49 @@ export default function EPCRClient() {
       totalFields: 2,
     },
     {
-      title: 'Patient Belongings',
+      title: "Patient Belongings",
       completedFields: [
         patientForm.patientEffects,
         patientForm.patientEffectsLeftWith,
-        ...(patientForm.patientEffectsLeftWith === 'Other Responding Agency'
+        ...(patientForm.patientEffectsLeftWith === "Other Responding Agency"
           ? [patientForm.patientEffectsLeftWithOther]
           : []),
       ].filter(Boolean).length,
       totalFields:
         2 +
-        (patientForm.patientEffectsLeftWith === 'Other Responding Agency'
+        (patientForm.patientEffectsLeftWith === "Other Responding Agency"
           ? 1
           : 0),
     },
     {
-      title: 'Patient Outcome',
+      title: "Patient Outcome",
       completedFields: [
         patientForm.disposition,
-        ...(patientForm.disposition === 'Transported'
+        ...(patientForm.disposition === "Transported"
           ? [patientForm.transportedTo]
           : []),
-        ...(patientForm.disposition === 'RMCT'
+        ...(patientForm.disposition === "RMCT"
           ? [patientForm.refusalType]
           : []),
-        ...(patientForm.disposition === 'Obvious Death'
+        ...(patientForm.disposition === "Obvious Death"
           ? [patientForm.obviousDeathCriteria]
           : []),
-        ...(patientForm.disposition === 'Death Pronounced at Scene'
+        ...(patientForm.disposition === "Death Pronounced at Scene"
           ? [patientForm.basisForPronouncement]
           : []),
-        ...(patientForm.disposition === 'Turnover Patient Care at Scene' ||
-        patientForm.disposition === 'Canceled by Other Agency at Scene'
+        ...(patientForm.disposition === "Turnover Patient Care at Scene" ||
+        patientForm.disposition === "Canceled by Other Agency at Scene"
           ? [patientForm.dispositionExplanation]
           : []),
       ].filter(Boolean).length,
       totalFields:
         1 +
-        (patientForm.disposition === 'Transported' ||
-        patientForm.disposition === 'RMCT' ||
-        patientForm.disposition === 'Obvious Death' ||
-        patientForm.disposition === 'Death Pronounced at Scene' ||
-        patientForm.disposition === 'Turnover Patient Care at Scene' ||
-        patientForm.disposition === 'Canceled by Other Agency at Scene'
+        (patientForm.disposition === "Transported" ||
+        patientForm.disposition === "RMCT" ||
+        patientForm.disposition === "Obvious Death" ||
+        patientForm.disposition === "Death Pronounced at Scene" ||
+        patientForm.disposition === "Turnover Patient Care at Scene" ||
+        patientForm.disposition === "Canceled by Other Agency at Scene"
           ? 1
           : 0),
     },
@@ -496,7 +500,7 @@ export default function EPCRClient() {
 
   const callProgressTasks = [
     {
-      title: 'Dispatch Information',
+      title: "Dispatch Information",
       completedFields: [
         callForm.emsResponseNumber,
         callForm.emsIncidentNumber,
@@ -505,7 +509,7 @@ export default function EPCRClient() {
       totalFields: 3,
     },
     {
-      title: 'Crew Information',
+      title: "Crew Information",
       completedFields: [
         callForm.respondingUnitNumber,
         callForm.lemsa,
@@ -513,16 +517,16 @@ export default function EPCRClient() {
         callForm.crewMembers.every(
           (member) => member.name && member.certification && member.role,
         )
-          ? 'crew-complete'
-          : '',
+          ? "crew-complete"
+          : "",
         callForm.crewMembers.some((member) => member.isDocumentingPcr)
-          ? 'documentor-selected'
-          : '',
+          ? "documentor-selected"
+          : "",
       ].filter(Boolean).length,
       totalFields: 4,
     },
     {
-      title: 'Response Information',
+      title: "Response Information",
       completedFields: [
         callForm.dispatchedNatureOfCall,
         callForm.typeOfServiceRequested,
@@ -531,10 +535,10 @@ export default function EPCRClient() {
       totalFields: 3,
     },
     {
-      title: 'Location Information',
+      title: "Location Information",
       completedFields: [
         callForm.incidentLocationType,
-        ...(callForm.incidentLocationType === 'Other'
+        ...(callForm.incidentLocationType === "Other"
           ? [callForm.incidentLocationTypeOther]
           : []),
         callForm.incidentStreet,
@@ -542,27 +546,27 @@ export default function EPCRClient() {
         callForm.incidentZip,
         callForm.numberOfPatientsAtScene,
         callForm.firstEmsUnitOnScene,
-        ...(callForm.otherAgenciesMode === 'Add'
+        ...(callForm.otherAgenciesMode === "Add"
           ? [callForm.otherAgenciesOnScene]
           : []),
         callForm.hazardousHealthExposures,
-        ...(callForm.hazardousHealthExposures === 'Other Exposure'
+        ...(callForm.hazardousHealthExposures === "Other Exposure"
           ? [callForm.hazardousHealthExposuresOther]
           : []),
-        callForm.personalProtectiveEquipmentUsed.length > 0 ? 'selected' : '',
-        ...(callForm.personalProtectiveEquipmentUsed.includes('Other')
+        callForm.personalProtectiveEquipmentUsed.length > 0 ? "selected" : "",
+        ...(callForm.personalProtectiveEquipmentUsed.includes("Other")
           ? [callForm.personalProtectiveEquipmentOther]
           : []),
       ].filter(Boolean).length,
       totalFields:
         8 +
-        (callForm.incidentLocationType === 'Other' ? 1 : 0) +
-        (callForm.otherAgenciesMode === 'Add' ? 1 : 0) +
-        (callForm.hazardousHealthExposures === 'Other Exposure' ? 1 : 0) +
-        (callForm.personalProtectiveEquipmentUsed.includes('Other') ? 1 : 0),
+        (callForm.incidentLocationType === "Other" ? 1 : 0) +
+        (callForm.otherAgenciesMode === "Add" ? 1 : 0) +
+        (callForm.hazardousHealthExposures === "Other Exposure" ? 1 : 0) +
+        (callForm.personalProtectiveEquipmentUsed.includes("Other") ? 1 : 0),
     },
     {
-      title: 'Times',
+      title: "Times",
       completedFields: [
         callForm.callReceived,
         callForm.callDispatched,
@@ -580,7 +584,7 @@ export default function EPCRClient() {
 
   const complaintProgressTasks = [
     {
-      title: 'Complaint',
+      title: "Complaint",
       completedFields: [
         complaintForm.chiefComplaint,
         complaintForm.clinicalCategory,
@@ -593,26 +597,22 @@ export default function EPCRClient() {
       totalFields: 7,
     },
     {
-      title: 'Circumstances',
+      title: "Circumstances",
       completedFields: [
         complaintForm.patientAcuity,
         complaintForm.possibleInjuryTrauma,
         complaintForm.cardiacArrest,
         complaintForm.suspectedStrokeCva,
-        ...(complaintForm.suspectedStrokeCva === 'Yes'
+        ...(complaintForm.suspectedStrokeCva === "Yes"
           ? [complaintForm.strokeCvaSymptomsResolved]
           : []),
         complaintForm.patientPlacedOn5150Hold,
         complaintForm.possibleDrugAlcoholUse,
-        ...(complaintForm.possibleDrugAlcoholUse === 'Yes'
-          ? [
-              complaintForm.drugAlcoholIndications.length > 0
-                ? 'selected'
-                : '',
-            ]
+        ...(complaintForm.possibleDrugAlcoholUse === "Yes"
+          ? [complaintForm.drugAlcoholIndications.length > 0 ? "selected" : ""]
           : []),
         ...(complaintForm.drugAlcoholIndications.some((item) =>
-          item.toLowerCase().includes('drug'),
+          item.toLowerCase().includes("drug"),
         )
           ? [complaintForm.suspectedDrug]
           : []),
@@ -620,10 +620,10 @@ export default function EPCRClient() {
       ].filter(Boolean).length,
       totalFields:
         7 +
-        (complaintForm.suspectedStrokeCva === 'Yes' ? 1 : 0) +
-        (complaintForm.possibleDrugAlcoholUse === 'Yes' ? 1 : 0) +
+        (complaintForm.suspectedStrokeCva === "Yes" ? 1 : 0) +
+        (complaintForm.possibleDrugAlcoholUse === "Yes" ? 1 : 0) +
         (complaintForm.drugAlcoholIndications.some((item) =>
-          item.toLowerCase().includes('drug'),
+          item.toLowerCase().includes("drug"),
         )
           ? 1
           : 0),
@@ -634,52 +634,66 @@ export default function EPCRClient() {
     vitalsForm,
     documentingProviderScope,
   );
+  const treatmentsProgress = getTreatmentsProgress(treatmentsForm);
 
   const progressSections = [
     {
-      title: 'Call',
+      title: "Call",
       completedFields: callCompletedRequiredFields,
       totalFields: callTotalRequiredFields,
       tasks: callProgressTasks,
     },
     {
-      title: 'Patient',
+      title: "Patient",
       completedFields: patientCompletedRequiredFields,
       totalFields: patientTotalRequiredFields,
       tasks: patientProgressTasks,
     },
     {
-      title: 'Complaint',
+      title: "Complaint",
       completedFields: complaintCompletedRequiredFields,
       totalFields: complaintTotalRequiredFields,
       tasks: complaintProgressTasks,
     },
     {
-      title: 'Assessment',
+      title: "Assessment",
       completedFields: assessmentProgress.completedFields,
       totalFields: assessmentProgress.totalFields || 1,
       tasks: assessmentProgress.tasks,
     },
     {
-      title: 'Vitals',
+      title: "Vitals",
       completedFields: vitalsProgress.completedFields,
       totalFields: vitalsProgress.totalFields,
       tasks: [
         {
-          title: 'Required Vital Sets',
+          title: "Required Vital Sets",
           completedFields: vitalsProgress.completedFields,
           totalFields: vitalsProgress.totalFields,
+        },
+      ],
+    },
+    {
+      title: "Treatments",
+      completedFields: treatmentsProgress.completedFields,
+      totalFields: treatmentsProgress.totalFields,
+      tasks: [
+        {
+          title: "Treatment Documentation",
+          completedFields: treatmentsProgress.completedFields,
+          totalFields: treatmentsProgress.totalFields,
         },
       ],
     },
     ...sections
       .filter(
         (section) =>
-          section !== 'Call' &&
-          section !== 'Patient' &&
-          section !== 'Complaint' &&
-          section !== 'Assessment' &&
-          section !== 'Vitals',
+          section !== "Call" &&
+          section !== "Patient" &&
+          section !== "Complaint" &&
+          section !== "Assessment" &&
+          section !== "Vitals" &&
+          section !== "Treatments",
       )
       .map((section) => ({
         title: section,
@@ -690,7 +704,7 @@ export default function EPCRClient() {
 
   function savePCRToFile() {
     const savedPCR = {
-      fileType: 'ApolloEMS Mock ePCR',
+      fileType: "ApolloEMS Mock ePCR",
       fileVersion: 1,
       savedAt: new Date().toISOString(),
       expandedSection,
@@ -700,22 +714,23 @@ export default function EPCRClient() {
         complaint: complaintForm,
         assessment: assessmentForm,
         vitals: vitalsForm,
+        treatments: treatmentsForm,
       },
     };
 
     const blob = new Blob([JSON.stringify(savedPCR, null, 2)], {
-      type: 'application/json',
+      type: "application/json",
     });
 
     const downloadUrl = URL.createObjectURL(blob);
-    const downloadLink = document.createElement('a');
+    const downloadLink = document.createElement("a");
 
     downloadLink.href = downloadUrl;
     downloadLink.download = `ApolloEMS-ePCR-${callForm.emsResponseNumber}.apolloepcr`;
     downloadLink.click();
 
     URL.revokeObjectURL(downloadUrl);
-    setFileStatus('PCR saved to local file.');
+    setFileStatus("PCR saved to local file.");
   }
 
   async function uploadPCRFromFile(event: ChangeEvent<HTMLInputElement>) {
@@ -737,50 +752,56 @@ export default function EPCRClient() {
           complaint?: ComplaintForm;
           assessment?: AssessmentForm;
           vitals?: VitalsForm;
+          treatments?: TreatmentsForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
         complaintForm?: ComplaintForm;
         assessmentForm?: AssessmentForm;
         vitalsForm?: VitalsForm;
+        treatmentsForm?: TreatmentsForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
       const uploadedPatientForm =
-        parsed.chart?.patient ?? parsed.patientForm ?? createDefaultPatientForm();
+        parsed.chart?.patient ??
+        parsed.patientForm ??
+        createDefaultPatientForm();
       const uploadedComplaintForm =
         parsed.chart?.complaint ??
         parsed.complaintForm ??
         createDefaultComplaintForm();
       const uploadedAssessmentForm =
         parsed.chart?.assessment ?? parsed.assessmentForm;
-      const uploadedVitalsForm =
-        parsed.chart?.vitals ?? parsed.vitalsForm;
+      const uploadedVitalsForm = parsed.chart?.vitals ?? parsed.vitalsForm;
+      const uploadedTreatmentsForm =
+        parsed.chart?.treatments ?? parsed.treatmentsForm;
 
       if (
-        parsed.fileType !== 'ApolloEMS Mock ePCR' ||
+        parsed.fileType !== "ApolloEMS Mock ePCR" ||
         parsed.fileVersion !== 1 ||
         !uploadedCallForm
       ) {
-        throw new Error('Invalid ApolloEMS ePCR file.');
+        throw new Error("Invalid ApolloEMS ePCR file.");
       }
 
       setCallForm({
         ...createDefaultCallForm(),
         ...uploadedCallForm,
-        lemsa: uploadedCallForm.lemsa ?? '',
+        lemsa: uploadedCallForm.lemsa ?? "",
         crewMembers:
-          uploadedCallForm.crewMembers && uploadedCallForm.crewMembers.length > 0
+          uploadedCallForm.crewMembers &&
+          uploadedCallForm.crewMembers.length > 0
             ? uploadedCallForm.crewMembers
             : [
                 {
-                  id: 'crew-1',
+                  id: "crew-1",
                   name:
                     uploadedCallForm.pcrDocumentedBy ||
                     uploadedCallForm.respondingCrew ||
-                    '',
-                  certification: 'EMT',
-                  role: 'Primary Care Giver',
+                    "",
+                  certification: "EMT",
+                  role: "Primary Care Giver",
                   isDocumentingPcr: true,
                 },
               ],
@@ -800,19 +821,18 @@ export default function EPCRClient() {
         ...createDefaultComplaintForm(),
         ...uploadedComplaintForm,
       });
-      setAssessmentForm(
-        mergeAssessmentWithDefaults(uploadedAssessmentForm),
-      );
+      setAssessmentForm(mergeAssessmentWithDefaults(uploadedAssessmentForm));
       setVitalsForm(mergeVitalsWithDefaults(uploadedVitalsForm));
-      setExpandedSection(parsed.expandedSection || 'Call');
-      setFileStatus('PCR uploaded successfully.');
+      setTreatmentsForm(mergeTreatmentsWithDefaults(uploadedTreatmentsForm));
+      setExpandedSection(parsed.expandedSection || "Call");
+      setFileStatus("PCR uploaded successfully.");
     } catch (error) {
       console.error(error);
       setFileStatus(
-        'Unable to upload PCR file. Please select a valid ApolloEMS ePCR save file.',
+        "Unable to upload PCR file. Please select a valid ApolloEMS ePCR save file.",
       );
     } finally {
-      event.target.value = '';
+      event.target.value = "";
     }
   }
 
@@ -866,14 +886,14 @@ export default function EPCRClient() {
         <div className="mb-4 flex items-center justify-between gap-3 xl:hidden">
           <button
             type="button"
-            onClick={() => setMobileDrawer('patient-summary')}
+            onClick={() => setMobileDrawer("patient-summary")}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
           >
             ☰ Patient Summary
           </button>
           <button
             type="button"
-            onClick={() => setMobileDrawer('quick-tools')}
+            onClick={() => setMobileDrawer("quick-tools")}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
           >
             Quick Tools ☰
@@ -890,9 +910,9 @@ export default function EPCRClient() {
             className="hidden items-start gap-4 xl:grid"
             style={{
               gridTemplateColumns: `${
-                patientSummaryOpen ? 'minmax(280px, 320px)' : '52px'
+                patientSummaryOpen ? "minmax(280px, 320px)" : "52px"
               } minmax(0, 1fr) ${
-                quickToolsOpen ? 'minmax(280px, 320px)' : '52px'
+                quickToolsOpen ? "minmax(280px, 320px)" : "52px"
               }`,
             }}
           >
@@ -934,7 +954,10 @@ export default function EPCRClient() {
                   <span className="font-black">▶</span>
                   <span
                     className="text-xs font-bold uppercase tracking-[0.16em]"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                    style={{
+                      writingMode: "vertical-rl",
+                      transform: "rotate(180deg)",
+                    }}
                   >
                     Patient Summary
                   </span>
@@ -957,29 +980,29 @@ export default function EPCRClient() {
                     expanded={expandedSection === section}
                     onToggle={() =>
                       setExpandedSection(
-                        expandedSection === section ? '' : section,
+                        expandedSection === section ? "" : section,
                       )
                     }
                   >
-                    {section === 'Call' ? (
+                    {section === "Call" ? (
                       <CallSection
                         callForm={callForm}
                         setCallForm={setCallForm}
                         updateCallForm={updateCallForm}
                       />
-                    ) : section === 'Patient' ? (
+                    ) : section === "Patient" ? (
                       <PatientSection
                         patientForm={patientForm}
                         callForm={callForm}
                         setPatientForm={setPatientForm}
                         updatePatientForm={updatePatientForm}
                       />
-                    ) : section === 'Complaint' ? (
+                    ) : section === "Complaint" ? (
                       <ComplaintSection
                         complaintForm={complaintForm}
                         updateComplaintForm={updateComplaintForm}
                       />
-                    ) : section === 'Assessment' ? (
+                    ) : section === "Assessment" ? (
                       <AssessmentSection
                         assessmentForm={assessmentForm}
                         onAssessmentFormChange={setAssessmentForm}
@@ -987,21 +1010,33 @@ export default function EPCRClient() {
                         onPatientChange={updatePatientForm}
                         providerScope={documentingProviderScope}
                         clinicalCategory={complaintForm.clinicalCategory}
-                        suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
-                        possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
-                        behavioralHold={complaintForm.patientPlacedOn5150Hold === 'Yes'}
+                        suspectedStroke={
+                          complaintForm.suspectedStrokeCva === "Yes"
+                        }
+                        possibleTrauma={
+                          complaintForm.possibleInjuryTrauma === "Yes"
+                        }
+                        behavioralHold={
+                          complaintForm.patientPlacedOn5150Hold === "Yes"
+                        }
                         cardiacArrest={
-                          complaintForm.cardiacArrest !== '' &&
-                          complaintForm.cardiacArrest !== 'No'
+                          complaintForm.cardiacArrest !== "" &&
+                          complaintForm.cardiacArrest !== "No"
                         }
                         onProgressChange={handleAssessmentProgressChange}
                       />
-                    ) : section === 'Vitals' ? (
+                    ) : section === "Vitals" ? (
                       <VitalsSection
                         vitalsForm={vitalsForm}
                         setVitalsForm={setVitalsForm}
                         providerScope={documentingProviderScope}
                         patientAge={patientAge}
+                      />
+                    ) : section === "Treatments" ? (
+                      <TreatmentsSection
+                        treatmentsForm={treatmentsForm}
+                        setTreatmentsForm={setTreatmentsForm}
+                        providerScope={documentingProviderScope}
                       />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
@@ -1038,6 +1073,8 @@ export default function EPCRClient() {
                       onAssessmentFormChange={setAssessmentForm}
                       vitalsForm={vitalsForm}
                       onVitalsFormChange={setVitalsForm}
+                      treatmentsForm={treatmentsForm}
+                      onTreatmentsFormChange={setTreatmentsForm}
                       providerScope={documentingProviderScope}
                     />
                   </div>
@@ -1052,7 +1089,7 @@ export default function EPCRClient() {
                   <span className="font-black">◀</span>
                   <span
                     className="text-xs font-bold uppercase tracking-[0.16em]"
-                    style={{ writingMode: 'vertical-rl' }}
+                    style={{ writingMode: "vertical-rl" }}
                   >
                     Quick Tools
                   </span>
@@ -1075,16 +1112,30 @@ export default function EPCRClient() {
                   totalFields={sectionProgress.totalFields}
                   expanded={expandedSection === section}
                   onToggle={() =>
-                    setExpandedSection(expandedSection === section ? '' : section)
+                    setExpandedSection(
+                      expandedSection === section ? "" : section,
+                    )
                   }
                 >
-                  {section === 'Call' ? (
-                    <CallSection callForm={callForm} setCallForm={setCallForm} updateCallForm={updateCallForm} />
-                  ) : section === 'Patient' ? (
-                    <PatientSection patientForm={patientForm} callForm={callForm} setPatientForm={setPatientForm} updatePatientForm={updatePatientForm} />
-                  ) : section === 'Complaint' ? (
-                    <ComplaintSection complaintForm={complaintForm} updateComplaintForm={updateComplaintForm} />
-                  ) : section === 'Assessment' ? (
+                  {section === "Call" ? (
+                    <CallSection
+                      callForm={callForm}
+                      setCallForm={setCallForm}
+                      updateCallForm={updateCallForm}
+                    />
+                  ) : section === "Patient" ? (
+                    <PatientSection
+                      patientForm={patientForm}
+                      callForm={callForm}
+                      setPatientForm={setPatientForm}
+                      updatePatientForm={updatePatientForm}
+                    />
+                  ) : section === "Complaint" ? (
+                    <ComplaintSection
+                      complaintForm={complaintForm}
+                      updateComplaintForm={updateComplaintForm}
+                    />
+                  ) : section === "Assessment" ? (
                     <AssessmentSection
                       assessmentForm={assessmentForm}
                       onAssessmentFormChange={setAssessmentForm}
@@ -1092,18 +1143,33 @@ export default function EPCRClient() {
                       onPatientChange={updatePatientForm}
                       providerScope={documentingProviderScope}
                       clinicalCategory={complaintForm.clinicalCategory}
-                      suspectedStroke={complaintForm.suspectedStrokeCva === 'Yes'}
-                      possibleTrauma={complaintForm.possibleInjuryTrauma === 'Yes'}
-                      behavioralHold={complaintForm.patientPlacedOn5150Hold === 'Yes'}
-                      cardiacArrest={complaintForm.cardiacArrest !== '' && complaintForm.cardiacArrest !== 'No'}
+                      suspectedStroke={
+                        complaintForm.suspectedStrokeCva === "Yes"
+                      }
+                      possibleTrauma={
+                        complaintForm.possibleInjuryTrauma === "Yes"
+                      }
+                      behavioralHold={
+                        complaintForm.patientPlacedOn5150Hold === "Yes"
+                      }
+                      cardiacArrest={
+                        complaintForm.cardiacArrest !== "" &&
+                        complaintForm.cardiacArrest !== "No"
+                      }
                       onProgressChange={handleAssessmentProgressChange}
                     />
-                  ) : section === 'Vitals' ? (
+                  ) : section === "Vitals" ? (
                     <VitalsSection
                       vitalsForm={vitalsForm}
                       setVitalsForm={setVitalsForm}
                       providerScope={documentingProviderScope}
                       patientAge={patientAge}
+                    />
+                  ) : section === "Treatments" ? (
+                    <TreatmentsSection
+                      treatmentsForm={treatmentsForm}
+                      setTreatmentsForm={setTreatmentsForm}
+                      providerScope={documentingProviderScope}
                     />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
@@ -1125,7 +1191,7 @@ export default function EPCRClient() {
             aria-expanded={clinicalIntelligenceOpen}
             aria-controls="apollo-clinical-intelligence-content"
             className={`flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-amber-100/70 ${
-              clinicalIntelligenceOpen ? 'border-b border-amber-200' : ''
+              clinicalIntelligenceOpen ? "border-b border-amber-200" : ""
             }`}
           >
             <span className="flex items-center gap-2">
@@ -1133,7 +1199,7 @@ export default function EPCRClient() {
                 aria-hidden="true"
                 className="text-sm font-black text-amber-800"
               >
-                {clinicalIntelligenceOpen ? '▼' : '▲'}
+                {clinicalIntelligenceOpen ? "▼" : "▲"}
               </span>
               <span className="font-black text-amber-950">
                 Apollo Clinical Intelligence
@@ -1143,10 +1209,10 @@ export default function EPCRClient() {
               <span className="text-xs font-bold uppercase tracking-wide text-amber-800">
                 {callForm.lemsa
                   ? `${callForm.lemsa} protocols selected`
-                  : 'Select a LEMSA to enable protocol guidance'}
+                  : "Select a LEMSA to enable protocol guidance"}
               </span>
               <span className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                {clinicalIntelligenceOpen ? 'Collapse' : 'Expand'}
+                {clinicalIntelligenceOpen ? "Collapse" : "Expand"}
               </span>
             </span>
           </button>
@@ -1160,7 +1226,7 @@ export default function EPCRClient() {
                       Assessment Mode
                     </div>
                     <div className="text-sm font-bold capitalize text-slate-900">
-                      {assessmentMode.replace('-', ' ')}
+                      {assessmentMode.replace("-", " ")}
                     </div>
                   </div>
                   <div>
@@ -1168,7 +1234,7 @@ export default function EPCRClient() {
                       Clinical Category
                     </div>
                     <div className="text-sm font-bold text-slate-900">
-                      {complaintForm.clinicalCategory || 'Not Yet Selected'}
+                      {complaintForm.clinicalCategory || "Not Yet Selected"}
                     </div>
                   </div>
                   <div>
@@ -1201,27 +1267,27 @@ export default function EPCRClient() {
                       <p
                         key={feedback.id}
                         className={
-                          feedback.severity === 'critical'
-                            ? 'text-sm font-semibold text-red-900'
-                            : feedback.severity === 'moderate'
-                              ? 'text-sm font-semibold text-orange-900'
-                              : 'text-sm text-amber-950'
+                          feedback.severity === "critical"
+                            ? "text-sm font-semibold text-red-900"
+                            : feedback.severity === "moderate"
+                              ? "text-sm font-semibold text-orange-900"
+                              : "text-sm text-amber-950"
                         }
                       >
-                        {feedback.severity === 'critical'
-                          ? '🔴'
-                          : feedback.severity === 'moderate'
-                            ? '🟠'
-                            : '•'}{' '}
+                        {feedback.severity === "critical"
+                          ? "🔴"
+                          : feedback.severity === "moderate"
+                            ? "🟠"
+                            : "•"}{" "}
                         {feedback.message}
                       </p>
                     ))}
                   </div>
                 ) : (
                   <p className="text-sm font-semibold text-amber-900">
-                    {callForm.lemsa === 'Merced County'
-                      ? 'Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment.'
-                      : 'No protocol-specific feedback is active for the current documentation.'}
+                    {callForm.lemsa === "Merced County"
+                      ? "Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment."
+                      : "No protocol-specific feedback is active for the current documentation."}
                   </p>
                 )}
               </div>
@@ -1239,16 +1305,20 @@ export default function EPCRClient() {
             />
             <aside
               className={`absolute inset-y-0 w-[min(92vw,360px)] overflow-y-auto bg-slate-100 shadow-2xl ${
-                mobileDrawer === 'patient-summary' ? 'left-0' : 'right-0'
+                mobileDrawer === "patient-summary" ? "left-0" : "right-0"
               }`}
             >
               <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
-                    {mobileDrawer === 'patient-summary' ? 'Live Clinical Summary' : 'Clinical Utilities'}
+                    {mobileDrawer === "patient-summary"
+                      ? "Live Clinical Summary"
+                      : "Clinical Utilities"}
                   </p>
                   <h2 className="text-lg font-bold">
-                    {mobileDrawer === 'patient-summary' ? 'Patient Handoff' : 'Quick Tools'}
+                    {mobileDrawer === "patient-summary"
+                      ? "Patient Handoff"
+                      : "Quick Tools"}
                   </h2>
                 </div>
                 <button
@@ -1261,7 +1331,7 @@ export default function EPCRClient() {
                 </button>
               </div>
               <div className="p-4">
-                {mobileDrawer === 'patient-summary' ? (
+                {mobileDrawer === "patient-summary" ? (
                   <PatientHandoffRail
                     callForm={callForm}
                     patientForm={patientForm}
@@ -1274,6 +1344,8 @@ export default function EPCRClient() {
                     onAssessmentFormChange={setAssessmentForm}
                     vitalsForm={vitalsForm}
                     onVitalsFormChange={setVitalsForm}
+                    treatmentsForm={treatmentsForm}
+                    onTreatmentsFormChange={setTreatmentsForm}
                     providerScope={documentingProviderScope}
                   />
                 )}
