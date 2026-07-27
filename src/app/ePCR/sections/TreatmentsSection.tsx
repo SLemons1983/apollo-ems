@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { CrewMember } from "../types";
 import {
+  isMedicationCategory,
   MEDICATION_CATEGORY,
   treatmentCatalog,
   type MedicationDetails,
@@ -134,7 +135,7 @@ export default function TreatmentsSection({
     (member) => member.id === performedById,
   );
   const isOtherProvider = performedById === "other-provider";
-  const isMedication = category === MEDICATION_CATEGORY;
+  const isMedication = isMedicationCategory(category);
   const canSave = Boolean(
     category &&
       subcategory &&
@@ -302,7 +303,7 @@ export default function TreatmentsSection({
               onChange={(value) => {
                 setName(value);
                 if (
-                  category === MEDICATION_CATEGORY &&
+                  isMedicationCategory(category) &&
                   value !== "Other medication"
                 )
                   updateMedication("medication", value);
@@ -650,7 +651,7 @@ export default function TreatmentsSection({
 }
 
 function isMedicationRecord(record: TreatmentRecord) {
-  return record.category === MEDICATION_CATEGORY;
+  return isMedicationCategory(record.category);
 }
 function Label({ children }: { children: ReactNode }) {
   return (

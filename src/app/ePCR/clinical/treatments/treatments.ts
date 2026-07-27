@@ -62,7 +62,14 @@ export type TreatmentCatalogItem = {
   protocolKeywords: string[];
 };
 
-export const MEDICATION_CATEGORY = "Medication Administered";
+export const MEDICATION_CATEGORY = "Medication Administration";
+export const LEGACY_MEDICATION_CATEGORY = "Medication Administered";
+
+export function isMedicationCategory(category: string) {
+  return (
+    category === MEDICATION_CATEGORY || category === LEGACY_MEDICATION_CATEGORY
+  );
+}
 
 export const treatmentCatalog: TreatmentCatalogItem[] = [
   [
@@ -454,6 +461,13 @@ export const treatmentCatalog: TreatmentCatalogItem[] = [
     "BLS",
     ["Allergic", "Anaphylactic"],
   ],
+  [
+    MEDICATION_CATEGORY,
+    "Allergy / Anaphylaxis",
+    "Diphenhydramine",
+    "ALS",
+    ["Allergic", "Anaphylactic"],
+  ],
   [MEDICATION_CATEGORY, "Cardiac Medication", "Aspirin", "BLS", ["Chest Pain"]],
   [
     MEDICATION_CATEGORY,
@@ -520,6 +534,13 @@ export const treatmentCatalog: TreatmentCatalogItem[] = [
   [MEDICATION_CATEGORY, "Nausea / Vomiting", "Ondansetron", "ALS", ["Nausea"]],
   [MEDICATION_CATEGORY, "Hemorrhage", "Tranexamic acid (TXA)", "ALS", ["TXA"]],
   [MEDICATION_CATEGORY, "Fluids", "Normal saline", "ALS", ["Shock", "Sepsis"]],
+  [
+    MEDICATION_CATEGORY,
+    "Fluids",
+    "Lactated Ringer's",
+    "ALS",
+    ["Shock", "Sepsis", "Trauma", "Burns"],
+  ],
   [
     MEDICATION_CATEGORY,
     "Other Medication",
