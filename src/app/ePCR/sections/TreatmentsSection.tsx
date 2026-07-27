@@ -23,6 +23,7 @@ type Props = {
   setTreatmentsForm: Dispatch<SetStateAction<TreatmentsForm>>;
   providerScope: "ALS" | "BLS";
   crewMembers: CrewMember[];
+  lemsa: string;
 };
 
 const statuses = [
@@ -94,6 +95,7 @@ export default function TreatmentsSection({
   setTreatmentsForm,
   providerScope,
   crewMembers,
+  lemsa,
 }: Props) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [category, setCategory] = useState("");
@@ -150,15 +152,38 @@ export default function TreatmentsSection({
           medication.unit &&
           medication.route)),
   );
+  const documentingCrewMember = crewMembers.find(
+    (member) => member.isDocumentingPcr,
+  );
+  const filteredProtocolCatalog = useMemo(() => {
+    if (!lemsa || !documentingCrewMember) return [];
+
+    if (lemsa === "Merced County") {
+      return ccemsaProtocolPack.protocols.filter(
+        (protocol) => protocol.source === "Merced County EMS",
+      );
+    }
+
+    if (lemsa === "CCEMSA") {
+      const level =
+        documentingCrewMember.certification === "Paramedic" ? "ALS" : "BLS";
+      return ccemsaProtocolPack.protocols.filter(
+        (protocol) =>
+          protocol.source === "CCEMSA" && protocol.level === level,
+      );
+    }
+
+    return [];
+  }, [documentingCrewMember, lemsa]);
   const protocolOptions = useMemo(() => {
     const query = protocolSearch.trim().toLowerCase();
-    if (!query) return ccemsaProtocolPack.protocols;
-    return ccemsaProtocolPack.protocols.filter((protocol) =>
+    if (!query) return filteredProtocolCatalog;
+    return filteredProtocolCatalog.filter((protocol) =>
       `${protocol.number} ${protocol.title} ${protocol.source} ${protocol.level}`
         .toLowerCase()
         .includes(query),
     );
-  }, [protocolSearch]);
+  }, [filteredProtocolCatalog, protocolSearch]);
   const aciRecommendedProtocol = useMemo(() => {
     const clues = treatmentsForm.records.flatMap((record) => [
       ...(record.protocolIds ?? []),
@@ -166,7 +191,7 @@ export default function TreatmentsSection({
       record.subcategory ?? "",
       record.name,
     ]);
-    const ranked = ccemsaProtocolPack.protocols
+    const ranked = filteredProtocolCatalog
       .map((protocol) => {
         const searchable =
           `${protocol.number} ${protocol.title} ${protocol.source} ${protocol.level}`.toLowerCase();
@@ -181,7 +206,7 @@ export default function TreatmentsSection({
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
     return ranked[0]?.protocol;
-  }, [treatmentsForm.records]);
+  }, [filteredProtocolCatalog, treatmentsForm.records]);
 
   function resetEditor() {
     setCategory("");
@@ -681,15 +706,20 @@ export default function TreatmentsSection({
           <Field
             label="Search Protocols"
             value={protocolSearch}
-            placeholder="Protocol number, title, source, or level"
+            placeholder={
+              filteredProtocolCatalog.length
+                ? "Protocol number or title"
+                : "Complete Call → Crew Information"
+            }
             onChange={setProtocolSearch}
           />
           <label className="space-y-1">
             <Label>Add Protocol</Label>
             <select
               value=""
+              disabled={filteredProtocolCatalog.length === 0}
               onChange={(event) => {
-                const protocol = ccemsaProtocolPack.protocols.find(
+                const protocol = filteredProtocolCatalog.find(
                   (item) => item.id === event.target.value,
                 );
                 if (!protocol) return;
@@ -702,7 +732,9 @@ export default function TreatmentsSection({
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold"
             >
               <option value="">
-                {protocolOptions.length
+                {!lemsa || !documentingCrewMember
+                  ? "Complete Call → Crew Information"
+                  : protocolOptions.length
                   ? "Select protocol"
                   : "No matching protocols"}
               </option>
@@ -715,6 +747,25 @@ export default function TreatmentsSection({
             </select>
           </label>
         </div>
+        {lemsa && documentingCrewMember && (
+          <p className="mt-2 text-xs font-semibold text-slate-500">
+            Showing{" "}
+            {lemsa === "Merced County"
+              ? "Merced County"
+              : `CCEMSA ${
+                  documentingCrewMember.certification === "Paramedic"
+                    ? "ALS"
+                    : "BLS"
+                }`}{" "}
+            protocols for {documentingCrewMember.name}.
+          </p>
+        )}
+        {(!lemsa || !documentingCrewMember) && (
+          <p className="mt-2 text-xs font-semibold text-amber-700">
+            Select a LEMSA and the documenting clinician in Call → Crew
+            Information to enable protocol selection and ACI recommendations.
+          </p>
+        )}
 
         {treatmentsForm.selectedProtocols.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">

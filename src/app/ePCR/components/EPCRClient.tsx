@@ -1067,6 +1067,7 @@ export default function EPCRClient() {
                         setTreatmentsForm={setTreatmentsForm}
                         providerScope={documentingProviderScope}
                         crewMembers={callForm.crewMembers}
+                        lemsa={callForm.lemsa}
                       />
                     ) : section === "Billing Information" ? (
                       <BillingSection
@@ -1206,6 +1207,7 @@ export default function EPCRClient() {
                       setTreatmentsForm={setTreatmentsForm}
                       providerScope={documentingProviderScope}
                       crewMembers={callForm.crewMembers}
+                      lemsa={callForm.lemsa}
                     />
                   ) : section === "Billing Information" ? (
                     <BillingSection
