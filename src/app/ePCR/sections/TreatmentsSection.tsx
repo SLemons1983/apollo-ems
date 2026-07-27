@@ -13,7 +13,6 @@ import {
   MEDICATION_CATEGORY,
   treatmentCatalog,
   type MedicationDetails,
-  type NoTreatmentReason,
   type TreatmentRecord,
   type TreatmentsForm,
 } from "../clinical/treatments/treatments";
@@ -111,6 +110,7 @@ export default function TreatmentsSection({
   const [complications, setComplications] = useState("");
   const [notes, setNotes] = useState("");
   const [medication, setMedication] = useState(emptyMedication());
+  const [protocolSearch, setProtocolSearch] = useState("");
 
   const available = useMemo(
     () =>
@@ -150,6 +150,38 @@ export default function TreatmentsSection({
           medication.unit &&
           medication.route)),
   );
+  const protocolOptions = useMemo(() => {
+    const query = protocolSearch.trim().toLowerCase();
+    if (!query) return ccemsaProtocolPack.protocols;
+    return ccemsaProtocolPack.protocols.filter((protocol) =>
+      `${protocol.id} ${protocol.title} ${protocol.category}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [protocolSearch]);
+  const aciRecommendedProtocol = useMemo(() => {
+    const clues = treatmentsForm.records.flatMap((record) => [
+      ...(record.protocolIds ?? []),
+      record.category,
+      record.subcategory ?? "",
+      record.name,
+    ]);
+    const ranked = ccemsaProtocolPack.protocols
+      .map((protocol) => {
+        const searchable =
+          `${protocol.id} ${protocol.title} ${protocol.category}`.toLowerCase();
+        const score = clues.reduce((total, clue) => {
+          const normalized = clue.trim().toLowerCase();
+          return (
+            total + (normalized && searchable.includes(normalized) ? 1 : 0)
+          );
+        }, 0);
+        return { protocol, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score);
+    return ranked[0]?.protocol;
+  }, [treatmentsForm.records]);
 
   function resetEditor() {
     setCategory("");
@@ -238,32 +270,33 @@ export default function TreatmentsSection({
     });
   }
 
+  function addProtocol(id: string, name: string) {
+    setTreatmentsForm((current) => {
+      if (current.selectedProtocols.some((protocol) => protocol.id === id))
+        return current;
+      return {
+        ...current,
+        selectedProtocols: [
+          ...current.selectedProtocols,
+          { id, name, selectedAt: new Date().toISOString() },
+        ],
+      };
+    });
+  }
+
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="font-black text-indigo-950">
-              Treatments &amp; Procedures
-            </h3>
-            <p className="mt-1 text-sm font-semibold text-indigo-800">
-              Select Category → Subcategory → Treatment / Procedure, then
-              document who performed it and the patient response.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              if (editorOpen) resetEditor();
-              else setPerformedAt(localDateTime());
-              setEditorOpen(!editorOpen);
-            }}
-            className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-black text-white shadow hover:bg-indigo-800"
-          >
-            {editorOpen ? "Cancel" : "+ Add Treatment"}
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (editorOpen) resetEditor();
+          else setPerformedAt(localDateTime());
+          setEditorOpen(!editorOpen);
+        }}
+        className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-black text-white shadow hover:bg-indigo-800"
+      >
+        {editorOpen ? "Cancel" : "+ Add Treatment"}
+      </button>
 
       {editorOpen && (
         <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm">
@@ -504,7 +537,7 @@ export default function TreatmentsSection({
         </div>
       )}
 
-      {treatmentsForm.records.length ? (
+      {treatmentsForm.records.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="font-black">Treatment Timeline</h4>
@@ -596,46 +629,104 @@ export default function TreatmentsSection({
               </article>
             ))}
         </div>
-      ) : (
-        <NoTreatment
-          treatmentsForm={treatmentsForm}
-          setTreatmentsForm={setTreatmentsForm}
-        />
       )}
 
-      <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
-        <h4 className="font-black text-sky-950">Referenced Protocols</h4>
-        <p className="mt-1 text-sm font-semibold text-sky-800">
-          Select the active Merced County or CCEMSA protocol used to guide care.
-          Provider scope remains controlled by local authorization.
-        </p>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {ccemsaProtocolPack.protocols.map((protocol) => {
-            const selected = treatmentsForm.selectedProtocols.some(
-              (item) => item.id === protocol.id,
-            );
-            return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h4 className="font-black text-slate-950">Protocol Used</h4>
+            <p className="mt-0.5 text-xs font-semibold text-slate-500">
+              Clinician-selected protocol(s) are the authoritative record.
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-600">
+            {treatmentsForm.selectedProtocols.length} selected
+          </span>
+        </div>
+
+        {aciRecommendedProtocol &&
+          !treatmentsForm.selectedProtocols.some(
+            (item) => item.id === aciRecommendedProtocol.id,
+          ) && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
+              <div className="min-w-0">
+                <span className="text-[11px] font-black uppercase tracking-wide text-indigo-700">
+                  ACI recommendation
+                </span>
+                <p className="truncate text-sm font-bold text-indigo-950">
+                  {aciRecommendedProtocol.id} — {aciRecommendedProtocol.title}
+                </p>
+              </div>
               <button
-                key={protocol.id}
                 type="button"
                 onClick={() =>
-                  toggleProtocol(
-                    protocol.id,
-                    `${protocol.id} — ${protocol.title}`,
+                  addProtocol(
+                    aciRecommendedProtocol.id,
+                    `${aciRecommendedProtocol.id} — ${aciRecommendedProtocol.title}`,
                   )
                 }
-                className={`rounded-lg border p-3 text-left ${selected ? "border-sky-500 bg-sky-200" : "border-sky-200 bg-white hover:bg-sky-100"}`}
+                className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-black text-white hover:bg-indigo-800"
               >
-                <span className="block text-xs font-black uppercase text-sky-700">
-                  {protocol.category}
-                </span>
-                <span className="mt-1 block font-black">
-                  {protocol.id} — {protocol.title}
-                </span>
+                Use Protocol
               </button>
-            );
-          })}
+            </div>
+          )}
+
+        <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
+          <Field
+            label="Search Protocols"
+            value={protocolSearch}
+            placeholder="Protocol number, title, or category"
+            onChange={setProtocolSearch}
+          />
+          <label className="space-y-1">
+            <Label>Add Protocol</Label>
+            <select
+              value=""
+              onChange={(event) => {
+                const protocol = ccemsaProtocolPack.protocols.find(
+                  (item) => item.id === event.target.value,
+                );
+                if (!protocol) return;
+                addProtocol(protocol.id, `${protocol.id} — ${protocol.title}`);
+                setProtocolSearch("");
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold"
+            >
+              <option value="">
+                {protocolOptions.length
+                  ? "Select protocol"
+                  : "No matching protocols"}
+              </option>
+              {protocolOptions.map((protocol) => (
+                <option key={protocol.id} value={protocol.id}>
+                  {protocol.id} — {protocol.title}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+
+        {treatmentsForm.selectedProtocols.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {treatmentsForm.selectedProtocols.map((protocol) => (
+              <span
+                key={protocol.id}
+                className="inline-flex max-w-full items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 py-1 pl-3 pr-1 text-xs font-bold text-emerald-900"
+              >
+                <span className="truncate">{protocol.name}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleProtocol(protocol.id, protocol.name)}
+                  className="rounded-full px-2 py-0.5 text-emerald-800 hover:bg-emerald-200"
+                  aria-label={`Remove ${protocol.name}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <Area
@@ -748,57 +839,5 @@ function Select({
         })}
       </select>
     </label>
-  );
-}
-function NoTreatment({
-  treatmentsForm,
-  setTreatmentsForm,
-}: {
-  treatmentsForm: TreatmentsForm;
-  setTreatmentsForm: Dispatch<SetStateAction<TreatmentsForm>>;
-}) {
-  const reasons: Exclude<NoTreatmentReason, "">[] = [
-    "No treatment indicated",
-    "Patient refused treatment",
-    "Treatment completed prior to EMS arrival",
-    "Other",
-  ];
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-      <h4 className="font-black text-amber-950">No Treatment Provided</h4>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {reasons.map((reason) => (
-          <button
-            key={reason}
-            type="button"
-            onClick={() =>
-              setTreatmentsForm((current) => ({
-                ...current,
-                noTreatmentReason:
-                  current.noTreatmentReason === reason ? "" : reason,
-                noTreatmentExplanation:
-                  reason === "Other" ? current.noTreatmentExplanation : "",
-              }))
-            }
-            className={`rounded-lg border px-3 py-2 text-left text-sm font-bold ${treatmentsForm.noTreatmentReason === reason ? "border-amber-500 bg-amber-200" : "border-amber-200 bg-white"}`}
-          >
-            {reason}
-          </button>
-        ))}
-      </div>
-      {treatmentsForm.noTreatmentReason === "Other" && (
-        <Area
-          className="mt-3"
-          label="Explanation"
-          value={treatmentsForm.noTreatmentExplanation}
-          onChange={(value) =>
-            setTreatmentsForm((current) => ({
-              ...current,
-              noTreatmentExplanation: value,
-            }))
-          }
-        />
-      )}
-    </div>
   );
 }
