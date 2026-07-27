@@ -497,7 +497,7 @@ function createAdminSupervisorShift(): ShiftAssignment {
     employee4: createEmptyEmployeeSlot(),
     employee5: createEmptyEmployeeSlot(),
     showEmployee3: false,
-    visibleEmployeeSlots: 1,
+    visibleEmployeeSlots: 2,
     vehicle: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
@@ -705,29 +705,23 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
             maybeShift.employee3Note,
           );
 
-    const employee4 =
-    category === 'SUPERVISOR'
-      ? createEmptyEmployeeSlot()
-      : maybeShift.employee4 && typeof maybeShift.employee4 === 'object'
-        ? normalizeEmployeeSlot(maybeShift.employee4)
-        : createEmptyEmployeeSlot();
+  const employee4 =
+    maybeShift.employee4 && typeof maybeShift.employee4 === 'object'
+      ? normalizeEmployeeSlot(maybeShift.employee4)
+      : createEmptyEmployeeSlot();
 
   const employee5 =
-    category === 'SUPERVISOR'
-      ? createEmptyEmployeeSlot()
-      : maybeShift.employee5 && typeof maybeShift.employee5 === 'object'
-        ? normalizeEmployeeSlot(maybeShift.employee5)
-        : createEmptyEmployeeSlot();
-        const visibleEmployeeSlots =
-    category === 'SUPERVISOR'
-      ? 1
-      : Math.max(
-          2,
-          Math.min(
-            5,
-            Number(maybeShift.visibleEmployeeSlots ?? (employee5.employeeId ? 5 : employee4.employeeId ? 4 : maybeShift.showEmployee3 || employee3.employeeId ? 3 : 2)),
-          ),
-        );
+    maybeShift.employee5 && typeof maybeShift.employee5 === 'object'
+      ? normalizeEmployeeSlot(maybeShift.employee5)
+      : createEmptyEmployeeSlot();
+
+  const visibleEmployeeSlots = Math.max(
+    2,
+    Math.min(
+      5,
+      Number(maybeShift.visibleEmployeeSlots ?? (employee5.employeeId ? 5 : employee4.employeeId ? 4 : maybeShift.showEmployee3 || employee3.employeeId ? 3 : 2)),
+    ),
+  );
 
   return {
     employee1,
@@ -735,7 +729,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     employee3,
     employee4,
     employee5,
-    showEmployee3: category === 'SUPERVISOR' ? false : Boolean(maybeShift.showEmployee3 || employee3.employeeId),
+    showEmployee3: Boolean(maybeShift.showEmployee3 || employee3.employeeId),
     visibleEmployeeSlots,
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
     allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
@@ -1363,12 +1357,14 @@ export default function SchedulePage() {
   const [openShiftRequests, setOpenShiftRequests] = useState<OpenShiftRequest[]>([]);
   const [shiftTradeRequests, setShiftTradeRequests] = useState<ShiftTradeRequest[]>([]);
   const [vacationRequests, setVacationRequests] = useState<VacationRequest[]>([]);
+  const [showPendingOpenShiftRequests, setShowPendingOpenShiftRequests] = useState(false);
   const [showPendingVacationRequests, setShowPendingVacationRequests] = useState(false);
   const [showPendingShiftTradeRequests, setShowPendingShiftTradeRequests] = useState(false);
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
   const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
   const [showScheduleKey, setShowScheduleKey] = useState(false);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
   const dirtyDatesRef = useRef<Set<string>>(new Set());
   const isSavingScheduleRef = useRef(false);
@@ -1383,6 +1379,7 @@ export default function SchedulePage() {
   }
 
   function closeSchedulePanels() {
+    setShowPendingOpenShiftRequests(false);
     setShowPendingVacationRequests(false);
     setShowPendingShiftTradeRequests(false);
     setShowSupervisorNotes(false);
@@ -2487,17 +2484,16 @@ export default function SchedulePage() {
     const fallbackOpenSlotId = preferredOpenSlotId === OPEN_ALS_SLOT_ID ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
 
     const assignIntoShift = (shift: ShiftAssignment | ExtraShiftAssignment, shiftName?: ShiftName): boolean => {
-      const slotKeys: Array<'employee1' | 'employee2' | 'employee3'> = ['employee1', 'employee2', 'employee3'];
-      const isSupervisorShift = shiftName ? SUPERVISOR_SHIFTS.has(shiftName) : 'category' in shift && shift.category === 'SUPERVISOR';
-      const availableSlotKeys = isSupervisorShift ? slotKeys.slice(0, 1) : slotKeys;
+      const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
 
-      let targetSlotKey = availableSlotKeys.find((slotKey) => shift[slotKey].employeeId === preferredOpenSlotId);
-      targetSlotKey = targetSlotKey ?? availableSlotKeys.find((slotKey) => shift[slotKey].employeeId === fallbackOpenSlotId);
-      targetSlotKey = targetSlotKey ?? availableSlotKeys.find((slotKey) => !shift[slotKey].employeeId);
+      let targetSlotKey = slotKeys.find((slotKey) => shift[slotKey].employeeId === preferredOpenSlotId);
+      targetSlotKey = targetSlotKey ?? slotKeys.find((slotKey) => shift[slotKey].employeeId === fallbackOpenSlotId);
+      targetSlotKey = targetSlotKey ?? slotKeys.find((slotKey) => !shift[slotKey].employeeId);
 
-      if (!targetSlotKey && !isSupervisorShift && !shift.showEmployee3) {
-        shift.showEmployee3 = true;
-        targetSlotKey = 'employee3';
+      if (!targetSlotKey && shift.visibleEmployeeSlots < 5) {
+        shift.visibleEmployeeSlots += 1;
+        shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
+        targetSlotKey = `employee${shift.visibleEmployeeSlots}` as ScheduleSlotKey;
       }
 
       if (!targetSlotKey) {
@@ -2730,12 +2726,6 @@ export default function SchedulePage() {
       const shift = next[dateKey].standard[shiftName];
       (shift[field] as string | boolean) = value;
 
-      if (SUPERVISOR_SHIFTS.has(shiftName)) {
-        shift.employee2 = createEmptyEmployeeSlot();
-        shift.employee3 = createEmptyEmployeeSlot();
-        shift.showEmployee3 = false;
-      }
-
       return next;
     });
   };
@@ -2797,12 +2787,6 @@ export default function SchedulePage() {
       }
 
       (extra[field] as string | boolean) = value;
-
-      if (field === 'category' && value === 'SUPERVISOR') {
-        extra.employee2 = createEmptyEmployeeSlot();
-        extra.employee3 = createEmptyEmployeeSlot();
-        extra.showEmployee3 = false;
-      }
 
       return next;
     });
@@ -2873,12 +2857,6 @@ export default function SchedulePage() {
       }
 
       const shift = next[dateKey].standard[shiftName];
-      if (SUPERVISOR_SHIFTS.has(shiftName)) {
-        shift.visibleEmployeeSlots = 1;
-        shift.showEmployee3 = false;
-        return next;
-      }
-
       shift.visibleEmployeeSlots = Math.min(5, Math.max(3, shift.visibleEmployeeSlots + 1));
       shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
 
@@ -2897,12 +2875,6 @@ export default function SchedulePage() {
       const extra = next[dateKey].extras.find((item) => item.id === extraId);
       if (!extra) {
         return current;
-      }
-
-      if (extra.category === 'SUPERVISOR') {
-        extra.visibleEmployeeSlots = 1;
-        extra.showEmployee3 = false;
-        return next;
       }
 
       extra.visibleEmployeeSlots = Math.min(5, Math.max(3, extra.visibleEmployeeSlots + 1));
@@ -3050,26 +3022,6 @@ export default function SchedulePage() {
       const previousDay = getDaySchedule(next, previousDateKey);
       next[dateKey] = JSON.parse(JSON.stringify(previousDay)) as DaySchedule;
 
-      for (const shiftName of SHIFT_ORDER) {
-        if (SUPERVISOR_SHIFTS.has(shiftName)) {
-          next[dateKey].standard[shiftName].employee2 = createEmptyEmployeeSlot();
-          next[dateKey].standard[shiftName].employee3 = createEmptyEmployeeSlot();
-          next[dateKey].standard[shiftName].showEmployee3 = false;
-        }
-      }
-
-      next[dateKey].extras = next[dateKey].extras.map((extra) => {
-        if (extra.category === 'SUPERVISOR') {
-          return {
-            ...extra,
-            employee2: createEmptyEmployeeSlot(),
-            employee3: createEmptyEmployeeSlot(),
-            showEmployee3: false,
-          };
-        }
-        return extra;
-      });
-
       return next;
     });
   };
@@ -3125,7 +3077,7 @@ export default function SchedulePage() {
     const eligibleEmployees = [
       ...requestedEmployees,
       ...baseEligibleEmployees.filter((employee) => !requestedEmployeeIdSet.has(employee.id)),
-    ];
+    ].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     const recommendedEmployee = baseEligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
     const isOpenSlotSelection = isOpenShiftSlot(slot.employeeId);
     const selectedEmployee = slot.employeeId && !isOpenSlotSelection ? getEmployeeById(slot.employeeId, employees) : null;
@@ -3719,6 +3671,50 @@ export default function SchedulePage() {
     return [...standardNotes, ...extraNotes];
   });
 
+  const employeeSearchResults = useMemo(() => {
+    const query = employeeSearchQuery.trim().toLowerCase();
+    if (!query) return [];
+
+    const results: Array<{ id: string; employeeName: string; dateKey: string; shiftLabel: string; expandedKey: string }> = [];
+    for (const date of dates) {
+      const dateKey = toDateKey(date);
+      const day = getDaySchedule(scheduleData, dateKey);
+
+      for (const shiftName of SHIFT_ORDER) {
+        const shift = day.standard[shiftName];
+        (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
+          const employee = getEmployeeById(shift[slotKey].employeeId, employees);
+          if (employee?.name.toLowerCase().includes(query)) {
+            results.push({
+              id: `${dateKey}-${shiftName}-${slotKey}-${employee.id}`,
+              employeeName: employee.name,
+              dateKey,
+              shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+              expandedKey: `${shiftName}-${dateKey}`,
+            });
+          }
+        });
+      }
+
+      day.extras.forEach((extra) => {
+        (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
+          const employee = getEmployeeById(extra[slotKey].employeeId, employees);
+          if (employee?.name.toLowerCase().includes(query)) {
+            results.push({
+              id: `${dateKey}-${extra.id}-${slotKey}-${employee.id}`,
+              employeeName: employee.name,
+              dateKey,
+              shiftLabel: extra.label,
+              expandedKey: `extra-${extra.id}-${dateKey}`,
+            });
+          }
+        });
+      });
+    }
+
+    return results;
+  }, [employeeSearchQuery, scheduleData, employees, dates]);
+
   const supervisorNotesSignature = supervisorNotes
     .map((entry) => `${entry.id}:${entry.note}`)
     .join('|');
@@ -3806,7 +3802,67 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className={`rounded-xl border p-3 shadow-sm ${pendingOpenShiftRequests.length > 0 ? 'border-violet-500 bg-violet-50' : 'border-slate-500 bg-white'}`}>
+            <button
+              type="button"
+              onClick={() => {
+                const nextValue = !showPendingOpenShiftRequests;
+                closeSchedulePanels();
+                setShowPendingOpenShiftRequests(nextValue);
+              }}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <div className={`text-sm font-bold ${pendingOpenShiftRequests.length > 0 ? 'text-violet-800' : 'text-slate-900'}`}>
+                  Pending Open Shift Requests
+                </div>
+                <div className={`mt-1 text-xs ${pendingOpenShiftRequests.length > 0 ? 'text-violet-700' : 'text-slate-500'}`}>
+                  {pendingOpenShiftRequests.length > 0
+                    ? `${pendingOpenShiftRequests.length} request${pendingOpenShiftRequests.length === 1 ? '' : 's'} awaiting supervisor review.`
+                    : 'No pending open shift requests.'}
+                </div>
+              </div>
+              <span className={`rounded-lg px-2 py-1 text-xs font-bold ${pendingOpenShiftRequests.length > 0 ? 'bg-violet-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                {showPendingOpenShiftRequests ? 'Hide Details' : 'Show Details'}
+              </span>
+            </button>
+
+            {showPendingOpenShiftRequests && (
+              <div className="mt-2 space-y-2">
+                {pendingOpenShiftRequests.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No pending open shift requests.
+                  </div>
+                ) : (
+                  pendingOpenShiftRequests.map((request) => (
+                    <div key={request.id} className="rounded-xl border border-violet-200 bg-white p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
+                          <div className="mt-1 text-sm text-slate-700">
+                            {request.shiftLabel} • {formatTileDate(request.dateKey)}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Requested {new Date(request.requestedAt).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void updateOpenShiftRequestStatus(request.id, 'DENIED')} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                            Deny
+                          </button>
+                          <button type="button" onClick={() => void updateOpenShiftRequestStatus(request.id, 'APPROVED')} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800">
+                            Approve
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <div className={`rounded-xl border p-3 shadow-sm ${pendingVacationRequests.length > 0 ? 'border-sky-500 bg-sky-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
@@ -4017,27 +4073,62 @@ export default function SchedulePage() {
 
           <button
             type="button"
-            onClick={() => scheduleScrollRef.current?.scrollBy({ left: -700, behavior: 'smooth' })}
-            className="rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-          >
-            ← Scroll
-          </button>
-          <button
-            type="button"
-            onClick={() => scheduleScrollRef.current?.scrollBy({ left: 700, behavior: 'smooth' })}
-            className="rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-          >
-            Scroll →
-          </button>
-
-          <button
-            type="button"
             onClick={() => setShowScheduleKey((current) => !current)}
             className="rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
           >
             {showScheduleKey ? 'Hide Key' : 'Show Key'}
           </button>
 
+        </div>
+
+        <div className="mb-3 rounded-2xl border border-slate-400 bg-white p-4 shadow-sm">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Search Employees on Schedule
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              type="search"
+              value={employeeSearchQuery}
+              onChange={(event) => setEmployeeSearchQuery(event.target.value)}
+              placeholder="Type an employee name"
+              className="w-full rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-700"
+            />
+            {employeeSearchQuery && (
+              <button type="button" onClick={() => setEmployeeSearchQuery('')} className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+                Clear
+              </button>
+            )}
+          </div>
+
+          {employeeSearchQuery.trim() && (
+            <div className="mt-3">
+              <div className="mb-2 text-xs font-semibold text-slate-600">
+                {employeeSearchResults.length} matching assignment{employeeSearchResults.length === 1 ? '' : 's'}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {employeeSearchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={() => {
+                      const dateIndex = dates.findIndex((date) => toDateKey(date) === result.dateKey);
+                      setVisibleScheduleWeek(dateIndex >= 7 ? 'WEEK2' : 'WEEK1');
+                      setExpandedShiftKey(result.expandedKey);
+                    }}
+                    className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-left text-xs transition hover:bg-slate-100"
+                  >
+                    <span className="font-bold text-slate-900">{result.employeeName}</span>
+                    <span className="ml-2 text-slate-600">{formatTileDate(result.dateKey)} • {result.shiftLabel}</span>
+                  </button>
+                ))}
+                {employeeSearchResults.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                    No scheduled assignments match that employee name.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {showScheduleKey && (
@@ -4132,8 +4223,8 @@ export default function SchedulePage() {
           </div>
         )}
 
-        <div ref={scheduleScrollRef} className="overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
-          <div key={visiblePayPeriodStartKey} className={`grid ${visibleScheduleWeek === 'ALL' ? 'min-w-[3330px] grid-cols-[110px_repeat(14,minmax(230px,1fr))]' : 'min-w-[1500px] grid-cols-[110px_repeat(7,minmax(195px,1fr))]'}`}>
+        <div ref={scheduleScrollRef} className="overflow-x-hidden rounded-2xl border border-slate-500 bg-white shadow-sm">
+          <div key={visiblePayPeriodStartKey} className={`grid w-full ${visibleScheduleWeek === 'ALL' ? 'grid-cols-[100px_repeat(14,minmax(0,1fr))]' : 'grid-cols-[100px_repeat(7,minmax(0,1fr))]'}`}>
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
               
             </div>
@@ -4359,8 +4450,7 @@ export default function SchedulePage() {
                             { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                           )}
 
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
+                          {renderEmployeeSlotEditor(
                               shift.employee2,
                               'Employee 2',
                               isExpanded ||
@@ -4372,8 +4462,7 @@ export default function SchedulePage() {
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
 
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
+                          {renderEmployeeSlotEditor(
                               shift.employee3,
                               'Employee 3',
                               (shift.showEmployee3 || Boolean(shift.employee3.employeeId)) &&
@@ -4385,8 +4474,7 @@ export default function SchedulePage() {
                               payPeriodHoursMap,
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
+                          {renderEmployeeSlotEditor(
                               shift.employee4,
                               'Employee 4',
                               (shift.visibleEmployeeSlots >= 4 || Boolean(shift.employee4.employeeId)) &&
@@ -4399,8 +4487,7 @@ export default function SchedulePage() {
                               { dateKey, shiftKey: shiftName, shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] },
                             )}
 
-                          {!isSupervisorShift &&
-                            renderEmployeeSlotEditor(
+                          {renderEmployeeSlotEditor(
                               shift.employee5,
                               'Employee 5',
                               (shift.visibleEmployeeSlots >= 5 || Boolean(shift.employee5.employeeId)) &&
@@ -4720,8 +4807,7 @@ export default function SchedulePage() {
                                 { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                               )}
 
-                              {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
+                              {renderEmployeeSlotEditor(
                                   extra.employee2,
                                   'Employee 2',
                                   isExpanded ||
@@ -4733,8 +4819,7 @@ export default function SchedulePage() {
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
 
-                              {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
+                              {renderEmployeeSlotEditor(
                                   extra.employee3,
                                   'Employee 3',
                                   (extra.showEmployee3 || Boolean(extra.employee3.employeeId)) &&
@@ -4746,8 +4831,7 @@ export default function SchedulePage() {
                                   payPeriodHoursMap,
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
-                                                            {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
+                                                            {renderEmployeeSlotEditor(
                                   extra.employee4,
                                   'Employee 4',
                                   (extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId)) &&
@@ -4760,8 +4844,7 @@ export default function SchedulePage() {
                                   { dateKey, shiftKey: extra.id, shiftLabel: extra.label },
                                 )}
 
-                              {!isSupervisorShift &&
-                                renderEmployeeSlotEditor(
+                              {renderEmployeeSlotEditor(
                                   extra.employee5,
                                   'Employee 5',
                                   (extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId)) &&
@@ -4986,16 +5069,15 @@ export default function SchedulePage() {
 
                       {renderEmployeeSlotEditor(extra.employee1, 'Employee 1', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee1', field, value), true, slotEligibilityMaps.employee1, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee2, 'Employee 2', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+                      {renderEmployeeSlotEditor(extra.employee2, 'Employee 2', true, (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee3, 'Employee 3', extra.visibleEmployeeSlots >= 3 || Boolean(extra.employee3.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+                      {renderEmployeeSlotEditor(extra.employee3, 'Employee 3', extra.visibleEmployeeSlots >= 3 || Boolean(extra.employee3.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee4, 'Employee 4', extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+                      {renderEmployeeSlotEditor(extra.employee4, 'Employee 4', extra.visibleEmployeeSlots >= 4 || Boolean(extra.employee4.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && renderEmployeeSlotEditor(extra.employee5, 'Employee 5', extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
+                      {renderEmployeeSlotEditor(extra.employee5, 'Employee 5', extra.visibleEmployeeSlots >= 5 || Boolean(extra.employee5.employeeId), (field, value) => handleExtraSlotChange(selectedExtraShift.dateKey, extra.id, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedExtraShift.dateKey, shiftKey: extra.id, shiftLabel: extra.label })}
 
-                      {!isSupervisorShift && (
-                        <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2">
                           {extra.visibleEmployeeSlots < 5 && (
                             <button type="button" onClick={() => handleAddEmployeeSlotToExtra(selectedExtraShift.dateKey, extra.id)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
                               Add Employee
@@ -5008,7 +5090,6 @@ export default function SchedulePage() {
                             </button>
                           )}
                         </div>
-                      )}
 
                       <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
                         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-violet-700">
@@ -5138,16 +5219,15 @@ export default function SchedulePage() {
                         <div className="space-y-3">
                           {renderEmployeeSlotEditor(selectedShift.shift.employee1, 'Employee 1', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee1', field, value), true, slotEligibilityMaps.employee1, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee2, 'Employee 2', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+                          {renderEmployeeSlotEditor(selectedShift.shift.employee2, 'Employee 2', true, (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee2', field, value), true, slotEligibilityMaps.employee2, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee3, 'Employee 3', selectedShift.shift.visibleEmployeeSlots >= 3 || Boolean(selectedShift.shift.employee3.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+                          {renderEmployeeSlotEditor(selectedShift.shift.employee3, 'Employee 3', selectedShift.shift.visibleEmployeeSlots >= 3 || Boolean(selectedShift.shift.employee3.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee3', field, value), true, slotEligibilityMaps.employee3, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee4, 'Employee 4', selectedShift.shift.visibleEmployeeSlots >= 4 || Boolean(selectedShift.shift.employee4.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+                          {renderEmployeeSlotEditor(selectedShift.shift.employee4, 'Employee 4', selectedShift.shift.visibleEmployeeSlots >= 4 || Boolean(selectedShift.shift.employee4.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee4', field, value), true, slotEligibilityMaps.employee4, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && renderEmployeeSlotEditor(selectedShift.shift.employee5, 'Employee 5', selectedShift.shift.visibleEmployeeSlots >= 5 || Boolean(selectedShift.shift.employee5.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
+                          {renderEmployeeSlotEditor(selectedShift.shift.employee5, 'Employee 5', selectedShift.shift.visibleEmployeeSlots >= 5 || Boolean(selectedShift.shift.employee5.employeeId), (field, value) => handleStandardSlotChange(selectedShift.dateKey, selectedShift.shiftName, 'employee5', field, value), true, slotEligibilityMaps.employee5, payPeriodHoursMap, { dateKey: selectedShift.dateKey, shiftKey: selectedShift.shiftName, shiftLabel: selectedShift.label })}
 
-                          {!isSupervisorShift && (
-                            <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2">
                               {selectedShift.shift.visibleEmployeeSlots < 5 && (
                                 <button type="button" onClick={() => handleAddEmployeeSlot(selectedShift.dateKey, selectedShift.shiftName)} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
                                   Add Employee
@@ -5160,7 +5240,6 @@ export default function SchedulePage() {
                                 </button>
                               )}
                             </div>
-                          )}
 
                           <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
                             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-violet-700">
