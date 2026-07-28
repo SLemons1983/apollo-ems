@@ -193,6 +193,15 @@ type VacationRequest = {
   requestedAt: string;
 };
 
+type ScheduleAuditDraft = {
+  dateKey: string;
+  shiftKey: string;
+  shiftLabel: string;
+  fieldChanged: string;
+  previousValue: string;
+  newValue: string;
+};
+
 const STORAGE_KEY = 'apollo-schedule-page-v6';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
@@ -1340,6 +1349,40 @@ function createExtraShiftId(): string {
   return `extra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getAuditShiftMap(day: DaySchedule | undefined) {
+  const shifts = new Map<string, {
+    shiftKey: string;
+    shiftLabel: string;
+    shift: ShiftAssignment | ExtraShiftAssignment;
+    isExtra: boolean;
+  }>();
+
+  if (!day) {
+    return shifts;
+  }
+
+  for (const shiftName of SHIFT_ORDER) {
+    shifts.set(shiftName, {
+      shiftKey: shiftName,
+      shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
+      shift: day.standard[shiftName],
+      isExtra: false,
+    });
+  }
+
+  for (const extra of day.extras) {
+    const shiftKey = `EXTRA::${extra.category}::${extra.id}`;
+    shifts.set(shiftKey, {
+      shiftKey,
+      shiftLabel: extra.label,
+      shift: extra,
+      isExtra: true,
+    });
+  }
+
+  return shifts;
+}
+
 export default function SchedulePage() {
   const [anchorDate, setAnchorDate] = useState<Date>(() => getGlobalPayPeriodStart(new Date()));
   const [payPeriodReady, setPayPeriodReady] = useState(false);
@@ -1368,6 +1411,7 @@ export default function SchedulePage() {
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
   const dirtyDatesRef = useRef<Set<string>>(new Set());
   const isSavingScheduleRef = useRef(false);
+  const persistedScheduleRef = useRef<ScheduleData>({});
 
   function markUnsavedChanges(dateKey?: string) {
     if (dateKey) {
@@ -1393,6 +1437,157 @@ export default function SchedulePage() {
       scheduleDataRef.current = next;
       return next;
     });
+  }
+
+  function getAuditEmployeeName(employeeId: string): string {
+    if (!employeeId) return 'Unassigned';
+    if (employeeId === OPEN_ALS_SLOT_ID) return 'Open ALS';
+    if (employeeId === OPEN_BLS_SLOT_ID) return 'Open BLS';
+
+    return employees.find((employee) => employee.id === employeeId)?.name || employeeId;
+  }
+
+  function formatAuditValue(field: keyof EmployeeSlot | keyof ShiftAssignment | 'label' | 'category', value: unknown): string {
+    if (field === 'employeeId') {
+      return getAuditEmployeeName(String(value || ''));
+    }
+
+    if (field === 'allowExtendedHours' || field === 'hiddenFromEmployees') {
+      return value ? 'Yes' : 'No';
+    }
+
+    if (field === 'shiftType') {
+      const shiftTypeLabels: Record<ShiftType, string> = {
+        REGULAR: 'Regular',
+        SICK: 'Sick',
+        VACATION: 'Vacation',
+        LEAVE: 'Leave',
+        TRAINING: 'Training',
+      };
+      return shiftTypeLabels[(value || 'REGULAR') as ShiftType] || String(value || '');
+    }
+
+    const text = String(value ?? '').trim();
+    return text || 'None';
+  }
+
+  function buildScheduleAuditDrafts(
+    previousSchedule: ScheduleData,
+    nextSchedule: ScheduleData,
+    dateKeys: string[],
+  ): ScheduleAuditDraft[] {
+    const drafts: ScheduleAuditDraft[] = [];
+    const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+
+    const addDraft = (
+      dateKey: string,
+      shiftKey: string,
+      shiftLabel: string,
+      fieldChanged: string,
+      previousValue: string,
+      newValue: string,
+    ) => {
+      if (previousValue === newValue) return;
+      drafts.push({ dateKey, shiftKey, shiftLabel, fieldChanged, previousValue, newValue });
+    };
+
+    for (const dateKey of dateKeys) {
+      const previousShifts = getAuditShiftMap(previousSchedule[dateKey]);
+      const nextShifts = getAuditShiftMap(nextSchedule[dateKey]);
+      const allShiftKeys = new Set([...previousShifts.keys(), ...nextShifts.keys()]);
+
+      for (const shiftKey of allShiftKeys) {
+        const previousEntry = previousShifts.get(shiftKey);
+        const nextEntry = nextShifts.get(shiftKey);
+        const shiftLabel = nextEntry?.shiftLabel || previousEntry?.shiftLabel || shiftKey;
+
+        if (!previousEntry && nextEntry) {
+          addDraft(dateKey, shiftKey, shiftLabel, 'Extra Shift', 'Not present', 'Created');
+        }
+
+        if (previousEntry && !nextEntry) {
+          addDraft(dateKey, shiftKey, shiftLabel, 'Extra Shift', 'Present', 'Removed');
+          continue;
+        }
+
+        if (!previousEntry || !nextEntry) continue;
+
+        const previousShift = previousEntry.shift;
+        const nextShift = nextEntry.shift;
+
+        if (previousEntry.isExtra || nextEntry.isExtra) {
+          const previousExtra = previousShift as ExtraShiftAssignment;
+          const nextExtra = nextShift as ExtraShiftAssignment;
+
+          addDraft(
+            dateKey,
+            shiftKey,
+            shiftLabel,
+            'Shift Name',
+            formatAuditValue('label', previousExtra.label),
+            formatAuditValue('label', nextExtra.label),
+          );
+          addDraft(
+            dateKey,
+            shiftKey,
+            shiftLabel,
+            'Shift Category',
+            formatAuditValue('category', previousExtra.category),
+            formatAuditValue('category', nextExtra.category),
+          );
+        }
+
+        const shiftFields: Array<{
+          key: 'vehicle' | 'allowExtendedHours' | 'hiddenFromEmployees' | 'supervisorNote' | 'visibleEmployeeSlots';
+          label: string;
+        }> = [
+          { key: 'vehicle', label: 'Vehicle' },
+          { key: 'allowExtendedHours', label: 'Extended Hours Approved' },
+          { key: 'hiddenFromEmployees', label: 'Hidden From Employees' },
+          { key: 'supervisorNote', label: 'Supervisor Note' },
+          { key: 'visibleEmployeeSlots', label: 'Visible Employee Slots' },
+        ];
+
+        for (const field of shiftFields) {
+          addDraft(
+            dateKey,
+            shiftKey,
+            shiftLabel,
+            field.label,
+            formatAuditValue(field.key, previousShift[field.key]),
+            formatAuditValue(field.key, nextShift[field.key]),
+          );
+        }
+
+        for (let index = 0; index < slotKeys.length; index += 1) {
+          const slotKey = slotKeys[index];
+          const previousSlot = previousShift[slotKey];
+          const nextSlot = nextShift[slotKey];
+          const slotLabel = `Employee ${index + 1}`;
+
+          const slotFields: Array<{ key: keyof EmployeeSlot; label: string }> = [
+            { key: 'employeeId', label: 'Assignment' },
+            { key: 'startTime', label: 'Start Time' },
+            { key: 'endTime', label: 'End Time' },
+            { key: 'shiftType', label: 'Shift Type' },
+            { key: 'note', label: 'Employee Note' },
+          ];
+
+          for (const field of slotFields) {
+            addDraft(
+              dateKey,
+              shiftKey,
+              shiftLabel,
+              `${slotLabel} — ${field.label}`,
+              formatAuditValue(field.key, previousSlot[field.key]),
+              formatAuditValue(field.key, nextSlot[field.key]),
+            );
+          }
+        }
+      }
+    }
+
+    return drafts;
   }
 
   useEffect(() => {
@@ -1668,7 +1863,9 @@ export default function SchedulePage() {
         }
 
         if (isActive) {
-          setScheduleDataSafely(normalizeLoadedData(rebuilt));
+          const normalizedRebuilt = normalizeLoadedData(rebuilt);
+          persistedScheduleRef.current = cloneScheduleData(normalizedRebuilt);
+          setScheduleDataSafely(normalizedRebuilt);
         }
       } catch (error) {
         console.error('Failed to load schedule from Supabase:', error);
@@ -1760,6 +1957,12 @@ export default function SchedulePage() {
           : Object.keys(normalizedSchedule);
 
       console.log(`Apollo schedule save started: ${datesToSave.length} of ${Object.keys(normalizedSchedule).length} dates.`);
+
+      const auditDrafts = buildScheduleAuditDrafts(
+        normalizeLoadedData(persistedScheduleRef.current),
+        normalizedSchedule,
+        datesToSave,
+      );
 
       const saveTasks: Promise<any>[] = [];
 
@@ -1910,6 +2113,49 @@ export default function SchedulePage() {
 
       await Promise.all(saveTasks);
 
+      if (auditDrafts.length > 0) {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          console.error('Unable to identify supervisor for schedule audit:', userError);
+        }
+
+        const user = userData.user;
+        const metadata = user?.user_metadata ?? {};
+        const supervisorName =
+          metadata.full_name ||
+          metadata.name ||
+          [metadata.first_name, metadata.last_name].filter(Boolean).join(' ') ||
+          user?.email ||
+          'Unknown Supervisor';
+        const saveBatchId = crypto.randomUUID();
+
+        const auditRows = auditDrafts.map((draft) => ({
+          save_batch_id: saveBatchId,
+          supervisor_user_id: user?.id ?? null,
+          supervisor_name: supervisorName,
+          supervisor_email: user?.email ?? null,
+          date_key: draft.dateKey,
+          shift_key: draft.shiftKey,
+          shift_label: draft.shiftLabel,
+          field_changed: draft.fieldChanged,
+          previous_value: draft.previousValue,
+          new_value: draft.newValue,
+        }));
+
+        const { error: auditError } = await supabase
+          .from('schedule_change_log')
+          .insert(auditRows);
+
+        if (auditError) {
+          console.error('Schedule saved but audit log insert failed:', auditError);
+          setHasUnsavedChanges(true);
+          setSaveStatus('Action Required — schedule saved, but the changes log failed. Click Confirm Changes to retry.');
+          window.alert('The schedule was saved, but Apollo could not save the Schedule Changes Log. The editor will remain open so you can retry.');
+          return false;
+        }
+      }
+
+      persistedScheduleRef.current = cloneScheduleData(normalizedSchedule);
       dirtyDatesRef.current.clear();
       setHasUnsavedChanges(false);
 
