@@ -1544,6 +1544,131 @@ export default function EmployeeProfilesPage() {
   }
 
 
+  async function handleEmployeeCertificationDocumentRemove(
+    employeeId: string,
+    field: CertificationField,
+    label: string,
+    document: CertificationDocument | undefined,
+  ) {
+    const documentKey = getCertificationDocumentKey(field);
+
+    if (!documentKey || !document?.path) {
+      window.alert('No certification document is currently on file.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove the uploaded ${label} document?\n\n${document.filename}\n\nThe certification expiration date or license number will remain unchanged.`,
+    );
+
+    if (!confirmed) return;
+
+    const statusKey = `${employeeId}-${field}`;
+
+    setCertificationDocumentUploading((current) => ({
+      ...current,
+      [statusKey]: true,
+    }));
+
+    setCertificationDocumentStatus((current) => ({
+      ...current,
+      [statusKey]: 'Removing document...',
+    }));
+
+    try {
+      const response = await fetch(
+        '/api/employee-certifications/remove',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            employeeId,
+            certificationField: field,
+            documentPath: document.path,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || 'Unable to remove certification document.',
+        );
+      }
+
+      setEditingEmployees((current) => {
+        const existing =
+          current[employeeId] ??
+          employees.find((employee) => employee.id === employeeId);
+
+        if (!existing) return current;
+
+        const nextCertifications =
+          normalizeCertificationRecord(existing.certifications);
+
+        delete nextCertifications[documentKey];
+
+        return {
+          ...current,
+          [employeeId]: normalizeEmployee({
+            ...existing,
+            certifications: nextCertifications,
+          }),
+        };
+      });
+
+      setEmployees((current) =>
+        current.map((employee) => {
+          if (employee.id !== employeeId) return employee;
+
+          const nextCertifications =
+            normalizeCertificationRecord(employee.certifications);
+
+          delete nextCertifications[documentKey];
+
+          return normalizeEmployee({
+            ...employee,
+            certifications: nextCertifications,
+          });
+        }),
+      );
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]: 'Certification document removed.',
+      }));
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Document removed.',
+      }));
+    } catch (error) {
+      console.error(
+        'Employee certification document removal failed:',
+        error,
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Certification document removal failed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+    } finally {
+      setCertificationDocumentUploading((current) => ({
+        ...current,
+        [statusKey]: false,
+      }));
+    }
+  }
+
+
   async function saveEmployeeChanges(employeeId: string) {
     const draft = editingEmployees[employeeId];
     if (!draft) {
@@ -1948,6 +2073,26 @@ export default function EmployeeProfilesPage() {
                           >
                             View Current
                           </button>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() =>
+                              void handleEmployeeCertificationDocumentRemove(
+                                employeeId,
+                                field,
+                                label,
+                                document,
+                              )
+                            }
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-red-300 bg-white text-red-700 hover:bg-red-50'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            Remove Document
+                          </button>
                         </div>
 
                         {documentStatus && (
@@ -2051,6 +2196,26 @@ export default function EmployeeProfilesPage() {
                             }`}
                           >
                             View Current
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() =>
+                              void handleEmployeeCertificationDocumentRemove(
+                                employeeId,
+                                field,
+                                label,
+                                document,
+                              )
+                            }
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-red-300 bg-white text-red-700 hover:bg-red-50'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            Remove Document
                           </button>
                         </div>
 
@@ -2194,6 +2359,26 @@ export default function EmployeeProfilesPage() {
                             }`}
                           >
                             View Current
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={!document || isUploadingDocument}
+                            onClick={() =>
+                              void handleEmployeeCertificationDocumentRemove(
+                                employeeId,
+                                field,
+                                label,
+                                document,
+                              )
+                            }
+                            className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              document && !isUploadingDocument
+                                ? 'border-red-300 bg-white text-red-700 hover:bg-red-50'
+                                : 'border-slate-200 bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            Remove Document
                           </button>
                         </div>
 
