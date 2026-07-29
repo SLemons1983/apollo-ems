@@ -5294,317 +5294,6 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div
-            className={`border-b p-5 ${
-              certificationStatus.isCompliant
-                ? 'border-emerald-200 bg-emerald-50'
-                : 'border-red-200 bg-red-50'
-            }`}
-          >
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  My Certifications
-                </div>
-                <div className="mt-2 text-xl font-extrabold text-slate-950">
-                  {currentEmployee
-                    ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope}`
-                    : 'Employee profile not loaded'}
-                </div>
-                <div
-                  className={`mt-2 text-sm font-semibold ${
-                    certificationStatus.isCompliant
-                      ? 'text-emerald-800'
-                      : 'text-red-800'
-                  }`}
-                >
-                  {certificationStatus.isCompliant
-                    ? 'All required certifications are current.'
-                    : `Action needed: ${certificationStatus.missingOrExpired.join(', ')}`}
-                </div>
-              </div>
-
-              <div
-                className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-extrabold ${
-                  certificationStatus.isCompliant
-                    ? 'bg-emerald-700 text-white'
-                    : 'bg-red-700 text-white'
-                }`}
-              >
-                {certificationStatus.isCompliant
-                  ? '● Compliant'
-                  : '● Action Needed'}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6 p-5">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">
-                  Current
-                </div>
-                <div className="mt-1 text-3xl font-extrabold text-emerald-900">
-                  {certificationSummary.current}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                  Expiring Soon
-                </div>
-                <div className="mt-1 text-3xl font-extrabold text-amber-900">
-                  {certificationSummary.expiringSoon}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-red-700">
-                  Expired
-                </div>
-                <div className="mt-1 text-3xl font-extrabold text-red-900">
-                  {certificationSummary.expired}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-red-700">
-                  Missing
-                </div>
-                <div className="mt-1 text-3xl font-extrabold text-red-900">
-                  {certificationSummary.missing}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-                <div className="text-xs font-bold uppercase tracking-wide text-blue-700">
-                  Next Expiration
-                </div>
-                <div className="mt-1 text-sm font-extrabold text-blue-950">
-                  {certificationStatus.nextExpiring
-                    ? certificationStatus.nextExpiring.label
-                    : 'None found'}
-                </div>
-                <div className="mt-1 text-xs font-semibold text-blue-800">
-                  {certificationStatus.nextExpiring
-                    ? formatShortDate(
-                        certificationStatus.nextExpiring.date,
-                      )
-                    : 'No upcoming date'}
-                </div>
-              </div>
-            </div>
-
-            {certificationDocumentStatus && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
-                {certificationDocumentStatus}
-              </div>
-            )}
-
-            <section>
-              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-extrabold text-slate-950">
-                    Required Certifications
-                  </h2>
-                  <p className="text-sm text-slate-600">
-                    Required for your assigned {currentEmployee?.scope ?? 'EMS'} scope.
-                  </p>
-                </div>
-
-                <div className="text-xs font-semibold text-slate-500">
-                  Yellow indicates expiration within 90 days.
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {requiredCertificationCards.map((certification) => (
-                  <article
-                    key={certification.key}
-                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-extrabold text-slate-950">
-                          {certification.label}
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {certification.expirationDate
-                            ? `Expires ${formatCertificationDate(
-                                certification.expirationDate,
-                              )}`
-                            : 'Expiration date not entered'}
-                        </p>
-                      </div>
-
-                      <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
-                          certification.status,
-                        )}`}
-                      >
-                        {getCertificationStatusLabel(
-                          certification.status,
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="mt-4">
-                      {certification.document ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleViewCertificationDocument(
-                              certification.document!,
-                            )
-                          }
-                          className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
-                        >
-                          View Document
-                        </button>
-                      ) : (
-                        <span className="text-xs font-semibold text-slate-400">
-                          No document uploaded
-                        </span>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="border-t border-slate-200 pt-6">
-              <div className="mb-3">
-                <h2 className="text-lg font-extrabold text-slate-950">
-                  Additional Certifications
-                </h2>
-                <p className="text-sm text-slate-600">
-                  Optional, specialty, instructor, and other professional certifications.
-                </p>
-              </div>
-
-              {additionalCertificationCards.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                  <div className="font-bold text-slate-800">
-                    No additional certifications on file
-                  </div>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Additional certifications can be added from the Employees page.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {additionalCertificationCards.map((certification) => {
-                    const status = getCertificationDisplayStatus(
-                      certification.expirationDate,
-                      true,
-                    );
-
-                    return (
-                      <article
-                        key={certification.id}
-                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-extrabold text-slate-950">
-                              {certification.name ||
-                                'Unnamed Certification'}
-                            </h3>
-                            <p className="mt-1 text-sm font-semibold text-slate-600">
-                              {certification.issuingAgency ||
-                                'Issuing agency not entered'}
-                            </p>
-                          </div>
-
-                          <span
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
-                              status,
-                            )}`}
-                          >
-                            {getCertificationStatusLabel(status)}
-                          </span>
-                        </div>
-
-                        <dl className="mt-4 space-y-2 text-sm">
-                          {certification.certificationNumber && (
-                            <div>
-                              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Certification Number
-                              </dt>
-                              <dd className="font-semibold text-slate-800">
-                                {certification.certificationNumber}
-                              </dd>
-                            </div>
-                          )}
-
-                          {certification.issueDate && (
-                            <div>
-                              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                                Issued
-                              </dt>
-                              <dd className="font-semibold text-slate-800">
-                                {formatCertificationDate(
-                                  certification.issueDate,
-                                )}
-                              </dd>
-                            </div>
-                          )}
-
-                          <div>
-                            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                              Expiration
-                            </dt>
-                            <dd className="font-semibold text-slate-800">
-                              {certification.expirationDate
-                                ? formatCertificationDate(
-                                    certification.expirationDate,
-                                  )
-                                : 'No expiration'}
-                            </dd>
-                          </div>
-                        </dl>
-
-                        {certification.notes && (
-                          <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
-                            {certification.notes}
-                          </div>
-                        )}
-
-                        <div className="mt-4">
-                          {certification.document ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleViewCertificationDocument(
-                                  certification.document!,
-                                )
-                              }
-                              className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
-                            >
-                              View Document
-                            </button>
-                          ) : (
-                            <span className="text-xs font-semibold text-slate-400">
-                              No document uploaded
-                            </span>
-                          )}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-              Certification records and documents are maintained by authorized
-              personnel on the Employees page. Contact a supervisor when a
-              certification needs to be added, replaced, or corrected.
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <a
             className="weatherwidget-io"
             href="https://forecast7.com/en/36d60n119d45/reedley/?unit=us"
@@ -5617,6 +5306,312 @@ export default function DashboardPage() {
         </div>
 
         <div className="space-y-4">
+          {renderTile(
+            'schedule',
+            'Schedule',
+            'View your assigned shifts or the full pay period schedule. Request time off or open shifts from shift details.',
+            <div>
+              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {showOpenShiftsOnly
+                      ? 'Showing eligible open shifts. Staffing Priority shifts are available to every active employee and still require supervisor approval.'
+                      : showFullSchedule
+                        ? 'Showing the full schedule with your assignments highlighted.'
+                        : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
+                  </div>
+                  {nextMyShift && (
+                    <div className="mt-1 text-sm text-slate-600">
+                      Next shift: {nextMyShift.label} on {formatShortDate(nextMyShift.date)} at {nextMyShift.startTime}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={selectedPayPeriod.key}
+                    onChange={(event) => setSelectedPayPeriodKey(event.target.value)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                  >
+                    {payPeriodOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {`Pay Period ${option.number} (${formatShortDate(option.start)} - ${formatShortDate(option.end)})`}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPayPeriodKey(currentPayPeriod.key);
+                      reloadPublishedSchedule();
+                    }}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Current
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={reloadPublishedSchedule}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Refresh Schedule
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowShiftTradeModal(true)}
+                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                  >
+                    Shift Trade
+                  </button>
+
+                  <div className="inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFullSchedule(false);
+                        setShowOpenShiftsOnly(false);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                        !showFullSchedule && !showOpenShiftsOnly
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      My Schedule
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFullSchedule(false);
+                        setShowOpenShiftsOnly(true);
+                      }}
+                      className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                        showOpenShiftsOnly
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      Show Open Shifts
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowFullSchedule(true);
+                        setShowOpenShiftsOnly(false);
+                      }}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                        showFullSchedule ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Full Schedule
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {!showFullSchedule && !showOpenShiftsOnly ? (
+                  renderMyScheduleCards()
+                ) : (
+                  <>
+                    {renderScheduleWeek('Week 1', week1Dates)}
+                    {renderScheduleWeek('Week 2', week2Dates)}
+                  </>
+                )}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Later, clicking a scheduled workday will open a shift detail page with public supervisor notes, time off requests, and open shift request actions.
+              </div>
+            </div>,
+          )}
+
+          {showShiftTradeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+              <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-start justify-between border-b border-slate-200 p-5">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Shift Trade</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Select one of your shifts, then choose an eligible shift to trade into.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowShiftTradeModal(false)}
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="grid flex-1 gap-5 overflow-y-auto p-5 lg:grid-cols-2">
+                  <div>
+                    <div className="mb-3 text-sm font-bold text-slate-900">
+                      Step 1: Select one of your shifts
+                    </div>
+                    {getMyTradeAssignments().length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        No assigned shifts were found in this pay period.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {getMyTradeAssignments().map(({ date, dateKey, assignment, slot, tradeKey }) => {
+                          const selected = selectedTradeShiftKey === tradeKey;
+
+                          return (
+                            <button
+                              type="button"
+                              key={tradeKey}
+                              onClick={() => {
+                                setSelectedTradeShiftKey(tradeKey);
+                                setSelectedTradeTargetKey('');
+                                setShiftTradeRequestStatus('');
+                              }}
+                              className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                                selected
+                                  ? 'border-amber-500 bg-amber-50 shadow-md'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-bold text-slate-900">{formatDayLabel(date)}</div>
+                                  <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
+                                </div>
+                                {selected && (
+                                  <span className="rounded-full bg-amber-600 px-2.5 py-1 text-xs font-bold text-white">
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
+                              <div className="mt-1 text-sm font-semibold text-slate-700">
+                                {slot.startTime} - {slot.endTime}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-3 text-sm font-bold text-slate-900">
+                      Step 2: Eligible trade targets
+                    </div>
+                    {!selectedTradeShiftKey ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        Select one of your shifts first.
+                      </div>
+                    ) : getEligibleTradeTargets().length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                        No eligible same-scope, same-duration future trade targets were found.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {getEligibleTradeTargets().map(({ date, dateKey, assignment, slot, targetKey, targetName, isOpenSlot }) => (
+                          <button
+                            type="button"
+                            key={targetKey}
+                            onClick={() => {
+                              setSelectedTradeTargetKey(targetKey);
+                              setShiftTradeRequestStatus('');
+                            }}
+                            className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                              selectedTradeTargetKey === targetKey
+                                ? 'border-amber-500 bg-amber-50 shadow-md'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-bold text-slate-900">{targetName}</div>
+                                <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
+                              </div>
+                              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                isOpenSlot ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {isOpenSlot ? 'Open' : 'Employee'}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
+                            <div className="mt-1 text-sm font-semibold text-slate-700">
+                              {formatDayLabel(date)} • {slot.startTime} - {slot.endTime}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 p-5">
+                  {shiftTradeRequestStatus && (
+                    <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                      {shiftTradeRequestStatus}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <button
+                      type="button"
+                      onClick={submitShiftTradeRequest}
+                      disabled={!selectedTradeShiftKey || !selectedTradeTargetKey}
+                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      Submit Shift Trade Request
+                    </button>
+
+                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 lg:max-w-xl">
+                      <div className="text-sm font-bold text-slate-900">Your Trade Requests</div>
+                      {getMyShiftTradeRequests().length === 0 ? (
+                        <div className="mt-2 text-sm text-slate-500">
+                          No shift trade requests submitted for this pay period.
+                        </div>
+                      ) : (
+                        <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                          {getMyShiftTradeRequests().map((request) => (
+                            <div
+                              key={request.id}
+                              className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                            >
+                              <div className="font-bold text-slate-900">
+                                {request.requestingShiftLabel} {request.requestingDateKey}
+                                {' → '}
+                                {request.targetShiftLabel} {request.targetDateKey}
+                              </div>
+                              <div className="mt-1 text-xs font-semibold text-slate-600">
+                                {request.requestingStartTime}-{request.requestingEndTime}
+                                {' → '}
+                                {request.targetStartTime}-{request.targetEndTime}
+                              </div>
+                              <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                                {getShiftTradeStatusLabel(request.status)}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                Target: {request.targetIsOpenShift ? 'Open Shift' : request.targetEmployeeName ?? 'Employee'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {renderTile(
             'timecard',
             'Timecard',
@@ -6290,309 +6285,326 @@ export default function DashboardPage() {
           )}
 
           {renderTile(
-            'schedule',
-            'Schedule',
-            'View your assigned shifts or the full pay period schedule. Request time off or open shifts from shift details.',
+            'certifications',
+            'My Certifications',
+            certificationStatus.isCompliant
+              ? certificationSummary.expiringSoon > 0
+                ? `${certificationSummary.expiringSoon} certification${certificationSummary.expiringSoon === 1 ? '' : 's'} expiring soon.`
+                : 'All required certifications are current.'
+              : `${certificationStatus.missingOrExpired.length} certification${certificationStatus.missingOrExpired.length === 1 ? '' : 's'} require attention.`,
             <div>
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div
+              className={`border-b p-5 ${
+                certificationStatus.isCompliant
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-red-200 bg-red-50'
+              }`}
+            >
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
+                  <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                    My Certifications
                   </div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    {showOpenShiftsOnly
-                      ? 'Showing eligible open shifts. Staffing Priority shifts are available to every active employee and still require supervisor approval.'
-                      : showFullSchedule
-                        ? 'Showing the full schedule with your assignments highlighted.'
-                        : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
+                  <div className="mt-2 text-xl font-extrabold text-slate-950">
+                    {currentEmployee
+                      ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope}`
+                      : 'Employee profile not loaded'}
                   </div>
-                  {nextMyShift && (
-                    <div className="mt-1 text-sm text-slate-600">
-                      Next shift: {nextMyShift.label} on {formatShortDate(nextMyShift.date)} at {nextMyShift.startTime}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={selectedPayPeriod.key}
-                    onChange={(event) => setSelectedPayPeriodKey(event.target.value)}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                  <div
+                    className={`mt-2 text-sm font-semibold ${
+                      certificationStatus.isCompliant
+                        ? 'text-emerald-800'
+                        : 'text-red-800'
+                    }`}
                   >
-                    {payPeriodOptions.map((option) => (
-                      <option key={option.key} value={option.key}>
-                        {`Pay Period ${option.number} (${formatShortDate(option.start)} - ${formatShortDate(option.end)})`}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedPayPeriodKey(currentPayPeriod.key);
-                      reloadPublishedSchedule();
-                    }}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Current
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={reloadPublishedSchedule}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Refresh Schedule
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowShiftTradeModal(true)}
-                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
-                  >
-                    Shift Trade
-                  </button>
-
-                  <div className="inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowFullSchedule(false);
-                        setShowOpenShiftsOnly(false);
-                      }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                        !showFullSchedule && !showOpenShiftsOnly
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      My Schedule
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowFullSchedule(false);
-                        setShowOpenShiftsOnly(true);
-                      }}
-                      className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
-                        showOpenShiftsOnly
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      Show Open Shifts
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowFullSchedule(true);
-                        setShowOpenShiftsOnly(false);
-                      }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                        showFullSchedule ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      Full Schedule
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {!showFullSchedule && !showOpenShiftsOnly ? (
-                  renderMyScheduleCards()
-                ) : (
-                  <>
-                    {renderScheduleWeek('Week 1', week1Dates)}
-                    {renderScheduleWeek('Week 2', week2Dates)}
-                  </>
-                )}
-              </div>
-
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Later, clicking a scheduled workday will open a shift detail page with public supervisor notes, time off requests, and open shift request actions.
-              </div>
-            </div>,
-          )}
-
-          {showShiftTradeModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-              <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
-                <div className="flex items-start justify-between border-b border-slate-200 p-5">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">Shift Trade</h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Select one of your shifts, then choose an eligible shift to trade into.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowShiftTradeModal(false)}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                <div className="grid flex-1 gap-5 overflow-y-auto p-5 lg:grid-cols-2">
-                  <div>
-                    <div className="mb-3 text-sm font-bold text-slate-900">
-                      Step 1: Select one of your shifts
-                    </div>
-                    {getMyTradeAssignments().length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                        No assigned shifts were found in this pay period.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {getMyTradeAssignments().map(({ date, dateKey, assignment, slot, tradeKey }) => {
-                          const selected = selectedTradeShiftKey === tradeKey;
-
-                          return (
-                            <button
-                              type="button"
-                              key={tradeKey}
-                              onClick={() => {
-                                setSelectedTradeShiftKey(tradeKey);
-                                setSelectedTradeTargetKey('');
-                                setShiftTradeRequestStatus('');
-                              }}
-                              className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
-                                selected
-                                  ? 'border-amber-500 bg-amber-50 shadow-md'
-                                  : 'border-slate-300 bg-white'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <div className="text-sm font-bold text-slate-900">{formatDayLabel(date)}</div>
-                                  <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
-                                </div>
-                                {selected && (
-                                  <span className="rounded-full bg-amber-600 px-2.5 py-1 text-xs font-bold text-white">
-                                    Selected
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
-                              <div className="mt-1 text-sm font-semibold text-slate-700">
-                                {slot.startTime} - {slot.endTime}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="mb-3 text-sm font-bold text-slate-900">
-                      Step 2: Eligible trade targets
-                    </div>
-                    {!selectedTradeShiftKey ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                        Select one of your shifts first.
-                      </div>
-                    ) : getEligibleTradeTargets().length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                        No eligible same-scope, same-duration future trade targets were found.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {getEligibleTradeTargets().map(({ date, dateKey, assignment, slot, targetKey, targetName, isOpenSlot }) => (
-                          <button
-                            type="button"
-                            key={targetKey}
-                            onClick={() => {
-                              setSelectedTradeTargetKey(targetKey);
-                              setShiftTradeRequestStatus('');
-                            }}
-                            className={`w-full rounded-xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
-                              selectedTradeTargetKey === targetKey
-                                ? 'border-amber-500 bg-amber-50 shadow-md'
-                                : 'border-slate-300 bg-white'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-bold text-slate-900">{targetName}</div>
-                                <div className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{dateKey}</div>
-                              </div>
-                              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${
-                                isOpenSlot ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-                              }`}>
-                                {isOpenSlot ? 'Open' : 'Employee'}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 text-lg font-extrabold text-slate-950">{assignment.label}</div>
-                            <div className="mt-1 text-sm font-semibold text-slate-700">
-                              {formatDayLabel(date)} • {slot.startTime} - {slot.endTime}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    {certificationStatus.isCompliant
+                      ? 'All required certifications are current.'
+                      : `Action needed: ${certificationStatus.missingOrExpired.join(', ')}`}
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 p-5">
-                  {shiftTradeRequestStatus && (
-                    <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                      {shiftTradeRequestStatus}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <button
-                      type="button"
-                      onClick={submitShiftTradeRequest}
-                      disabled={!selectedTradeShiftKey || !selectedTradeTargetKey}
-                      className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      Submit Shift Trade Request
-                    </button>
-
-                    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 lg:max-w-xl">
-                      <div className="text-sm font-bold text-slate-900">Your Trade Requests</div>
-                      {getMyShiftTradeRequests().length === 0 ? (
-                        <div className="mt-2 text-sm text-slate-500">
-                          No shift trade requests submitted for this pay period.
-                        </div>
-                      ) : (
-                        <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
-                          {getMyShiftTradeRequests().map((request) => (
-                            <div
-                              key={request.id}
-                              className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
-                            >
-                              <div className="font-bold text-slate-900">
-                                {request.requestingShiftLabel} {request.requestingDateKey}
-                                {' → '}
-                                {request.targetShiftLabel} {request.targetDateKey}
-                              </div>
-                              <div className="mt-1 text-xs font-semibold text-slate-600">
-                                {request.requestingStartTime}-{request.requestingEndTime}
-                                {' → '}
-                                {request.targetStartTime}-{request.targetEndTime}
-                              </div>
-                              <div className="mt-2 inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-                                {getShiftTradeStatusLabel(request.status)}
-                              </div>
-                              <div className="mt-1 text-xs text-slate-500">
-                                Target: {request.targetIsOpenShift ? 'Open Shift' : request.targetEmployeeName ?? 'Employee'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                <div
+                  className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-extrabold ${
+                    certificationStatus.isCompliant
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-red-700 text-white'
+                  }`}
+                >
+                  {certificationStatus.isCompliant
+                    ? '● Compliant'
+                    : '● Action Needed'}
                 </div>
               </div>
             </div>
+
+            <div className="space-y-6 p-5">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                    Current
+                  </div>
+                  <div className="mt-1 text-3xl font-extrabold text-emerald-900">
+                    {certificationSummary.current}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                    Expiring Soon
+                  </div>
+                  <div className="mt-1 text-3xl font-extrabold text-amber-900">
+                    {certificationSummary.expiringSoon}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-red-700">
+                    Expired
+                  </div>
+                  <div className="mt-1 text-3xl font-extrabold text-red-900">
+                    {certificationSummary.expired}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-red-700">
+                    Missing
+                  </div>
+                  <div className="mt-1 text-3xl font-extrabold text-red-900">
+                    {certificationSummary.missing}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <div className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                    Next Expiration
+                  </div>
+                  <div className="mt-1 text-sm font-extrabold text-blue-950">
+                    {certificationStatus.nextExpiring
+                      ? certificationStatus.nextExpiring.label
+                      : 'None found'}
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-blue-800">
+                    {certificationStatus.nextExpiring
+                      ? formatShortDate(
+                          certificationStatus.nextExpiring.date,
+                        )
+                      : 'No upcoming date'}
+                  </div>
+                </div>
+              </div>
+
+              {certificationDocumentStatus && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
+                  {certificationDocumentStatus}
+                </div>
+              )}
+
+              <section>
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-950">
+                      Required Certifications
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      Required for your assigned {currentEmployee?.scope ?? 'EMS'} scope.
+                    </p>
+                  </div>
+
+                  <div className="text-xs font-semibold text-slate-500">
+                    Yellow indicates expiration within 90 days.
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {requiredCertificationCards.map((certification) => (
+                    <article
+                      key={certification.key}
+                      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-extrabold text-slate-950">
+                            {certification.label}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600">
+                            {certification.expirationDate
+                              ? `Expires ${formatCertificationDate(
+                                  certification.expirationDate,
+                                )}`
+                              : 'Expiration date not entered'}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
+                            certification.status,
+                          )}`}
+                        >
+                          {getCertificationStatusLabel(
+                            certification.status,
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="mt-4">
+                        {certification.document ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleViewCertificationDocument(
+                                certification.document!,
+                              )
+                            }
+                            className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                          >
+                            View Document
+                          </button>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-400">
+                            No document uploaded
+                          </span>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="border-t border-slate-200 pt-6">
+                <div className="mb-3">
+                  <h2 className="text-lg font-extrabold text-slate-950">
+                    Additional Certifications
+                  </h2>
+                  <p className="text-sm text-slate-600">
+                    Optional, specialty, instructor, and other professional certifications.
+                  </p>
+                </div>
+
+                {additionalCertificationCards.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                    <div className="font-bold text-slate-800">
+                      No additional certifications on file
+                    </div>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Additional certifications can be added from the Employees page.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {additionalCertificationCards.map((certification) => {
+                      const status = getCertificationDisplayStatus(
+                        certification.expirationDate,
+                        true,
+                      );
+
+                      return (
+                        <article
+                          key={certification.id}
+                          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-extrabold text-slate-950">
+                                {certification.name ||
+                                  'Unnamed Certification'}
+                              </h3>
+                              <p className="mt-1 text-sm font-semibold text-slate-600">
+                                {certification.issuingAgency ||
+                                  'Issuing agency not entered'}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
+                                status,
+                              )}`}
+                            >
+                              {getCertificationStatusLabel(status)}
+                            </span>
+                          </div>
+
+                          <dl className="mt-4 space-y-2 text-sm">
+                            {certification.certificationNumber && (
+                              <div>
+                                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Certification Number
+                                </dt>
+                                <dd className="font-semibold text-slate-800">
+                                  {certification.certificationNumber}
+                                </dd>
+                              </div>
+                            )}
+
+                            {certification.issueDate && (
+                              <div>
+                                <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  Issued
+                                </dt>
+                                <dd className="font-semibold text-slate-800">
+                                  {formatCertificationDate(
+                                    certification.issueDate,
+                                  )}
+                                </dd>
+                              </div>
+                            )}
+
+                            <div>
+                              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Expiration
+                              </dt>
+                              <dd className="font-semibold text-slate-800">
+                                {certification.expirationDate
+                                  ? formatCertificationDate(
+                                      certification.expirationDate,
+                                    )
+                                  : 'No expiration'}
+                              </dd>
+                            </div>
+                          </dl>
+
+                          {certification.notes && (
+                            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                              {certification.notes}
+                            </div>
+                          )}
+
+                          <div className="mt-4">
+                            {certification.document ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleViewCertificationDocument(
+                                    certification.document!,
+                                  )
+                                }
+                                className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                              >
+                                View Document
+                              </button>
+                            ) : (
+                              <span className="text-xs font-semibold text-slate-400">
+                                No document uploaded
+                              </span>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                Certification records and documents are maintained by authorized
+                personnel on the Employees page. Contact a supervisor when a
+                certification needs to be added, replaced, or corrected.
+              </div>
+            </div>
+          </div>
+            </div>,
+            !certificationStatus.isCompliant,
           )}
 
           {renderTile(
@@ -6911,25 +6923,6 @@ export default function DashboardPage() {
           )}
 
           {renderTile(
-            'employee-handbook',
-            'Employee Handbook',
-            'View the company Employee Policy Manual / SOP.',
-            <div>
-              <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                The current handbook is the Sequoia Safety Council Employee Policy Manual, effective January 1, 2026.
-              </div>
-              <iframe
-                src="/Employee Handbook.pdf"
-                title="Employee Handbook"
-                className="h-[720px] w-full rounded-xl border border-slate-200 bg-white"
-              />
-              <div className="mt-3 text-xs text-slate-500">
-                Place the handbook PDF in the project's public folder as: public/Employee Handbook.pdf
-              </div>
-            </div>,
-          )}
-
-          {renderTile(
             'unit-inspection',
             'Daily Unit Inspection',
             'Complete the daily ambulance checklist and submit required vehicle photos.',
@@ -7132,6 +7125,25 @@ export default function DashboardPage() {
                 {isSubmittingIncidentReport ? 'Submitting...' : 'Submit Incident Report'}
               </button>
             </form>,
+          )}
+
+          {renderTile(
+            'employee-handbook',
+            'Employee Handbook',
+            'View the company Employee Policy Manual / SOP.',
+            <div>
+              <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                The current handbook is the Sequoia Safety Council Employee Policy Manual, effective January 1, 2026.
+              </div>
+              <iframe
+                src="/Employee Handbook.pdf"
+                title="Employee Handbook"
+                className="h-[720px] w-full rounded-xl border border-slate-200 bg-white"
+              />
+              <div className="mt-3 text-xs text-slate-500">
+                Place the handbook PDF in the project's public folder as: public/Employee Handbook.pdf
+              </div>
+            </div>,
           )}
 
           {renderTile(
