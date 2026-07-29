@@ -1424,6 +1424,7 @@ export default function SchedulePage() {
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
   const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
   const [showScheduleKey, setShowScheduleKey] = useState(false);
+  const [showScheduleChanges, setShowScheduleChanges] = useState(false);
   const [scheduleChangeLog, setScheduleChangeLog] = useState<ScheduleChangeLogEntry[]>([]);
   const [scheduleChangeLogLoading, setScheduleChangeLogLoading] = useState(false);
   const [scheduleChangeLogError, setScheduleChangeLogError] = useState('');
@@ -4480,42 +4481,65 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        <section className="mb-6 rounded-2xl border border-slate-400 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-400 bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowScheduleChanges((current) => !current)}
+            aria-expanded={showScheduleChanges}
+            className="flex w-full flex-col gap-3 p-4 text-left transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
+          >
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Schedule Changes</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">Schedule Changes</h2>
+
+                <span className="rounded-lg bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">
+                  {groupedScheduleChangeLog.length} save{groupedScheduleChangeLog.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
               <p className="mt-1 text-sm text-slate-600">
-                The 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.
+                {showScheduleChanges
+                  ? 'The 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.'
+                  : groupedScheduleChangeLog.length > 0
+                    ? `${filteredScheduleChangeLog.length} change${filteredScheduleChangeLog.length === 1 ? '' : 's'} recorded in this view.`
+                    : 'No schedule changes recorded in this view.'}
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Show
-                </label>
-                <select
-                  value={scheduleChangeLogFilter}
-                  onChange={(event) => setScheduleChangeLogFilter(event.target.value as ScheduleChangeLogFilter)}
-                  className="min-w-[220px] rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
-                >
-                  <option value="PAY_PERIOD">Entire Selected Pay Period</option>
-                  <option value="TODAY">Today</option>
-                  <option value="LAST_7_DAYS">Last 7 Days</option>
-                  <option value="MINE_ONLY">Mine Only</option>
-                </select>
-              </div>
+            <span className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-bold text-white">
+              {showScheduleChanges ? '▲ Collapse' : '▼ Expand'}
+            </span>
+          </button>
 
-              <button
-                type="button"
-                onClick={() => void loadScheduleChangeLog()}
-                disabled={scheduleChangeLogLoading}
-                className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {scheduleChangeLogLoading ? 'Refreshing...' : 'Refresh Log'}
-              </button>
-            </div>
-          </div>
+          {showScheduleChanges && (
+            <div className="border-t border-slate-300 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Show
+                  </label>
+
+                  <select
+                    value={scheduleChangeLogFilter}
+                    onChange={(event) => setScheduleChangeLogFilter(event.target.value as ScheduleChangeLogFilter)}
+                    className="min-w-[220px] rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
+                  >
+                    <option value="PAY_PERIOD">Entire Selected Pay Period</option>
+                    <option value="TODAY">Today</option>
+                    <option value="LAST_7_DAYS">Last 7 Days</option>
+                    <option value="MINE_ONLY">Mine Only</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => void loadScheduleChangeLog()}
+                  disabled={scheduleChangeLogLoading}
+                  className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {scheduleChangeLogLoading ? 'Refreshing...' : 'Refresh Log'}
+                </button>
+              </div>
 
           {scheduleChangeLogError && (
             <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
@@ -4606,6 +4630,8 @@ export default function SchedulePage() {
               })
             )}
           </div>
+            </div>
+          )}
         </section>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
