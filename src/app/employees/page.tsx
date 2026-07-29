@@ -1409,19 +1409,10 @@ export default function EmployeeProfilesPage() {
     }));
   }
 
-  function handleRemoveAdditionalCertification(
+  function updateAdditionalCertificationState(
     employeeId: string,
-    certification: AdditionalCertification,
+    updatedCertification: AdditionalCertification,
   ) {
-    const certificationName =
-      certification.name.trim() || 'this additional certification';
-
-    const confirmed = window.confirm(
-      `Remove ${certificationName}?\n\nThis will remove the certification information from the employee profile after you click Save Changes.`,
-    );
-
-    if (!confirmed) return;
-
     setEditingEmployees((current) => {
       const existing =
         current[employeeId] ??
@@ -1439,19 +1430,552 @@ export default function EmployeeProfilesPage() {
           certifications: {
             ...certifications,
             additionalCertifications:
-              certifications.additionalCertifications.filter(
-                (item) => item.id !== certification.id,
+              certifications.additionalCertifications.map(
+                (certification) => {
+                  if (
+                    certification.id !== updatedCertification.id
+                  ) {
+                    return certification;
+                  }
+
+                  const {
+                    document: existingDocument,
+                    ...localCertificationDetails
+                  } = certification;
+
+                  void existingDocument;
+
+                  return {
+                    ...updatedCertification,
+                    ...localCertificationDetails,
+                    document: updatedCertification.document,
+                  };
+                },
               ),
           },
         }),
       };
     });
 
-    setEmployeeSaveStatus((current) => ({
+    setEmployees((current) =>
+      current.map((employee) => {
+        if (employee.id !== employeeId) return employee;
+
+        const certifications =
+          normalizeCertificationRecord(employee.certifications);
+
+        return normalizeEmployee({
+          ...employee,
+          certifications: {
+            ...certifications,
+            additionalCertifications:
+              certifications.additionalCertifications.map(
+                (certification) => {
+                  if (
+                    certification.id !== updatedCertification.id
+                  ) {
+                    return certification;
+                  }
+
+                  const {
+                    document: existingDocument,
+                    ...localCertificationDetails
+                  } = certification;
+
+                  void existingDocument;
+
+                  return {
+                    ...updatedCertification,
+                    ...localCertificationDetails,
+                    document: updatedCertification.document,
+                  };
+                },
+              ),
+          },
+        });
+      }),
+    );
+  }
+
+  async function handleAdditionalCertificationDocumentUpload(
+    employeeId: string,
+    certification: AdditionalCertification,
+    file: File | null,
+  ) {
+    if (!file) return;
+
+    const savedEmployee = employees.find(
+      (employee) => employee.id === employeeId,
+    );
+
+    const certificationIsSaved = savedEmployee
+      ? normalizeCertificationRecord(
+          savedEmployee.certifications,
+        ).additionalCertifications.some(
+          (item) => item.id === certification.id,
+        )
+      : false;
+
+    if (!certificationIsSaved) {
+      const message =
+        'Save Changes before uploading a document for this certification.';
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]: message,
+      }));
+
+      window.alert(message);
+      return;
+    }
+
+    const statusKey =
+      `${employeeId}-additional-${certification.id}`;
+
+    const allowedTypes = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+    ]);
+
+    if (!allowedTypes.has(file.type)) {
+      const message =
+        'Only PDF, JPG, JPEG, and PNG files are allowed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      const message =
+        'Certification file must be 10 MB or smaller.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+      return;
+    }
+
+    setCertificationDocumentUploading((current) => ({
       ...current,
-      [employeeId]:
-        'Additional certification removed. Click Save Changes.',
+      [statusKey]: true,
     }));
+
+    setCertificationDocumentStatus((current) => ({
+      ...current,
+      [statusKey]: 'Preparing secure upload...',
+    }));
+
+    try {
+      const prepareResponse = await fetch(
+        '/api/employee-certifications/additional',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'prepare',
+            employeeId,
+            certificationId: certification.id,
+            filename: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+          }),
+        },
+      );
+
+      const prepareResult = await prepareResponse.json();
+
+      if (
+        !prepareResponse.ok ||
+        !prepareResult.path ||
+        !prepareResult.token
+      ) {
+        throw new Error(
+          prepareResult.error ||
+            'Unable to prepare certification upload.',
+        );
+      }
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Uploading document...',
+      }));
+
+      const { error: uploadError } = await supabase.storage
+        .from('employee-certifications')
+        .uploadToSignedUrl(
+          prepareResult.path,
+          prepareResult.token,
+          file,
+          {
+            contentType: file.type,
+          },
+        );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Saving certification document...',
+      }));
+
+      const completeResponse = await fetch(
+        '/api/employee-certifications/additional',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'complete',
+            employeeId,
+            certificationId: certification.id,
+            certificationLabel:
+              certification.name.trim() ||
+              'Additional Certification',
+            filename: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+            path: prepareResult.path,
+          }),
+        },
+      );
+
+      const completeResult = await completeResponse.json();
+
+      if (
+        !completeResponse.ok ||
+        !completeResult.certification
+      ) {
+        throw new Error(
+          completeResult.error ||
+            'Certification document could not be saved.',
+        );
+      }
+
+      updateAdditionalCertificationState(
+        employeeId,
+        completeResult.certification as AdditionalCertification,
+      );
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]:
+          'Additional certification document uploaded.',
+      }));
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: `Uploaded ${file.name}.`,
+      }));
+    } catch (error) {
+      console.error(
+        'Additional certification document upload failed:',
+        error,
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Certification upload failed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+    } finally {
+      setCertificationDocumentUploading((current) => ({
+        ...current,
+        [statusKey]: false,
+      }));
+    }
+  }
+
+  function handleAdditionalCertificationDocumentDrop(
+    event: React.DragEvent<HTMLDivElement>,
+    employeeId: string,
+    certification: AdditionalCertification,
+    isUploading: boolean,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (isUploading) return;
+
+    const file = event.dataTransfer.files?.[0] ?? null;
+
+    if (!file) {
+      window.alert(
+        'Apollo did not receive an actual file from the drop. Download the file first, then try again.',
+      );
+      return;
+    }
+
+    void handleAdditionalCertificationDocumentUpload(
+      employeeId,
+      certification,
+      file,
+    );
+  }
+
+  async function handleAdditionalCertificationDocumentRemove(
+    employeeId: string,
+    certification: AdditionalCertification,
+  ) {
+    if (!certification.document?.path) {
+      window.alert(
+        'No certification document is currently on file.',
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove the uploaded document?\n\n${certification.document.filename}\n\nThe certification details will remain unchanged.`,
+    );
+
+    if (!confirmed) return;
+
+    const statusKey =
+      `${employeeId}-additional-${certification.id}`;
+
+    setCertificationDocumentUploading((current) => ({
+      ...current,
+      [statusKey]: true,
+    }));
+
+    setCertificationDocumentStatus((current) => ({
+      ...current,
+      [statusKey]: 'Removing document...',
+    }));
+
+    try {
+      const response = await fetch(
+        '/api/employee-certifications/additional',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'removeDocument',
+            employeeId,
+            certificationId: certification.id,
+            documentPath: certification.document.path,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.certification) {
+        throw new Error(
+          result.error ||
+            'Unable to remove certification document.',
+        );
+      }
+
+      updateAdditionalCertificationState(
+        employeeId,
+        result.certification as AdditionalCertification,
+      );
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]:
+          'Additional certification document removed.',
+      }));
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: 'Document removed.',
+      }));
+    } catch (error) {
+      console.error(
+        'Additional certification document removal failed:',
+        error,
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Certification document removal failed.';
+
+      setCertificationDocumentStatus((current) => ({
+        ...current,
+        [statusKey]: message,
+      }));
+
+      window.alert(message);
+    } finally {
+      setCertificationDocumentUploading((current) => ({
+        ...current,
+        [statusKey]: false,
+      }));
+    }
+  }
+
+  async function handleRemoveAdditionalCertification(
+    employeeId: string,
+    certification: AdditionalCertification,
+  ) {
+    const certificationName =
+      certification.name.trim() ||
+      'this additional certification';
+
+    const confirmed = window.confirm(
+      `Remove ${certificationName}?\n\nThis will permanently remove the certification details and any uploaded document.`,
+    );
+
+    if (!confirmed) return;
+
+    const savedEmployee = employees.find(
+      (employee) => employee.id === employeeId,
+    );
+
+    const certificationIsSaved = savedEmployee
+      ? normalizeCertificationRecord(
+          savedEmployee.certifications,
+        ).additionalCertifications.some(
+          (item) => item.id === certification.id,
+        )
+      : false;
+
+    if (!certificationIsSaved) {
+      setEditingEmployees((current) => {
+        const existing =
+          current[employeeId] ??
+          employees.find(
+            (employee) => employee.id === employeeId,
+          );
+
+        if (!existing) return current;
+
+        const certifications =
+          normalizeCertificationRecord(
+            existing.certifications,
+          );
+
+        return {
+          ...current,
+          [employeeId]: normalizeEmployee({
+            ...existing,
+            certifications: {
+              ...certifications,
+              additionalCertifications:
+                certifications.additionalCertifications.filter(
+                  (item) => item.id !== certification.id,
+                ),
+            },
+          }),
+        };
+      });
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]:
+          'Unsaved additional certification removed.',
+      }));
+
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        '/api/employee-certifications/additional',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'removeCertification',
+            employeeId,
+            certificationId: certification.id,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            'Unable to remove additional certification.',
+        );
+      }
+
+      setEditingEmployees((current) => {
+        const existing =
+          current[employeeId] ??
+          employees.find(
+            (employee) => employee.id === employeeId,
+          );
+
+        if (!existing) return current;
+
+        const certifications =
+          normalizeCertificationRecord(existing.certifications);
+
+        return {
+          ...current,
+          [employeeId]: normalizeEmployee({
+            ...existing,
+            certifications: {
+              ...certifications,
+              additionalCertifications:
+                certifications.additionalCertifications.filter(
+                  (item) => item.id !== certification.id,
+                ),
+            },
+          }),
+        };
+      });
+
+      setEmployees((current) =>
+        current.map((employee) => {
+          if (employee.id !== employeeId) return employee;
+
+          const certifications =
+            normalizeCertificationRecord(
+              employee.certifications,
+            );
+
+          return normalizeEmployee({
+            ...employee,
+            certifications: {
+              ...certifications,
+              additionalCertifications:
+                certifications.additionalCertifications.filter(
+                  (item) => item.id !== certification.id,
+                ),
+            },
+          });
+        }),
+      );
+
+      setEmployeeSaveStatus((current) => ({
+        ...current,
+        [employeeId]:
+          'Additional certification removed.',
+      }));
+    } catch (error) {
+      console.error(
+        'Additional certification removal failed:',
+        error,
+      );
+
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : 'Unable to remove additional certification.',
+      );
+    }
   }
 
   async function handleEmployeeCertificationDocumentUpload(
@@ -3278,14 +3802,120 @@ export default function EmployeeProfilesPage() {
                                           </div>
                                         </div>
 
-                                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            Certification Document
-                                          </div>
-                                          <div className="mt-1 text-sm text-slate-600">
-                                            Secure document upload will be added in the next patch.
-                                          </div>
-                                        </div>
+                                        {(() => {
+                                          const statusKey =
+                                            `${employee.id}-additional-${certification.id}`;
+                                          const isUploading =
+                                            Boolean(
+                                              certificationDocumentUploading[
+                                                statusKey
+                                              ],
+                                            );
+                                          const documentStatus =
+                                            certificationDocumentStatus[
+                                              statusKey
+                                            ];
+
+                                          return (
+                                            <div
+                                              className="mt-4 rounded-xl border border-slate-300 bg-slate-50 p-4"
+                                              onDragOver={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                              }}
+                                              onDrop={(event) =>
+                                                handleAdditionalCertificationDocumentDrop(
+                                                  event,
+                                                  employee.id,
+                                                  certification,
+                                                  isUploading,
+                                                )
+                                              }
+                                            >
+                                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                                Certification Document
+                                              </div>
+
+                                              <div className="mt-2 text-sm text-slate-600">
+                                                {certification.document
+                                                  ? certification.document.filename
+                                                  : 'Drag and drop a PDF, JPG, JPEG, or PNG here, or choose a file below.'}
+                                              </div>
+
+                                              <div className="mt-3 flex flex-wrap gap-2">
+                                                <label
+                                                  className={`cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                                                    isUploading
+                                                      ? 'bg-slate-300 text-slate-500'
+                                                      : 'bg-blue-700 text-white hover:bg-blue-800'
+                                                  }`}
+                                                >
+                                                  {certification.document
+                                                    ? 'Replace Document'
+                                                    : 'Upload Document'}
+
+                                                  <input
+                                                    type="file"
+                                                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                                                    disabled={isUploading}
+                                                    className="hidden"
+                                                    onChange={(event) => {
+                                                      const file =
+                                                        event.target.files?.[0] ??
+                                                        null;
+
+                                                      void handleAdditionalCertificationDocumentUpload(
+                                                        employee.id,
+                                                        certification,
+                                                        file,
+                                                      );
+
+                                                      event.currentTarget.value =
+                                                        '';
+                                                    }}
+                                                  />
+                                                </label>
+
+                                                {certification.document && (
+                                                  <>
+                                                    <button
+                                                      type="button"
+                                                      disabled={isUploading}
+                                                      onClick={() =>
+                                                        handleEmployeeCertificationDocumentView(
+                                                          certification.document,
+                                                        )
+                                                      }
+                                                      className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                      View Current
+                                                    </button>
+
+                                                    <button
+                                                      type="button"
+                                                      disabled={isUploading}
+                                                      onClick={() =>
+                                                        void handleAdditionalCertificationDocumentRemove(
+                                                          employee.id,
+                                                          certification,
+                                                        )
+                                                      }
+                                                      className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                      Remove Document
+                                                    </button>
+                                                  </>
+                                                )}
+                                              </div>
+
+                                              {documentStatus && (
+                                                <div className="mt-2 text-xs font-semibold text-slate-600">
+                                                  {documentStatus}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
 
                                         <div className="mt-4 flex justify-end">
                                           <button
