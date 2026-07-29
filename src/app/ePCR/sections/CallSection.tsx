@@ -115,7 +115,7 @@ export default function CallSection({
   setCallForm,
   updateCallForm,
 }: CallSectionProps) {
-  const [expandedCard, setExpandedCard] = useState('Dispatch Information');
+  const [expandedCard, setExpandedCard] = useState('');
 
   function toggleCard(cardTitle: string) {
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
