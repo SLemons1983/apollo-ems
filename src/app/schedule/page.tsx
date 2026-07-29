@@ -202,6 +202,23 @@ type ScheduleAuditDraft = {
   newValue: string;
 };
 
+type ScheduleChangeLogEntry = {
+  id: string;
+  createdAt: string;
+  saveBatchId: string;
+  supervisorUserId?: string;
+  supervisorName: string;
+  supervisorEmail?: string;
+  dateKey: string;
+  shiftKey: string;
+  shiftLabel: string;
+  fieldChanged: string;
+  previousValue: string;
+  newValue: string;
+};
+
+type ScheduleChangeLogFilter = 'PAY_PERIOD' | 'TODAY' | 'LAST_7_DAYS' | 'MINE_ONLY';
+
 const STORAGE_KEY = 'apollo-schedule-page-v6';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
@@ -1407,6 +1424,12 @@ export default function SchedulePage() {
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
   const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
   const [showScheduleKey, setShowScheduleKey] = useState(false);
+  const [scheduleChangeLog, setScheduleChangeLog] = useState<ScheduleChangeLogEntry[]>([]);
+  const [scheduleChangeLogLoading, setScheduleChangeLogLoading] = useState(false);
+  const [scheduleChangeLogError, setScheduleChangeLogError] = useState('');
+  const [scheduleChangeLogFilter, setScheduleChangeLogFilter] = useState<ScheduleChangeLogFilter>('PAY_PERIOD');
+  const [expandedScheduleChangeBatches, setExpandedScheduleChangeBatches] = useState<Record<string, boolean>>({});
+  const [currentSupervisorUserId, setCurrentSupervisorUserId] = useState('');
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
   const dirtyDatesRef = useRef<Set<string>>(new Set());
@@ -2158,6 +2181,7 @@ export default function SchedulePage() {
       persistedScheduleRef.current = cloneScheduleData(normalizedSchedule);
       dirtyDatesRef.current.clear();
       setHasUnsavedChanges(false);
+      await loadScheduleChangeLog();
 
       const saveSeconds = ((Date.now() - saveStartedAt) / 1000).toFixed(1);
       console.log(`Apollo schedule save completed in ${saveSeconds}s.`);
@@ -2963,6 +2987,109 @@ export default function SchedulePage() {
     );
   }, [visibleYear]);
   const selectedPayPeriodValue = `${visibleYear}|${toDateKey(visiblePayPeriod.start)}`;
+
+  async function loadScheduleChangeLog() {
+    if (!dates.length) return;
+
+    setScheduleChangeLogLoading(true);
+    setScheduleChangeLogError('');
+
+    try {
+      const startDateKey = toDateKey(dates[0]);
+      const endDateKey = toDateKey(dates[dates.length - 1]);
+
+      const [{ data: userData }, { data, error }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from('schedule_change_log')
+          .select('*')
+          .gte('date_key', startDateKey)
+          .lte('date_key', endDateKey)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ]);
+
+      if (error) throw error;
+
+      setCurrentSupervisorUserId(userData.user?.id ?? '');
+      setScheduleChangeLog(
+        (data ?? []).map((row: any) => ({
+          id: row.id,
+          createdAt: row.created_at,
+          saveBatchId: row.save_batch_id,
+          supervisorUserId: row.supervisor_user_id ?? undefined,
+          supervisorName: row.supervisor_name || 'Unknown Supervisor',
+          supervisorEmail: row.supervisor_email ?? undefined,
+          dateKey: row.date_key,
+          shiftKey: row.shift_key,
+          shiftLabel: row.shift_label,
+          fieldChanged: row.field_changed,
+          previousValue: row.previous_value ?? 'None',
+          newValue: row.new_value ?? 'None',
+        })),
+      );
+    } catch (error) {
+      console.error('Failed to load schedule change log:', error);
+      setScheduleChangeLogError('Apollo could not load the Schedule Changes Log.');
+    } finally {
+      setScheduleChangeLogLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadScheduleChangeLog();
+  }, [selectedPayPeriodValue]);
+
+  const filteredScheduleChangeLog = useMemo(() => {
+    const todayKey = toDateKey(new Date());
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const sevenDaysAgoKey = toDateKey(sevenDaysAgo);
+
+    return scheduleChangeLog.filter((entry) => {
+      if (scheduleChangeLogFilter === 'TODAY') {
+        return entry.dateKey === todayKey;
+      }
+      if (scheduleChangeLogFilter === 'LAST_7_DAYS') {
+        return entry.dateKey >= sevenDaysAgoKey && entry.dateKey <= todayKey;
+      }
+      if (scheduleChangeLogFilter === 'MINE_ONLY') {
+        return Boolean(currentSupervisorUserId) && entry.supervisorUserId === currentSupervisorUserId;
+      }
+      return true;
+    });
+  }, [scheduleChangeLog, scheduleChangeLogFilter, currentSupervisorUserId]);
+
+  const groupedScheduleChangeLog = useMemo(() => {
+    const groups = new Map<string, {
+      saveBatchId: string;
+      createdAt: string;
+      supervisorName: string;
+      supervisorEmail?: string;
+      entries: ScheduleChangeLogEntry[];
+    }>();
+
+    for (const entry of filteredScheduleChangeLog) {
+      const existing = groups.get(entry.saveBatchId);
+
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        groups.set(entry.saveBatchId, {
+          saveBatchId: entry.saveBatchId,
+          createdAt: entry.createdAt,
+          supervisorName: entry.supervisorName,
+          supervisorEmail: entry.supervisorEmail,
+          entries: [entry],
+        });
+      }
+    }
+
+    return Array.from(groups.values()).sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    );
+  }, [filteredScheduleChangeLog]);
 
   useEffect(() => {
     setScheduleDataSafely((current) => {
@@ -4352,6 +4479,134 @@ export default function SchedulePage() {
             </button>
           </div>
         </div>
+
+        <section className="mb-6 rounded-2xl border border-slate-400 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Schedule Changes</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                The 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Show
+                </label>
+                <select
+                  value={scheduleChangeLogFilter}
+                  onChange={(event) => setScheduleChangeLogFilter(event.target.value as ScheduleChangeLogFilter)}
+                  className="min-w-[220px] rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
+                >
+                  <option value="PAY_PERIOD">Entire Selected Pay Period</option>
+                  <option value="TODAY">Today</option>
+                  <option value="LAST_7_DAYS">Last 7 Days</option>
+                  <option value="MINE_ONLY">Mine Only</option>
+                </select>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void loadScheduleChangeLog()}
+                disabled={scheduleChangeLogLoading}
+                className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {scheduleChangeLogLoading ? 'Refreshing...' : 'Refresh Log'}
+              </button>
+            </div>
+          </div>
+
+          {scheduleChangeLogError && (
+            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {scheduleChangeLogError}
+            </div>
+          )}
+
+          <div className="mt-4 space-y-3">
+            {scheduleChangeLogLoading && scheduleChangeLog.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                Loading schedule changes...
+              </div>
+            ) : groupedScheduleChangeLog.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                No schedule changes match this view.
+              </div>
+            ) : (
+              groupedScheduleChangeLog.map((group) => {
+                const isExpanded = Boolean(expandedScheduleChangeBatches[group.saveBatchId]);
+                const scheduleDates = Array.from(new Set(group.entries.map((entry) => entry.dateKey))).sort();
+                const dateSummary =
+                  scheduleDates.length === 1
+                    ? formatTileDate(scheduleDates[0])
+                    : `${formatTileDate(scheduleDates[0])} – ${formatTileDate(scheduleDates[scheduleDates.length - 1])}`;
+
+                return (
+                  <div key={group.saveBatchId} className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedScheduleChangeBatches((current) => ({
+                          ...current,
+                          [group.saveBatchId]: !current[group.saveBatchId],
+                        }))
+                      }
+                      className="flex w-full flex-col gap-3 p-4 text-left transition hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{group.supervisorName}</div>
+                        <div className="mt-1 text-xs text-slate-600">
+                          {new Date(group.createdAt).toLocaleString()} • Schedule date{scheduleDates.length === 1 ? '' : 's'}: {dateSummary}
+                        </div>
+                        {group.supervisorEmail && (
+                          <div className="mt-1 text-xs text-slate-500">{group.supervisorEmail}</div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
+                          {group.entries.length} change{group.entries.length === 1 ? '' : 's'}
+                        </span>
+                        <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
+                          {isExpanded ? 'Hide Details' : 'Show Details'}
+                        </span>
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="border-t border-slate-300 bg-white p-4">
+                        <div className="grid gap-3 lg:grid-cols-2">
+                          {group.entries.map((entry) => (
+                            <div key={entry.id} className="rounded-xl border border-slate-300 bg-slate-50 p-4">
+                              <div className="text-sm font-bold text-slate-900">{entry.fieldChanged}</div>
+                              <div className="mt-1 text-xs font-semibold text-slate-600">
+                                {formatTileDate(entry.dateKey)} • {entry.shiftLabel}
+                              </div>
+
+                              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                                <div className="rounded-lg border border-slate-300 bg-white p-3">
+                                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Previous</div>
+                                  <div className="mt-1 break-words text-sm font-semibold text-slate-700">{entry.previousValue}</div>
+                                </div>
+
+                                <div className="text-center text-lg font-bold text-slate-400">→</div>
+
+                                <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+                                  <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">New</div>
+                                  <div className="mt-1 break-words text-sm font-bold text-emerald-900">{entry.newValue}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <div className="min-w-[180px]">
