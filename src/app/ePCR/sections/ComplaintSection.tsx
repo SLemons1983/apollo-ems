@@ -94,7 +94,7 @@ export default function ComplaintSection({
   complaintForm,
   updateComplaintForm,
 }: ComplaintSectionProps) {
-  const [expandedCard, setExpandedCard] = useState('Chief Complaint');
+  const [expandedCard, setExpandedCard] = useState('');
   const [associatedSymptomDraft, setAssociatedSymptomDraft] =
     useState<CodedSelection | null>(null);
 

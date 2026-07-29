@@ -242,7 +242,7 @@ export default function PatientSection({
   setPatientForm,
   updatePatientForm,
 }: PatientSectionProps) {
-  const [expandedCard, setExpandedCard] = useState('Patient Demographics');
+  const [expandedCard, setExpandedCard] = useState('');
 
   function toggleCard(cardTitle: string) {
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
