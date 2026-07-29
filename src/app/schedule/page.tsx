@@ -566,11 +566,40 @@ function parseTimeToMinutes(timeValue: string): number {
   return hours * 60 + minutes;
 }
 
-function calculateSlotHours(startTime: string, endTime: string): number {
+const STANDARD_24_HOUR_SHIFT_KEYS = new Set([
+  'R1',
+  'R2',
+  'P',
+  'OC',
+  'standard-R1',
+  'standard-R2',
+  'standard-P',
+  'standard-OC',
+]);
+
+function isStandardTwentyFourHourShiftKey(shiftKey?: string): boolean {
+  return Boolean(shiftKey && STANDARD_24_HOUR_SHIFT_KEYS.has(shiftKey));
+}
+
+function calculateSlotHours(
+  startTime: string,
+  endTime: string,
+  isStandardTwentyFourHourShift = false,
+): number {
   const startMinutes = parseTimeToMinutes(startTime);
   let endMinutes = parseTimeToMinutes(endTime);
 
-  if (endMinutes <= startMinutes || endMinutes === parseTimeToMinutes(DEFAULT_END_TIME)) {
+  const isTwentyFourHourHoldover =
+    isStandardTwentyFourHourShift &&
+    startMinutes === parseTimeToMinutes(DEFAULT_START_TIME) &&
+    endMinutes > startMinutes &&
+    endMinutes < parseTimeToMinutes('18:00');
+
+  if (
+    endMinutes <= startMinutes ||
+    endMinutes === parseTimeToMinutes(DEFAULT_END_TIME) ||
+    isTwentyFourHourHoldover
+  ) {
     endMinutes += 24 * 60;
   }
 
@@ -585,10 +614,18 @@ function formatHours(hours: number): string {
   return hours.toFixed(1);
 }
 
-function formatCollapsedShiftHours(startTime: string, endTime: string): string {
+function formatCollapsedShiftHours(
+  startTime: string,
+  endTime: string,
+  isStandardTwentyFourHourShift = false,
+): string {
   const normalizedStart = normalizeMilitaryTime(startTime, DEFAULT_START_TIME);
   const normalizedEnd = normalizeMilitaryTime(endTime, DEFAULT_END_TIME);
-  const hours = calculateSlotHours(normalizedStart, normalizedEnd);
+  const hours = calculateSlotHours(
+    normalizedStart,
+    normalizedEnd,
+    isStandardTwentyFourHourShift,
+  );
 
   if (normalizedStart === '06:00' && normalizedEnd === '06:00') {
     return '24 H';
@@ -1133,7 +1170,11 @@ function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: s
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
         if (slot.employeeId === employeeId) {
           hasShift = true;
-          hours += calculateSlotHours(slot.startTime, slot.endTime);
+          hours += calculateSlotHours(
+            slot.startTime,
+            slot.endTime,
+            isStandardTwentyFourHourShiftKey(assignment.key),
+          );
           if (assignment.shift.allowExtendedHours) {
             hasExtendedApproval = true;
           }
@@ -1263,7 +1304,11 @@ function getAssignmentHoursForEmployeeOnDate(
 
     for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
       if (slot.employeeId === employeeId) {
-        hours += calculateSlotHours(slot.startTime, slot.endTime);
+        hours += calculateSlotHours(
+            slot.startTime,
+            slot.endTime,
+            isStandardTwentyFourHourShiftKey(assignment.key),
+          );
       }
     }
   }
@@ -1291,7 +1336,11 @@ function getEmployeePayPeriodHours(
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
         if (slot.employeeId === employeeId) {
-          hours += calculateSlotHours(slot.startTime, slot.endTime);
+          hours += calculateSlotHours(
+            slot.startTime,
+            slot.endTime,
+            isStandardTwentyFourHourShiftKey(assignment.key),
+          );
         }
       }
     }
@@ -1338,7 +1387,16 @@ function getEligibilityForEmployee(
   const summary = buildEmployeeDailyUnitSummary(scheduleData, employeeId);
   const targetAssignmentHours = getAssignedSlotsForAssignment(target.category, target.shift)
     .filter((slot) => slot.employeeId === employeeId)
-    .reduce((total, slot) => total + calculateSlotHours(slot.startTime, slot.endTime), 0);
+    .reduce(
+      (total, slot) =>
+        total +
+        calculateSlotHours(
+          slot.startTime,
+          slot.endTime,
+          isStandardTwentyFourHourShiftKey(target.key),
+        ),
+      0,
+    );
 
   const hasCurrentDayExistingHours = summary[dateKey]?.hours ?? 0;
   const adjustedCurrentDayHours = Math.max(hasCurrentDayExistingHours - targetAssignmentHours, 0);
@@ -3447,7 +3505,13 @@ export default function SchedulePage() {
       return null;
     }
 
-    const slotHours = slot.employeeId ? calculateSlotHours(slot.startTime, slot.endTime) : 0;
+    const slotHours = slot.employeeId
+      ? calculateSlotHours(
+          slot.startTime,
+          slot.endTime,
+          isStandardTwentyFourHourShiftKey(requestContext?.shiftKey),
+        )
+      : 0;
     const noteRequired = requiresSupervisorNote(slot);
     const requestedEmployeeIds = requestContext
       ? pendingOpenShiftRequests
@@ -3496,7 +3560,11 @@ export default function SchedulePage() {
 
       const shiftTypeLabel = getCollapsedShiftTypeLabel(slot.shiftType);
       const collapsedHours = slot.employeeId
-        ? formatCollapsedShiftHours(slot.startTime, slot.endTime)
+        ? formatCollapsedShiftHours(
+            slot.startTime,
+            slot.endTime,
+            isStandardTwentyFourHourShiftKey(requestContext?.shiftKey),
+          )
         : '';
 
       const sortedEligibleEmployees = [...eligibleEmployees].sort((a, b) =>
@@ -4106,7 +4174,11 @@ export default function SchedulePage() {
                 : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
               startTime: slot.startTime,
               endTime: slot.endTime,
-              hours: calculateSlotHours(slot.startTime, slot.endTime),
+              hours: calculateSlotHours(
+                slot.startTime,
+                slot.endTime,
+                isStandardTwentyFourHourShiftKey(shiftName),
+              ),
               vehicle: shift.vehicle || 'No vehicle assigned',
               expandedKey: `${shiftName}-${dateKey}`,
             });
