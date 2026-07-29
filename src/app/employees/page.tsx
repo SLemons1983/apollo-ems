@@ -12,6 +12,17 @@ type CertificationDocument = {
   label: string;
 };
 
+type AdditionalCertification = {
+  id: string;
+  name: string;
+  issuingAgency: string;
+  certificationNumber: string;
+  issueDate: string;
+  expirationDate: string;
+  notes: string;
+  document?: CertificationDocument;
+};
+
 type CertificationField =
   | 'driversLicense'
   | 'ambulanceDriversLicense'
@@ -50,7 +61,11 @@ type CertificationDocumentKey =
   | 'californiaEmtLicenseDocument'
   | 'ccemsaEmtLicenseDocument';
 
-type CertificationRecord = Record<CertificationField, string> & Partial<Record<CertificationDocumentKey, CertificationDocument>>;
+type CertificationRecord =
+  Record<CertificationField, string> &
+  Partial<Record<CertificationDocumentKey, CertificationDocument>> & {
+    additionalCertifications: AdditionalCertification[];
+  };
 
 type EmployeeProfile = {
   id: string;
@@ -126,6 +141,7 @@ const EMPTY_CERTIFICATIONS: CertificationRecord = {
   californiaEmtLicenseNumber: '',
   ccemsaEmtLicense: '',
   ccemsaEmtLicenseNumber: '',
+  additionalCertifications: [],
 };
 
 const INITIAL_EMPLOYEES: EmployeeProfile[] = [
@@ -844,6 +860,57 @@ function normalizeCertificationDocument(value: unknown): CertificationDocument |
   };
 }
 
+function normalizeAdditionalCertification(
+  value: unknown,
+): AdditionalCertification | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const certification = value as Partial<AdditionalCertification>;
+  const id = String(certification.id || '').trim();
+
+  if (!id) return null;
+
+  return {
+    id,
+    name: String(certification.name || ''),
+    issuingAgency: String(certification.issuingAgency || ''),
+    certificationNumber: String(certification.certificationNumber || ''),
+    issueDate: String(certification.issueDate || ''),
+    expirationDate: String(certification.expirationDate || ''),
+    notes: String(certification.notes || ''),
+    document: normalizeCertificationDocument(certification.document),
+  };
+}
+
+function normalizeAdditionalCertifications(
+  value: unknown,
+): AdditionalCertification[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map(normalizeAdditionalCertification)
+    .filter(
+      (
+        certification,
+      ): certification is AdditionalCertification =>
+        certification !== null,
+    );
+}
+
+function createAdditionalCertificationId(): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return `additional-${crypto.randomUUID()}`;
+  }
+
+  return (
+    `additional-${Date.now()}-` +
+    Math.random().toString(36).slice(2, 10)
+  );
+}
+
 function normalizeCertificationRecord(value: Partial<CertificationRecord> | null | undefined): CertificationRecord {
   return {
     driversLicense: value?.driversLicense || '',
@@ -880,6 +947,9 @@ function normalizeCertificationRecord(value: Partial<CertificationRecord> | null
     palsDocument: normalizeCertificationDocument(value?.palsDocument),
     californiaEmtLicenseDocument: normalizeCertificationDocument(value?.californiaEmtLicenseDocument),
     ccemsaEmtLicenseDocument: normalizeCertificationDocument(value?.ccemsaEmtLicenseDocument),
+    additionalCertifications: normalizeAdditionalCertifications(
+      value?.additionalCertifications,
+    ),
   };
 }
 
@@ -1248,6 +1318,141 @@ export default function EmployeeProfilesPage() {
       [employeeId]: 'Unsaved changes.',
     }));
   };
+
+  function handleAddAdditionalCertification(
+    employeeId: string,
+  ) {
+    setEditingEmployees((current) => {
+      const existing =
+        current[employeeId] ??
+        employees.find((employee) => employee.id === employeeId);
+
+      if (!existing) return current;
+
+      const certifications =
+        normalizeCertificationRecord(existing.certifications);
+
+      const additionalCertification: AdditionalCertification = {
+        id: createAdditionalCertificationId(),
+        name: '',
+        issuingAgency: '',
+        certificationNumber: '',
+        issueDate: '',
+        expirationDate: '',
+        notes: '',
+      };
+
+      return {
+        ...current,
+        [employeeId]: normalizeEmployee({
+          ...existing,
+          certifications: {
+            ...certifications,
+            additionalCertifications: [
+              ...certifications.additionalCertifications,
+              additionalCertification,
+            ],
+          },
+        }),
+      };
+    });
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Unsaved additional certification.',
+    }));
+  }
+
+  function handleAdditionalCertificationChange(
+    employeeId: string,
+    certificationId: string,
+    field: Exclude<
+      keyof AdditionalCertification,
+      'id' | 'document'
+    >,
+    value: string,
+  ) {
+    setEditingEmployees((current) => {
+      const existing =
+        current[employeeId] ??
+        employees.find((employee) => employee.id === employeeId);
+
+      if (!existing) return current;
+
+      const certifications =
+        normalizeCertificationRecord(existing.certifications);
+
+      return {
+        ...current,
+        [employeeId]: normalizeEmployee({
+          ...existing,
+          certifications: {
+            ...certifications,
+            additionalCertifications:
+              certifications.additionalCertifications.map(
+                (certification) =>
+                  certification.id === certificationId
+                    ? {
+                        ...certification,
+                        [field]: value,
+                      }
+                    : certification,
+              ),
+          },
+        }),
+      };
+    });
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]: 'Unsaved changes.',
+    }));
+  }
+
+  function handleRemoveAdditionalCertification(
+    employeeId: string,
+    certification: AdditionalCertification,
+  ) {
+    const certificationName =
+      certification.name.trim() || 'this additional certification';
+
+    const confirmed = window.confirm(
+      `Remove ${certificationName}?\n\nThis will remove the certification information from the employee profile after you click Save Changes.`,
+    );
+
+    if (!confirmed) return;
+
+    setEditingEmployees((current) => {
+      const existing =
+        current[employeeId] ??
+        employees.find((employee) => employee.id === employeeId);
+
+      if (!existing) return current;
+
+      const certifications =
+        normalizeCertificationRecord(existing.certifications);
+
+      return {
+        ...current,
+        [employeeId]: normalizeEmployee({
+          ...existing,
+          certifications: {
+            ...certifications,
+            additionalCertifications:
+              certifications.additionalCertifications.filter(
+                (item) => item.id !== certification.id,
+              ),
+          },
+        }),
+      };
+    });
+
+    setEmployeeSaveStatus((current) => ({
+      ...current,
+      [employeeId]:
+        'Additional certification removed. Click Save Changes.',
+    }));
+  }
 
   async function handleEmployeeCertificationDocumentUpload(
     employeeId: string,
@@ -2879,6 +3084,231 @@ export default function EmployeeProfilesPage() {
                           editingEmployee.scope,
                           employee.id,
                         )}
+
+                        <div className="md:col-span-2 xl:col-span-4">
+                          <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4">
+                            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <h3 className="text-base font-bold text-slate-900">
+                                  Additional Certifications
+                                </h3>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  Optional agency, specialty, training, and professional certifications. These do not affect required-certification compliance.
+                                </p>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleAddAdditionalCertification(
+                                    employee.id,
+                                  )
+                                }
+                                className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
+                              >
+                                + Add Additional Certification
+                              </button>
+                            </div>
+
+                            {normalizeCertificationRecord(
+                              editingEmployee.certifications,
+                            ).additionalCertifications.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm font-semibold text-slate-500">
+                                No additional certifications on file.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                {normalizeCertificationRecord(
+                                  editingEmployee.certifications,
+                                ).additionalCertifications.map(
+                                  (certification, index) => (
+                                    <details
+                                      key={certification.id}
+                                      className="rounded-xl border border-slate-300 bg-white shadow-sm"
+                                    >
+                                      <summary className="cursor-pointer list-none px-4 py-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div>
+                                            <div className="font-bold text-slate-900">
+                                              {certification.name.trim() ||
+                                                `Additional Certification ${index + 1}`}
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                              {certification.issuingAgency.trim() ||
+                                                'Issuing agency not entered'}
+                                              {certification.expirationDate
+                                                ? ` • Expires ${new Date(
+                                                    `${certification.expirationDate}T12:00:00`,
+                                                  ).toLocaleDateString(
+                                                    'en-US',
+                                                  )}`
+                                                : ''}
+                                            </div>
+                                          </div>
+
+                                          <span className="text-sm font-bold text-slate-500">
+                                            Expand
+                                          </span>
+                                        </div>
+                                      </summary>
+
+                                      <div className="border-t border-slate-200 p-4">
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                          <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Certification Name
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={certification.name}
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'name',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              placeholder="Example: PHTLS"
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Issuing Agency
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={
+                                                certification.issuingAgency
+                                              }
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'issuingAgency',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              placeholder="Example: NAEMT"
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Certification Number
+                                            </label>
+                                            <input
+                                              type="text"
+                                              value={
+                                                certification.certificationNumber
+                                              }
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'certificationNumber',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Issue Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              value={certification.issueDate}
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'issueDate',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Expiration Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              value={
+                                                certification.expirationDate
+                                              }
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'expirationDate',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+
+                                          <div className="md:col-span-2 xl:col-span-3">
+                                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                              Notes
+                                            </label>
+                                            <textarea
+                                              value={certification.notes}
+                                              onChange={(event) =>
+                                                handleAdditionalCertificationChange(
+                                                  employee.id,
+                                                  certification.id,
+                                                  'notes',
+                                                  event.target.value,
+                                                )
+                                              }
+                                              rows={3}
+                                              placeholder="Optional notes about this certification."
+                                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            Certification Document
+                                          </div>
+                                          <div className="mt-1 text-sm text-slate-600">
+                                            Secure document upload will be added in the next patch.
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4 flex justify-end">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveAdditionalCertification(
+                                                employee.id,
+                                                certification,
+                                              )
+                                            }
+                                            className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                                          >
+                                            Remove Certification
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </details>
+                                  ),
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
                         <div className="md:col-span-2 xl:col-span-4">
                           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</label>
