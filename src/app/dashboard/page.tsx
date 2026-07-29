@@ -13,19 +13,60 @@ type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type ShiftCategory = 'UNIT' | 'SUPERVISOR';
 type VehicleValue = string;
 
-type CertificationRecord = {
-  driversLicense: string;
-  ambulanceDriversLicense: string;
-  ahaBlsCpr: string;
-  medicalExaminerCertificate: string;
-  annualTbScreen: string;
-  californiaParamedicLicense: string;
-  ccemsaParamedicLicense: string;
-  acls: string;
-  pals: string;
-  californiaEmtLicense: string;
-  ccemsaEmtLicense: string;
+type CertificationDocument = {
+  path: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  label: string;
 };
+
+type AdditionalCertification = {
+  id: string;
+  name: string;
+  issuingAgency: string;
+  certificationNumber: string;
+  issueDate: string;
+  expirationDate: string;
+  notes: string;
+  document?: CertificationDocument;
+};
+
+type CertificationDateKey =
+  | 'driversLicense'
+  | 'ambulanceDriversLicense'
+  | 'ahaBlsCpr'
+  | 'medicalExaminerCertificate'
+  | 'annualTbScreen'
+  | 'is100'
+  | 'is200'
+  | 'is700'
+  | 'is800'
+  | 'californiaParamedicLicense'
+  | 'ccemsaParamedicLicense'
+  | 'acls'
+  | 'pals'
+  | 'californiaEmtLicense'
+  | 'ccemsaEmtLicense';
+
+type CertificationDocumentKey = `${CertificationDateKey}Document`;
+
+type CertificationRecord =
+  Record<CertificationDateKey, string> &
+  Partial<Record<CertificationDocumentKey, CertificationDocument>> & {
+    californiaParamedicLicenseNumber: string;
+    ccemsaParamedicLicenseNumber: string;
+    californiaEmtLicenseNumber: string;
+    ccemsaEmtLicenseNumber: string;
+    additionalCertifications: AdditionalCertification[];
+  };
+
+type CertificationDisplayStatus =
+  | 'CURRENT'
+  | 'EXPIRING_SOON'
+  | 'EXPIRED'
+  | 'MISSING';
 
 type EmployeeRole = 'Paramedic' | 'EMT' | 'Supervisor';
 
@@ -547,20 +588,33 @@ const EMPTY_CERTIFICATIONS: CertificationRecord = {
   ahaBlsCpr: '',
   medicalExaminerCertificate: '',
   annualTbScreen: '',
+  is100: '',
+  is200: '',
+  is700: '',
+  is800: '',
   californiaParamedicLicense: '',
+  californiaParamedicLicenseNumber: '',
   ccemsaParamedicLicense: '',
+  ccemsaParamedicLicenseNumber: '',
   acls: '',
   pals: '',
   californiaEmtLicense: '',
+  californiaEmtLicenseNumber: '',
   ccemsaEmtLicense: '',
+  ccemsaEmtLicenseNumber: '',
+  additionalCertifications: [],
 };
 
-const CERTIFICATION_LABELS: Record<keyof CertificationRecord, string> = {
-  driversLicense: 'Drivers License',
-  ambulanceDriversLicense: 'Ambulance Drivers License',
+const CERTIFICATION_LABELS: Record<CertificationDateKey, string> = {
+  driversLicense: 'Driver License',
+  ambulanceDriversLicense: 'Ambulance Driver License',
   ahaBlsCpr: 'AHA BLS CPR Card',
-  medicalExaminerCertificate: 'Medical Examiners Certificate',
+  medicalExaminerCertificate: 'Medical Examiner Certificate',
   annualTbScreen: 'Annual TB Screen',
+  is100: 'FEMA IS-100',
+  is200: 'FEMA IS-200',
+  is700: 'FEMA IS-700',
+  is800: 'FEMA IS-800',
   californiaParamedicLicense: 'California Paramedic License',
   ccemsaParamedicLicense: 'CCEMSA Paramedic License',
   acls: 'ACLS',
@@ -569,8 +623,8 @@ const CERTIFICATION_LABELS: Record<keyof CertificationRecord, string> = {
   ccemsaEmtLicense: 'CCEMSA EMT License',
 };
 
-function getRequiredCertificationKeys(scope: 'ALS' | 'BLS'): Array<keyof CertificationRecord> {
-  const common: Array<keyof CertificationRecord> = [
+function getRequiredCertificationKeys(scope: 'ALS' | 'BLS'): CertificationDateKey[] {
+  const common: CertificationDateKey[] = [
     'driversLicense',
     'ambulanceDriversLicense',
     'ahaBlsCpr',
@@ -578,19 +632,85 @@ function getRequiredCertificationKeys(scope: 'ALS' | 'BLS'): Array<keyof Certifi
     'annualTbScreen',
   ];
 
-  const alsOnly: Array<keyof CertificationRecord> = [
+  const alsOnly: CertificationDateKey[] = [
     'californiaParamedicLicense',
     'ccemsaParamedicLicense',
     'acls',
     'pals',
   ];
 
-  const blsOnly: Array<keyof CertificationRecord> = [
+  const blsOnly: CertificationDateKey[] = [
     'californiaEmtLicense',
     'ccemsaEmtLicense',
   ];
 
   return scope === 'ALS' ? [...common, ...alsOnly] : [...common, ...blsOnly];
+}
+
+function getCertificationDocumentKey(
+  key: CertificationDateKey,
+): CertificationDocumentKey {
+  return `${key}Document`;
+}
+
+function getCertificationDisplayStatus(
+  expirationDate: string,
+  allowNoExpiration = false,
+): CertificationDisplayStatus {
+  if (!expirationDate) {
+    return allowNoExpiration ? 'CURRENT' : 'MISSING';
+  }
+
+  const expiration = new Date(`${expirationDate}T00:00:00`);
+  if (Number.isNaN(expiration.getTime())) {
+    return 'MISSING';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (expiration < today) {
+    return 'EXPIRED';
+  }
+
+  const expiringSoonDate = new Date(today);
+  expiringSoonDate.setDate(expiringSoonDate.getDate() + 90);
+
+  return expiration <= expiringSoonDate ? 'EXPIRING_SOON' : 'CURRENT';
+}
+
+function getCertificationStatusLabel(status: CertificationDisplayStatus): string {
+  if (status === 'CURRENT') return 'Current';
+  if (status === 'EXPIRING_SOON') return 'Expiring Soon';
+  if (status === 'EXPIRED') return 'Expired';
+  return 'Missing';
+}
+
+function getCertificationStatusClasses(
+  status: CertificationDisplayStatus,
+): string {
+  if (status === 'CURRENT') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  }
+
+  if (status === 'EXPIRING_SOON') {
+    return 'border-amber-200 bg-amber-50 text-amber-800';
+  }
+
+  return 'border-red-200 bg-red-50 text-red-800';
+}
+
+function formatCertificationDate(value: string): string {
+  if (!value) return 'No expiration';
+
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function getCertificationStatus(employee: EmployeeOption | null) {
@@ -693,19 +813,76 @@ function normalizeEmployeeScope(scopeValue: string | undefined, roleValue: strin
   return normalizeEmployeeRole(roleValue) === 'Paramedic' ? 'ALS' : 'BLS';
 }
 
-function normalizeCertificationRecord(value: Partial<CertificationRecord> | undefined): CertificationRecord {
+function normalizeCertificationRecord(
+  value: Partial<CertificationRecord> | undefined,
+): CertificationRecord {
+  const additionalCertifications = Array.isArray(value?.additionalCertifications)
+    ? value.additionalCertifications
+        .filter(
+          (certification): certification is AdditionalCertification =>
+            Boolean(certification && typeof certification === 'object'),
+        )
+        .map((certification) => ({
+          id: String(certification.id || ''),
+          name: String(certification.name || ''),
+          issuingAgency: String(certification.issuingAgency || ''),
+          certificationNumber: String(
+            certification.certificationNumber || '',
+          ),
+          issueDate: String(certification.issueDate || ''),
+          expirationDate: String(certification.expirationDate || ''),
+          notes: String(certification.notes || ''),
+          document: certification.document,
+        }))
+    : [];
+
   return {
     driversLicense: value?.driversLicense || '',
     ambulanceDriversLicense: value?.ambulanceDriversLicense || '',
     ahaBlsCpr: value?.ahaBlsCpr || '',
     medicalExaminerCertificate: value?.medicalExaminerCertificate || '',
     annualTbScreen: value?.annualTbScreen || '',
-    californiaParamedicLicense: value?.californiaParamedicLicense || '',
+    is100: value?.is100 || '',
+    is200: value?.is200 || '',
+    is700: value?.is700 || '',
+    is800: value?.is800 || '',
+    californiaParamedicLicense:
+      value?.californiaParamedicLicense || '',
+    californiaParamedicLicenseNumber:
+      value?.californiaParamedicLicenseNumber || '',
     ccemsaParamedicLicense: value?.ccemsaParamedicLicense || '',
+    ccemsaParamedicLicenseNumber:
+      value?.ccemsaParamedicLicenseNumber || '',
     acls: value?.acls || '',
     pals: value?.pals || '',
     californiaEmtLicense: value?.californiaEmtLicense || '',
+    californiaEmtLicenseNumber:
+      value?.californiaEmtLicenseNumber || '',
     ccemsaEmtLicense: value?.ccemsaEmtLicense || '',
+    ccemsaEmtLicenseNumber:
+      value?.ccemsaEmtLicenseNumber || '',
+    driversLicenseDocument: value?.driversLicenseDocument,
+    ambulanceDriversLicenseDocument:
+      value?.ambulanceDriversLicenseDocument,
+    ahaBlsCprDocument: value?.ahaBlsCprDocument,
+    medicalExaminerCertificateDocument:
+      value?.medicalExaminerCertificateDocument,
+    annualTbScreenDocument: value?.annualTbScreenDocument,
+    is100Document: value?.is100Document,
+    is200Document: value?.is200Document,
+    is700Document: value?.is700Document,
+    is800Document: value?.is800Document,
+    californiaParamedicLicenseDocument:
+      value?.californiaParamedicLicenseDocument,
+    ccemsaParamedicLicenseDocument:
+      value?.ccemsaParamedicLicenseDocument,
+    aclsDocument: value?.aclsDocument,
+    palsDocument: value?.palsDocument,
+    californiaEmtLicenseDocument:
+      value?.californiaEmtLicenseDocument,
+    ccemsaEmtLicenseDocument:
+      value?.ccemsaEmtLicenseDocument,
+    additionalCertifications,
   };
 }
 
@@ -1097,10 +1274,8 @@ export default function DashboardPage() {
   const [selectedTradeTargetKey, setSelectedTradeTargetKey] = useState('');
   const [shiftTradeRequestStatus, setShiftTradeRequestStatus] = useState('');
   const [activeTile, setActiveTile] = useState<string | null>(null);
-  const [showCertificationUpload, setShowCertificationUpload] = useState(false);
-  const [certificationUploadName, setCertificationUploadName] = useState('');
-  const [certificationUploadStatus, setCertificationUploadStatus] = useState('');
-  const [isSubmittingCertificationUpload, setIsSubmittingCertificationUpload] = useState(false);
+  const [certificationDocumentStatus, setCertificationDocumentStatus] =
+    useState('');
   const [unitInspectionStatus, setUnitInspectionStatus] = useState('');
   const [isSubmittingUnitInspection, setIsSubmittingUnitInspection] = useState(false);
   const [inspectionVehicle, setInspectionVehicle] = useState('');
@@ -1466,52 +1641,39 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleCertificationUploadSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!currentEmployee) {
-      setCertificationUploadStatus('Unable to identify the logged-in employee.');
-      return;
-    }
-
-    const fileInput = event.currentTarget.elements.namedItem('certificationFile') as HTMLInputElement | null;
-    const file = fileInput?.files?.[0];
-
-    if (!file) {
-      setCertificationUploadStatus('Please select a certification file.');
-      return;
-    }
-
-    setIsSubmittingCertificationUpload(true);
-    setCertificationUploadStatus('Submitting certification...');
+  async function handleViewCertificationDocument(
+    document: CertificationDocument,
+  ) {
+    setCertificationDocumentStatus(`Opening ${document.filename}...`);
 
     try {
-      const formData = new FormData();
-      formData.append('employeeName', currentEmployee.name);
-      formData.append('phoneNumber', currentEmployee.phone);
-      formData.append('companyEmail', currentEmployee.email || authEmail);
-      formData.append('certificationName', certificationUploadName.trim());
-      formData.append('certificationFile', file);
-
-      const response = await fetch('/api/certifications/upload', {
+      const response = await fetch('/api/employee-certifications/view', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentPath: document.path,
+        }),
       });
 
-      if (!response.ok) {
-        throw new Error('Certification upload failed.');
+      const payload = await response.json();
+
+      if (!response.ok || !payload.signedUrl) {
+        throw new Error(
+          payload.error || 'Unable to open the certification document.',
+        );
       }
 
-      setCertificationUploadName('');
-      if (fileInput) {
-        fileInput.value = '';
-      }
-      setCertificationUploadStatus('Certification submitted successfully. Your certification has been forwarded to the supervisor for verification.');
+      window.open(payload.signedUrl, '_blank', 'noopener,noreferrer');
+      setCertificationDocumentStatus('');
     } catch (error) {
-      console.error('Certification upload failed:', error);
-      setCertificationUploadStatus('Unable to submit certification. Please try again.');
-    } finally {
-      setIsSubmittingCertificationUpload(false);
+      console.error('Failed to open certification document:', error);
+      setCertificationDocumentStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to open the certification document.',
+      );
     }
   }
 
@@ -2161,7 +2323,62 @@ export default function DashboardPage() {
 
   const [week1Dates, week2Dates] = useMemo(() => splitIntoWeeks(dates), [dates]);
 
-  const certificationStatus = useMemo(() => getCertificationStatus(currentEmployee), [currentEmployee]);
+  const certificationStatus = useMemo(
+    () => getCertificationStatus(currentEmployee),
+    [currentEmployee],
+  );
+
+  const requiredCertificationCards = useMemo(() => {
+    if (!currentEmployee) return [];
+
+    return getRequiredCertificationKeys(currentEmployee.scope).map((key) => {
+      const expirationDate = currentEmployee.certifications[key];
+      const documentKey = getCertificationDocumentKey(key);
+
+      return {
+        key,
+        label: CERTIFICATION_LABELS[key],
+        expirationDate,
+        status: getCertificationDisplayStatus(expirationDate),
+        document: currentEmployee.certifications[documentKey],
+      };
+    });
+  }, [currentEmployee]);
+
+  const additionalCertificationCards = useMemo(() => {
+    if (!currentEmployee) return [];
+
+    return [...currentEmployee.certifications.additionalCertifications].sort(
+      (left, right) =>
+        left.name.localeCompare(right.name, undefined, {
+          sensitivity: 'base',
+        }),
+    );
+  }, [currentEmployee]);
+
+  const certificationSummary = useMemo(() => {
+    const statuses: CertificationDisplayStatus[] = [
+      ...requiredCertificationCards.map(
+        (certification) => certification.status,
+      ),
+      ...additionalCertificationCards.map((certification) =>
+        getCertificationDisplayStatus(
+          certification.expirationDate,
+          true,
+        ),
+      ),
+    ];
+
+    return {
+      current: statuses.filter((status) => status === 'CURRENT').length,
+      expiringSoon: statuses.filter(
+        (status) => status === 'EXPIRING_SOON',
+      ).length,
+      expired: statuses.filter((status) => status === 'EXPIRED').length,
+      missing: statuses.filter((status) => status === 'MISSING').length,
+    };
+  }, [additionalCertificationCards, requiredCertificationCards]);
+
   const isSupervisorUser = currentEmployee?.role === 'Supervisor';
 
   const activeAnnouncements = useMemo(() => {
@@ -5007,9 +5224,17 @@ export default function DashboardPage() {
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Apollo Dashboard</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                Apollo Dashboard
+              </h1>
+
               <div className="mt-1 text-sm text-slate-600">
-                {currentEmployee ? currentEmployee.name : authEmail ? 'Employee profile not linked' : 'Loading employee profile'} • Personal dashboard
+                {currentEmployee
+                  ? currentEmployee.name
+                  : authEmail
+                    ? 'Employee profile not linked'
+                    : 'Loading employee profile'}{' '}
+                • Personal dashboard
               </div>
 
               {isSupervisorUser && (
@@ -5025,15 +5250,20 @@ export default function DashboardPage() {
 
               {authEmail && !currentEmployee && (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800">
-                  No employee profile is linked to {authEmail}. Check the email field in Employee Profiles.
+                  No employee profile is linked to {authEmail}. Check the email
+                  field in Employee Profiles.
                 </div>
               )}
             </div>
 
             <div className="flex items-center gap-4">
               <div className="hidden text-right md:block">
-                <div className="text-sm font-semibold text-slate-900">{systemConfig.companyName}</div>
-                <div className="text-xs text-slate-500">Company logo configurable in Supervisor Tools</div>
+                <div className="text-sm font-semibold text-slate-900">
+                  {systemConfig.companyName}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Company logo configurable in Supervisor Tools
+                </div>
               </div>
 
               <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -5053,89 +5283,325 @@ export default function DashboardPage() {
                         event.currentTarget.style.display = 'none';
                       }}
                     />
-                    <span className="text-xs font-bold text-slate-500">SSC</span>
+                    <span className="text-xs font-bold text-slate-500">
+                      SSC
+                    </span>
                   </>
                 )}
               </div>
-
             </div>
           </div>
         </div>
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Employee Status</div>
-              <div className="mt-2 text-lg font-bold text-slate-900">
-                {currentEmployee
-                  ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope} • Status: ${currentEmployee.status ?? 'Active'}`
-                  : 'Employee profile not loaded'}
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div
+            className={`border-b p-5 ${
+              certificationStatus.isCompliant
+                ? 'border-emerald-200 bg-emerald-50'
+                : 'border-red-200 bg-red-50'
+            }`}
+          >
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  My Certifications
+                </div>
+                <div className="mt-2 text-xl font-extrabold text-slate-950">
+                  {currentEmployee
+                    ? `${currentEmployee.employeeType} • ${currentEmployee.role} / ${currentEmployee.scope}`
+                    : 'Employee profile not loaded'}
+                </div>
+                <div
+                  className={`mt-2 text-sm font-semibold ${
+                    certificationStatus.isCompliant
+                      ? 'text-emerald-800'
+                      : 'text-red-800'
+                  }`}
+                >
+                  {certificationStatus.isCompliant
+                    ? 'All required certifications are current.'
+                    : `Action needed: ${certificationStatus.missingOrExpired.join(', ')}`}
+                </div>
               </div>
-              <div className="mt-1 text-sm text-slate-600">
-                {certificationStatus.isCompliant
-                  ? 'All required certifications are up to date.'
-                  : `Missing or expired: ${certificationStatus.missingOrExpired.join(', ')}`}
-              </div>
-              <div className="mt-1 text-sm text-slate-600">
-                {certificationStatus.nextExpiring
-                  ? `Next expiring certification: ${certificationStatus.nextExpiring.label} on ${formatShortDate(certificationStatus.nextExpiring.date)}`
-                  : 'No valid upcoming certification expiration found.'}
-              </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
               <div
-                className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-extrabold ${
                   certificationStatus.isCompliant
-                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                    : 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-red-700 text-white'
                 }`}
               >
-                {certificationStatus.isCompliant ? 'Compliant' : 'Action Needed'}
+                {certificationStatus.isCompliant
+                  ? '● Compliant'
+                  : '● Action Needed'}
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowCertificationUpload((current) => !current)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Upload Certifications
-              </button>
             </div>
           </div>
 
-          {showCertificationUpload && (
-            <form
-              className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              onSubmit={handleCertificationUploadSubmit}
-            >
-              <div className="grid gap-3 md:grid-cols-3">
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.phone ?? ''} readOnly />
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.email ?? authEmail} readOnly />
+          <div className="space-y-6 p-5">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                  Current
+                </div>
+                <div className="mt-1 text-3xl font-extrabold text-emerald-900">
+                  {certificationSummary.current}
+                </div>
               </div>
 
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={certificationUploadName}
-                onChange={(event) => setCertificationUploadName(event.target.value)}
-                placeholder="Certification name"
-                required
-              />
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                  Expiring Soon
+                </div>
+                <div className="mt-1 text-3xl font-extrabold text-amber-900">
+                  {certificationSummary.expiringSoon}
+                </div>
+              </div>
 
-              <input type="file" name="certificationFile" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required />
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-red-700">
+                  Expired
+                </div>
+                <div className="mt-1 text-3xl font-extrabold text-red-900">
+                  {certificationSummary.expired}
+                </div>
+              </div>
 
-              {certificationUploadStatus && <p className="text-sm font-semibold text-slate-700">{certificationUploadStatus}</p>}
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-red-700">
+                  Missing
+                </div>
+                <div className="mt-1 text-3xl font-extrabold text-red-900">
+                  {certificationSummary.missing}
+                </div>
+              </div>
 
-              <button
-                type="submit"
-                disabled={isSubmittingCertificationUpload}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
-              >
-                {isSubmittingCertificationUpload ? 'Submitting...' : 'Submit Certification'}
-              </button>
-            </form>
-          )}
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                  Next Expiration
+                </div>
+                <div className="mt-1 text-sm font-extrabold text-blue-950">
+                  {certificationStatus.nextExpiring
+                    ? certificationStatus.nextExpiring.label
+                    : 'None found'}
+                </div>
+                <div className="mt-1 text-xs font-semibold text-blue-800">
+                  {certificationStatus.nextExpiring
+                    ? formatShortDate(
+                        certificationStatus.nextExpiring.date,
+                      )
+                    : 'No upcoming date'}
+                </div>
+              </div>
+            </div>
+
+            {certificationDocumentStatus && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900">
+                {certificationDocumentStatus}
+              </div>
+            )}
+
+            <section>
+              <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-extrabold text-slate-950">
+                    Required Certifications
+                  </h2>
+                  <p className="text-sm text-slate-600">
+                    Required for your assigned {currentEmployee?.scope ?? 'EMS'} scope.
+                  </p>
+                </div>
+
+                <div className="text-xs font-semibold text-slate-500">
+                  Yellow indicates expiration within 90 days.
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {requiredCertificationCards.map((certification) => (
+                  <article
+                    key={certification.key}
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-extrabold text-slate-950">
+                          {certification.label}
+                        </h3>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {certification.expirationDate
+                            ? `Expires ${formatCertificationDate(
+                                certification.expirationDate,
+                              )}`
+                            : 'Expiration date not entered'}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
+                          certification.status,
+                        )}`}
+                      >
+                        {getCertificationStatusLabel(
+                          certification.status,
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="mt-4">
+                      {certification.document ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleViewCertificationDocument(
+                              certification.document!,
+                            )
+                          }
+                          className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                        >
+                          View Document
+                        </button>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-400">
+                          No document uploaded
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="border-t border-slate-200 pt-6">
+              <div className="mb-3">
+                <h2 className="text-lg font-extrabold text-slate-950">
+                  Additional Certifications
+                </h2>
+                <p className="text-sm text-slate-600">
+                  Optional, specialty, instructor, and other professional certifications.
+                </p>
+              </div>
+
+              {additionalCertificationCards.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                  <div className="font-bold text-slate-800">
+                    No additional certifications on file
+                  </div>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Additional certifications can be added from the Employees page.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {additionalCertificationCards.map((certification) => {
+                    const status = getCertificationDisplayStatus(
+                      certification.expirationDate,
+                      true,
+                    );
+
+                    return (
+                      <article
+                        key={certification.id}
+                        className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-extrabold text-slate-950">
+                              {certification.name ||
+                                'Unnamed Certification'}
+                            </h3>
+                            <p className="mt-1 text-sm font-semibold text-slate-600">
+                              {certification.issuingAgency ||
+                                'Issuing agency not entered'}
+                            </p>
+                          </div>
+
+                          <span
+                            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold ${getCertificationStatusClasses(
+                              status,
+                            )}`}
+                          >
+                            {getCertificationStatusLabel(status)}
+                          </span>
+                        </div>
+
+                        <dl className="mt-4 space-y-2 text-sm">
+                          {certification.certificationNumber && (
+                            <div>
+                              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Certification Number
+                              </dt>
+                              <dd className="font-semibold text-slate-800">
+                                {certification.certificationNumber}
+                              </dd>
+                            </div>
+                          )}
+
+                          {certification.issueDate && (
+                            <div>
+                              <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Issued
+                              </dt>
+                              <dd className="font-semibold text-slate-800">
+                                {formatCertificationDate(
+                                  certification.issueDate,
+                                )}
+                              </dd>
+                            </div>
+                          )}
+
+                          <div>
+                            <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                              Expiration
+                            </dt>
+                            <dd className="font-semibold text-slate-800">
+                              {certification.expirationDate
+                                ? formatCertificationDate(
+                                    certification.expirationDate,
+                                  )
+                                : 'No expiration'}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        {certification.notes && (
+                          <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                            {certification.notes}
+                          </div>
+                        )}
+
+                        <div className="mt-4">
+                          {certification.document ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleViewCertificationDocument(
+                                  certification.document!,
+                                )
+                              }
+                              className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                            >
+                              View Document
+                            </button>
+                          ) : (
+                            <span className="text-xs font-semibold text-slate-400">
+                              No document uploaded
+                            </span>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              Certification records and documents are maintained by authorized
+              personnel on the Employees page. Contact a supervisor when a
+              certification needs to be added, replaced, or corrected.
+            </div>
+          </div>
         </div>
 
         <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
