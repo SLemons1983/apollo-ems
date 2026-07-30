@@ -45,6 +45,7 @@ type ScheduleRow = {
   employee_id: string | null;
   start_time: string;
   end_time: string;
+  held_over: boolean | null;
   shift_type: string | null;
 };
 
@@ -88,8 +89,14 @@ function isOnDuty(row: ScheduleRow, nowDateKey: string, nowMinutes: number) {
 
   const startMinutes = timeToMinutes(row.start_time);
   const endMinutes = timeToMinutes(row.end_time);
+  const isStandardTwentyFourHourShift = ['R1', 'R2', 'P', 'OC'].includes(
+    row.shift_key,
+  );
   const endDateKey =
-    endMinutes <= startMinutes ? addDays(row.date_key, 1) : row.date_key;
+    endMinutes <= startMinutes ||
+    (isStandardTwentyFourHourShift && row.held_over && endMinutes > startMinutes)
+      ? addDays(row.date_key, 1)
+      : row.date_key;
 
   const afterStart =
     nowDateKey > row.date_key ||
@@ -191,7 +198,7 @@ export async function POST(request: NextRequest) {
       const now = getPacificNow();
       const { data: schedule, error: scheduleError } = await supabase
         .from('schedule_assignments')
-        .select('date_key,shift_key,shift_label,employee_id,start_time,end_time,shift_type')
+        .select('date_key,shift_key,shift_label,employee_id,start_time,end_time,held_over,shift_type')
         .in('date_key', [addDays(now.dateKey, -1), now.dateKey])
         .eq('is_open_slot', false)
         .not('employee_id', 'is', null);

@@ -63,6 +63,8 @@ type EmployeeSlot = {
   employeeId: string;
   startTime: string;
   endTime: string;
+  heldOver: boolean;
+  holdoverReason: string;
   note: string;
   shiftType: ShiftType;
 };
@@ -484,6 +486,8 @@ function createEmptyEmployeeSlot(): EmployeeSlot {
     employeeId: '',
     startTime: DEFAULT_START_TIME,
     endTime: DEFAULT_END_TIME,
+    heldOver: false,
+    holdoverReason: '',
     note: '',
     shiftType: 'REGULAR',
   };
@@ -510,6 +514,8 @@ function createAdminSupervisorSlot(): EmployeeSlot {
     employeeId: '',
     startTime: '06:00',
     endTime: '18:00',
+    heldOver: false,
+    holdoverReason: '',
     note: '',
     shiftType: 'REGULAR',
   };
@@ -585,20 +591,15 @@ function calculateSlotHours(
   startTime: string,
   endTime: string,
   isStandardTwentyFourHourShift = false,
+  heldOver = false,
 ): number {
   const startMinutes = parseTimeToMinutes(startTime);
   let endMinutes = parseTimeToMinutes(endTime);
 
-  const isTwentyFourHourHoldover =
-    isStandardTwentyFourHourShift &&
-    startMinutes === parseTimeToMinutes(DEFAULT_START_TIME) &&
-    endMinutes > startMinutes &&
-    endMinutes < parseTimeToMinutes('18:00');
-
   if (
     endMinutes <= startMinutes ||
     endMinutes === parseTimeToMinutes(DEFAULT_END_TIME) ||
-    isTwentyFourHourHoldover
+    (isStandardTwentyFourHourShift && heldOver && endMinutes > startMinutes)
   ) {
     endMinutes += 24 * 60;
   }
@@ -618,6 +619,7 @@ function formatCollapsedShiftHours(
   startTime: string,
   endTime: string,
   isStandardTwentyFourHourShift = false,
+  heldOver = false,
 ): string {
   const normalizedStart = normalizeMilitaryTime(startTime, DEFAULT_START_TIME);
   const normalizedEnd = normalizeMilitaryTime(endTime, DEFAULT_END_TIME);
@@ -625,6 +627,7 @@ function formatCollapsedShiftHours(
     normalizedStart,
     normalizedEnd,
     isStandardTwentyFourHourShift,
+    heldOver,
   );
 
   if (normalizedStart === '06:00' && normalizedEnd === '06:00') {
@@ -685,6 +688,8 @@ function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
     employeeId?: string;
     startTime?: string;
     endTime?: string;
+    heldOver?: boolean;
+    holdoverReason?: string;
     note?: string;
     shiftType?: ShiftType;
   };
@@ -693,6 +698,8 @@ function normalizeEmployeeSlot(raw: unknown): EmployeeSlot {
     employeeId: maybeSlot.employeeId ?? '',
     startTime: maybeSlot.startTime ?? DEFAULT_START_TIME,
     endTime: maybeSlot.endTime ?? DEFAULT_END_TIME,
+    heldOver: Boolean(maybeSlot.heldOver),
+    holdoverReason: maybeSlot.holdoverReason ?? '',
     note: maybeSlot.note ?? '',
     shiftType: maybeSlot.shiftType ?? 'REGULAR',
   };
@@ -708,6 +715,8 @@ function normalizeLegacyEmployeeSlot(
     employeeId: employeeId ?? '',
     startTime: startTime ?? DEFAULT_START_TIME,
     endTime: endTime ?? DEFAULT_END_TIME,
+    heldOver: false,
+    holdoverReason: '',
     note: note ?? '',
     shiftType: 'REGULAR',
   };
@@ -1174,6 +1183,7 @@ function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: s
             slot.startTime,
             slot.endTime,
             isStandardTwentyFourHourShiftKey(assignment.key),
+            slot.heldOver,
           );
           if (assignment.shift.allowExtendedHours) {
             hasExtendedApproval = true;
@@ -1308,6 +1318,7 @@ function getAssignmentHoursForEmployeeOnDate(
             slot.startTime,
             slot.endTime,
             isStandardTwentyFourHourShiftKey(assignment.key),
+            slot.heldOver,
           );
       }
     }
@@ -1340,6 +1351,7 @@ function getEmployeePayPeriodHours(
             slot.startTime,
             slot.endTime,
             isStandardTwentyFourHourShiftKey(assignment.key),
+            slot.heldOver,
           );
         }
       }
@@ -1394,6 +1406,7 @@ function getEligibilityForEmployee(
           slot.startTime,
           slot.endTime,
           isStandardTwentyFourHourShiftKey(target.key),
+          slot.heldOver,
         ),
       0,
     );
@@ -1855,6 +1868,8 @@ export default function SchedulePage() {
             employeeId: savedEmployeeId,
             startTime: row.start_time || DEFAULT_START_TIME,
             endTime: row.end_time || DEFAULT_END_TIME,
+            heldOver: Boolean(row.held_over),
+            holdoverReason: row.holdover_reason || '',
             note: row.note || '',
             shiftType: (row.shift_type as ShiftType) || 'REGULAR',
           };
@@ -1978,6 +1993,8 @@ export default function SchedulePage() {
       slot.employeeId ||
         normalizeMilitaryTime(slot.startTime, DEFAULT_START_TIME) !== DEFAULT_START_TIME ||
         normalizeMilitaryTime(slot.endTime, defaultEndTime) !== defaultEndTime ||
+        slot.heldOver ||
+        slot.holdoverReason.trim() ||
         slot.note?.trim(),
     );
   }
@@ -2005,6 +2022,8 @@ export default function SchedulePage() {
       employee_id: isOpenSlot ? null : params.slot.employeeId || null,
       start_time: normalizeMilitaryTime(params.slot.startTime, DEFAULT_START_TIME),
       end_time: normalizeMilitaryTime(params.slot.endTime, params.defaultEndTime ?? DEFAULT_END_TIME),
+      held_over: Boolean(params.slot.heldOver),
+      holdover_reason: params.slot.holdoverReason.trim() || null,
       note: params.slot.note || '',
       shift_type: params.slot.shiftType,
       vehicle: params.vehicle || '',
@@ -2361,6 +2380,8 @@ export default function SchedulePage() {
         employeeId: openSlotId,
         startTime: coverageStartTime,
         endTime: coverageEndTime,
+        heldOver: false,
+        holdoverReason: '',
         note: `Vacation coverage for ${request.employeeName}`,
         shiftType: 'REGULAR',
       };
@@ -2376,6 +2397,8 @@ export default function SchedulePage() {
           employeeId: openSlotId,
           startTime: coverageStartTime,
           endTime: coverageEndTime,
+          heldOver: false,
+          holdoverReason: '',
           note: `Vacation coverage for ${request.employeeName}`,
           shiftType: 'REGULAR',
         },
@@ -3218,7 +3241,7 @@ export default function SchedulePage() {
     shiftName: ShiftName,
     slotKey: ScheduleSlotKey,
     field: keyof EmployeeSlot,
-    value: string,
+    value: string | boolean,
   ) => {
     markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
@@ -3232,10 +3255,14 @@ export default function SchedulePage() {
       if (field === 'shiftType') {
         shift[slotKey].shiftType = value as ShiftType;
       } else {
-        shift[slotKey][field] = value;
+        (shift[slotKey][field] as string | boolean) = value;
       }
 
-      if (field === 'employeeId' && value && shiftName === 'ADMIN_SUP' && slotKey === 'employee1') {
+      if (field === 'heldOver' && value === false) {
+        shift[slotKey].holdoverReason = '';
+      }
+
+      if (field === 'employeeId' && typeof value === 'string' && value && shiftName === 'ADMIN_SUP' && slotKey === 'employee1') {
         shift[slotKey].startTime = '06:00';
         shift[slotKey].endTime = '18:00';
       }
@@ -3243,6 +3270,8 @@ export default function SchedulePage() {
       if (field === 'employeeId' && !value) {
         shift[slotKey].startTime = DEFAULT_START_TIME;
         shift[slotKey].endTime = getDefaultEndTimeForShift(shiftName, slotKey);
+        shift[slotKey].heldOver = false;
+        shift[slotKey].holdoverReason = '';
         shift[slotKey].note = '';
         shift[slotKey].shiftType = 'REGULAR';
       }
@@ -3300,7 +3329,7 @@ export default function SchedulePage() {
     extraId: string,
     slotKey: ScheduleSlotKey,
     field: keyof EmployeeSlot,
-    value: string,
+    value: string | boolean,
   ) => {
     markUnsavedChanges(dateKey);
     setScheduleDataSafely((current) => {
@@ -3317,12 +3346,18 @@ export default function SchedulePage() {
       if (field === 'shiftType') {
         extra[slotKey].shiftType = value as ShiftType;
       } else {
-        extra[slotKey][field] = value;
+        (extra[slotKey][field] as string | boolean) = value;
+      }
+
+      if (field === 'heldOver' && value === false) {
+        extra[slotKey].holdoverReason = '';
       }
 
       if (field === 'employeeId' && !value) {
         extra[slotKey].startTime = DEFAULT_START_TIME;
         extra[slotKey].endTime = DEFAULT_END_TIME;
+        extra[slotKey].heldOver = false;
+        extra[slotKey].holdoverReason = '';
         extra[slotKey].note = '';
         extra[slotKey].shiftType = 'REGULAR';
       }
@@ -3523,7 +3558,7 @@ export default function SchedulePage() {
     slot: EmployeeSlot,
     slotLabel: string,
     isVisible: boolean,
-    onChange: (field: keyof EmployeeSlot, value: string) => void,
+    onChange: (field: keyof EmployeeSlot, value: string | boolean) => void,
     showDetails: boolean,
     eligibilityMap: Record<string, EligibilityResult>,
     payPeriodHoursMap: Record<string, number>,
@@ -3538,6 +3573,7 @@ export default function SchedulePage() {
           slot.startTime,
           slot.endTime,
           isStandardTwentyFourHourShiftKey(requestContext?.shiftKey),
+          slot.heldOver,
         )
       : 0;
     const noteRequired = requiresSupervisorNote(slot);
@@ -3592,6 +3628,7 @@ export default function SchedulePage() {
             slot.startTime,
             slot.endTime,
             isStandardTwentyFourHourShiftKey(requestContext?.shiftKey),
+            slot.heldOver,
           )
         : '';
 
@@ -3902,6 +3939,32 @@ export default function SchedulePage() {
                 </div>
               </div>
 
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={slot.heldOver}
+                  disabled={!slot.employeeId}
+                  onChange={(event) => onChange('heldOver', event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Held Over
+              </label>
+
+              {slot.heldOver && (
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Holdover Reason (optional)
+                  </label>
+                  <textarea
+                    defaultValue={slot.holdoverReason}
+                    onBlur={(event) => onChange('holdoverReason', event.target.value)}
+                    rows={2}
+                    placeholder="Reason employee was held beyond the scheduled shift"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
+                  />
+                </div>
+              )}
+
 
 
               <div>
@@ -4206,6 +4269,7 @@ export default function SchedulePage() {
                 slot.startTime,
                 slot.endTime,
                 isStandardTwentyFourHourShiftKey(shiftName),
+                slot.heldOver,
               ),
               vehicle: shift.vehicle || 'No vehicle assigned',
               expandedKey: `${shiftName}-${dateKey}`,
@@ -4230,7 +4294,7 @@ export default function SchedulePage() {
                 : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
               startTime: slot.startTime,
               endTime: slot.endTime,
-              hours: calculateSlotHours(slot.startTime, slot.endTime),
+              hours: calculateSlotHours(slot.startTime, slot.endTime, false, slot.heldOver),
               vehicle: extra.vehicle || 'No vehicle assigned',
               expandedKey: `extra-${extra.id}-${dateKey}`,
             });

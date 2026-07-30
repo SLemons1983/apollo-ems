@@ -38,6 +38,7 @@ type Assignment = {
   openScope: string;
   startTime: string;
   endTime: string;
+  heldOver: boolean;
   shiftType: string;
 };
 
@@ -126,11 +127,18 @@ function presetRange(preset: string) {
   return { start: dateKey(start), end: dateKey(end) };
 }
 
-function hoursBetween(start: string, end: string) {
+function hoursBetween(
+  start: string,
+  end: string,
+  heldOver = false,
+  isStandardTwentyFourHourShift = false,
+) {
   const [sh, sm] = (start || '06:00').split(':').map(Number);
   const [eh, em] = (end || '06:00').split(':').map(Number);
   let minutes = eh * 60 + em - (sh * 60 + sm);
-  if (minutes <= 0) minutes += 1440;
+  if (minutes <= 0 || (isStandardTwentyFourHourShift && heldOver && minutes > 0)) {
+    minutes += 1440;
+  }
   return minutes / 60;
 }
 
@@ -287,6 +295,7 @@ export default function AnalyticsPage() {
           openScope: row.open_slot_scope || '',
           startTime: row.start_time || '06:00',
           endTime: row.end_time || '06:00',
+          heldOver: Boolean(row.held_over),
           shiftType: String(row.shift_type || 'REGULAR').toUpperCase(),
         })));
         setOpenRequests(openResult.data ?? []);
@@ -322,7 +331,17 @@ export default function AnalyticsPage() {
   const employeeRows = useMemo(() => filteredEmployees.map((employee) => {
     const cards = approvedTimecards.filter((card) => card.employeeId === employee.id);
     const scheduled = rangeAssignments.filter((row) => row.employeeId === employee.id && !row.isOpen && !['SICK', 'SICK_TIME', 'VACATION', 'LEAVE'].includes(row.shiftType))
-      .reduce((sum, row) => sum + hoursBetween(row.startTime, row.endTime), 0);
+      .reduce(
+        (sum, row) =>
+          sum +
+          hoursBetween(
+            row.startTime,
+            row.endTime,
+            row.heldOver,
+            ['R1', 'R2', 'P', 'OC'].includes(row.shiftKey),
+          ),
+        0,
+      );
     return {
       ...employee,
       total: cards.reduce((sum, card) => sum + card.total, 0),
@@ -348,7 +367,12 @@ export default function AnalyticsPage() {
       const type = row.shiftType === 'SICK_TIME' ? 'SICK' : row.shiftType;
       if (!['SICK', 'VACATION', 'LEAVE'].includes(type)) continue;
       const day = byDay[localDate(row.dateKey).getDay()];
-      const hours = hoursBetween(row.startTime, row.endTime);
+      const hours = hoursBetween(
+        row.startTime,
+        row.endTime,
+        row.heldOver,
+        ['R1', 'R2', 'P', 'OC'].includes(row.shiftKey),
+      );
       const month = row.dateKey.slice(0, 7);
       const monthRow = monthly.get(month) || { sick: 0, vacation: 0, leave: 0 };
       if (type === 'SICK') { day.sick += 1; day.sickHours += hours; monthRow.sick += hours; }
@@ -361,7 +385,17 @@ export default function AnalyticsPage() {
 
   const staffing = useMemo(() => {
     const scheduled = rangeAssignments.filter((row) => !row.isOpen && !['SICK', 'SICK_TIME', 'VACATION', 'LEAVE'].includes(row.shiftType))
-      .reduce((sum, row) => sum + hoursBetween(row.startTime, row.endTime), 0);
+      .reduce(
+        (sum, row) =>
+          sum +
+          hoursBetween(
+            row.startTime,
+            row.endTime,
+            row.heldOver,
+            ['R1', 'R2', 'P', 'OC'].includes(row.shiftKey),
+          ),
+        0,
+      );
     const requestRows = openRequests.filter((row) => String(row.date_key) >= startDate && String(row.date_key) <= endDate);
     const opportunities = new Map<string, { date: string; shift: string; statuses: string[] }>();
     for (const row of requestRows) {

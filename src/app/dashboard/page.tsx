@@ -199,6 +199,9 @@ type EmployeeSlot = {
   employeeId: string;
   startTime: string;
   endTime: string;
+  heldOver: boolean;
+  holdoverReason: string;
+  isStandardTwentyFourHourShift: boolean;
   note: string;
   shiftType: ShiftType;
 };
@@ -763,6 +766,9 @@ function createEmptyEmployeeSlot(): EmployeeSlot {
     employeeId: '',
     startTime: '06:00',
     endTime: '06:00',
+    heldOver: false,
+    holdoverReason: '',
+    isStandardTwentyFourHourShift: false,
     note: '',
     shiftType: 'REGULAR',
   };
@@ -1165,7 +1171,10 @@ function getShiftDateTimeRange(date: Date, slot: EmployeeSlot): { start: Date; e
   const start = parseTimeOnDate(date, slot.startTime || '06:00');
   let end = parseTimeOnDate(date, slot.endTime || '06:00');
 
-  if (end <= start) {
+  if (
+    end <= start ||
+    (slot.isStandardTwentyFourHourShift && slot.heldOver && end > start)
+  ) {
     end = addDays(end, 1);
   }
 
@@ -1854,6 +1863,9 @@ export default function DashboardPage() {
           employeeId: savedEmployeeId,
           startTime: row.start_time || '06:00',
           endTime: row.end_time || '06:00',
+          heldOver: Boolean(row.held_over),
+          holdoverReason: row.holdover_reason || '',
+          isStandardTwentyFourHourShift: ['R1', 'R2', 'P', 'OC'].includes(String(row.shift_key)),
           note: row.note || '',
           shiftType: row.shift_type || 'REGULAR',
         };
