@@ -2171,24 +2171,52 @@ export default function SchedulePage() {
 
         saveTasks.push(
           (async () => {
-            const { error: deleteError } = await supabase
+            const { data: existingAssignments, error: existingAssignmentsError } = await supabase
               .from('schedule_assignments')
-              .delete()
+              .select('id')
               .eq('date_key', dateKey);
 
-        if (deleteError) {
-          throw deleteError;
-        }
+            if (existingAssignmentsError) {
+              throw existingAssignmentsError;
+            }
 
-        if (rows.length > 0) {
-          const { error: assignmentError } = await supabase
-            .from('schedule_assignments')
-            .upsert(rows, { onConflict: 'id' });
+            if (rows.length > 0) {
+              const { error: assignmentError } = await supabase
+                .from('schedule_assignments')
+                .upsert(rows, { onConflict: 'id' });
 
-          if (assignmentError) {
-            throw assignmentError;
-          }
-        }
+              if (assignmentError) {
+                throw assignmentError;
+              }
+            }
+
+            const replacementIds = new Set(rows.map((row) => String(row.id)));
+            const staleAssignmentIds = (existingAssignments ?? [])
+              .map((assignment) => String(assignment.id))
+              .filter((assignmentId) => !replacementIds.has(assignmentId));
+
+            // Delete only rows that are no longer part of this date, and only
+            // after every replacement row has been stored successfully.
+            const DELETE_BATCH_SIZE = 100;
+
+            for (
+              let batchStart = 0;
+              batchStart < staleAssignmentIds.length;
+              batchStart += DELETE_BATCH_SIZE
+            ) {
+              const staleIdBatch = staleAssignmentIds.slice(
+                batchStart,
+                batchStart + DELETE_BATCH_SIZE,
+              );
+              const { error: staleDeleteError } = await supabase
+                .from('schedule_assignments')
+                .delete()
+                .in('id', staleIdBatch);
+
+              if (staleDeleteError) {
+                throw staleDeleteError;
+              }
+            }
           })(),
         );
       }
