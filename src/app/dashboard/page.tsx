@@ -5483,25 +5483,7 @@ export default function DashboardPage() {
             'Schedule',
             'View your assigned shifts or the full pay period schedule. Request time off or open shifts from shift details.',
             <div>
-              <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">
-                    {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
-                  </div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    {showOpenShiftsOnly
-                      ? 'Showing eligible open shifts. Staffing Priority shifts are available to every active employee and still require supervisor approval.'
-                      : showFullSchedule
-                        ? 'Showing the full schedule with your assignments highlighted.'
-                        : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
-                  </div>
-                  {nextMyShift && (
-                    <div className="mt-1 text-sm text-slate-600">
-                      Next shift: {nextMyShift.label} on {formatShortDate(nextMyShift.date)} at {nextMyShift.startTime}
-                    </div>
-                  )}
-                </div>
-
+              <div className="mb-4 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     value={selectedPayPeriod.key}
@@ -5596,6 +5578,24 @@ export default function DashboardPage() {
                   >
                     Print Schedule
                   </button>
+                </div>
+
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    {formatShortDate(selectedPayPeriod.start)} to {formatShortDate(selectedPayPeriod.end)}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-600">
+                    {showOpenShiftsOnly
+                      ? 'Showing eligible open shifts. Staffing Priority shifts are available to every active employee and still require supervisor approval.'
+                      : showFullSchedule
+                        ? 'Showing the full schedule with your assignments highlighted.'
+                        : `Showing your assigned shifts only. ${myShiftCount} shift${myShiftCount === 1 ? '' : 's'} in this pay period.`}
+                  </div>
+                  {nextMyShift && (
+                    <div className="mt-1 text-sm text-slate-600">
+                      Next shift: {nextMyShift.label} on {formatShortDate(nextMyShift.date)} at {nextMyShift.startTime}
+                    </div>
+                  )}
                 </div>
               </div>
 
