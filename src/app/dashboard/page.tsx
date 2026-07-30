@@ -1107,6 +1107,14 @@ function formatShortDate(date: Date): string {
   });
 }
 
+function escapePrintHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
 function getNthWeekdayOfMonth(year: number, monthIndex: number, weekday: number, nth: number): Date {
   const date = new Date(year, monthIndex, 1);
 
@@ -1279,6 +1287,9 @@ export default function DashboardPage() {
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
+  const [showPrintScheduleModal, setShowPrintScheduleModal] = useState(false);
+  const [printScheduleStart, setPrintScheduleStart] = useState('');
+  const [printScheduleEnd, setPrintScheduleEnd] = useState('');
   const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
   const [selectedTradeTargetKey, setSelectedTradeTargetKey] = useState('');
   const [shiftTradeRequestStatus, setShiftTradeRequestStatus] = useState('');
@@ -4788,6 +4799,164 @@ export default function DashboardPage() {
     return status;
   }
 
+  function openPrintScheduleModal() {
+    setPrintScheduleStart(toDateKey(selectedPayPeriod.start));
+    setPrintScheduleEnd(toDateKey(selectedPayPeriod.end));
+    setShowPrintScheduleModal(true);
+  }
+
+  function printPersonalSchedule() {
+    if (!currentEmployee || !printScheduleStart || !printScheduleEnd) {
+      window.alert('Select a valid start and end date before printing.');
+      return;
+    }
+
+    const startDate = parseDateKey(printScheduleStart);
+    const endDate = parseDateKey(printScheduleEnd);
+
+    if (endDate < startDate) {
+      window.alert('The print end date must be on or after the start date.');
+      return;
+    }
+
+    const rangeDays =
+      Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (rangeDays > 366) {
+      window.alert('Please select a print range of one year or less.');
+      return;
+    }
+
+    const printDates = Array.from({ length: rangeDays }, (_, index) => addDays(startDate, index));
+    const assignmentsByPrintDate = new Map<
+      string,
+      Array<{ shiftLabel: string; startTime: string; endTime: string; note: string }>
+    >();
+
+    for (const date of printDates) {
+      const dateKey = toDateKey(date);
+      const day = getDaySchedule(scheduleData, dateKey);
+      const standardAssignments: DisplayAssignment[] = SHIFT_ORDER.map((shiftName) => ({
+        key: `standard-${shiftName}`,
+        label: SHIFT_DISPLAY[shiftName],
+        slots: getAssignedSlots(
+          day.standard[shiftName],
+          shiftName === 'ADMIN_SUP' || shiftName === 'FIELD_SUP' ? 'SUPERVISOR' : 'UNIT',
+        ),
+        hiddenFromEmployees: Boolean(day.standard[shiftName].hiddenFromEmployees),
+      }));
+      const extraAssignments: DisplayAssignment[] = day.extras.map((extra) => ({
+        key: `extra-${extra.id}`,
+        label: extra.label,
+        slots: getAssignedSlots(extra, extra.category),
+        hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
+      }));
+      const assignments = [...standardAssignments, ...extraAssignments]
+        .filter((assignment) => !assignment.hiddenFromEmployees)
+        .flatMap((assignment) =>
+        assignment.slots
+          .filter(
+            (slot) =>
+              slot.employeeId === currentEmployeeId &&
+              !['SICK', 'VACATION', 'LEAVE'].includes(slot.shiftType),
+          )
+          .map((slot) => ({
+            shiftLabel: assignment.label,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            note: slot.note.trim(),
+          })),
+        );
+
+      assignmentsByPrintDate.set(dateKey, assignments);
+    }
+
+    const leadingBlankDays = startDate.getDay();
+    const calendarCells = [
+      ...Array.from({ length: leadingBlankDays }, () => '<div class="day blank"></div>'),
+      ...printDates.map((date) => {
+        const dateKey = toDateKey(date);
+        const assignments = assignmentsByPrintDate.get(dateKey) ?? [];
+        const assignmentHtml = assignments.length
+          ? assignments
+              .map(
+                (assignment) => `
+                  <div class="assignment">
+                    <div class="shift">${escapePrintHtml(assignment.shiftLabel)}</div>
+                    <div class="time">${escapePrintHtml(assignment.startTime)} - ${escapePrintHtml(assignment.endTime)}</div>
+                    ${
+                      assignment.note
+                        ? `<div class="note"><strong>Supervisor note:</strong> ${escapePrintHtml(assignment.note)}</div>`
+                        : ''
+                    }
+                  </div>
+                `,
+              )
+              .join('')
+          : '<div class="off">Not scheduled</div>';
+
+        return `
+          <div class="day">
+            <div class="date">${escapePrintHtml(
+              date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              }),
+            )}</div>
+            ${assignmentHtml}
+          </div>
+        `;
+      }),
+    ].join('');
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.alert('Allow pop-ups for ApolloEMS to print your schedule.');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapePrintHtml(currentEmployee.name)} Schedule</title>
+          <style>
+            @page { size: landscape; margin: 0.4in; }
+            * { box-sizing: border-box; }
+            body { margin: 0; color: #0f172a; font-family: Arial, sans-serif; }
+            h1 { margin: 0; font-size: 22px; }
+            .range { margin: 5px 0 16px; color: #475569; font-size: 12px; }
+            .weekdays, .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+            .weekday { border: 1px solid #64748b; background: #e2e8f0; padding: 7px; text-align: center; font-size: 11px; font-weight: 700; }
+            .day { min-height: 125px; border: 1px solid #94a3b8; padding: 7px; break-inside: avoid; }
+            .blank { background: #f8fafc; }
+            .date { margin-bottom: 7px; font-size: 11px; font-weight: 700; }
+            .assignment { margin-bottom: 7px; border-left: 3px solid #2563eb; background: #eff6ff; padding: 6px; }
+            .shift { font-size: 12px; font-weight: 700; }
+            .time { margin-top: 2px; font-size: 11px; }
+            .note { margin-top: 5px; white-space: pre-wrap; font-size: 10px; line-height: 1.3; }
+            .off { color: #94a3b8; font-size: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>${escapePrintHtml(currentEmployee.name)} — Personal Schedule</h1>
+          <div class="range">${escapePrintHtml(formatShortDate(startDate))} to ${escapePrintHtml(formatShortDate(endDate))}</div>
+          <div class="weekdays">
+            ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+              .map((day) => `<div class="weekday">${day}</div>`)
+              .join('')}
+          </div>
+          <div class="calendar">${calendarCells}</div>
+          <script>window.addEventListener('load', () => window.print());<\/script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    setShowPrintScheduleModal(false);
+  }
+
   function getEligibleTradeTargets() {
     const selectedShift = getMyTradeAssignments().find((item) => item.tradeKey === selectedTradeShiftKey);
     if (!selectedShift || !currentEmployee) {
@@ -5103,6 +5272,14 @@ export default function DashboardPage() {
                                 return null;
                               }
 
+                              if (
+                                showFullSchedule &&
+                                !isOpenSlot &&
+                                ['SICK', 'VACATION', 'LEAVE'].includes(slot.shiftType)
+                              ) {
+                                return null;
+                              }
+
                               return (
                                 <div
                                   key={`${assignment.key}-${slot.employeeId}-${index}`}
@@ -5187,6 +5364,56 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
+      {showPrintScheduleModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="text-xl font-bold text-slate-900">Print My Schedule</div>
+            <p className="mt-2 text-sm text-slate-600">
+              Choose the dates to print. The printout includes only your work schedule and supervisor notes.
+            </p>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Start Date
+                <input
+                  type="date"
+                  value={printScheduleStart}
+                  onChange={(event) => setPrintScheduleStart(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                End Date
+                <input
+                  type="date"
+                  value={printScheduleEnd}
+                  min={printScheduleStart}
+                  onChange={(event) => setPrintScheduleEnd(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPrintScheduleModal(false)}
+                className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={printPersonalSchedule}
+                className="rounded-xl border border-blue-700 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Print Schedule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {selectedVacationShift && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
@@ -5389,10 +5616,10 @@ export default function DashboardPage() {
                         setShowFullSchedule(false);
                         setShowOpenShiftsOnly(false);
                       }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                         !showFullSchedule && !showOpenShiftsOnly
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-600 hover:text-slate-900'
+                          ? 'border-blue-700 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-500 bg-white text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       My Schedule
@@ -5405,8 +5632,8 @@ export default function DashboardPage() {
                       }}
                       className={`rounded-xl border px-4 py-2 text-sm font-semibold transition ${
                         showOpenShiftsOnly
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                          ? 'border-blue-700 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-500 bg-white text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       Show Open Shifts
@@ -5418,13 +5645,24 @@ export default function DashboardPage() {
                         setShowFullSchedule(true);
                         setShowOpenShiftsOnly(false);
                       }}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-                        showFullSchedule ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                        showFullSchedule
+                          ? 'border-blue-700 bg-blue-600 text-white shadow-sm'
+                          : 'border-slate-500 bg-white text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       Full Schedule
                     </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={openPrintScheduleModal}
+                    disabled={!currentEmployee}
+                    className="rounded-xl border border-slate-600 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Print Schedule
+                  </button>
                 </div>
               </div>
 
