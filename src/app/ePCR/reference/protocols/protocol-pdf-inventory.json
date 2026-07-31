@@ -1,0 +1,580 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "ccemsa/als/530-07-ventricular-tachycardia-with-pulses.pdf",
+      "sha256": "0aff2845b450c20998d136d7d616b0cffa1327eefd1ba42e2145496057f0c950",
+      "size": 20106
+    },
+    {
+      "path": "ccemsa/als/530-12-atrial-fibrillation.pdf",
+      "sha256": "d03461999ddb042398dc522a5cb1e1291eb2a7ac3a5a5c8aec7cca50e7edbae3",
+      "size": 30707
+    },
+    {
+      "path": "ccemsa/als/530-14-shortness-of-breath-with-bronchospasm-including-copd-and-asthma.pdf",
+      "sha256": "1b25bcd591b33dab0ee3bf15a53defd035b25e9293b3eed256d3dda120c166f3",
+      "size": 17573
+    },
+    {
+      "path": "ccemsa/als/530-15-shortness-of-breath-with-pulmonary-edema-including-chf.pdf",
+      "sha256": "d637ee50d4618bab4ca0840457c1d9031ef18a5ced19d9b5082d46d51f0a12d5",
+      "size": 17026
+    },
+    {
+      "path": "ccemsa/als/530-16-respiratory-distress.pdf",
+      "sha256": "af2a997d3fbaba83a108eaeef3cb30c9a8cfb377327f37544c23c08edb196fcb",
+      "size": 32926
+    },
+    {
+      "path": "ccemsa/als/530-17-airway-obstruction-foreign-body.pdf",
+      "sha256": "cfd7ffb03db4eb6852be780637bb09d047ecabdd521caa76ccf89a90fabeb6ac",
+      "size": 31295
+    },
+    {
+      "path": "ccemsa/als/530-19-seizures.pdf",
+      "sha256": "fae6c0396783ac9256724f43425cbfc6325d1f4bc8dd27a4d934f2c9bb1c8e9c",
+      "size": 47775
+    },
+    {
+      "path": "ccemsa/als/530-20-ingestion-poisoning.pdf",
+      "sha256": "7dcebd8a183bb6f215b32a7d7f188c5799f54897d7dc3bbe18f98a83fc032526",
+      "size": 33384
+    },
+    {
+      "path": "ccemsa/als/530-21-shock-non-traumatic.pdf",
+      "sha256": "6f1aeae9803565948dcc6c09b3e647c86d0638634b8cde1149b9010533736747",
+      "size": 33622
+    },
+    {
+      "path": "ccemsa/als/530-25-near-drowning.pdf",
+      "sha256": "d07caefaa842b3daa2ee167d928311bb7f880b2db06be577c6d25aa7c64f5971",
+      "size": 28146
+    },
+    {
+      "path": "ccemsa/als/530-27-behavioral-emergencies.pdf",
+      "sha256": "34dfc13ababa6321f3bdad809255304fdfa61e1263ea4a90be0c1dc2582f3d25",
+      "size": 96328
+    },
+    {
+      "path": "ccemsa/als/530-28-dystonic-reaction-to-phenothiazine-drugs.pdf",
+      "sha256": "4798fa470dc5617aa00f277e3a6dbafff7303ce41c109123aacb4d237b4f7988",
+      "size": 25193
+    },
+    {
+      "path": "ccemsa/als/530-29-vaginal-bleeding.pdf",
+      "sha256": "d77166059325ca8a9fcaa67a5bbc7bd9c5a9b28c49a46589945f784ca0b7dd67",
+      "size": 25357
+    },
+    {
+      "path": "ccemsa/als/530-32-pediatric-primary-survey.pdf",
+      "sha256": "1666c92a9cd8541dcfa2d5c88d66f0c0faeca9c2376d634381eadbdfb25b72a6",
+      "size": 32534
+    },
+    {
+      "path": "ccemsa/als/530-37-pediatric-tachycardia-with-pulses.pdf",
+      "sha256": "5f51ddba0b39427902ba77245ee9c34184bf744c6888584348e567d67db0bf95",
+      "size": 20193
+    },
+    {
+      "path": "ccemsa/als/530-39-pediatric-shock-non-traumatic.pdf",
+      "sha256": "8179c24d0b20f2f1e03a39c7cb887959f01dd5b9f5549d2b88df9fc329a0a8e5",
+      "size": 28889
+    },
+    {
+      "path": "ccemsa/als/530-41-nausea-and-or-vomiting.pdf",
+      "sha256": "06cf56acb9b1fb491f6cd3e907ebca2aa52f72c41b00d07d43b8b982f3bb1dce",
+      "size": 13555
+    },
+    {
+      "path": "ccemsa/als/530-a-policy.pdf",
+      "sha256": "2bb6d5521f27c8973f73ff711bbaac262f0b090f646803faa9040aa8bae5087d",
+      "size": 32421
+    },
+    {
+      "path": "ccemsa/als/530.01_table-of-contents-c.pdf",
+      "sha256": "c51828e6997edf6978cace9f5f80bd0bad74344eb7f07a6065d6b8c76353de2c",
+      "size": 153782
+    },
+    {
+      "path": "ccemsa/als/530.02-general-procedures-g.pdf",
+      "sha256": "4bac4d3cf5509948a367d93f55fd29948f0e20a20561bea1b249860cdc1be94a",
+      "size": 449383
+    },
+    {
+      "path": "ccemsa/als/530.04_cardiac-arrest_medical-a.pdf",
+      "sha256": "e18fa9935b9f4b3028475379493718a54285e5c837a5d79c11c1cc6673fa4ad0",
+      "size": 170350
+    },
+    {
+      "path": "ccemsa/als/530.05_cardiac-arrest_trauma.pdf",
+      "sha256": "1e506f3fa5a1a2cfdc899b1275e3fb67dd53a89a054d00db8c9c56ab4622e114",
+      "size": 135520
+    },
+    {
+      "path": "ccemsa/als/530.06_dysrhythmias.pdf",
+      "sha256": "9605612479d0834a17c84150f1923114c976e11742610d5694d6d147232df3b1",
+      "size": 89590
+    },
+    {
+      "path": "ccemsa/als/530.10_bradydysrhythmias-a.pdf",
+      "sha256": "2c592542893ea33a3590f3e2f01cff91b24cf6ab5abb92632d6629bc2e7a6ec5",
+      "size": 150095
+    },
+    {
+      "path": "ccemsa/als/530.11_paroxysmal-supraventricular-tachycardia-pvst.pdf",
+      "sha256": "41c3fba4fc9aa60f91ab654e7cb501ae7101fa79e3cb258a01dea7f77ecce823",
+      "size": 140444
+    },
+    {
+      "path": "ccemsa/als/530.13-coronary-ischemic-chest-discomfort.pdf",
+      "sha256": "a02ac538723863480bcf6b965ba467911e14d74355c10eab708121c4b745bb31",
+      "size": 105659
+    },
+    {
+      "path": "ccemsa/als/530.18_altered-ms-and-syncope.pdf",
+      "sha256": "ebb41034923beec52c4514609e4a0b97ecc7dadd9e44bbcc36404b1d06cb51a5",
+      "size": 140526
+    },
+    {
+      "path": "ccemsa/als/530.22_allergic-reactions-and-anaphylactic-shock-a.pdf",
+      "sha256": "3b0a55538ed2422a82e077f705ad3c2f96cb26103f784ca3186ac2db8dc431fc",
+      "size": 141230
+    },
+    {
+      "path": "ccemsa/als/530.23_trauma-b.pdf",
+      "sha256": "b7da67ab7c981c117d16a43434a4c07594374c73f12a84c3afd4e96b19140bd8",
+      "size": 144236
+    },
+    {
+      "path": "ccemsa/als/530.24_burns-a.pdf",
+      "sha256": "20b3496c2240bc2385fb3c668fb82bdb9c927b3d73f49db6c059e858d129ead4",
+      "size": 120470
+    },
+    {
+      "path": "ccemsa/als/530.26_snakebite-a.pdf",
+      "sha256": "133f4e71480f320d8b0ce836fad6b60439ece9aedaf2bc7a662d40a2ebdf8a22",
+      "size": 88122
+    },
+    {
+      "path": "ccemsa/als/530.30_childbirth.pdf",
+      "sha256": "2fb461ca7d66201bbdc3cc9ca5626fab14da0884f4056af82752fdfd05c47ef5",
+      "size": 186248
+    },
+    {
+      "path": "ccemsa/als/530.31-neonatal-resuscitation-a.pdf",
+      "sha256": "9991e69ec2d1e198d324106eb15f414c419fc62bc446aff82434afa87e98ca89",
+      "size": 149722
+    },
+    {
+      "path": "ccemsa/als/530.33-pediatric-arrest-medical.pdf",
+      "sha256": "6f2c4d9613974356182a95ecae3a5953bc7e786be912466e9b181fffa4470ac6",
+      "size": 161666
+    },
+    {
+      "path": "ccemsa/als/530.36_pediatric-bradycardia-a.pdf",
+      "sha256": "3c8cbd811373791327a6a7b98939ed95b4de5851f2d2d639f931e3c26449f12f",
+      "size": 197463
+    },
+    {
+      "path": "ccemsa/als/530.38-pediatric-respiratory-distress-a.pdf",
+      "sha256": "b0013a252735d3be4e24ca75691cdc0ef70acfef7fd0cc90378f94a16218a2c1",
+      "size": 94864
+    },
+    {
+      "path": "ccemsa/als/530.40-suspected-stroke.pdf",
+      "sha256": "1d7b059ab0932f8403f9276ddd3b888ac8380eea8b1c1b59e635ae258f2b0757",
+      "size": 113991
+    },
+    {
+      "path": "ccemsa/als/530.42_adult-pain-management.pdf",
+      "sha256": "ca87c7985d4a63b5c09a4f85c8cb08f2a3758ecac6dbcb6a5b65518fdbb517ac",
+      "size": 244893
+    },
+    {
+      "path": "ccemsa/als/530.43_pediatric-pain-management.pdf",
+      "sha256": "fe6430e9d198b8bf992f3151e3f2f90b034ef1af3ac75ef8c84f97937bd3527c",
+      "size": 230921
+    },
+    {
+      "path": "ccemsa/als/530.44_ventilators-automatic-transport-a.pdf",
+      "sha256": "e7c54da8f461b0551c9c4acc3d452484a952039e055da03d215e476d2b599a6b",
+      "size": 141554
+    },
+    {
+      "path": "ccemsa/als/530.45_pediatric-allergic-reactions-and-anaphylactic-shock-a.pdf",
+      "sha256": "bc9aa7bb433945b7c4c525590a6e9fcfdd28615b4c12cc2e7946640ca7dbbb2e",
+      "size": 195716
+    },
+    {
+      "path": "ccemsa/als/drug-box_01-26.pdf",
+      "sha256": "5ba5e071b39ab7f092b588154b6aba8c1cc6895bd2d77e197c62dbb1589687f9",
+      "size": 546752
+    },
+    {
+      "path": "ccemsa/bls/510-02-basic-life-support-call-ins.pdf",
+      "sha256": "f295423aaf816416911f42a197b3791b3b836181f18af484396f80e9d1cdbaa8",
+      "size": 32920
+    },
+    {
+      "path": "ccemsa/bls/510-03-prehospital-rendezvous.pdf",
+      "sha256": "57acac4ed5e09ec019a8a214b91e019c1811e2010c0d1b9626d54d2a332e2159",
+      "size": 23459
+    },
+    {
+      "path": "ccemsa/bls/510-04-prehospital-use-of-oxygen.pdf",
+      "sha256": "aed3294235321f668dffff346d290174db5456e1435a20bc1f1796485c54f433",
+      "size": 22970
+    },
+    {
+      "path": "ccemsa/bls/510-05-tracheostomy-care-suctioning.pdf",
+      "sha256": "5b38809dc50f1ec26a29e42ddbe6d54b6152a1af2da111473d828e21142d10cf",
+      "size": 22716
+    },
+    {
+      "path": "ccemsa/bls/510-07-monitoring-ivs.pdf",
+      "sha256": "ec48cd15b61328daca642cd7f21e94534fb99134260926e16615a5e225ddff50",
+      "size": 19429
+    },
+    {
+      "path": "ccemsa/bls/510-09-cardiac-arrest-trauma.pdf",
+      "sha256": "f76c98939f5a976391a3b7b4ac566cc26469f77299410c9126101e1d0d8380fc",
+      "size": 23121
+    },
+    {
+      "path": "ccemsa/bls/510-10-chest-pain.pdf",
+      "sha256": "bee788650845cf8df7b2f2f3963856217a8b729200b249dc455e924f30a2f8b1",
+      "size": 21444
+    },
+    {
+      "path": "ccemsa/bls/510-11-respiratory-distress.pdf",
+      "sha256": "ccaf439ac7f5398701d73c2fcb584248b6c692267a8baf8837e542f14ada7373",
+      "size": 23080
+    },
+    {
+      "path": "ccemsa/bls/510-12-airway-obstruction.pdf",
+      "sha256": "872026c60b138e28a79d751915ff9b391b0f72c2eb724f5fe1859095097b1072",
+      "size": 23056
+    },
+    {
+      "path": "ccemsa/bls/510-14-syncope-any-transient-loss-of-consciousness.pdf",
+      "sha256": "0afb5f53ae7784e10c0d567325661dac87b4f5afbe3ad5633ba2b88af2c14f1e",
+      "size": 19045
+    },
+    {
+      "path": "ccemsa/bls/510-15-seizures.pdf",
+      "sha256": "3c6c14704a7bf49d003ee05791248f34cc22768a62e33d3b1dc1f900dc53fdf7",
+      "size": 92776
+    },
+    {
+      "path": "ccemsa/bls/510-17-ingestion-poisoning.pdf",
+      "sha256": "126e4819dac7c4a755ba441fccae88f4ebcf013c65fbaa4710a062d3e21104ea",
+      "size": 22997
+    },
+    {
+      "path": "ccemsa/bls/510-18-abdominal-emergencies-medical-and-trauma.pdf",
+      "sha256": "22be00fb145f5704899bd18ac7db9f077986962cbbc4697cfbaf5d3e760e7c13",
+      "size": 19353
+    },
+    {
+      "path": "ccemsa/bls/510-19-shock-hypotension.pdf",
+      "sha256": "8a2f5b126f4874d5fe613b3a1e25e8dd4c3db2b2b6e60de3138556111dc4665d",
+      "size": 22548
+    },
+    {
+      "path": "ccemsa/bls/510-20-head-trauma.pdf",
+      "sha256": "a177d5e63fd6f5034d74275c0681c5c6d43cc4132a5198ddc3827dbe8a233712",
+      "size": 19425
+    },
+    {
+      "path": "ccemsa/bls/510-21-chest-trauma.pdf",
+      "sha256": "a47160b7fe323017f10b7822d63bd864c698572f9a6837887201666d8193a651",
+      "size": 19752
+    },
+    {
+      "path": "ccemsa/bls/510-22-orthopedic-trauma.pdf",
+      "sha256": "6a6603e72d66bb2978b80274243149b0a2e55b758ebcdaa032aa17a629355dd2",
+      "size": 24768
+    },
+    {
+      "path": "ccemsa/bls/510-23-soft-tissue-injuries.pdf",
+      "sha256": "3fb495324467202e676e8ecbb93494a7815151f852361b5ba28879ac789abf11",
+      "size": 19942
+    },
+    {
+      "path": "ccemsa/bls/510-24-ear-injuries.pdf",
+      "sha256": "1cff20abec4362cc368e646ab8f91d255eb02e0b9320bcf517aafe5195798997",
+      "size": 17948
+    },
+    {
+      "path": "ccemsa/bls/510-25-eye-injuries.pdf",
+      "sha256": "249d49a4ed9b151ce80672415d081efcc89f589a60e2e06e2d52f4fa1df1c539",
+      "size": 18344
+    },
+    {
+      "path": "ccemsa/bls/510-26-burns.pdf",
+      "sha256": "d86ef8c11855cac82b900cc2ad80d10b089770dbb6ae256fc4724a8b12d772fa",
+      "size": 46594
+    },
+    {
+      "path": "ccemsa/bls/510-27-hyperthermia.pdf",
+      "sha256": "cc4fce521f2c2b4fbeeebd3341f4ea3609644c04f54d56279c3d9de5409ceda9",
+      "size": 18184
+    },
+    {
+      "path": "ccemsa/bls/510-28-hypothermia.pdf",
+      "sha256": "5c4bd28cb600b4731dcd91600a1cf09b41089260d033be55099c56001fbcae80",
+      "size": 18171
+    },
+    {
+      "path": "ccemsa/bls/510-29-frostbite.pdf",
+      "sha256": "fdf24481fd38f8dd034f2bbba75cae777296073f6626aeb18c12574e825a1b04",
+      "size": 18205
+    },
+    {
+      "path": "ccemsa/bls/510-30-near-drowning.pdf",
+      "sha256": "c2782ee8bda8ba70ee58fb2c26776ac4a46d3542e2baa4abc85bb186084096c4",
+      "size": 22795
+    },
+    {
+      "path": "ccemsa/bls/510-33-childbirth-protocol.pdf",
+      "sha256": "3a719ecd3a0c75b958c6ff52df5ce31e9f35d8dd55cbdc2019d5e39de132d054",
+      "size": 30320
+    },
+    {
+      "path": "ccemsa/bls/510-34-behavioral-emergencies.pdf",
+      "sha256": "762c2fca0a9e702336f2946b69057cb6911cc3e4d11e678f0b50ceea8ab8bb9d",
+      "size": 23321
+    },
+    {
+      "path": "ccemsa/bls/510-a.pdf",
+      "sha256": "955a3f5173bf38940d3c9e9e3463d43286ef6de290d27beb4db5089c44288c11",
+      "size": 13872
+    },
+    {
+      "path": "ccemsa/bls/510.01_table-of-contents-b.pdf",
+      "sha256": "072d710998167e1421fb15ee1fba0c18acd465b93d462c0e7170ac2a615b85ed",
+      "size": 92210
+    },
+    {
+      "path": "ccemsa/bls/510.06_spinal-motion-restriction-a.pdf",
+      "sha256": "b16aae6dba4422c5cc57657d060f73b0b33439a51461845e6a9130707a89ba2d",
+      "size": 88725
+    },
+    {
+      "path": "ccemsa/bls/510.08_cardiac-arrest_medical-bls-b.pdf",
+      "sha256": "0a1b994248d5457983038226b7140ec5619da616ffb2a5f11e1bc8a522e1c113",
+      "size": 220108
+    },
+    {
+      "path": "ccemsa/bls/510.13-altered-ms-and-syncope.pdf",
+      "sha256": "f0e52e0b356a843ac6c049465c4db397f56891d1622edd2f1206159139989feb",
+      "size": 150160
+    },
+    {
+      "path": "ccemsa/bls/510.16-stroke.pdf",
+      "sha256": "cd77e2143c09dc4674319e4ee0edaaad06321cebcac126c148292c5a90b56989",
+      "size": 112365
+    },
+    {
+      "path": "ccemsa/bls/510.31_snakebite.pdf",
+      "sha256": "ceaf0b31c1bf52eb131418eb3e73a6a359616e94a25ad8afade79f0e514cdb0d",
+      "size": 85024
+    },
+    {
+      "path": "ccemsa/bls/510.32_allergic-reactions-and-anaphylaxis.pdf",
+      "sha256": "087d7ababa560eb41f443065b09fa7fa0b794e3a37c9bf86eceee08e1053d1a4",
+      "size": 135222
+    },
+    {
+      "path": "ccemsa/bls/510.35-bls-pediatric-respiratory-distress.pdf",
+      "sha256": "8d1f96d498c03be6585aee2ab44bdcbe0d6c320c3ae929e087040c3d651c88c2",
+      "size": 35421
+    },
+    {
+      "path": "ccemsa/bls/510.36-pediatric-arrest-medical.pdf",
+      "sha256": "e71e3b28bc9baf10aedc5b009a1fb12fb53e71e4d56c11170840df07d33de056",
+      "size": 91329
+    },
+    {
+      "path": "ccemsa/bls/510.37_supraglottic-airway.pdf",
+      "sha256": "020cd05d70f1b3d8e5b90e66a9ffad0efee48ca1f25e0cbc3e7fc5101e09c118",
+      "size": 156635
+    },
+    {
+      "path": "merced-county/EMS Policy 700 General Procedures - New Format - Final - 11.2025.pdf",
+      "sha256": "151f3b22363ee8ae81f42a0cde12bdba8076b4bfb288dd33a075f748e1993ab6",
+      "size": 1223724
+    },
+    {
+      "path": "merced-county/EMS Policy 702 Cardiac Arrest New Format - Final - 11.2025.pdf",
+      "sha256": "06cd40250c575b15ada7bd63e6005370fef051531d0dbbbfd038daea2ae5b9fd",
+      "size": 237595
+    },
+    {
+      "path": "merced-county/EMS Policy 704 Chest Pain New Format - Final - 11.2025.pdf",
+      "sha256": "8be9784bb1246231147253fb9423ed3d2cb0842b5814344f32d96fb74e5384cd",
+      "size": 256498
+    },
+    {
+      "path": "merced-county/EMS Policy 706 Bradycardia New Format - Final - 11.2025.pdf",
+      "sha256": "6d93267490ece503734784843ad80d4cf0375bcd22a52e6ab8efe698e4b4ad4b",
+      "size": 236206
+    },
+    {
+      "path": "merced-county/EMS Policy 708 Tachyarrhythmias New Format - Final - 11.2025.pdf",
+      "sha256": "4c906d16195109181471e3d93cad3d263ffa5227d4e2887f1822af607f59113a",
+      "size": 244992
+    },
+    {
+      "path": "merced-county/EMS Policy 710 ROSC New Format - Final - 11.2025.pdf",
+      "sha256": "456471fe82de895e9c0ce60a3778de298f3a58d352b79c8ea6f1758156c33c57",
+      "size": 227318
+    },
+    {
+      "path": "merced-county/EMS Policy 712 Airway Obstruction New Format - Final - 11.2025.pdf",
+      "sha256": "ad9351ce2c93a1e789d051b3a9cb7b6068e57ae5d4d9deca714c1fd1649cb583",
+      "size": 220988
+    },
+    {
+      "path": "merced-county/EMS Policy 714 Respiratory Distress New Format - Final - 11.2025 - Revision - 3.5.2026.pdf",
+      "sha256": "269509a1e46b529e2e0b049386a4c86b9a267ba18550b456357754c3a5d15e0e",
+      "size": 240076
+    },
+    {
+      "path": "merced-county/EMS Policy 716 Nausea and Vomiting New Format - Final - 11.2025.pdf",
+      "sha256": "050da1bbad5d80497b2e89bf7181bf9f4fc31c5621b01f156be7faef30cea94a",
+      "size": 227455
+    },
+    {
+      "path": "merced-county/EMS Policy 718 Pain Management New Format - Final - 11.2025.pdf",
+      "sha256": "7af87de2c8b3af52bf75453b00032f60c304e9308865550b39f20f278710b61f",
+      "size": 322092
+    },
+    {
+      "path": "merced-county/EMS Policy 720 Sepsis New Format - Final - 11.2025.pdf",
+      "sha256": "8d14706daa558ffa497e3cc05520f7ee047a8acbf6703f240d4333193b5accba",
+      "size": 268597
+    },
+    {
+      "path": "merced-county/EMS Policy 722 Stroke New Format - Final - 11.2025.pdf",
+      "sha256": "ba57cb93379849ab94adbd2347f1b3871ebdd2abcdf5f52474c47f5e3c6b9773",
+      "size": 220704
+    },
+    {
+      "path": "merced-county/EMS Policy 724 Altered Level of Consciousness (ALOC) or Syncope New Format - Final - 11.2025.pdf",
+      "sha256": "513a29d444615225c43d7cb9b11b5849666dd0e25376a888b3cd43dad9e18411",
+      "size": 262055
+    },
+    {
+      "path": "merced-county/EMS Policy 726 Allergic Reaction and Anaphylactic Shock New Format - Final - 11.2025.pdf",
+      "sha256": "d8a1ab95e7a7ec28aca263a86d3aec1601933e4a0fe9380ac730fe48fd2b4902",
+      "size": 257633
+    },
+    {
+      "path": "merced-county/EMS Policy 728 Seizures New Format - Final - 11.2025.pdf",
+      "sha256": "c1d19739ead45dd1086c4daaa8f6678a9db23801caceb489e44a3e106392c887",
+      "size": 247888
+    },
+    {
+      "path": "merced-county/EMS Policy 730 Hyperglycemia New Format - Final - 11.2025.pdf",
+      "sha256": "b49faf509ccf125d2cd293348ca81c8d3830a1b12dd3ce52eb75afcc17395f62",
+      "size": 249361
+    },
+    {
+      "path": "merced-county/EMS Policy 732 Hyperthermia New Format - Final - 11.2025.pdf",
+      "sha256": "4c6ab0312216f7952dcd5047e36d4f21dfb17aa157a99bff9cec7521aac69724",
+      "size": 224873
+    },
+    {
+      "path": "merced-county/EMS Policy 734 Hypothermia New Format - Final - 11.2025.pdf",
+      "sha256": "d3913a79d59f977e648811b712f2444ad992f7112788d1bc84a54b90bdcb5df6",
+      "size": 228979
+    },
+    {
+      "path": "merced-county/EMS Policy 736 Medication Poisonings New Format - Final - 11.2025.pdf",
+      "sha256": "025fe3b6055dbdcf2b081a75dc3913c7f68aab2dd20cfa49d299a5cd9dbc6de6",
+      "size": 237762
+    },
+    {
+      "path": "merced-county/EMS Policy 738 Non-Traumatic Shock New Format - Final - 11.2025.pdf",
+      "sha256": "dedbe5a7f3607896b38f9bc99cb35169f9b974c775b1670703a48d7cb75b8e26",
+      "size": 225247
+    },
+    {
+      "path": "merced-county/EMS Policy 740 Dystonic Reactions New Format - Final - 11.2025.pdf",
+      "sha256": "4153903b006dfa7df697350dba7d1cb926062a65b9a90641341eaf592a2a0e79",
+      "size": 221784
+    },
+    {
+      "path": "merced-county/EMS Policy 742 Behavioral Emergency New Format - Final - 11.2025.pdf",
+      "sha256": "9343edef422027fda2ecb3316a1eb569b5eda5fe8a619c30c19b868f05ba0533",
+      "size": 243098
+    },
+    {
+      "path": "merced-county/EMS Policy 744 Envenomation-Bites-Stings New Format - Final - 11.2025.pdf",
+      "sha256": "e8775c91ea6571c72520ea204908464819bd7dfc15bdbe0037a2f3883e424ac3",
+      "size": 231771
+    },
+    {
+      "path": "merced-county/EMS Policy 746 Organophosphates Exposure - Final - 11.2025.pdf",
+      "sha256": "9264d5b4b21c083e3977bb9f3e88c50277f48bd614b8992c3ec55862a76fd623",
+      "size": 226932
+    },
+    {
+      "path": "merced-county/EMS Policy 748 OB-GYB Emergencies New Format - Final - 11.2025.pdf",
+      "sha256": "74f2fa7d58eaaffa4f13fc05fe0da52b913316844550e3d171b6c95c37f111c4",
+      "size": 232440
+    },
+    {
+      "path": "merced-county/EMS Policy 749 Newborn Resuscitation New Format - Final - 11.2025.pdf",
+      "sha256": "2eea95c94beae450661d32447fe7697763e954fa37eb984106e385ebc6404ae6",
+      "size": 318877
+    },
+    {
+      "path": "merced-county/EMS Policy 750 Spinal Motion Restriction New Format - Final - 11.2025.pdf",
+      "sha256": "ada901c160767ec000163813a3fa9557b4f4fd19be06170025efc9cda0b565e6",
+      "size": 483270
+    },
+    {
+      "path": "merced-county/EMS Policy 752 Trauma New Format - Final - 11.2025.pdf",
+      "sha256": "3ba30003b230283e3c488847452db9af3b4711ab96a9961ee4fc403efd627319",
+      "size": 226623
+    },
+    {
+      "path": "merced-county/EMS Policy 754 Traumatic Arrest New Format - Final - 11.2025.pdf",
+      "sha256": "35b41d0364683fe453601ed746dc7bd6537dab3259318fb041c8c5c5ca5a2946",
+      "size": 224773
+    },
+    {
+      "path": "merced-county/EMS Policy 756 Burns New Format - Final - 11.2025.pdf",
+      "sha256": "64a28ec878367866edc5c7144dab3ab6bd8d029ba5114a0bded33f9c49731a4c",
+      "size": 398581
+    },
+    {
+      "path": "merced-county/EMS Policy 758 TXA - Bleeding Control New Format - Final - 11.2025.pdf",
+      "sha256": "5381360e6af2ad9e4f523ab9ff81c3430bae2ca05848a20023fad95c7c1f0bb5",
+      "size": 291693
+    },
+    {
+      "path": "merced-county/EMS Policy 760 Airway Management New Format - Final - 11.2025.pdf",
+      "sha256": "dac2295395a410800ca0d23d981d49f99edc427c11f498c5ec80a45339883a2b",
+      "size": 253515
+    },
+    {
+      "path": "merced-county/EMS Policy 910 - Multiple Casualty Incident (MCI) - Field Operations.pdf",
+      "sha256": "b58eb76862d0b0dc0d2b536b968602776df43d54b4f7f3bbd1d94c302be2284d",
+      "size": 4103304
+    },
+    {
+      "path": "merced-county/EMS Policy 915 -  Hazardous Materials Incidents.pdf",
+      "sha256": "a4363953a47c337e38e664f9841b18310b11563f8ee4c4069d0c3afce9b43af5",
+      "size": 268459
+    },
+    {
+      "path": "merced-county/EMS Policy 920 - Nerve Agent Exposures - 7.2024 - Revision 3.5.2026.pdf",
+      "sha256": "75412bb36c571a9bc86d6c2c25a8865054de549ba3709911a97330bc51bde280",
+      "size": 201975
+    }
+  ]
+}

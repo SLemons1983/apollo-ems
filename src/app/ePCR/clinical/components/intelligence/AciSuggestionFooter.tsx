@@ -9,6 +9,11 @@ import {
 } from '../../engine/assessment';
 import { evaluateAssessmentClinicalIntelligence } from '../../engine/intelligence';
 import { calculateCcemsaGfastScore } from '../../engine/protocols/ccemsaStroke';
+import {
+  findBestVerifiedProtocol,
+  protocolSourceLabel,
+  protocolViewerUrl,
+} from '../../engine/protocolReferenceIndex';
 
 type ExistingAciFeedback = {
   id: string;
@@ -116,6 +121,29 @@ export default function AciSuggestionFooter({
           ? 'Low'
           : notYetDetermined;
 
+  const protocolMatch = useMemo(
+    () =>
+      findBestVerifiedProtocol({
+        lemsa,
+        providerScope,
+        assessmentMode,
+        clinicalCategory,
+        findings: significantFindings.flatMap((finding) => [
+          finding.title,
+          finding.description,
+        ]),
+        considerations: feedback.map((item) => item.message),
+      }),
+    [
+      assessmentMode,
+      clinicalCategory,
+      feedback,
+      lemsa,
+      providerScope,
+      significantFindings,
+    ],
+  );
+
   const rows = useMemo<SuggestionRow[]>(
     () => [
       {
@@ -156,10 +184,14 @@ export default function AciSuggestionFooter({
       {
         id: 'protocol-match',
         label: 'Best Protocol Match',
-        value: notYetDetermined,
-        explanation: lemsa
-          ? `${lemsa} is selected. A verified match will appear after the indexed protocol-reference foundation is connected.`
-          : 'Select the applicable LEMSA. ACI will only display a protocol match that can be traced to an indexed source protocol.',
+        value: protocolMatch
+          ? `${protocolMatch.protocol.number} — ${protocolMatch.protocol.title}`
+          : notYetDetermined,
+        explanation: protocolMatch
+          ? `Matched from the documented PCR evidence: ${protocolMatch.matchedTerms.join(', ')}. Source: ${protocolSourceLabel(protocolMatch)}. Open the source PDF to review the complete protocol; page 1 is opened initially because the catalog does not claim an unsupported internal page citation.`
+          : lemsa
+            ? `No supported ${lemsa} ${providerScope} protocol match was determined from the documentation entered so far.`
+            : 'Select the applicable LEMSA. ACI only displays a protocol match that is traceable to an indexed source PDF.',
       },
       {
         id: 'shock-risk',
@@ -219,6 +251,7 @@ export default function AciSuggestionFooter({
       lemsa,
       moderateVitalCount,
       providerScope,
+      protocolMatch,
       shockRisk,
       significantFindings,
     ],
@@ -309,6 +342,16 @@ export default function AciSuggestionFooter({
                 </div>
                 <div className={`text-sm font-bold ${row.value === notYetDetermined ? 'text-slate-400' : 'text-slate-900'}`}>
                   {row.value}
+                  {row.id === 'protocol-match' && protocolMatch && (
+                    <a
+                      href={protocolViewerUrl(protocolMatch)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-3 inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-black text-blue-800 hover:bg-blue-100"
+                    >
+                      View Protocol
+                    </a>
+                  )}
                 </div>
                 <span
                   tabIndex={0}
