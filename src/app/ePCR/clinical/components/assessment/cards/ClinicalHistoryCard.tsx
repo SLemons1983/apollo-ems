@@ -1,6 +1,74 @@
 'use client';
 
+import ClinicalMultiSelect from '../../inputs/ClinicalMultiSelect';
 import type { PatientForm } from '../../../../types';
+
+const medicalHistoryOptions = [
+  'None Reported',
+  'Unknown',
+  'Hypertension',
+  'Diabetes Mellitus',
+  'Coronary Artery Disease',
+  'Congestive Heart Failure',
+  'Myocardial Infarction',
+  'Atrial Fibrillation',
+  'CVA / Stroke',
+  'TIA',
+  'Seizure Disorder',
+  'COPD',
+  'Asthma',
+  'Chronic Kidney Disease',
+  'Dialysis',
+  'Liver Disease',
+  'Cancer',
+  'Dementia',
+  'Psychiatric History',
+  'Substance Use Disorder',
+] as const;
+
+const surgicalHistoryOptions = [
+  'None Reported',
+  'Unknown',
+  'Appendectomy',
+  'Cholecystectomy',
+  'CABG',
+  'Cardiac Stent',
+  'Pacemaker / AICD',
+  'Valve Replacement',
+  'Joint Replacement',
+  'Spinal Surgery',
+  'Hysterectomy',
+  'Cesarean Section',
+  'Bariatric Surgery',
+  'Organ Transplant',
+  'Amputation',
+] as const;
+
+const currentMedicationOptions = [
+  'None Reported',
+  'Unknown',
+  'Aspirin',
+  'Clopidogrel',
+  'Warfarin',
+  'Apixaban',
+  'Rivaroxaban',
+  'Lisinopril',
+  'Losartan',
+  'Amlodipine',
+  'Metoprolol',
+  'Furosemide',
+  'Atorvastatin',
+  'Metformin',
+  'Insulin',
+  'Albuterol',
+  'Nitroglycerin',
+  'Levothyroxine',
+  'Prednisone',
+  'Gabapentin',
+  'Opioid Pain Medication',
+  'Antidepressant',
+  'Antipsychotic',
+] as const;
 
 type ClinicalHistoryForm = {
   eventsLeadingToIllness: string;
@@ -158,28 +226,28 @@ export default function ClinicalHistoryCard({
             }}
           />
 
-          <HistoryField
+          <ClinicalMultiSelect
             label="Current Medications"
             value={patientForm.currentMedications}
-            placeholder="Enter current medications or document none"
+            options={currentMedicationOptions}
             onChange={(nextValue) =>
               onPatientChange('currentMedications', nextValue)
             }
           />
 
-          <HistoryField
+          <ClinicalMultiSelect
             label="Medical History"
             value={patientForm.medicalHistory}
-            placeholder="Enter pertinent medical history or document none"
+            options={medicalHistoryOptions}
             onChange={(nextValue) =>
               onPatientChange('medicalHistory', nextValue)
             }
           />
 
-          <HistoryField
+          <ClinicalMultiSelect
             label="Surgical History"
             value={patientForm.surgicalHistory}
-            placeholder="Enter pertinent surgical history or document none"
+            options={surgicalHistoryOptions}
             onChange={(nextValue) =>
               onPatientChange('surgicalHistory', nextValue)
             }
