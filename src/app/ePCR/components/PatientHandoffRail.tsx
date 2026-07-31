@@ -5,12 +5,14 @@ import type {
 } from '../types';
 import { calculatePatientAge } from '../utils';
 import type { VitalsForm } from '../clinical/vitals/vitals';
+import type { AssessmentForm } from '../clinical/assessment/assessmentForm';
 
 type PatientHandoffRailProps = {
   callForm: CallForm;
   patientForm: PatientForm;
   complaintForm: ComplaintForm;
   vitalsForm: VitalsForm;
+  assessmentForm: AssessmentForm;
 };
 
 function displayValue(
@@ -156,6 +158,7 @@ export default function PatientHandoffRail({
   patientForm,
   complaintForm,
   vitalsForm,
+  assessmentForm,
 }: PatientHandoffRailProps) {
   const latestVitals = vitalsForm.sets[vitalsForm.sets.length - 1];
   return (
@@ -247,7 +250,7 @@ export default function PatientHandoffRail({
           <div className="grid grid-cols-2 gap-2">
             <ScoreTile label="GCS" value="—" />
             <ScoreTile label="RTS" value="—" />
-            <ScoreTile label="APGAR" value="—" />
+            <ScoreTile label="APGAR" value={(() => { const values = ['appearance','pulse','grimace','activity','respiration'].map((key) => assessmentForm.clinical.apgar[key as keyof typeof assessmentForm.clinical.apgar]).filter(Boolean); return values.length === 5 ? `${values.reduce((sum, item) => sum + Number(item), 0)}/10` : '—'; })()} />
             <ScoreTile label="Burn %" value="—" />
           </div>
         </div>

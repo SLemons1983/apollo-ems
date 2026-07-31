@@ -20,6 +20,9 @@ import ComplaintSection from "../sections/ComplaintSection";
 import PatientSection from "../sections/PatientSection";
 import TreatmentsSection from "../sections/TreatmentsSection";
 import VitalsSection from "../sections/VitalsSection";
+import NarrativeSection from "../sections/NarrativeSection";
+import SignatureSection, { createDefaultSignatureForm, type SignatureForm } from "../sections/SignatureSection";
+import { createDefaultNarrativeForm, generateNarrative, narrativeFingerprint, type NarrativeForm, type NarrativeFormat } from "../clinical/narrative/narrative";
 import type { CallForm, ComplaintForm, PatientForm } from "../types";
 import {
   createDefaultBillingForm,
@@ -214,6 +217,8 @@ export default function EPCRClient() {
   const [billingForm, setBillingForm] = useState<BillingForm>(() =>
     createDefaultBillingForm(),
   );
+  const [narrativeForm, setNarrativeForm] = useState<NarrativeForm>(() => createDefaultNarrativeForm());
+  const [signatureForm, setSignatureForm] = useState<SignatureForm>(() => createDefaultSignatureForm());
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
     totalFields: 0,
@@ -623,6 +628,9 @@ export default function EPCRClient() {
   );
   const treatmentsProgress = getTreatmentsProgress(treatmentsForm);
   const billingProgress = getBillingProgress(billingForm);
+  const narrativeSource = { call: callForm, patient: patientForm, complaint: complaintForm, assessment: assessmentForm, vitals: vitalsForm, treatments: treatmentsForm };
+  const currentNarrativeFingerprint = narrativeFingerprint(narrativeSource);
+  const signedSourceFingerprint = JSON.stringify({ ...narrativeSource, narrative: narrativeForm.text });
 
   const progressSections = [
     {
@@ -685,6 +693,8 @@ export default function EPCRClient() {
         },
       ],
     },
+    { title: "Narrative", completedFields: narrativeForm.text.trim() ? 1 : 0, totalFields: 1 },
+    { title: "Signatures", completedFields: signatureForm.imageData && signatureForm.sourceFingerprint === signedSourceFingerprint ? 1 : 0, totalFields: 1 },
     ...sections
       .filter(
         (section) =>
@@ -694,7 +704,9 @@ export default function EPCRClient() {
           section !== "Assessment" &&
           section !== "Vitals" &&
           section !== "Treatments" &&
-          section !== "Billing Information",
+          section !== "Billing Information" &&
+          section !== "Narrative" &&
+          section !== "Signatures",
       )
       .map((section) => ({
         title: section,
@@ -717,6 +729,8 @@ export default function EPCRClient() {
         vitals: vitalsForm,
         treatments: treatmentsForm,
         billing: billingForm,
+        narrative: narrativeForm,
+        signature: signatureForm,
       },
     };
 
@@ -756,6 +770,8 @@ export default function EPCRClient() {
           vitals?: VitalsForm;
           treatments?: TreatmentsForm;
           billing?: BillingForm;
+          narrative?: NarrativeForm;
+          signature?: SignatureForm;
         };
         callForm?: CallForm;
         patientForm?: PatientForm;
@@ -764,6 +780,8 @@ export default function EPCRClient() {
         vitalsForm?: VitalsForm;
         treatmentsForm?: TreatmentsForm;
         billingForm?: BillingForm;
+        narrativeForm?: NarrativeForm;
+        signatureForm?: SignatureForm;
       };
 
       const uploadedCallForm = parsed.chart?.call ?? parsed.callForm;
@@ -781,6 +799,8 @@ export default function EPCRClient() {
       const uploadedTreatmentsForm =
         parsed.chart?.treatments ?? parsed.treatmentsForm;
       const uploadedBillingForm = parsed.chart?.billing ?? parsed.billingForm;
+      const uploadedNarrativeForm = parsed.chart?.narrative ?? parsed.narrativeForm;
+      const uploadedSignatureForm = parsed.chart?.signature ?? parsed.signatureForm;
 
       if (
         parsed.fileType !== "ApolloEMS Mock ePCR" ||
@@ -830,6 +850,8 @@ export default function EPCRClient() {
       setVitalsForm(mergeVitalsWithDefaults(uploadedVitalsForm));
       setTreatmentsForm(mergeTreatmentsWithDefaults(uploadedTreatmentsForm));
       setBillingForm(mergeBillingWithDefaults(uploadedBillingForm));
+      setNarrativeForm({ ...createDefaultNarrativeForm(), ...(uploadedNarrativeForm ?? {}) });
+      setSignatureForm({ ...createDefaultSignatureForm(), ...(uploadedSignatureForm ?? {}) });
       setExpandedSection(parsed.expandedSection || "Call");
       setFileStatus("PCR uploaded successfully.");
     } catch (error) {
@@ -947,6 +969,7 @@ export default function EPCRClient() {
                       patientForm={patientForm}
                       complaintForm={complaintForm}
                       vitalsForm={vitalsForm}
+                      assessmentForm={assessmentForm}
                     />
                   </div>
                 </div>
@@ -1057,6 +1080,10 @@ export default function EPCRClient() {
                         billingForm={billingForm}
                         setBillingForm={setBillingForm}
                       />
+                    ) : section === "Narrative" ? (
+                      <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
+                    ) : section === "Signatures" ? (
+                      <SignatureSection value={signatureForm} onChange={setSignatureForm} sourceFingerprint={signedSourceFingerprint} />
                     ) : (
                       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
                         {section} cards will be added here.
@@ -1203,6 +1230,10 @@ export default function EPCRClient() {
                       billingForm={billingForm}
                       setBillingForm={setBillingForm}
                     />
+                  ) : section === "Narrative" ? (
+                    <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
+                  ) : section === "Signatures" ? (
+                    <SignatureSection value={signatureForm} onChange={setSignatureForm} sourceFingerprint={signedSourceFingerprint} />
                   ) : (
                     <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">
                       {section} cards will be added here.
@@ -1285,6 +1316,7 @@ export default function EPCRClient() {
                     patientForm={patientForm}
                     complaintForm={complaintForm}
                     vitalsForm={vitalsForm}
+                    assessmentForm={assessmentForm}
                   />
                 ) : (
                   <QuickToolsPanel
