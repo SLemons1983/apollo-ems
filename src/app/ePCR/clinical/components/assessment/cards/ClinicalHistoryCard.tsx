@@ -131,12 +131,12 @@ function HistoryField({
   }
 
   return (
-    <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+    <div className="rounded-xl border border-slate-300 bg-white p-4">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h5 className="text-xs font-bold uppercase tracking-wide text-amber-900">
+        <h5 className="text-xs font-bold uppercase tracking-wide text-slate-700">
           {label}
         </h5>
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">
           Missing
         </span>
       </div>
@@ -145,7 +145,7 @@ function HistoryField({
         <button
           type="button"
           onClick={() => onChange(quickChoice.value)}
-          className="mb-2 w-full rounded-lg border border-amber-400 bg-white px-3 py-2 text-sm font-bold text-amber-900 shadow-sm transition hover:bg-amber-100"
+          className="mb-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:bg-slate-50"
         >
           {quickChoice.label}
         </button>
@@ -156,7 +156,7 @@ function HistoryField({
           type="datetime-local"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
         />
       ) : (
         <textarea
@@ -164,7 +164,7 @@ function HistoryField({
           onChange={(event) => onChange(event.target.value)}
           rows={rows}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm placeholder:text-slate-400"
         />
       )}
     </div>
