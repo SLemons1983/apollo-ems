@@ -970,7 +970,6 @@ export default function EPCRClient() {
                       patientForm={patientForm}
                       complaintForm={complaintForm}
                       vitalsForm={vitalsForm}
-                      assessmentForm={assessmentForm}
                     />
                   </div>
                 </div>
@@ -1317,7 +1316,6 @@ export default function EPCRClient() {
                     patientForm={patientForm}
                     complaintForm={complaintForm}
                     vitalsForm={vitalsForm}
-                    assessmentForm={assessmentForm}
                   />
                 ) : (
                   <QuickToolsPanel

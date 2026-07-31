@@ -5,14 +5,12 @@ import type {
 } from '../types';
 import { calculatePatientAge } from '../utils';
 import type { VitalsForm } from '../clinical/vitals/vitals';
-import type { AssessmentForm } from '../clinical/assessment/assessmentForm';
 
 type PatientHandoffRailProps = {
   callForm: CallForm;
   patientForm: PatientForm;
   complaintForm: ComplaintForm;
   vitalsForm: VitalsForm;
-  assessmentForm: AssessmentForm;
 };
 
 function displayValue(
@@ -158,7 +156,6 @@ export default function PatientHandoffRail({
   patientForm,
   complaintForm,
   vitalsForm,
-  assessmentForm,
 }: PatientHandoffRailProps) {
   const latestVitals = vitalsForm.sets[vitalsForm.sets.length - 1];
   return (
@@ -242,19 +239,6 @@ export default function PatientHandoffRail({
           </div>
         </div>
 
-        <div className="border-t border-slate-300 bg-slate-50 p-4">
-          <div className="mb-3 text-xs font-black uppercase tracking-wide text-slate-600">
-            Clinical Scores
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <ScoreTile label="GCS" value="—" />
-            <ScoreTile label="RTS" value="—" />
-            <ScoreTile label="APGAR" value={(() => { const values = ['appearance','pulse','grimace','activity','respiration'].map((key) => assessmentForm.clinical.apgar[key as keyof typeof assessmentForm.clinical.apgar]).filter(Boolean); return values.length === 5 ? `${values.reduce((sum, item) => sum + Number(item), 0)}/10` : '—'; })()} />
-            <ScoreTile label="Burn %" value="—" />
-          </div>
-        </div>
-
         <div className="border-t border-slate-300 p-4">
           <div className="mb-3 text-xs font-black uppercase tracking-wide text-slate-600">
             Last Set of Vitals
@@ -273,6 +257,7 @@ export default function PatientHandoffRail({
               <ScoreTile label="Pulse" value={latestVitals.heartRate} />
               <ScoreTile label="Resp" value={latestVitals.respiratoryRate} />
               <ScoreTile label="SpO₂" value={`${latestVitals.spo2}%`} />
+              <ScoreTile label="GCS" value={latestVitals.gcs || '—'} />
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-center text-sm font-semibold text-slate-500">

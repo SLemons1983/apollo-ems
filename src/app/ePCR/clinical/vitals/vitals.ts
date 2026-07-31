@@ -26,6 +26,9 @@ export type VitalSetDraft = {
   spo2: string;
   spco: string;
   etco2: string;
+  gcsEyes: string;
+  gcsVerbal: string;
+  gcsMotor: string;
   gcs: string;
   temperature: string;
   temperatureCelsius: string;
@@ -69,6 +72,9 @@ export function createEmptyVitalSet(
     spo2: '',
     spco: '',
     etco2: '',
+    gcsEyes: '',
+    gcsVerbal: '',
+    gcsMotor: '',
     gcs: '',
     temperature: '',
     temperatureCelsius: '',

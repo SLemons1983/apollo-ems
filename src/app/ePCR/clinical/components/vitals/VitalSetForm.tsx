@@ -52,6 +52,46 @@ const oxygenDevices = [
   'Advanced Airway',
 ];
 
+const gcsGroups: {
+  field: 'gcsEyes' | 'gcsVerbal' | 'gcsMotor';
+  label: string;
+  options: { score: string; description: string }[];
+}[] = [
+  {
+    field: 'gcsEyes',
+    label: 'Eye Opening',
+    options: [
+      { score: '4', description: 'Spontaneous' },
+      { score: '3', description: 'To speech' },
+      { score: '2', description: 'To pain' },
+      { score: '1', description: 'None' },
+    ],
+  },
+  {
+    field: 'gcsVerbal',
+    label: 'Verbal Response',
+    options: [
+      { score: '5', description: 'Oriented' },
+      { score: '4', description: 'Confused' },
+      { score: '3', description: 'Inappropriate words' },
+      { score: '2', description: 'Incomprehensible sounds' },
+      { score: '1', description: 'None' },
+    ],
+  },
+  {
+    field: 'gcsMotor',
+    label: 'Motor Response',
+    options: [
+      { score: '6', description: 'Obeys commands' },
+      { score: '5', description: 'Localizes pain' },
+      { score: '4', description: 'Withdraws from pain' },
+      { score: '3', description: 'Flexion to pain' },
+      { score: '2', description: 'Extension to pain' },
+      { score: '1', description: 'None' },
+    ],
+  },
+];
+
 function Field({
   label,
   required = false,
@@ -121,6 +161,24 @@ export default function VitalSetForm({
   };
   const findingTitle = (field: 'pulseQuality' | 'respiratoryQuality' | 'skinColor' | 'skinTemperature' | 'skinMoisture') =>
     getCategoricalVitalAssessment(value[field])?.explanation;
+  const updateGcs = (
+    field: 'gcsEyes' | 'gcsVerbal' | 'gcsMotor',
+    score: string,
+  ) => {
+    const components = {
+      gcsEyes: value.gcsEyes,
+      gcsVerbal: value.gcsVerbal,
+      gcsMotor: value.gcsMotor,
+      [field]: score,
+    };
+    const complete = Object.values(components).every(Boolean);
+    const total = complete
+      ? String(Object.values(components).reduce((sum, item) => sum + Number(item), 0))
+      : '';
+
+    onChange(field, score);
+    onChange('gcs', total);
+  };
 
   return (
     <div className="space-y-5">
@@ -305,17 +363,57 @@ export default function VitalSetForm({
           />
         </Field>
 
-        <Field label="GCS" required error={getVitalFieldError(value, 'gcs')}>
-          <input
-            type="number"
-            inputMode="numeric"
-            min="3"
-            max="15"
-            value={value.gcs}
-            onChange={(event) => onChange('gcs', event.target.value)}
-            className={numericClass('gcs')}
-          />
-        </Field>
+        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black uppercase tracking-wide text-slate-600">
+                Glasgow Coma Scale <span className="text-red-600">*</span>
+              </div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                Select one response in each category.
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-center">
+              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Calculated GCS</div>
+              <div className="text-2xl font-black text-slate-900">{value.gcs || '—'}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            {gcsGroups.map((group) => (
+              <div key={group.field}>
+                <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-600">
+                  {group.label}
+                </div>
+                <div className="space-y-2">
+                  {group.options.map((option) => {
+                    const selected = value[group.field] === option.score;
+                    return (
+                      <button
+                        key={`${group.field}-${option.score}`}
+                        type="button"
+                        onClick={() => updateGcs(group.field, option.score)}
+                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${
+                          selected
+                            ? 'border-slate-900 bg-slate-900 text-white'
+                            : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span className="text-lg font-black">{option.score}</span>
+                        <span>{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+          {getVitalFieldError(value, 'gcs') && (
+            <div className="mt-2 text-xs font-bold text-red-700">
+              {getVitalFieldError(value, 'gcs')}
+            </div>
+          )}
+        </div>
 
         <Field label="Temperature °F (Optional)" error={getVitalFieldError(value, 'temperature')}>
           <input
