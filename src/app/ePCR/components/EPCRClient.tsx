@@ -22,7 +22,7 @@ import TreatmentsSection from "../sections/TreatmentsSection";
 import VitalsSection from "../sections/VitalsSection";
 import NarrativeSection from "../sections/NarrativeSection";
 import SignatureSection, { createDefaultSignatureForm, type SignatureForm } from "../sections/SignatureSection";
-import { createDefaultNarrativeForm, generateNarrative, narrativeFingerprint, type NarrativeForm, type NarrativeFormat } from "../clinical/narrative/narrative";
+import { createDefaultNarrativeForm, generateNarrative, getNarrativeReviewIssues, narrativeFingerprint, type NarrativeForm, type NarrativeFormat } from "../clinical/narrative/narrative";
 import type { CallForm, ComplaintForm, PatientForm } from "../types";
 import {
   createDefaultBillingForm,
@@ -630,6 +630,7 @@ export default function EPCRClient() {
   const billingProgress = getBillingProgress(billingForm);
   const narrativeSource = { call: callForm, patient: patientForm, complaint: complaintForm, assessment: assessmentForm, vitals: vitalsForm, treatments: treatmentsForm };
   const currentNarrativeFingerprint = narrativeFingerprint(narrativeSource);
+  const narrativeReviewIssues = getNarrativeReviewIssues(narrativeSource);
   const signedSourceFingerprint = JSON.stringify({ ...narrativeSource, narrative: narrativeForm.text });
 
   const progressSections = [
@@ -1081,7 +1082,7 @@ export default function EPCRClient() {
                         setBillingForm={setBillingForm}
                       />
                     ) : section === "Narrative" ? (
-                      <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
+                      <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} reviewIssues={narrativeReviewIssues} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
                     ) : section === "Signatures" ? (
                       <SignatureSection value={signatureForm} onChange={setSignatureForm} sourceFingerprint={signedSourceFingerprint} />
                     ) : (
@@ -1231,7 +1232,7 @@ export default function EPCRClient() {
                       setBillingForm={setBillingForm}
                     />
                   ) : section === "Narrative" ? (
-                    <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
+                    <NarrativeSection value={narrativeForm} onChange={setNarrativeForm} sourceChanged={Boolean(narrativeForm.sourceFingerprint && narrativeForm.sourceFingerprint !== currentNarrativeFingerprint)} reviewIssues={narrativeReviewIssues} onGenerate={(format: Exclude<NarrativeFormat, ''>) => setNarrativeForm({ text: generateNarrative(narrativeSource, format), format, generatedAt: new Date().toISOString(), sourceFingerprint: currentNarrativeFingerprint })} />
                   ) : section === "Signatures" ? (
                     <SignatureSection value={signatureForm} onChange={setSignatureForm} sourceFingerprint={signedSourceFingerprint} />
                   ) : (
