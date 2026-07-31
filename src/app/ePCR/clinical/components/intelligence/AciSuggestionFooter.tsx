@@ -8,7 +8,6 @@ import {
   type AssessmentMode,
 } from '../../engine/assessment';
 import { evaluateAssessmentClinicalIntelligence } from '../../engine/intelligence';
-import { calculateCcemsaGfastScore } from '../../engine/protocols/ccemsaStroke';
 import {
   findBestVerifiedProtocol,
   protocolSourceLabel,
@@ -42,15 +41,7 @@ type SuggestionRow = {
 };
 
 const notYetDetermined = 'Not yet determined';
-const notificationRowIds = new Set([
-  'clinical-findings',
-  'protocol-match',
-  'shock-risk',
-  'gfast-score',
-  'medications-consider',
-  'medications-contraindicated',
-  'other-considerations',
-]);
+const notificationRowIds = new Set(['protocol-match']);
 
 function formatAssessmentMode(mode: AssessmentMode) {
   return mode
@@ -95,35 +86,7 @@ export default function AciSuggestionFooter({
     }
   }, [assessmentContext, assessmentForm]);
 
-  const gfastDocumented = Object.values(assessmentForm.clinical.gfast).some(
-    Boolean,
-  );
-  const gfastScore = gfastDocumented
-    ? calculateCcemsaGfastScore({
-        gaze: assessmentForm.clinical.gfast.gaze,
-        face: assessmentForm.clinical.gfast.face,
-        arms: assessmentForm.clinical.gfast.arms,
-        speech: assessmentForm.clinical.gfast.speech,
-        lastKnownNormal: assessmentForm.clinical.gfast.time,
-        bloodGlucose: assessmentForm.clinical.gfast.bloodGlucose,
-      })
-    : null;
-
   const significantFindings = assessmentIntelligence?.significances ?? [];
-  const criticalVitalCount = feedback.filter(
-    (item) => item.severity === 'critical',
-  ).length;
-  const moderateVitalCount = feedback.filter(
-    (item) => item.severity === 'moderate',
-  ).length;
-  const shockRisk =
-    criticalVitalCount > 0
-      ? 'High'
-      : moderateVitalCount > 0
-        ? 'Moderate'
-        : feedback.some((item) => item.id.startsWith('vital-'))
-          ? 'Low'
-          : notYetDetermined;
 
   const protocolMatch = useMemo(
     () =>
@@ -176,20 +139,6 @@ export default function AciSuggestionFooter({
         explanation: `Based on the certification of the crew member identified as the documenting PCR provider. Current ACI scope is ${providerScope}.`,
       },
       {
-        id: 'clinical-findings',
-        label: 'Based on Clinical Findings',
-        value:
-          significantFindings.length > 0
-            ? significantFindings.map((finding) => finding.title).join('; ')
-            : notYetDetermined,
-        explanation:
-          significantFindings.length > 0
-            ? significantFindings
-                .map((finding) => finding.description)
-                .join(' ')
-            : 'No active clinically significant Assessment findings have been identified from the documentation entered so far.',
-      },
-      {
         id: 'protocol-match',
         label: 'Best Protocol Match',
         value: protocolMatch
@@ -201,67 +150,13 @@ export default function AciSuggestionFooter({
             ? `No supported ${lemsa} ${providerScope} protocol match was determined from the documentation entered so far.`
             : 'Select the applicable LEMSA. ACI only displays a protocol match that is traceable to an indexed source PDF.',
       },
-      {
-        id: 'shock-risk',
-        label: 'Risk of Shock',
-        value: shockRisk,
-        explanation:
-          shockRisk === 'High'
-            ? `${criticalVitalCount} critical vital alert${criticalVitalCount === 1 ? '' : 's'} support a high-risk indication. This is advisory and must be interpreted with the full patient assessment.`
-            : shockRisk === 'Moderate'
-              ? `${moderateVitalCount} moderate vital alert${moderateVitalCount === 1 ? '' : 's'} support a moderate-risk indication. This is advisory and must be interpreted with the full patient assessment.`
-              : shockRisk === 'Low'
-                ? 'Documented vital sets do not currently contain an active critical or moderate ACI vital alert.'
-                : 'Document a complete vital set before ACI estimates shock risk.',
-      },
-      {
-        id: 'gfast-score',
-        label: 'GFAST Stroke Score',
-        value: gfastScore === null ? notYetDetermined : String(gfastScore),
-        explanation:
-          gfastScore === null
-            ? 'Document the Gaze, Face, Arm, and Speech findings to calculate the score.'
-            : `Calculated from the documented Gaze, Face, Arm, and Speech findings. Current score: ${gfastScore}.`,
-      },
-      {
-        id: 'medications-consider',
-        label: 'Medications to Consider',
-        value: notYetDetermined,
-        explanation:
-          'ACI will not recommend a medication until the recommendation can be traced to the applicable indexed protocol and filtered by provider scope.',
-      },
-      {
-        id: 'medications-contraindicated',
-        label: 'Contraindicated Medications',
-        value: notYetDetermined,
-        explanation:
-          'ACI will not identify a protocol contraindication until the applicable indexed protocol and patient criteria are connected.',
-      },
-      {
-        id: 'other-considerations',
-        label: 'Other Clinical Considerations',
-        value:
-          feedback.length > 0
-            ? feedback.map((item) => item.message).join(' • ')
-            : notYetDetermined,
-        explanation:
-          feedback.length > 0
-            ? 'These considerations come from the existing deterministic vital and GFAST rules active for the current documentation.'
-            : 'Additional deterministic considerations will appear as relevant findings, vitals, and protocol criteria are documented.',
-      },
     ],
     [
       assessmentMode,
       clinicalCategory,
-      criticalVitalCount,
-      feedback,
-      gfastScore,
       lemsa,
-      moderateVitalCount,
       providerScope,
       protocolMatch,
-      shockRisk,
-      significantFindings,
     ],
   );
 

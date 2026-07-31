@@ -398,29 +398,6 @@ export default function QuickToolsPanel({
         )}
       </div>
 
-      {[
-        [
-          "Dosing Calculator",
-          "Weight-based medication and infusion calculations.",
-        ],
-        [
-          "Clinical Timer",
-          "Track CPR, stroke, medication, contraction, or procedure times.",
-        ],
-      ].map(([title, description]) => (
-        <div
-          key={title}
-          className="rounded-xl border border-slate-200 bg-slate-50 p-4"
-        >
-          <div className="mb-2 flex items-start justify-between gap-3">
-            <h3 className="font-bold text-slate-900">{title}</h3>
-            <span className="rounded-full bg-slate-200 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-              Coming Soon
-            </span>
-          </div>
-          <p className="text-sm leading-6 text-slate-600">{description}</p>
-        </div>
-      ))}
     </div>
   );
 }
