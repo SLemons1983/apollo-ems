@@ -12,6 +12,7 @@ import PCRProgress from "./PCRProgress";
 import PCRSection from "./PCRSection";
 import PatientHandoffRail from "./PatientHandoffRail";
 import QuickToolsPanel from "./QuickToolsPanel";
+import AciSuggestionFooter from "../clinical/components/intelligence/AciSuggestionFooter";
 import AssessmentSection from "../sections/AssessmentSection";
 import BillingSection from "../sections/BillingSection";
 import CallSection from "../sections/CallSection";
@@ -1225,118 +1226,17 @@ export default function EPCRClient() {
           </div>
         </div>
 
-        <footer className="sticky bottom-0 z-30 mt-6 rounded-t-2xl border border-amber-300 bg-amber-50/95 shadow-[0_-8px_24px_rgba(15,23,42,0.14)] backdrop-blur">
-          <button
-            type="button"
-            onClick={() =>
-              setClinicalIntelligenceOpen((currentOpen) => !currentOpen)
-            }
-            aria-expanded={clinicalIntelligenceOpen}
-            aria-controls="apollo-clinical-intelligence-content"
-            className={`flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-amber-100/70 ${
-              clinicalIntelligenceOpen ? "border-b border-amber-200" : ""
-            }`}
-          >
-            <span className="flex items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="text-sm font-black text-amber-800"
-              >
-                {clinicalIntelligenceOpen ? "▼" : "▲"}
-              </span>
-              <span className="font-black text-amber-950">
-                Apollo Clinical Intelligence
-              </span>
-            </span>
-            <span className="flex items-center gap-3">
-              <span className="text-xs font-bold uppercase tracking-wide text-amber-800">
-                {callForm.lemsa
-                  ? `${callForm.lemsa} protocols selected`
-                  : "Select a LEMSA to enable protocol guidance"}
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                {clinicalIntelligenceOpen ? "Collapse" : "Expand"}
-              </span>
-            </span>
-          </button>
-
-          {clinicalIntelligenceOpen && (
-            <div id="apollo-clinical-intelligence-content">
-              <div className="border-b border-amber-200 px-4 py-3">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                      Assessment Mode
-                    </div>
-                    <div className="text-sm font-bold capitalize text-slate-900">
-                      {assessmentMode.replace("-", " ")}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                      Clinical Category
-                    </div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {complaintForm.clinicalCategory || "Not Yet Selected"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wide text-amber-700">
-                      Documenting Provider Scope
-                    </div>
-                    <div className="text-sm font-bold text-slate-900">
-                      {documentingProviderScope}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-36 overflow-y-auto px-4 py-3">
-                {!callForm.lemsa &&
-                vitalClinicalIntelligenceFeedback.length === 0 ? (
-                  <p className="text-sm font-semibold text-amber-900">
-                    No protocol references are active. Select the applicable
-                    LEMSA in Crew Information.
-                  </p>
-                ) : clinicalIntelligenceFeedback.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {!callForm.lemsa && (
-                      <p className="text-sm font-semibold text-amber-900">
-                        No protocol references are active. Select the applicable
-                        LEMSA in Crew Information.
-                      </p>
-                    )}
-                    {clinicalIntelligenceFeedback.map((feedback) => (
-                      <p
-                        key={feedback.id}
-                        className={
-                          feedback.severity === "critical"
-                            ? "text-sm font-semibold text-red-900"
-                            : feedback.severity === "moderate"
-                              ? "text-sm font-semibold text-orange-900"
-                              : "text-sm text-amber-950"
-                        }
-                      >
-                        {feedback.severity === "critical"
-                          ? "🔴"
-                          : feedback.severity === "moderate"
-                            ? "🟠"
-                            : "•"}{" "}
-                        {feedback.message}
-                      </p>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold text-amber-900">
-                    {callForm.lemsa === "Merced County"
-                      ? "Merced County is selected. No Merced County protocol-specific guidance is loaded for the current assessment."
-                      : "No protocol-specific feedback is active for the current documentation."}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </footer>
+        <AciSuggestionFooter
+          assessmentForm={assessmentForm}
+          assessmentMode={assessmentMode}
+          clinicalCategory={complaintForm.clinicalCategory}
+          providerScope={documentingProviderScope}
+          lemsa={callForm.lemsa}
+          feedback={clinicalIntelligenceFeedback}
+          open={clinicalIntelligenceOpen}
+          preferenceLoaded={clinicalIntelligencePreferenceLoaded}
+          onOpenChange={setClinicalIntelligenceOpen}
+        />
 
         {mobileDrawer && (
           <div className="fixed inset-0 z-50 xl:hidden">
