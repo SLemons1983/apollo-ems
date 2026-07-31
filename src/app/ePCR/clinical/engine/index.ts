@@ -5,3 +5,4 @@ export * from './protocolReference';
 export * from './types';
 export * from './assessment';
 export * from './facts';
+export * from './narrative';
