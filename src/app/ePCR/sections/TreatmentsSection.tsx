@@ -66,6 +66,9 @@ const authorizations = [
   "Patient-assisted medication",
   "Other",
 ];
+const patientResponses = [
+  'Improved', 'Unchanged', 'Worsened', 'No Response', 'Unable to Assess', 'Not Applicable',
+];
 
 function localDateTime(date = new Date()) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -514,9 +517,11 @@ export default function TreatmentsSection({
           )}
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Area
+            <Select
               label="Patient Response"
               value={patientResponse}
+              placeholder="Select patient response"
+              options={patientResponses}
               onChange={setPatientResponse}
             />
             <Area
@@ -543,12 +548,15 @@ export default function TreatmentsSection({
             <button
               type="button"
               onClick={() => {
-                resetEditor();
-                setEditorOpen(false);
+                if (canSave) saveTreatment();
+                else {
+                  resetEditor();
+                  setEditorOpen(false);
+                }
               }}
               className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold"
             >
-              Cancel
+              {canSave ? 'Close & Save' : 'Cancel'}
             </button>
             <button
               type="button"

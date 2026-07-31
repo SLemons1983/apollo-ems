@@ -135,7 +135,6 @@ export function getVitalRequiredValues(
     vital.respiratoryRate,
     vital.respiratoryQuality,
     vital.spo2,
-    ...(providerScope === 'ALS' ? [vital.etco2] : []),
     vital.gcs,
     vital.skinColor,
     vital.skinTemperature,

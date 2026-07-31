@@ -42,6 +42,24 @@ const drugAlcoholIndicationOptions = [
 
 const workRelatedOptions = ['Yes', 'No', 'Unknown'];
 
+const commonChiefComplaints = [
+  'Abdominal Pain', 'Abnormal Lab Results', 'Allergic Reaction', 'Altered Mental Status',
+  'Anxiety', 'Arm Pain', 'Assault', 'Back Pain', 'Behavioral Emergency', 'Bleeding',
+  'Blood in Stool', 'Body Aches', 'Burn', 'Cardiac Arrest', 'Chest Pain', 'Chills',
+  'Choking', 'Confusion', 'Constipation', 'Cough', 'Dehydration', 'Diabetic Emergency',
+  'Diarrhea', 'Difficulty Breathing', 'Difficulty Swallowing', 'Dizziness', 'Drug Overdose',
+  'Ear Pain', 'Eye Problem', 'Fall', 'Fatigue', 'Fever', 'Flank Pain', 'Flu-Like Symptoms',
+  'Foot Pain', 'Foreign Body', 'Generalized Weakness', 'Head Injury', 'Headache',
+  'Hip Pain', 'Hypertension', 'Hypotension', 'Ingestion / Poisoning', 'Knee Pain',
+  'Labor / Childbirth', 'Leg Pain', 'Loss of Consciousness', 'Medical Device Problem',
+  'Medication Reaction', 'Motor Vehicle Collision', 'Nausea', 'Neck Pain', 'Nosebleed',
+  'Numbness / Tingling', 'Obstetric Complaint', 'Palpitations', 'Pelvic Pain',
+  'Psychiatric Complaint', 'Respiratory Distress', 'Seizure', 'Shortness of Breath',
+  'Sick Person', 'Skin Problem', 'Stroke Symptoms', 'Suicidal Ideation', 'Syncope',
+  'Testicular Pain', 'Traumatic Injury', 'Unconscious / Unresponsive', 'Urinary Problem',
+  'Vaginal Bleeding', 'Vertigo', 'Vomiting', 'Weakness', 'Wound Check', 'Other',
+];
+
 const noneClinicalOption: ClinicalOption = {
   code: 'NONE',
   category: 'All',
@@ -166,6 +184,7 @@ export default function ComplaintSection({
 
             <input
               type="text"
+              list="chief-complaint-options"
               value={complaintForm.chiefComplaint}
               onChange={(event) =>
                 updateComplaintForm(
@@ -175,6 +194,9 @@ export default function ComplaintSection({
               }
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
             />
+            <datalist id="chief-complaint-options">
+              {commonChiefComplaints.map((option) => <option key={option} value={option} />)}
+            </datalist>
           </label>
 
           <ClinicalCategoryPicker
@@ -364,6 +386,14 @@ export default function ComplaintSection({
             <span className="mb-1 block text-sm font-semibold text-slate-700">
               Last Known Well
             </span>
+            <button
+              type="button"
+              disabled={!complaintForm.symptomsBeganDateTime}
+              onClick={() => updateComplaintForm('lastSeenNormalDateTime', complaintForm.symptomsBeganDateTime)}
+              className="mb-2 w-full rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Same as Symptom Onset
+            </button>
             <input
               type="datetime-local"
               value={complaintForm.lastSeenNormalDateTime}

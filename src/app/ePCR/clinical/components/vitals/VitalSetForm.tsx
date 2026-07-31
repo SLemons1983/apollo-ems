@@ -293,7 +293,7 @@ export default function VitalSetForm({
           />
         </Field>
 
-        <Field label={`ETCO₂ mmHg${providerScope === 'BLS' ? ' (Optional)' : ''}`} required={providerScope === 'ALS'} error={getVitalFieldError(value, 'etco2')}>
+        <Field label="ETCO₂ mmHg (Optional)" error={getVitalFieldError(value, 'etco2')}>
           <input
             type="number"
             inputMode="decimal"
@@ -427,7 +427,6 @@ export default function VitalSetForm({
       {!complete && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
           Complete every required value before saving this vital-sign set.
-          {providerScope === 'ALS' && ' ETCO₂ is required for ALS.'}
           {validationErrors.length > 0 && ` ${validationErrors[0]}`}
         </p>
       )}

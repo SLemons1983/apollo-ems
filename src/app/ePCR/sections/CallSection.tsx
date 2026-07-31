@@ -25,6 +25,17 @@ const responseModes = [
   'Code-2',
 ];
 
+const dispatchedNatureOptions = [
+  'Abdominal Pain', 'Allergic Reaction', 'Altered Mental Status', 'Animal Bite',
+  'Assault', 'Back Pain', 'Behavioral Emergency', 'Bleeding / Hemorrhage',
+  'Burns', 'Cardiac Arrest', 'Chest Pain', 'Choking', 'Diabetic Emergency',
+  'Difficulty Breathing', 'Dizziness / Vertigo', 'Fall', 'Fever', 'Headache',
+  'Interfacility Transfer', 'Labor / Childbirth', 'Motor Vehicle Collision',
+  'Nausea / Vomiting', 'Overdose / Poisoning', 'Seizure', 'Sick Person',
+  'Standby', 'Stroke / CVA', 'Syncope / Near Syncope', 'Traumatic Injury',
+  'Unconscious / Unresponsive', 'Unknown Medical Problem', 'Other',
+];
+
 const incidentLocationTypes = [
   'Private Residence',
   'Commercial Building/Area',
@@ -86,6 +97,14 @@ function normalizeTimeInput(value: string) {
   }
 
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function currentTime() {
+  return new Date().toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function togglePpeSelection(
@@ -287,10 +306,16 @@ export default function CallSection({
                           </span>
                           <input
                             type="text"
+                            list="dispatched-nature-options"
                             value={callForm.emsResponseNumber}
                             readOnly
                             className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-700 shadow-sm"
                           />
+                          <datalist id="dispatched-nature-options">
+                            {dispatchedNatureOptions.map((option) => (
+                              <option key={option} value={option} />
+                            ))}
+                          </datalist>
                         </label>
 
                         <label className="block">
@@ -912,20 +937,25 @@ export default function CallSection({
                                 <span className="mb-1 block text-sm font-semibold text-slate-700">
                                   {label}
                                 </span>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={callForm[field]}
-                                  onChange={(event) =>
-                                    updateCallForm(
-                                      field,
-                                      normalizeTimeInput(event.target.value),
-                                    )
-                                  }
-                                  
-                                  maxLength={5}
-                                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={callForm[field]}
+                                    onChange={(event) => updateCallForm(field, normalizeTimeInput(event.target.value))}
+                                    maxLength={5}
+                                    className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={`Enter current time for ${label}`}
+                                    title="Enter current time"
+                                    onClick={() => updateCallForm(field, currentTime())}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg shadow-sm hover:bg-slate-50"
+                                  >
+                                    ⌛
+                                  </button>
+                                </div>
                               </label>
                             ))}
                           </div>

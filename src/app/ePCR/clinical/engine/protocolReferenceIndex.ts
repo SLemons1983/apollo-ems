@@ -39,6 +39,14 @@ const titleAliases: Record<string, string[]> = {
   childbirth: ['childbirth', 'labor', 'obstetric', 'pregnancy'],
 };
 
+const conditionSpecificBoosts: Array<{ title: string; evidence: string[]; score: number }> = [
+  {
+    title: 'coronary ischemic chest discomfort',
+    evidence: ['chest pain', 'chest discomfort', 'stemi', 'myocardial infarction', 'angina', 'diaphoretic', 'jaw', 'coronary artery disease'],
+    score: 35,
+  },
+];
+
 function normalize(value: string) {
   return value
     .toLowerCase()
@@ -79,7 +87,17 @@ export function findBestVerifiedProtocol(input: ProtocolMatchInput): VerifiedPro
         (term) => term.length >= 4 && evidence.includes(term),
       );
       const exactTitle = evidence.includes(normalize(protocol.title));
-      const score = matchedTerms.length * 10 + (exactTitle ? 25 : 0);
+      const boost = conditionSpecificBoosts
+        .filter((rule) => normalize(protocol.title).includes(normalize(rule.title)))
+        .reduce((total, rule) => {
+          const hits = rule.evidence.filter((term) => evidence.includes(normalize(term))).length;
+          return total + (hits >= 2 ? rule.score + hits * 8 : 0);
+        }, 0);
+      const genericPainPenalty = normalize(protocol.title).includes('pain management') &&
+        ['chest pain', 'stemi', 'myocardial infarction', 'angina'].some((term) => evidence.includes(term))
+          ? 40
+          : 0;
+      const score = matchedTerms.length * 10 + (exactTitle ? 25 : 0) + boost - genericPainPenalty;
       return { protocol, score, matchedTerms };
     })
     .filter((match) => match.score > 0)

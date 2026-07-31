@@ -373,7 +373,9 @@ export default function PatientSection({
 
   const belongingsFields = [
     patientForm.patientEffects,
-    patientForm.patientEffectsLeftWith,
+    ...(patientForm.patientEffects.trim().toLowerCase() === 'none'
+      ? []
+      : [patientForm.patientEffectsLeftWith]),
     ...(patientForm.patientEffectsLeftWith === 'Other Responding Agency'
       ? [patientForm.patientEffectsLeftWithOther]
       : []),
@@ -973,6 +975,22 @@ export default function PatientSection({
             <span className="mb-1 block text-sm font-semibold text-slate-700">
               Patient&apos;s Effects
             </span>
+            <button
+              type="button"
+              aria-pressed={patientForm.patientEffects.trim().toLowerCase() === 'none'}
+              onClick={() => {
+                updatePatientForm('patientEffects', 'None');
+                updatePatientForm('patientEffectsLeftWith', '');
+                updatePatientForm('patientEffectsLeftWithOther', '');
+              }}
+              className={`mb-2 w-full rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                patientForm.patientEffects.trim().toLowerCase() === 'none'
+                  ? 'border-emerald-700 bg-emerald-700 text-white shadow-sm'
+                  : 'border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+              }`}
+            >
+              {patientForm.patientEffects.trim().toLowerCase() === 'none' ? '✓ None' : 'None'}
+            </button>
             <textarea
               value={patientForm.patientEffects}
               onChange={(event) =>
@@ -982,7 +1000,7 @@ export default function PatientSection({
             />
           </label>
 
-          <label className="block">
+          {patientForm.patientEffects.trim().toLowerCase() !== 'none' && <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
               Patient&apos;s Effects Left With
             </span>
@@ -1020,7 +1038,7 @@ export default function PatientSection({
                 />
               </div>
             )}
-          </label>
+          </label>}
         </div>
       </PCRCard>
 
