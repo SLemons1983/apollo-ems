@@ -2,10 +2,78 @@
 
 import { Dispatch, SetStateAction, useState } from 'react';
 import PCRCard from '../components/PCRCard';
+import ClinicalMultiSelect from '../clinical/components/inputs/ClinicalMultiSelect';
 import type { CallForm, PatientForm } from '../types';
 import { calculatePatientAge } from '../utils';
 
 const genderOptions = ['Male', 'Female', 'Undetermined'];
+
+const medicalHistoryOptions = [
+  'None Reported',
+  'Unknown',
+  'Hypertension',
+  'Diabetes Mellitus',
+  'Coronary Artery Disease',
+  'Congestive Heart Failure',
+  'Myocardial Infarction',
+  'Atrial Fibrillation',
+  'CVA / Stroke',
+  'TIA',
+  'Seizure Disorder',
+  'COPD',
+  'Asthma',
+  'Chronic Kidney Disease',
+  'Dialysis',
+  'Liver Disease',
+  'Cancer',
+  'Dementia',
+  'Psychiatric History',
+  'Substance Use Disorder',
+] as const;
+
+const surgicalHistoryOptions = [
+  'None Reported',
+  'Unknown',
+  'Appendectomy',
+  'Cholecystectomy',
+  'CABG',
+  'Cardiac Stent',
+  'Pacemaker / AICD',
+  'Valve Replacement',
+  'Joint Replacement',
+  'Spinal Surgery',
+  'Hysterectomy',
+  'Cesarean Section',
+  'Bariatric Surgery',
+  'Organ Transplant',
+  'Amputation',
+] as const;
+
+const currentMedicationOptions = [
+  'None Reported',
+  'Unknown',
+  'Aspirin',
+  'Clopidogrel',
+  'Warfarin',
+  'Apixaban',
+  'Rivaroxaban',
+  'Lisinopril',
+  'Losartan',
+  'Amlodipine',
+  'Metoprolol',
+  'Furosemide',
+  'Atorvastatin',
+  'Metformin',
+  'Insulin',
+  'Albuterol',
+  'Nitroglycerin',
+  'Levothyroxine',
+  'Prednisone',
+  'Gabapentin',
+  'Opioid Pain Medication',
+  'Antidepressant',
+  'Antipsychotic',
+] as const;
 
 const codeStatusOptions = [
   'Full Code',
@@ -786,27 +854,26 @@ export default function PatientSection({
             </select>
           </label>
 
-          {([
-            ['medicalHistory', 'Medical History'],
-            ['surgicalHistory', 'Surgical History'],
-            ['currentMedications', 'Current Medications'],
-          ] satisfies [keyof PatientForm, string][]).map(([field, label]) => (
-            <label key={field} className="block">
-              <span className="mb-1 block text-sm font-semibold text-slate-700">
-                {label}
-              </span>
-              <textarea
-                value={patientForm[field as keyof PatientForm] as string}
-                onChange={(event) =>
-                  updatePatientForm(
-                    field as keyof PatientForm,
-                    event.target.value,
-                  )
-                }
-                className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-              />
-            </label>
-          ))}
+          <ClinicalMultiSelect
+            label="Medical History"
+            value={patientForm.medicalHistory}
+            options={medicalHistoryOptions}
+            onChange={(value) => updatePatientForm('medicalHistory', value)}
+          />
+
+          <ClinicalMultiSelect
+            label="Surgical History"
+            value={patientForm.surgicalHistory}
+            options={surgicalHistoryOptions}
+            onChange={(value) => updatePatientForm('surgicalHistory', value)}
+          />
+
+          <ClinicalMultiSelect
+            label="Current Medications"
+            value={patientForm.currentMedications}
+            options={currentMedicationOptions}
+            onChange={(value) => updatePatientForm('currentMedications', value)}
+          />
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
