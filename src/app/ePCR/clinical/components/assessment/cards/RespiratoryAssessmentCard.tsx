@@ -136,10 +136,13 @@ const sections: {
   },
 ];
 
-const totalFields = 16;
+const requiredFields = sections.flatMap((section) =>
+  section.fields.map((item) => item.field),
+);
+const totalFields = requiredFields.length;
 
 function getCompletedFields(value: RespiratoryAssessmentForm) {
-  return Object.values(value).filter(Boolean).length;
+  return requiredFields.filter((field) => value[field]).length;
 }
 
 function getCompletionPercent(value: RespiratoryAssessmentForm) {

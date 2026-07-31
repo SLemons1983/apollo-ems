@@ -1016,6 +1016,12 @@ export default function EPCRClient() {
                         onPatientChange={updatePatientForm}
                         providerScope={documentingProviderScope}
                         clinicalCategory={complaintForm.clinicalCategory}
+                        complaintSummary={[
+                          complaintForm.chiefComplaint,
+                          complaintForm.primaryImpression?.description,
+                          complaintForm.secondaryImpression?.description,
+                          complaintForm.primarySymptom?.description,
+                        ].filter(Boolean).join(' ')}
                         suspectedStroke={
                           complaintForm.suspectedStrokeCva === "Yes"
                         }
@@ -1156,6 +1162,12 @@ export default function EPCRClient() {
                       onPatientChange={updatePatientForm}
                       providerScope={documentingProviderScope}
                       clinicalCategory={complaintForm.clinicalCategory}
+                      complaintSummary={[
+                        complaintForm.chiefComplaint,
+                        complaintForm.primaryImpression?.description,
+                        complaintForm.secondaryImpression?.description,
+                        complaintForm.primarySymptom?.description,
+                      ].filter(Boolean).join(' ')}
                       suspectedStroke={
                         complaintForm.suspectedStrokeCva === "Yes"
                       }

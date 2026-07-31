@@ -543,8 +543,7 @@ export default function CallSection({
                           <span className="mb-1 block text-sm font-semibold text-slate-700">
                             Dispatched Nature of Call
                           </span>
-                          <input
-                            type="text"
+                          <select
                             value={callForm.dispatchedNatureOfCall}
                             onChange={(event) =>
                               updateCallForm(
@@ -552,9 +551,13 @@ export default function CallSection({
                                 event.target.value,
                               )
                             }
-                            
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-                          />
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+                          >
+                            <option value=""></option>
+                            {dispatchedNatureOptions.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
                         </label>
 
                         <label className="block">

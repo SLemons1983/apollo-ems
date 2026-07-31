@@ -223,7 +223,9 @@ export function getPatientRequiredFields(patientForm: PatientForm) {
     patientForm.medicationAllergies,
     patientForm.environmentalAllergies,
     patientForm.patientEffects,
-    patientForm.patientEffectsLeftWith,
+    ...(patientForm.patientEffects === 'None'
+      ? []
+      : [patientForm.patientEffectsLeftWith]),
     ...(patientForm.patientEffectsLeftWith === 'Other Responding Agency'
       ? [patientForm.patientEffectsLeftWithOther]
       : []),

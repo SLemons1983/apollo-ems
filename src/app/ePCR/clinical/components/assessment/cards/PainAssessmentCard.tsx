@@ -28,24 +28,23 @@ const facesScores = [
   { score: '10', label: 'Hurts Worst' },
 ];
 
-const opqrstFields: {
-  field: keyof Pick<
-    PainAssessmentForm,
-    'onset' | 'provocation' | 'quality' | 'radiation' | 'time'
-  >;
-  label: string;
-}[] = [
-  { field: 'onset', label: 'Onset' },
-  { field: 'provocation', label: 'Provocation / Palliation' },
-  { field: 'quality', label: 'Quality' },
-  { field: 'radiation', label: 'Radiation' },
-  { field: 'time', label: 'Time / Duration' },
-];
+const provocationOptions = ['Nothing', 'Exertion', 'Movement', 'Position', 'Palpation', 'Inspiration', 'Eating', 'Rest Improves', 'Medication Improves', 'Other'];
+const qualityOptions = ['Pressure', 'Tightness', 'Crushing', 'Sharp', 'Stabbing', 'Dull', 'Aching', 'Burning', 'Tearing', 'Throbbing', 'Cramping', 'Other'];
+const radiationOptions = ['No Radiation', 'Left Arm', 'Right Arm', 'Both Arms', 'Jaw', 'Neck', 'Back', 'Shoulder', 'Abdomen', 'Groin', 'Leg', 'Other'];
+
+function splitDuration(value: string) {
+  const match = value.match(/^(\d+(?:\.\d+)?)\s+(Minutes?|Hours?)$/i);
+  return { amount: match?.[1] ?? '', unit: match?.[2] ?? 'Minutes' };
+}
 
 export default function PainAssessmentCard({
   value,
   onChange,
 }: PainAssessmentCardProps) {
+  const severity = value.painScaleType === '0-10 Numeric' ? value.numericPainScore : value.facesPainScore;
+  const duration = splitDuration(value.time);
+  const updateDuration = (amount: string, unit: string) =>
+    onChange('time', amount ? `${amount} ${unit}` : '');
   return (
     <div className="space-y-6">
       <div>
@@ -171,21 +170,40 @@ export default function PainAssessmentCard({
             </h4>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {opqrstFields.map((field) => (
-                <label key={field.field} className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-700">
-                    {field.label}
-                  </span>
-                  <textarea
-                    value={value[field.field]}
-                    onChange={(event) =>
-                      onChange(field.field, event.target.value)
-                    }
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-                  />
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">O - Onset</span>
+                <textarea value={value.onset} onChange={(event) => onChange('onset', event.target.value)} rows={2} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm" />
+              </label>
+
+              {([
+                ['provocation', 'P - Provocation / Palliation', provocationOptions],
+                ['quality', 'Q - Quality', qualityOptions],
+                ['radiation', 'R - Radiation', radiationOptions],
+              ] as const).map(([field, label, options]) => (
+                <label key={field} className="block">
+                  <span className="mb-1 block text-sm font-semibold text-slate-700">{label}</span>
+                  <select value={value[field]} onChange={(event) => onChange(field, event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm">
+                    <option value=""></option>
+                    {options.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
                 </label>
               ))}
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">S - Severity</span>
+                <input value={severity} readOnly aria-label="Severity carried from pain scale" className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 font-bold text-slate-900 shadow-sm" />
+              </label>
+
+              <div>
+                <span className="mb-1 block text-sm font-semibold text-slate-700">T - Time / Duration</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" min="0" step="1" value={duration.amount} onChange={(event) => updateDuration(event.target.value, duration.unit)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm" />
+                  <select value={duration.unit} onChange={(event) => updateDuration(duration.amount, event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm">
+                    <option value="Minutes">Minutes</option>
+                    <option value="Hours">Hours</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </>

@@ -57,6 +57,7 @@ import EcgAssessmentCard, {
 import PainAssessmentCard, {
   type PainAssessmentForm,
 } from '../clinical/components/assessment/cards/PainAssessmentCard';
+import { createPainOverlay } from '../clinical/body-map/overlayFactory';
 import PrimaryAssessmentCard, {
   type PrimaryAssessmentForm,
 } from '../clinical/components/assessment/cards/PrimaryAssessmentCard';
@@ -155,6 +156,7 @@ type AssessmentSectionProps = {
   ) => void;
   providerScope: 'BLS' | 'ALS';
   clinicalCategory: string;
+  complaintSummary: string;
   suspectedStroke: boolean;
   possibleTrauma: boolean;
   behavioralHold: boolean;
@@ -177,6 +179,7 @@ export default function AssessmentSection({
   onPatientChange,
   providerScope,
   clinicalCategory,
+  complaintSummary,
   suspectedStroke,
   possibleTrauma,
   behavioralHold,
@@ -473,8 +476,24 @@ export default function AssessmentSection({
     }
 
     if (taskId === 'respiratory-assessment') {
-      const completed = Object.values(respiratoryAssessment).filter(Boolean).length;
-      return { completed, total: Object.keys(respiratoryAssessment).length };
+      const requiredFields = [
+        respiratoryAssessment.respiratoryEffort,
+        respiratoryAssessment.airwayPatency,
+        respiratoryAssessment.breathSoundsLeft,
+        respiratoryAssessment.breathSoundsRight,
+        respiratoryAssessment.accessoryMuscleUse,
+        respiratoryAssessment.cough,
+        respiratoryAssessment.currentRespiratorySupport,
+        respiratoryAssessment.observedResponse,
+        respiratoryAssessment.pastmedProvocation,
+        respiratoryAssessment.pastmedAssociatedSymptoms,
+        respiratoryAssessment.pastmedSputum,
+        respiratoryAssessment.pastmedTriggers,
+        respiratoryAssessment.pastmedMedicalHistory,
+        respiratoryAssessment.pastmedExerciseTolerance,
+        respiratoryAssessment.pastmedDuration,
+      ];
+      return { completed: requiredFields.filter(Boolean).length, total: requiredFields.length };
     }
 
     if (taskId === 'aloc-assessment') {
@@ -854,6 +873,20 @@ export default function AssessmentSection({
         Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>
       >,
     );
+
+  const normalizedComplaintSummary = complaintSummary.toLowerCase();
+  const chestPainDocumented =
+    painAssessment.painPresent === 'Yes' &&
+    (normalizedComplaintSummary.includes('chest pain') ||
+      normalizedComplaintSummary.includes('chest discomfort'));
+  const painScore = Number(
+    painAssessment.painScaleType === '0-10 Numeric'
+      ? painAssessment.numericPainScore
+      : painAssessment.facesPainScore,
+  );
+  const assessmentClinicalOverlays = chestPainDocumented
+    ? [createPainOverlay('chest', Number.isFinite(painScore) ? painScore : undefined)]
+    : [];
 
   function getAssessmentClinicalStatusPresentation(
     status: AssessmentClinicalStatus,
@@ -1597,6 +1630,7 @@ export default function AssessmentSection({
             selectedRegions={selectedAssessmentRegions}
             focusedRegion={selectedAssessmentRegion}
             regionStatuses={assessmentBodyRegionStatuses}
+            clinicalOverlays={assessmentClinicalOverlays}
             onRegionClick={handleAssessmentBodyRegionClick}
           />
   

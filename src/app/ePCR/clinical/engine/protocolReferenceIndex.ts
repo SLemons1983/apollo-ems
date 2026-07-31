@@ -70,6 +70,26 @@ function termsFor(protocol: ProtocolManifestEntry) {
   return Array.from(new Set([normalizedTitle, ...aliases.map(normalize)]));
 }
 
+function meetsDefiningEvidence(protocol: ProtocolManifestEntry, evidence: string) {
+  const title = normalize(protocol.title);
+  const hasAny = (terms: string[]) => terms.some((term) => evidence.includes(normalize(term)));
+
+  if (title.includes('allergic reaction') || title.includes('anaphylactic')) {
+    return hasAny(['allergic', 'allergen', 'anaphylaxis', 'urticaria', 'hives', 'angioedema']);
+  }
+
+  if (title.includes('coronary ischemic chest discomfort')) {
+    return hasAny(['chest pain', 'chest discomfort', 'stemi', 'myocardial infarction', 'angina']);
+  }
+
+  if (title.includes('pain management') &&
+      hasAny(['chest pain', 'chest discomfort', 'stemi', 'myocardial infarction', 'angina'])) {
+    return false;
+  }
+
+  return true;
+}
+
 export function findBestVerifiedProtocol(input: ProtocolMatchInput): VerifiedProtocolMatch | null {
   if (!input.lemsa || !input.clinicalCategory) return null;
 
@@ -82,6 +102,7 @@ export function findBestVerifiedProtocol(input: ProtocolMatchInput): VerifiedPro
 
   const ranked = ccemsaProtocolPack.protocols
     .filter((protocol) => applicable(protocol, input.lemsa, input.providerScope))
+    .filter((protocol) => meetsDefiningEvidence(protocol, evidence))
     .map((protocol) => {
       const matchedTerms = termsFor(protocol).filter(
         (term) => term.length >= 4 && evidence.includes(term),
