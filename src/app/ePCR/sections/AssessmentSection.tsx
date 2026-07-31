@@ -30,6 +30,7 @@ import {
   getAdditionalAssessmentTasksForContext,
   getAssessmentTasksForContext,
 } from '../clinical/engine/assessment';
+import AssessmentClinicalIntelligencePanel from '../clinical/components/intelligence/AssessmentClinicalIntelligencePanel';
 import ClinicalHistoryCard, {
   type ClinicalHistoryForm,
   type EditablePatientHistoryField,
@@ -1505,6 +1506,11 @@ export default function AssessmentSection({
 
   return (
     <div className="space-y-6">
+      <AssessmentClinicalIntelligencePanel
+        assessmentForm={assessmentForm}
+        context={context}
+      />
+
       <div>
         <div className="mb-3 rounded-lg bg-blue-100 px-4 py-3 text-sm font-bold uppercase tracking-wide text-blue-900">
           Initial Assessment and History
