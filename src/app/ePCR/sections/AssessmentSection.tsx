@@ -73,6 +73,9 @@ import TraumaAssessmentCard, {
   type TraumaFindingKey,
   type TraumaRegionKey,
 } from '../clinical/components/assessment/cards/TraumaAssessmentCard';
+import PoisoningAssessmentCard, { type PoisoningAssessmentForm } from '../clinical/components/assessment/cards/PoisoningAssessmentCard';
+import SeizureAssessmentCard, { type SeizureAssessmentForm } from '../clinical/components/assessment/cards/SeizureAssessmentCard';
+import ApgarAssessmentCard, { type ApgarAssessmentForm } from '../clinical/components/assessment/cards/ApgarAssessmentCard';
 import { calculateGcsScore } from '../clinical/engine/scores/gcs';
 import type { PatientForm } from '../types';
 import type {
@@ -347,6 +350,9 @@ export default function AssessmentSection({
   const respiratoryAssessment = assessmentForm.clinical.respiratory;
   const alocAssessment = assessmentForm.clinical.aloc;
   const ecgAssessment = assessmentForm.clinical.ecg;
+  const poisoningAssessment = assessmentForm.clinical.poisoning;
+  const seizureAssessment = assessmentForm.clinical.seizure;
+  const apgarAssessment = assessmentForm.clinical.apgar;
 
   const setConsciousnessAssessment = (
     value: SetStateAction<ConsciousnessAssessmentForm>,
@@ -384,6 +390,9 @@ export default function AssessmentSection({
   const setEcgAssessment = (
     value: SetStateAction<EcgAssessmentForm>,
   ) => setClinicalAssessmentValue('ecg', value);
+  const setPoisoningAssessment = (value: SetStateAction<PoisoningAssessmentForm>) => setClinicalAssessmentValue('poisoning', value);
+  const setSeizureAssessment = (value: SetStateAction<SeizureAssessmentForm>) => setClinicalAssessmentValue('seizure', value);
+  const setApgarAssessment = (value: SetStateAction<ApgarAssessmentForm>) => setClinicalAssessmentValue('apgar', value);
 
 
   function getTaskProgress(taskId: string) {
@@ -561,6 +570,18 @@ export default function AssessmentSection({
             : 0,
         total: 1,
       };
+    }
+    if (taskId === 'poisoning-assessment') {
+      const fields = [poisoningAssessment.salivation, poisoningAssessment.lacrimation, poisoningAssessment.urination, poisoningAssessment.defecation, poisoningAssessment.gastrointestinalDistress, poisoningAssessment.emesis, poisoningAssessment.miosis, poisoningAssessment.muscleActivity];
+      return { completed: fields.filter(Boolean).length, total: fields.length };
+    }
+    if (taskId === 'seizure-assessment') {
+      const fields = [seizureAssessment.focus, seizureAssessment.activity, seizureAssessment.color, seizureAssessment.duration, seizureAssessment.durationUnit, seizureAssessment.consciousness, seizureAssessment.incontinence, seizureAssessment.oralTrauma, seizureAssessment.postictalState];
+      return { completed: fields.filter(Boolean).length, total: fields.length };
+    }
+    if (taskId === 'neonate-assessment') {
+      const fields = [apgarAssessment.assessedAt, apgarAssessment.appearance, apgarAssessment.pulse, apgarAssessment.grimace, apgarAssessment.activity, apgarAssessment.respiration];
+      return { completed: fields.filter(Boolean).length, total: fields.length };
     }
 
     return { completed: 0, total: 1 };
@@ -1316,6 +1337,7 @@ export default function AssessmentSection({
     traumaAssessment,
     revisedTraumaScore,
     ecgAssessment,
+    poisoningAssessment, seizureAssessment, apgarAssessment,
     providerScope,
     onProgressChange,
   ]);
@@ -1528,6 +1550,9 @@ export default function AssessmentSection({
         />
       );
     }
+    if (taskId === 'poisoning-assessment') return <PoisoningAssessmentCard value={poisoningAssessment} onChange={(field, value) => setPoisoningAssessment((current) => ({ ...current, [field]: value }))} />;
+    if (taskId === 'seizure-assessment') return <SeizureAssessmentCard value={seizureAssessment} onChange={(field, value) => setSeizureAssessment((current) => ({ ...current, [field]: value }))} />;
+    if (taskId === 'neonate-assessment') return <ApgarAssessmentCard value={apgarAssessment} onChange={(field, value) => setApgarAssessment((current) => ({ ...current, [field]: value }))} />;
 
     return (
       <div className="rounded-lg border-2 border-dashed border-slate-300 p-10 text-center text-slate-500">

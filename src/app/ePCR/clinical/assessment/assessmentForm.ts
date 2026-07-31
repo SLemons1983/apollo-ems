@@ -21,6 +21,9 @@ import {
 import type { RespiratoryAssessmentForm } from '../components/assessment/cards/RespiratoryAssessmentCard';
 import type { RevisedTraumaScoreForm } from '../components/assessment/cards/RevisedTraumaScoreCard';
 import type { TraumaAssessmentForm } from '../components/assessment/cards/TraumaAssessmentCard';
+import type { PoisoningAssessmentForm } from '../components/assessment/cards/PoisoningAssessmentCard';
+import type { SeizureAssessmentForm } from '../components/assessment/cards/SeizureAssessmentCard';
+import type { ApgarAssessmentForm } from '../components/assessment/cards/ApgarAssessmentCard';
 
 export type ApolloBodyRegionSelection = Record<ApolloBodyRegionKey, boolean>;
 
@@ -96,6 +99,9 @@ export type AssessmentClinicalForm = {
   respiratory: RespiratoryAssessmentForm;
   aloc: AlocAssessmentForm;
   ecg: EcgAssessmentForm;
+  poisoning: PoisoningAssessmentForm;
+  seizure: SeizureAssessmentForm;
+  apgar: ApgarAssessmentForm;
 };
 
 export type AssessmentForm = {
@@ -456,6 +462,17 @@ export function createDefaultAssessmentForm(): AssessmentForm {
         fourLeadInterpretation: '',
         twelveLeadInterpretation: '',
         abnormalFindings: '',
+      },
+      poisoning: {
+        salivation: '', lacrimation: '', urination: '', defecation: '',
+        gastrointestinalDistress: '', emesis: '', miosis: '', muscleActivity: '', notes: '',
+      },
+      seizure: {
+        focus: '', activity: '', color: '', duration: '', durationUnit: '',
+        consciousness: '', incontinence: '', oralTrauma: '', postictalState: '', notes: '',
+      },
+      apgar: {
+        assessedAt: '', appearance: '', pulse: '', grimace: '', activity: '', respiration: '', notes: '',
       },
       extremity: {
         rightArm: {
