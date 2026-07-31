@@ -40,14 +40,14 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
   return (
-    <div className="mb-6 rounded-xl border bg-white p-5 shadow">
+    <div className="mb-6 rounded-xl border border-blue-200 bg-white p-5 shadow-md shadow-blue-950/5">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         className="mb-3 flex w-full flex-wrap items-center justify-between gap-3 text-left"
       >
         <div>
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 className="text-xl font-bold text-blue-950">
             Overall PCR Progress
           </h2>
           <p className="text-sm text-slate-500">
@@ -56,7 +56,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-slate-900 px-4 py-2 text-sm font-bold text-white">
+          <span className="rounded-full bg-blue-950 px-4 py-2 text-sm font-bold text-white">
             {percentage}%
           </span>
           <span className="text-2xl text-slate-700">
@@ -69,7 +69,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
         <>
           <div className="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
             <div
-              className="h-full rounded-full bg-slate-900"
+              className="h-full rounded-full bg-gradient-to-r from-blue-700 to-blue-500"
               style={{ width: `${percentage}%` }}
             />
           </div>

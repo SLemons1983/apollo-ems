@@ -20,18 +20,18 @@ export default function PCRSection({
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-white shadow">
+    <section className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-md shadow-blue-950/5">
       <button
         type="button"
         onClick={onToggle}
         className={`flex w-full items-center justify-between px-6 py-5 text-left transition ${
           complete
-            ? 'border-l-8 border-emerald-600'
-            : 'border-l-8 border-red-600 bg-red-50'
+            ? 'border-l-8 border-emerald-600 bg-emerald-50/40'
+            : 'border-l-8 border-blue-700 bg-blue-50/60'
         }`}
       >
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-xl font-semibold text-blue-950">{title}</h2>
 
           <p className="text-sm text-slate-500">
             {completedFields} / {totalFields} Required Fields Complete
@@ -40,7 +40,7 @@ export default function PCRSection({
           <div className="mt-2 h-2 w-64 overflow-hidden rounded-full bg-slate-200">
             <div
               className={`h-full rounded-full ${
-                complete ? 'bg-emerald-600' : 'bg-red-600'
+                complete ? 'bg-emerald-600' : 'bg-blue-600'
               }`}
               style={{ width: `${percentage}%` }}
             />

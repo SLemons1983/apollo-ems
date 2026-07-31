@@ -716,6 +716,20 @@ export default function EPCRClient() {
       })),
   ];
 
+  const totalRequiredFields = progressSections.reduce(
+    (total, section) => total + section.totalFields,
+    0,
+  );
+  const completedRequiredFields = progressSections.reduce(
+    (total, section) => total + section.completedFields,
+    0,
+  );
+  const overallProgress =
+    totalRequiredFields > 0
+      ? Math.round((completedRequiredFields / totalRequiredFields) * 100)
+      : 0;
+  const pcrReadyToSubmit = overallProgress === 100;
+
   function savePCRToFile() {
     const savedPCR = {
       fileType: "ApolloEMS Mock ePCR",
@@ -866,22 +880,31 @@ export default function EPCRClient() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-6">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1600px]">
-        <h1 className="mb-2 text-4xl font-bold text-slate-900">
-          ApolloEMS ePCR
-        </h1>
+        <div className="mb-6 rounded-2xl border border-blue-200 bg-white/95 px-5 py-4 shadow-lg shadow-blue-950/5">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <img
+                src="/apollo-logo.png"
+                alt="ApolloEMS"
+                className="h-16 w-16 shrink-0 rounded-xl object-contain"
+              />
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">
+                  ApolloEMS ePCR
+                </h1>
+                <p className="mt-1 text-sm font-medium text-slate-600 sm:text-base">
+                  Mock Electronic Patient Care Report Demonstration
+                </p>
+              </div>
+            </div>
 
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <p className="text-slate-600">
-            Mock Electronic Patient Care Report Demonstration
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={savePCRToFile}
-              className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-700"
+              className="rounded-lg bg-blue-950 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-800"
             >
               Save PCR
             </button>
@@ -889,9 +912,27 @@ export default function EPCRClient() {
             <button
               type="button"
               onClick={() => uploadInputRef.current?.click()}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow hover:bg-slate-50"
+              className="rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 shadow transition hover:bg-blue-50"
             >
               Upload PCR
+            </button>
+
+            <button
+              type="button"
+              disabled={!pcrReadyToSubmit}
+              aria-disabled={!pcrReadyToSubmit}
+              title={
+                pcrReadyToSubmit
+                  ? "PCR complete — submission workflow coming next build"
+                  : `Complete all required fields before submission (${overallProgress}%)`
+              }
+              className={`rounded-lg px-4 py-2 text-sm font-bold shadow transition ${
+                pcrReadyToSubmit
+                  ? "bg-emerald-600 text-white ring-2 ring-emerald-200 hover:bg-emerald-700"
+                  : "cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500 shadow-none"
+              }`}
+            >
+              Submit PCR
             </button>
 
             <input
@@ -901,6 +942,7 @@ export default function EPCRClient() {
               onChange={uploadPCRFromFile}
               className="hidden"
             />
+          </div>
           </div>
         </div>
 
@@ -948,7 +990,7 @@ export default function EPCRClient() {
             <aside className="sticky top-4 min-w-0">
               {patientSummaryOpen ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
-                  <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                  <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                         Live Clinical Summary
@@ -1097,7 +1139,7 @@ export default function EPCRClient() {
             <aside className="sticky top-4 min-w-0">
               {quickToolsOpen ? (
                 <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
-                  <div className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+                  <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
                     <button
                       type="button"
                       onClick={() => setQuickToolsOpen(false)}
@@ -1287,7 +1329,7 @@ export default function EPCRClient() {
                 mobileDrawer === "patient-summary" ? "left-0" : "right-0"
               }`}
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between bg-slate-900 px-4 py-3 text-white">
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                     {mobileDrawer === "patient-summary"
