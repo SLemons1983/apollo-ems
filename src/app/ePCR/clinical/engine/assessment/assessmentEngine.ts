@@ -1,7 +1,10 @@
-import { assessmentFindingOptions } from './findings';
+import type { AssessmentForm } from '../../assessment/assessmentForm';
+import { extractAssessmentClinicalFacts } from '../facts/assessmentFactExtractor';
 import { assessmentTasks } from './assessmentTasks';
+import { assessmentFindingOptions } from './findings';
 import type {
   AssessmentContext,
+  AssessmentEngineResult,
   AssessmentFindingOption,
   AssessmentMode,
   AssessmentTask,
@@ -29,7 +32,10 @@ export function determineAssessmentMode(
   return 'medical';
 }
 
-function taskMatchesContext(task: AssessmentTask, context: AssessmentContext) {
+function taskMatchesContext(
+  task: AssessmentTask,
+  context: AssessmentContext,
+): boolean {
   if (task.alwaysShow) {
     return true;
   }
@@ -73,7 +79,9 @@ export function getAssessmentTasksForContext(
   const mode = determineAssessmentMode(context);
 
   return assessmentTasks.filter(
-    (task) => task.mode.includes(mode) && taskMatchesContext(task, context),
+    (task) =>
+      task.mode.includes(mode) &&
+      taskMatchesContext(task, context),
   );
 }
 
@@ -91,7 +99,6 @@ export function getAssessmentFindingsForContext(
     );
   });
 }
-
 
 export function getAdditionalAssessmentTasksForContext(
   context: AssessmentContext,
@@ -128,4 +135,26 @@ export function getAdditionalAssessmentTasksForContext(
 
     return firstPriority - secondPriority;
   });
+}
+
+/**
+ * Produces the canonical Assessment Engine result for the current patient.
+ *
+ * Existing workflow functions remain available for backward compatibility.
+ * Downstream ACI, narrative, protocol, QA, billing, and analytics systems can
+ * consume this snapshot without reading AssessmentForm directly.
+ */
+export function buildAssessmentEngineResult(
+  context: AssessmentContext,
+  form: AssessmentForm,
+): AssessmentEngineResult {
+  return {
+    mode: determineAssessmentMode(context),
+    suggestedTasks: getAssessmentTasksForContext(context),
+    additionalTasks:
+      getAdditionalAssessmentTasksForContext(context),
+    availableFindings:
+      getAssessmentFindingsForContext(context),
+    clinicalFacts: extractAssessmentClinicalFacts(form),
+  };
 }
