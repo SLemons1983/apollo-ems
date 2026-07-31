@@ -24,7 +24,6 @@ type AciSuggestionFooterProps = {
   lemsa: string;
   feedback: ExistingAciFeedback[];
   open: boolean;
-  preferenceLoaded: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
@@ -36,6 +35,15 @@ type SuggestionRow = {
 };
 
 const notYetDetermined = 'Not yet determined';
+const notificationRowIds = new Set([
+  'clinical-findings',
+  'protocol-match',
+  'shock-risk',
+  'gfast-score',
+  'medications-consider',
+  'medications-contraindicated',
+  'other-considerations',
+]);
 
 function formatAssessmentMode(mode: AssessmentMode) {
   return mode
@@ -52,7 +60,6 @@ export default function AciSuggestionFooter({
   lemsa,
   feedback,
   open,
-  preferenceLoaded,
   onOpenChange,
 }: AciSuggestionFooterProps) {
   const [hasUnreadSuggestion, setHasUnreadSuggestion] = useState(false);
@@ -218,13 +225,16 @@ export default function AciSuggestionFooter({
   );
 
   const suggestionSignature = useMemo(
-    () => JSON.stringify(rows.map(({ id, value }) => [id, value])),
+    () =>
+      JSON.stringify(
+        rows
+          .filter(({ id }) => notificationRowIds.has(id))
+          .map(({ id, value }) => [id, value]),
+      ),
     [rows],
   );
 
   useEffect(() => {
-    if (!preferenceLoaded) return;
-
     if (!acknowledgedSignatureRef.current || open) {
       acknowledgedSignatureRef.current = suggestionSignature;
       setHasUnreadSuggestion(false);
@@ -234,7 +244,7 @@ export default function AciSuggestionFooter({
     if (suggestionSignature !== acknowledgedSignatureRef.current) {
       setHasUnreadSuggestion(true);
     }
-  }, [open, preferenceLoaded, suggestionSignature]);
+  }, [open, suggestionSignature]);
 
   function toggleFooter() {
     const nextOpen = !open;

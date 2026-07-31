@@ -157,11 +157,7 @@ export default function EPCRClient() {
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
-    useState(true);
-  const [
-    clinicalIntelligencePreferenceLoaded,
-    setClinicalIntelligencePreferenceLoaded,
-  ] = useState(false);
+    useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<
     "patient-summary" | "quick-tools" | null
   >(null);
@@ -173,10 +169,6 @@ export default function EPCRClient() {
     const savedQuickTools = window.localStorage.getItem(
       "apollo-epcr-quick-tools-open",
     );
-    const savedClinicalIntelligence = window.localStorage.getItem(
-      "apollo-epcr-clinical-intelligence-open",
-    );
-
     if (savedPatientSummary !== null) {
       setPatientSummaryOpen(savedPatientSummary === "true");
     }
@@ -185,11 +177,6 @@ export default function EPCRClient() {
       setQuickToolsOpen(savedQuickTools === "true");
     }
 
-    if (savedClinicalIntelligence !== null) {
-      setClinicalIntelligenceOpen(savedClinicalIntelligence === "true");
-    }
-
-    setClinicalIntelligencePreferenceLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -205,17 +192,6 @@ export default function EPCRClient() {
       String(quickToolsOpen),
     );
   }, [quickToolsOpen]);
-
-  useEffect(() => {
-    if (!clinicalIntelligencePreferenceLoaded) {
-      return;
-    }
-
-    window.localStorage.setItem(
-      "apollo-epcr-clinical-intelligence-open",
-      String(clinicalIntelligenceOpen),
-    );
-  }, [clinicalIntelligenceOpen, clinicalIntelligencePreferenceLoaded]);
 
   const [callForm, setCallForm] = useState<CallForm>(() =>
     createDefaultCallForm(),
@@ -1234,7 +1210,6 @@ export default function EPCRClient() {
           lemsa={callForm.lemsa}
           feedback={clinicalIntelligenceFeedback}
           open={clinicalIntelligenceOpen}
-          preferenceLoaded={clinicalIntelligencePreferenceLoaded}
           onOpenChange={setClinicalIntelligenceOpen}
         />
 
