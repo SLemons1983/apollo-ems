@@ -1218,6 +1218,24 @@ export default function EPCRClient() {
           assessmentForm={assessmentForm}
           assessmentMode={assessmentMode}
           clinicalCategory={complaintForm.clinicalCategory}
+          patientAge={patientAge}
+          complaintFindings={[
+            complaintForm.chiefComplaint,
+            complaintForm.clinicalCategory,
+            complaintForm.primaryImpression?.description,
+            complaintForm.secondaryImpression?.description,
+            complaintForm.primarySymptom?.description,
+            ...complaintForm.otherAssociatedSymptoms.map(
+              (symptom) => symptom.description,
+            ),
+            complaintForm.patientAcuity,
+            complaintForm.possibleInjuryTrauma === "Yes" ? "trauma" : "",
+            complaintForm.cardiacArrest,
+            complaintForm.suspectedStrokeCva === "Yes" ? "stroke" : "",
+            complaintForm.possibleDrugAlcoholUse === "Yes"
+              ? "drug or alcohol involvement"
+              : "",
+          ].filter((value): value is string => Boolean(value))}
           providerScope={documentingProviderScope}
           lemsa={callForm.lemsa}
           feedback={clinicalIntelligenceFeedback}

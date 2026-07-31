@@ -75,6 +75,61 @@ const currentMedicationOptions = [
   'Antipsychotic',
 ] as const;
 
+const medicationAllergyOptions = [
+  'Penicillin',
+  'Amoxicillin',
+  'Cephalosporins',
+  'Sulfonamides / Sulfa Drugs',
+  'Aspirin',
+  'NSAIDs',
+  'Ibuprofen',
+  'Naproxen',
+  'Acetaminophen',
+  'Codeine',
+  'Morphine',
+  'Hydrocodone',
+  'Oxycodone',
+  'Tramadol',
+  'Fentanyl',
+  'Erythromycin',
+  'Azithromycin',
+  'Ciprofloxacin',
+  'Clindamycin',
+  'Tetracyclines',
+  'Vancomycin',
+  'Iodinated Contrast Media',
+  'Insulin',
+  'Latex',
+  'Unknown Medication Allergy',
+  'Other',
+] as const;
+
+const environmentalAllergyOptions = [
+  'Bee / Wasp / Hornet Venom',
+  'Insect Bites / Stings',
+  'Latex',
+  'Adhesive Tape',
+  'Pollen',
+  'Grass',
+  'Trees',
+  'Weeds',
+  'Dust / Dust Mites',
+  'Mold',
+  'Animal Dander',
+  'Smoke',
+  'Food Allergy',
+  'Peanuts',
+  'Tree Nuts',
+  'Shellfish',
+  'Fish',
+  'Eggs',
+  'Milk / Dairy',
+  'Soy',
+  'Wheat',
+  'Unknown Environmental Allergy',
+  'Other',
+] as const;
+
 const codeStatusOptions = [
   'Full Code',
   'Do Not Resuscitate',
@@ -919,13 +974,19 @@ export default function PatientSection({
                 ? '✓ NKDA — No Known Drug Allergies'
                 : 'NKDA — No Known Drug Allergies'}
             </button>
-            <textarea
+            <select
               value={patientForm.medicationAllergies}
               onChange={(event) =>
                 updateAllergy('medicationAllergies', event.target.value)
               }
-              className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-            />
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+            >
+              <option value="">Select medication allergy...</option>
+              <option value="NKDA">NKDA — No Known Drug Allergies</option>
+              {medicationAllergyOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
             <p className="mt-2 text-xs text-slate-500">
               Entering a medication allergy replaces this selection.
             </p>
@@ -949,13 +1010,19 @@ export default function PatientSection({
                 ? '✓ No Environmental Allergies'
                 : 'No Environmental Allergies'}
             </button>
-            <textarea
+            <select
               value={patientForm.environmentalAllergies}
               onChange={(event) =>
                 updateAllergy('environmentalAllergies', event.target.value)
               }
-              className="min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-            />
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
+            >
+              <option value="">Select environmental allergy...</option>
+              <option value="No Environmental Allergies">No Environmental Allergies</option>
+              {environmentalAllergyOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
             <p className="mt-2 text-xs text-slate-500">
               Entering an environmental allergy replaces this selection.
             </p>

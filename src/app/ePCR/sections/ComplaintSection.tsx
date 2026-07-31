@@ -182,9 +182,7 @@ export default function ComplaintSection({
               Patient&apos;s Chief Complaint
             </span>
 
-            <input
-              type="text"
-              list="chief-complaint-options"
+            <select
               value={complaintForm.chiefComplaint}
               onChange={(event) =>
                 updateComplaintForm(
@@ -193,10 +191,12 @@ export default function ComplaintSection({
                 )
               }
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-            />
-            <datalist id="chief-complaint-options">
-              {commonChiefComplaints.map((option) => <option key={option} value={option} />)}
-            </datalist>
+            >
+              <option value="">Select chief complaint...</option>
+              {commonChiefComplaints.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
           </label>
 
           <ClinicalCategoryPicker

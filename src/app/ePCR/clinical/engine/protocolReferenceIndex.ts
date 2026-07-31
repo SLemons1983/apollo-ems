@@ -6,6 +6,8 @@ export type ProtocolMatchInput = {
   providerScope: 'ALS' | 'BLS';
   assessmentMode: string;
   clinicalCategory: string;
+  patientAge: number | null;
+  complaintFindings: string[];
   findings: string[];
   considerations: string[];
 };
@@ -18,6 +20,16 @@ export type VerifiedProtocolMatch = {
 
 const titleAliases: Record<string, string[]> = {
   'cardiac arrest': ['cardiac arrest', 'pulseless', 'cpr', 'rosc'],
+  'coronary ischemic chest discomfort': [
+    'chest pain',
+    'chest discomfort',
+    'cardiac',
+    'acute coronary syndrome',
+    'acs',
+    'stemi',
+    'myocardial infarction',
+    'angina',
+  ],
   'chest pain': ['chest pain', 'chest discomfort', 'cardiac', 'acs', 'stemi'],
   stroke: ['stroke', 'cva', 'gfast', 'facial droop', 'arm drift', 'speech'],
   'suspected stroke': ['stroke', 'cva', 'gfast', 'facial droop', 'arm drift', 'speech'],
@@ -70,16 +82,42 @@ function termsFor(protocol: ProtocolManifestEntry) {
   return Array.from(new Set([normalizedTitle, ...aliases.map(normalize)]));
 }
 
-function meetsDefiningEvidence(protocol: ProtocolManifestEntry, evidence: string) {
+function meetsDefiningEvidence(
+  protocol: ProtocolManifestEntry,
+  evidence: string,
+  complaintEvidence: string,
+  patientAge: number | null,
+) {
   const title = normalize(protocol.title);
   const hasAny = (terms: string[]) => terms.some((term) => evidence.includes(normalize(term)));
+  const complaintHasAny = (terms: string[]) =>
+    terms.some((term) => complaintEvidence.includes(normalize(term)));
+
+  if (title.includes('pediatric') && patientAge !== null && patientAge >= 18) {
+    return false;
+  }
+
+  if (title.includes('adult') && patientAge !== null && patientAge < 18) {
+    return false;
+  }
 
   if (title.includes('allergic reaction') || title.includes('anaphylactic')) {
     return hasAny(['allergic', 'allergen', 'anaphylaxis', 'urticaria', 'hives', 'angioedema']);
   }
 
   if (title.includes('coronary ischemic chest discomfort')) {
-    return hasAny(['chest pain', 'chest discomfort', 'stemi', 'myocardial infarction', 'angina']);
+    return complaintHasAny([
+      'chest pain',
+      'chest discomfort',
+      'stemi',
+      'myocardial infarction',
+      'angina',
+      'acute coronary syndrome',
+    ]);
+  }
+
+  if (title.includes('shock') && !title.includes('cardiac arrest')) {
+    return complaintHasAny(['shock', 'septic shock', 'hypovolemic shock', 'cardiogenic shock']);
   }
 
   if (title.includes('pain management') &&
@@ -98,11 +136,15 @@ export function findBestVerifiedProtocol(input: ProtocolMatchInput): VerifiedPro
     input.clinicalCategory,
     ...input.findings,
     ...input.considerations,
+    ...input.complaintFindings,
   ].join(' '));
+  const complaintEvidence = normalize(input.complaintFindings.join(' '));
 
   const ranked = ccemsaProtocolPack.protocols
     .filter((protocol) => applicable(protocol, input.lemsa, input.providerScope))
-    .filter((protocol) => meetsDefiningEvidence(protocol, evidence))
+    .filter((protocol) =>
+      meetsDefiningEvidence(protocol, evidence, complaintEvidence, input.patientAge),
+    )
     .map((protocol) => {
       const matchedTerms = termsFor(protocol).filter(
         (term) => term.length >= 4 && evidence.includes(term),

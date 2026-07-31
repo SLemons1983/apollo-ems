@@ -25,6 +25,8 @@ type AciSuggestionFooterProps = {
   assessmentForm: AssessmentForm;
   assessmentMode: AssessmentMode;
   clinicalCategory: string;
+  patientAge: number | null;
+  complaintFindings: string[];
   providerScope: 'ALS' | 'BLS';
   lemsa: string;
   feedback: ExistingAciFeedback[];
@@ -61,6 +63,8 @@ export default function AciSuggestionFooter({
   assessmentForm,
   assessmentMode,
   clinicalCategory,
+  patientAge,
+  complaintFindings,
   providerScope,
   lemsa,
   feedback,
@@ -128,6 +132,8 @@ export default function AciSuggestionFooter({
         providerScope,
         assessmentMode,
         clinicalCategory,
+        patientAge,
+        complaintFindings,
         findings: significantFindings.flatMap((finding) => [
           finding.title,
           finding.description,
@@ -137,8 +143,10 @@ export default function AciSuggestionFooter({
     [
       assessmentMode,
       clinicalCategory,
+      complaintFindings,
       feedback,
       lemsa,
+      patientAge,
       providerScope,
       significantFindings,
     ],
