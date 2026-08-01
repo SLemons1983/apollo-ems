@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 const modules = [
-  { title: 'Agency Management', detail: 'View organizations, onboarding status, and enabled platform modules.', href: '/admin/agencies', status: 'Foundation ready' },
+  { title: 'Agency Management', detail: 'Create and manage organizations, onboarding status, contacts, subscriptions, and enabled platform modules.', href: '/admin/agencies', status: 'Registry active' },
   { title: 'Platform Access', detail: 'Owner identities and future Apollo support-administrator access.', status: 'Owner-only' },
   { title: 'Subscriptions', detail: 'Future plans, billing state, trials, and contract milestones.', status: 'Planned' },
   { title: 'Platform Health', detail: 'Future deployment, integration, notification, and service visibility.', status: 'Planned' },
@@ -17,7 +17,7 @@ export default function AdminPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        {[['Organizations','1','Current operational tenant'],['External beta organizations','0','None publicly onboarded'],['Platform status','Foundation','Read-only administration']].map(([label,value,detail]) => (
+        {[['Organizations','1','Initial registered agency'],['External beta organizations','0','None publicly onboarded'],['Platform status','Operational','Owner-controlled agency registry']].map(([label,value,detail]) => (
           <div key={label} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><p className="text-sm font-bold text-slate-500">{label}</p><p className="mt-2 text-3xl font-black text-slate-950">{value}</p><p className="mt-2 text-sm text-slate-600">{detail}</p></div>
         ))}
       </section>
