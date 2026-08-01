@@ -14,10 +14,15 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setStatusMessage('Opening Google sign-in...');
 
+    const requestedNext = new URLSearchParams(window.location.search).get('next');
+    const nextPath = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : '/dashboard';
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
       },
     });
 

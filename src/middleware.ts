@@ -2,8 +2,17 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor'];
+const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin'];
 const supervisorRoutes = ['/employees', '/schedule', '/supervisor'];
+
+function isPlatformOwner(email?: string | null): boolean {
+  const ownerEmails = (process.env.APOLLO_OWNER_EMAILS ?? '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return Boolean(email && ownerEmails.includes(email.trim().toLowerCase()));
+}
 
 function isSupervisorRole(role?: string | null, jobTitle?: string | null): boolean {
   const normalizedRole = (role ?? '').trim().toLowerCase();
@@ -66,7 +75,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user?.email) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = new URL('/login', request.url);
+    if (routeMatches(pathname, ['/admin'])) loginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (routeMatches(pathname, ['/admin'])) {
+    if (!isPlatformOwner(user.email)) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+
+    return response;
   }
 
   if (!routeMatches(pathname, supervisorRoutes)) {
@@ -90,5 +109,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*'],
+  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*', '/admin/:path*'],
 };
