@@ -880,31 +880,26 @@ export default function EPCRClient() {
   }
 
   return (
-    <main className="min-h-screen bg-[#246fbe] px-4 py-6 sm:px-6">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#031735_0%,#0a438d_52%,#168fd0_100%)] bg-fixed px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1600px]">
         <div className="mb-6 rounded-2xl border border-blue-950/30 bg-slate-100 px-5 py-4 shadow-lg shadow-blue-950/20">
           <div className="flex flex-wrap items-center justify-between gap-5">
-            <div className="flex min-w-0 items-center gap-4">
+            <div className="flex min-w-0 items-center gap-5">
               <img
                 src="/apollo-logo.png"
                 alt="ApolloEMS"
-                className="h-24 w-24 shrink-0 object-contain sm:h-28 sm:w-28"
+                className="h-24 w-auto max-w-[15rem] shrink-0 object-contain sm:h-28 sm:max-w-[18rem]"
               />
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">
-                  ApolloEMS ePCR
-                </h1>
-                <p className="mt-1 text-sm font-medium text-slate-600 sm:text-base">
-                  Mock Electronic Patient Care Report Demonstration
-                </p>
-              </div>
+              <h1 className="border-l border-blue-950/20 pl-5 text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">
+                ePCR
+              </h1>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={savePCRToFile}
-              className="rounded-lg bg-blue-950 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-blue-800"
+              className="rounded-lg bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110"
             >
               Save PCR
             </button>
@@ -990,7 +985,7 @@ export default function EPCRClient() {
             <aside className="sticky top-4 min-w-0">
               {patientSummaryOpen ? (
                 <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
-                  <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
+                  <div className="flex items-center justify-between bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-3 text-white">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                         Live Clinical Summary
@@ -1139,7 +1134,7 @@ export default function EPCRClient() {
             <aside className="sticky top-4 min-w-0">
               {quickToolsOpen ? (
                 <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
-                  <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
+                  <div className="flex items-center justify-between bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-3 text-white">
                     <button
                       type="button"
                       onClick={() => setQuickToolsOpen(false)}
@@ -1329,7 +1324,7 @@ export default function EPCRClient() {
                 mobileDrawer === "patient-summary" ? "left-0" : "right-0"
               }`}
             >
-              <div className="sticky top-0 z-10 flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
+              <div className="sticky top-0 z-10 flex items-center justify-between bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-3 text-white">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                     {mobileDrawer === "patient-summary"

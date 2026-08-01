@@ -56,7 +56,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="rounded-full bg-blue-950 px-4 py-2 text-sm font-bold text-white">
+          <span className="rounded-full bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-2 text-sm font-bold text-white">
             {percentage}%
           </span>
           <span className="text-2xl text-slate-700">
@@ -69,7 +69,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
         <>
           <div className="mb-4 h-3 overflow-hidden rounded-full bg-slate-200">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-blue-700 to-blue-500"
+              className="h-full rounded-full bg-[linear-gradient(90deg,#031735_0%,#0a438d_55%,#168fd0_100%)]"
               style={{ width: `${percentage}%` }}
             />
           </div>

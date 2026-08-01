@@ -40,7 +40,9 @@ export default function PCRSection({
           <div className="mt-2 h-2 w-64 overflow-hidden rounded-full bg-slate-200">
             <div
               className={`h-full rounded-full ${
-                complete ? 'bg-emerald-600' : 'bg-blue-600'
+                complete
+                  ? 'bg-emerald-600'
+                  : 'bg-[linear-gradient(90deg,#031735_0%,#0a438d_55%,#168fd0_100%)]'
               }`}
               style={{ width: `${percentage}%` }}
             />
