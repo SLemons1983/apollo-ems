@@ -18,7 +18,7 @@ export default function DispatchLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl">
         <h1 className="text-2xl font-bold text-slate-900">Dispatch Login</h1>
         <p className="mt-2 text-sm text-slate-600">Read-only schedule access for dispatch partners.</p>
