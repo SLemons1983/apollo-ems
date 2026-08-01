@@ -28,7 +28,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4">
       <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-8 shadow-2xl">
         <div className="flex flex-col items-center text-center">
           <Image
@@ -60,7 +60,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleLogin}
-            className="mt-8 w-full max-w-md cursor-pointer rounded-2xl bg-slate-900 px-4 py-4 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+            className="mt-8 w-full max-w-md cursor-pointer rounded-2xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] px-4 py-4 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.99]"
           >
             Sign in with Google
           </button>

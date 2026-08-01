@@ -1287,6 +1287,9 @@ export default function DashboardPage() {
   const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
+  const [showVacationRangeModal, setShowVacationRangeModal] = useState(false);
+  const [vacationRangeStart, setVacationRangeStart] = useState('');
+  const [vacationRangeEnd, setVacationRangeEnd] = useState('');
   const [showPrintScheduleModal, setShowPrintScheduleModal] = useState(false);
   const [printScheduleStart, setPrintScheduleStart] = useState('');
   const [printScheduleEnd, setPrintScheduleEnd] = useState('');
@@ -4620,6 +4623,43 @@ export default function DashboardPage() {
     setSelectedVacationShift(null);
   }
 
+  async function submitVacationRangeRequest() {
+    if (!currentEmployee || !vacationRangeStart || !vacationRangeEnd) {
+      setVacationRequestStatus('Select both a start date and an end date.');
+      return;
+    }
+    if (vacationRangeEnd < vacationRangeStart) {
+      setVacationRequestStatus('The end date cannot be before the start date.');
+      return;
+    }
+
+    const request: VacationRequest = {
+      id: `vacation-range-${currentEmployee.id}-${vacationRangeStart}-${Date.now()}`,
+      employee_id: currentEmployee.id,
+      employee_name: currentEmployee.name,
+      date_key: vacationRangeStart,
+      shift_label: 'Vacation Range',
+      start_time: '',
+      end_time: '',
+      reason: vacationReason.trim(),
+      status: 'PENDING',
+      supervisor_note: `VACATION_RANGE_END:${vacationRangeEnd}`,
+      requested_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase.from('vacation_requests').insert(request);
+    if (error) {
+      console.error('Failed to submit vacation range request:', error);
+      setVacationRequestStatus('Vacation request could not be submitted. Please try again.');
+      return;
+    }
+
+    setVacationRequestStatus('Vacation range request submitted to supervisors.');
+    setVacationRangeStart('');
+    setVacationRangeEnd('');
+    setVacationReason('');
+  }
+
   async function revokeApprovedVacation(params: {
     dateKey: string;
     shiftLabel: string;
@@ -5296,7 +5336,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
       {showPrintScheduleModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
@@ -5518,10 +5558,13 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={() => setShowShiftTradeModal(true)}
-                    className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700"
+                    onClick={() => {
+                      setVacationRequestStatus('');
+                      setShowVacationRangeModal(true);
+                    }}
+                    className="rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                   >
-                    Shift Trade
+                    Vacation Request
                   </button>
 
                   <div className="inline-flex rounded-xl border border-slate-300 bg-slate-50 p-1">
@@ -5610,7 +5653,37 @@ export default function DashboardPage() {
             </div>,
           )}
 
-          {showShiftTradeModal && (
+          {showVacationRangeModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+              <div className="w-full max-w-xl rounded-2xl border border-blue-200 bg-white shadow-2xl">
+                <div className="rounded-t-2xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] p-5 text-white">
+                  <h2 className="text-xl font-bold">Vacation Request</h2>
+                  <p className="mt-1 text-sm text-blue-100">Request an inclusive date range, including dates beyond the published schedule.</p>
+                </div>
+                <div className="space-y-4 p-5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">Start Date
+                      <input type="date" value={vacationRangeStart} onChange={(event) => { setVacationRangeStart(event.target.value); setVacationRequestStatus(''); }} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-600">End Date
+                      <input type="date" min={vacationRangeStart} value={vacationRangeEnd} onChange={(event) => { setVacationRangeEnd(event.target.value); setVacationRequestStatus(''); }} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                    </label>
+                  </div>
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">Reason / note to supervisor
+                    <textarea value={vacationReason} onChange={(event) => setVacationReason(event.target.value)} rows={4} placeholder="Optional note..." className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" />
+                  </label>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Approval affects only shifts you are scheduled to work. Normal days off remain unchanged.</div>
+                  {vacationRequestStatus && <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">{vacationRequestStatus}</div>}
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => { setShowVacationRangeModal(false); setVacationRangeStart(''); setVacationRangeEnd(''); setVacationReason(''); setVacationRequestStatus(''); }} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+                    <button type="button" onClick={submitVacationRangeRequest} disabled={!vacationRangeStart || !vacationRangeEnd} className="rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Submit Request</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {false && showShiftTradeModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
               <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl">
                 <div className="flex items-start justify-between border-b border-slate-200 p-5">

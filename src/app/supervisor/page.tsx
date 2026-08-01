@@ -5675,7 +5675,7 @@ export default function SupervisorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

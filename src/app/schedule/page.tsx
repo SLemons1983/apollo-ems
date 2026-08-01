@@ -2326,50 +2326,53 @@ export default function SchedulePage() {
       .sort((a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime());
   }, [vacationRequests]);
 
+  function getVacationRangeEnd(request: VacationRequest): string {
+    const match = request.supervisorNote?.match(/VACATION_RANGE_END:(\d{4}-\d{2}-\d{2})/);
+    return match?.[1] ?? request.dateKey;
+  }
+
+  function isVacationRangeRequest(request: VacationRequest): boolean {
+    return request.shiftLabel === 'Vacation Range' || getVacationRangeEnd(request) !== request.dateKey;
+  }
+
   function applyApprovedVacationRequest(
     current: ScheduleData,
     request: VacationRequest,
   ): { next: ScheduleData; applied: boolean } {
     const next = cloneScheduleData(normalizeLoadedData(current));
-    const day = next[request.dateKey];
-    if (!day) return { next, applied: false };
-
     const employee = employees.find((item) => item.id === request.employeeId);
     if (!employee) return { next, applied: false };
 
+    const rangeEnd = getVacationRangeEnd(request);
+    const datesToApply = Object.keys(next).filter((dateKey) => dateKey >= request.dateKey && dateKey <= rangeEnd);
+    if (!isVacationRangeRequest(request) && !next[request.dateKey]) return { next, applied: false };
+
     const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
-    let matchedShift: ShiftAssignment | ExtraShiftAssignment | null = null;
-    let matchedSlotKey: ScheduleSlotKey | null = null;
+    let applied = false;
 
     const matchingStandardNames = SHIFT_ORDER.filter(
       (shiftName) => SHIFT_DISPLAY_NAMES[shiftName] === request.shiftLabel,
     );
     const standardNamesToSearch = matchingStandardNames.length > 0 ? matchingStandardNames : SHIFT_ORDER;
 
-    for (const shiftName of standardNamesToSearch) {
-      const shift = day.standard[shiftName];
-      const slotKey = slotKeys.find((key) => shift[key].employeeId === request.employeeId);
-      if (slotKey) {
-        matchedShift = shift;
-        matchedSlotKey = slotKey;
-        break;
+    for (const dateKey of datesToApply) {
+      const day = next[dateKey];
+      let matchedShift: ShiftAssignment | ExtraShiftAssignment | null = null;
+      let matchedSlotKey: ScheduleSlotKey | null = null;
+      for (const shiftName of standardNamesToSearch) {
+        const shift = day.standard[shiftName];
+        const slotKey = slotKeys.find((key) => shift[key].employeeId === request.employeeId);
+        if (slotKey) { matchedShift = shift; matchedSlotKey = slotKey; break; }
       }
-    }
-
-    if (!matchedShift) {
-      const matchingExtras = day.extras.filter((extra) => extra.label === request.shiftLabel);
-      const extrasToSearch = matchingExtras.length > 0 ? matchingExtras : day.extras;
-      for (const extra of extrasToSearch) {
+      if (!matchedShift) {
+        const matchingExtras = day.extras.filter((extra) => extra.label === request.shiftLabel);
+        const extrasToSearch = matchingExtras.length > 0 ? matchingExtras : day.extras;
+        for (const extra of extrasToSearch) {
         const slotKey = slotKeys.find((key) => extra[key].employeeId === request.employeeId);
-        if (slotKey) {
-          matchedShift = extra;
-          matchedSlotKey = slotKey;
-          break;
+          if (slotKey) { matchedShift = extra; matchedSlotKey = slotKey; break; }
         }
       }
-    }
-
-    if (!matchedShift || !matchedSlotKey) return { next, applied: false };
+      if (!matchedShift || !matchedSlotKey) continue;
 
     const vacationSlot = matchedShift[matchedSlotKey];
     const coverageStartTime = vacationSlot.startTime || request.startTime || DEFAULT_START_TIME;
@@ -2419,7 +2422,10 @@ export default function SchedulePage() {
       });
     }
 
-    return { next, applied: true };
+      applied = true;
+    }
+
+    return { next, applied: applied || isVacationRangeRequest(request) };
   }
 
   async function sendVacationDecisionNotifications(
@@ -2476,7 +2482,7 @@ export default function SchedulePage() {
     if (!request) return;
 
     const confirmed = window.confirm(
-      `${status === 'APPROVED' ? 'Approve' : 'Deny'} ${request.employeeName}'s vacation request for ${request.dateKey}?`,
+      `${status === 'APPROVED' ? 'Approve' : 'Deny'} ${request.employeeName}'s vacation request for ${request.dateKey}${getVacationRangeEnd(request) !== request.dateKey ? ` through ${getVacationRangeEnd(request)}` : ''}?`,
     );
     if (!confirmed) return;
 
@@ -2488,7 +2494,7 @@ export default function SchedulePage() {
         return;
       }
 
-      markUnsavedChanges(request.dateKey);
+      Object.keys(result.next).filter((dateKey) => dateKey >= request.dateKey && dateKey <= getVacationRangeEnd(request)).forEach(markUnsavedChanges);
       scheduleDataRef.current = result.next;
       setScheduleDataSafely(result.next);
       setSaveStatus('Saving approved vacation and coverage shift...');
@@ -2496,9 +2502,10 @@ export default function SchedulePage() {
       if (!scheduleSaved) return;
     }
 
+    const rangeMarker = `VACATION_RANGE_END:${getVacationRangeEnd(request)}`;
     const supervisorNote = status === 'APPROVED'
-      ? 'Approved by supervisor. Assignment changed to Vacation and a coverage opening was created automatically.'
-      : 'Denied by supervisor.';
+      ? `${rangeMarker} | Approved by supervisor. Scheduled assignments in the range are Vacation; future assignments are restricted.`
+      : `${rangeMarker} | Denied by supervisor.`;
     const { error } = await supabase
       .from('vacation_requests')
       .update({ status, supervisor_note: supervisorNote })
@@ -2994,10 +3001,7 @@ export default function SchedulePage() {
     [pendingOpenShiftRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
   );
 
-  const selectedPayPeriodPendingVacationRequests = useMemo(
-    () => pendingVacationRequests.filter((request) => isDateInSelectedPayPeriod(request.dateKey)),
-    [pendingVacationRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
-  );
+  const selectedPayPeriodPendingVacationRequests = pendingVacationRequests;
 
   const selectedPayPeriodPendingShiftTradeRequests = useMemo(
     () => pendingShiftTradeRequests.filter(
@@ -4318,7 +4322,7 @@ export default function SchedulePage() {
 
   if (!payPeriodReady) {
     return (
-      <div className="min-h-screen bg-slate-200 px-4 py-6 md:px-6">
+      <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
         <div className="mx-auto max-w-[1900px] rounded-2xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-700 shadow-sm">
           Loading current pay period...
         </div>
@@ -4496,7 +4500,9 @@ export default function SchedulePage() {
                         <div>
                           <div className="text-sm font-bold text-slate-900">{request.employeeName}</div>
                           <div className="mt-1 text-sm text-slate-700">
-                            {request.shiftLabel} • {formatTileDate(request.dateKey)} • {request.startTime}-{request.endTime}
+                            {isVacationRangeRequest(request)
+                              ? `${formatTileDate(request.dateKey)} through ${formatTileDate(getVacationRangeEnd(request))}`
+                              : `${request.shiftLabel} • ${formatTileDate(request.dateKey)} • ${request.startTime}-${request.endTime}`}
                           </div>
                           {request.reason && (
                             <div className="mt-2 text-sm text-slate-600">Reason: {request.reason}</div>
@@ -4530,7 +4536,7 @@ export default function SchedulePage() {
             )}
           </div>
 
-          <div className={`rounded-xl border p-3 shadow-sm ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
+          {false && <div className={`rounded-xl border p-3 shadow-sm ${selectedPayPeriodPendingShiftTradeRequests.length > 0 ? 'border-amber-500 bg-amber-50' : 'border-slate-500 bg-white'}`}>
             <button
               type="button"
               onClick={() => {
@@ -4602,7 +4608,7 @@ export default function SchedulePage() {
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           <div className={`rounded-xl border p-3 shadow-sm ${showOnDutyEmployees ? 'border-emerald-600 bg-emerald-50' : 'border-emerald-500 bg-white'}`}>
             <button
