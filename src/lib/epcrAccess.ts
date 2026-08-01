@@ -5,7 +5,8 @@ export type EpcrMembership = {
   id: string; agency_id: string; auth_user_id: string | null; first_name: string;
   last_name: string; email: string; username: string; role: EpcrRole;
   status: 'INVITED' | 'ACTIVE' | 'INACTIVE' | 'REVOKED'; invited_at: string;
-  accepted_at: string | null; last_invited_at: string;
+  accepted_at: string | null; last_invited_at: string; revoked_at: string | null;
+  revoked_by: string | null;
 };
 
 export function usernameBase(firstName: string, lastName: string) {

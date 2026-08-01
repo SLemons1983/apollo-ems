@@ -34,17 +34,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const owner = await getOwnerAdminClient();
   if (!owner) return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 });
   const { id } = await params;
-  const body = await request.json() as { membership_id?: unknown };
+  const body = await request.json() as { membership_id?: unknown; action?: unknown };
   const membershipId = String(body.membership_id ?? '');
-  if (!/^[0-9a-f-]{36}$/i.test(membershipId)) return NextResponse.json({ error: 'Select a valid invited membership.' }, { status: 400 });
-  const { data: member, error: memberError } = await owner.db.from('epcr_memberships').select('id,email,status').eq('id', membershipId).eq('agency_id', id).maybeSingle();
-  if (memberError || !member) return NextResponse.json({ error: 'The invited membership was not found.' }, { status: 404 });
-  if (member.status !== 'INVITED') return NextResponse.json({ error: 'Only an unaccepted invitation can be replaced.' }, { status: 409 });
+  const action = String(body.action ?? 'REINVITE');
+  if (!/^[0-9a-f-]{36}$/i.test(membershipId)) return NextResponse.json({ error: 'Select a valid ePCR membership.' }, { status: 400 });
+  const { data: member, error: memberError } = await owner.db.from('epcr_memberships').select('id,email,status,role').eq('id', membershipId).eq('agency_id', id).maybeSingle();
+  if (memberError || !member) return NextResponse.json({ error: 'The ePCR membership was not found.' }, { status: 404 });
+
+  if (action === 'REVOKE') {
+    if (!['ACTIVE', 'INVITED'].includes(member.status)) return NextResponse.json({ error: 'Only active access or a pending invitation can be revoked.' }, { status: 409 });
+    if (member.status === 'ACTIVE' && member.role === 'PRIMARY_ADMIN') {
+      const { count, error: countError } = await owner.db.from('epcr_memberships').select('id', { count: 'exact', head: true }).eq('agency_id', id).eq('role', 'PRIMARY_ADMIN').eq('status', 'ACTIVE');
+      if (countError) return NextResponse.json({ error: countError.message }, { status: 400 });
+      if ((count ?? 0) <= 1) return NextResponse.json({ error: 'Assign and activate another Primary Admin before removing this user. Every agency must retain at least one active Primary Admin.' }, { status: 409 });
+    }
+    const revokedAt = new Date().toISOString();
+    const { data: updated, error: updateError } = await owner.db.from('epcr_memberships').update({ status: 'REVOKED', revoked_at: revokedAt, revoked_by: owner.user.email }).eq('id', member.id).eq('agency_id', id).eq('status', member.status).select().maybeSingle();
+    if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
+    if (!updated) return NextResponse.json({ error: 'Access changed before this request completed. Refresh and try again.' }, { status: 409 });
+    return NextResponse.json({ member: updated });
+  }
+
+  if (action !== 'REINVITE') return NextResponse.json({ error: 'Select a valid access action.' }, { status: 400 });
+  if (!['INVITED', 'REVOKED'].includes(member.status)) return NextResponse.json({ error: 'Only an unaccepted or revoked membership can receive a fresh invitation.' }, { status: 409 });
   const origin = new URL(request.url).origin;
   const auth = createClient('https://xyrusrspvyuwpplhhett.supabase.co', 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU', { auth: { persistSession: false, autoRefreshToken: false } });
   const { error: resendError } = await auth.auth.resetPasswordForEmail(member.email, { redirectTo: `${origin}/epcr/setup-password` });
   if (resendError) return NextResponse.json({ error: resendError.message }, { status: 400 });
-  const { error: updateError } = await owner.db.from('epcr_memberships').update({ last_invited_at: new Date().toISOString() }).eq('id', member.id).eq('agency_id', id).eq('status', 'INVITED');
+  const { data: updated, error: updateError } = await owner.db.from('epcr_memberships').update({ status: 'INVITED', last_invited_at: new Date().toISOString(), revoked_at: null, revoked_by: null }).eq('id', member.id).eq('agency_id', id).eq('status', member.status).select().maybeSingle();
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
-  return NextResponse.json({ member });
+  if (!updated) return NextResponse.json({ error: 'Access changed before this request completed. Refresh and try again.' }, { status: 409 });
+  return NextResponse.json({ member: updated });
 }
