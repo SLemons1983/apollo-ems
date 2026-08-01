@@ -40,7 +40,7 @@ export default function PCRProgress({ sections }: PCRProgressProps) {
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
   return (
-    <div className="mb-6 rounded-xl border border-blue-200 bg-white p-5 shadow-md shadow-blue-950/5">
+    <div className="mb-6 rounded-xl border border-blue-950/30 bg-slate-100 p-5 shadow-md shadow-blue-950/20">
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}

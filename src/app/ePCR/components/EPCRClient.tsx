@@ -880,15 +880,15 @@ export default function EPCRClient() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 px-4 py-6 sm:px-6">
+    <main className="min-h-screen bg-[#246fbe] px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-[1600px]">
-        <div className="mb-6 rounded-2xl border border-blue-200 bg-white/95 px-5 py-4 shadow-lg shadow-blue-950/5">
+        <div className="mb-6 rounded-2xl border border-blue-950/30 bg-slate-100 px-5 py-4 shadow-lg shadow-blue-950/20">
           <div className="flex flex-wrap items-center justify-between gap-5">
             <div className="flex min-w-0 items-center gap-4">
               <img
                 src="/apollo-logo.png"
                 alt="ApolloEMS"
-                className="h-16 w-16 shrink-0 rounded-xl object-contain"
+                className="h-24 w-24 shrink-0 object-contain sm:h-28 sm:w-28"
               />
               <div>
                 <h1 className="text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">
@@ -947,7 +947,7 @@ export default function EPCRClient() {
         </div>
 
         {fileStatus && (
-          <div className="mb-6 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+          <div className="mb-6 rounded-lg border border-blue-950/30 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
             {fileStatus}
           </div>
         )}
@@ -958,14 +958,14 @@ export default function EPCRClient() {
           <button
             type="button"
             onClick={() => setMobileDrawer("patient-summary")}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+            className="rounded-lg border border-blue-950/30 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-200"
           >
             ☰ Patient Summary
           </button>
           <button
             type="button"
             onClick={() => setMobileDrawer("quick-tools")}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+            className="rounded-lg border border-blue-950/30 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-200"
           >
             Quick Tools ☰
           </button>
@@ -989,7 +989,7 @@ export default function EPCRClient() {
           >
             <aside className="sticky top-4 min-w-0">
               {patientSummaryOpen ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
+                <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
                   <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
@@ -1006,7 +1006,7 @@ export default function EPCRClient() {
                       ◀
                     </button>
                   </div>
-                  <div className="p-3">
+                  <div className="bg-slate-100 p-3">
                     <PatientHandoffRail
                       callForm={callForm}
                       patientForm={patientForm}
@@ -1019,7 +1019,7 @@ export default function EPCRClient() {
                 <button
                   type="button"
                   onClick={() => setPatientSummaryOpen(true)}
-                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-2 py-4 shadow-md hover:bg-slate-50"
+                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-blue-950/30 bg-slate-100 px-2 py-4 text-blue-950 shadow-md hover:bg-slate-200"
                   aria-label="Expand patient summary"
                 >
                   <span className="font-black">▶</span>
@@ -1138,7 +1138,7 @@ export default function EPCRClient() {
 
             <aside className="sticky top-4 min-w-0">
               {quickToolsOpen ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-lg">
+                <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
                   <div className="flex items-center justify-between bg-gradient-to-r from-blue-950 to-blue-800 px-4 py-3 text-white">
                     <button
                       type="button"
@@ -1155,7 +1155,7 @@ export default function EPCRClient() {
                       <h2 className="font-bold">Quick Tools</h2>
                     </div>
                   </div>
-                  <div className="p-4">
+                  <div className="bg-slate-100 p-4">
                     <QuickToolsPanel
                       assessmentForm={assessmentForm}
                       onAssessmentFormChange={setAssessmentForm}
@@ -1171,7 +1171,7 @@ export default function EPCRClient() {
                 <button
                   type="button"
                   onClick={() => setQuickToolsOpen(true)}
-                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-slate-300 bg-white px-2 py-4 shadow-md hover:bg-slate-50"
+                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-blue-950/30 bg-slate-100 px-2 py-4 text-blue-950 shadow-md hover:bg-slate-200"
                   aria-label="Expand quick tools"
                 >
                   <span className="font-black">◀</span>

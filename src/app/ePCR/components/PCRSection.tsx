@@ -20,14 +20,14 @@ export default function PCRSection({
     totalFields > 0 ? Math.round((completedFields / totalFields) * 100) : 0;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-md shadow-blue-950/5">
+    <section className="overflow-hidden rounded-xl border border-blue-950/30 bg-slate-100 shadow-md shadow-blue-950/20">
       <button
         type="button"
         onClick={onToggle}
         className={`flex w-full items-center justify-between px-6 py-5 text-left transition ${
           complete
-            ? 'border-l-8 border-emerald-600 bg-emerald-50/40'
-            : 'border-l-8 border-blue-700 bg-blue-50/60'
+            ? 'border-l-8 border-emerald-600 bg-slate-100'
+            : 'border-l-8 border-blue-700 bg-slate-100'
         }`}
       >
         <div>
@@ -50,7 +50,7 @@ export default function PCRSection({
         <span className="text-2xl text-slate-700">{expanded ? '−' : '+'}</span>
       </button>
 
-      {expanded && <div className="border-t bg-white p-6">{children}</div>}
+      {expanded && <div className="border-t bg-slate-100 p-6">{children}</div>}
     </section>
   );
 }
