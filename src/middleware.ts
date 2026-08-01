@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin', '/epcr-dashboard'];
+const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin', '/epcr/dashboard', '/epcr-dashboard'];
 const supervisorRoutes = ['/employees', '/schedule', '/supervisor'];
 
 function isPlatformOwner(email?: string | null): boolean {
@@ -34,6 +34,10 @@ function routeMatches(pathname: string, routes: string[]): boolean {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname === '/epcr-dashboard') {
+    return NextResponse.redirect(new URL('/epcr/dashboard', request.url));
+  }
 
   if (!routeMatches(pathname, protectedRoutes)) {
     return NextResponse.next();
@@ -76,7 +80,7 @@ export async function middleware(request: NextRequest) {
 
   if (!user?.email) {
     const loginUrl = new URL('/login', request.url);
-    if (routeMatches(pathname, ['/epcr-dashboard'])) return NextResponse.redirect(new URL('/epcr/login', request.url));
+    if (routeMatches(pathname, ['/epcr/dashboard'])) return NextResponse.redirect(new URL('/epcr/login', request.url));
     if (routeMatches(pathname, ['/admin'])) loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -110,5 +114,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*', '/admin/:path*', '/epcr-dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*', '/admin/:path*', '/epcr/dashboard/:path*', '/epcr-dashboard/:path*'],
 };
