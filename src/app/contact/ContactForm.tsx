@@ -4,10 +4,12 @@ import { FormEvent, useState } from 'react';
 export default function ContactForm(){
   const [state,setState]=useState<'idle'|'sending'|'sent'|'error'>('idle');
   async function submit(event:FormEvent<HTMLFormElement>){
-    event.preventDefault(); setState('sending');
-    const form=new FormData(event.currentTarget);
+    event.preventDefault();
+    const formElement=event.currentTarget;
+    setState('sending');
+    const form=new FormData(formElement);
     const payload=Object.fromEntries(form.entries());
-    try{const response=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!response.ok) throw new Error(); setState('sent'); event.currentTarget.reset();}catch{setState('error');}
+    try{const response=await fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!response.ok) throw new Error(); formElement.reset(); setState('sent');}catch{setState('error');}
   }
   return <form onSubmit={submit} className="space-y-5 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
     <div className="hidden" aria-hidden="true"><label>Website<input name="website" tabIndex={-1} autoComplete="off"/></label></div>
