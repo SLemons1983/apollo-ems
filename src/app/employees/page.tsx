@@ -3163,7 +3163,7 @@ export default function EmployeeProfilesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-6 md:px-6">
+    <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1850px]">
         {!mounted && (
           <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700">

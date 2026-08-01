@@ -4331,7 +4331,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="schedule-page bg-slate-200 px-4 py-6 md:px-6">
+    <div className="schedule-page min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
         <div className="mb-6 rounded-2xl border border-slate-400 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
