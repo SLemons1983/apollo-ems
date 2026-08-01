@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'ApolloEMS',
-  description: 'Apollo EMS Management',
+  description: 'Purpose-built EMS workforce and operations management software.',
   icons: {
     icon: '/apollo-logo.png',
     apple: '/apollo-logo.png',
