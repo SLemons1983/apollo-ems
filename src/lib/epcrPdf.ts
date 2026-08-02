@@ -154,6 +154,21 @@ export async function reportPdf(chart: Record<string, unknown>, reportNumber: st
 
   newPage(); page.drawText(`Report ${safe(reportNumber)}`,{x:margin,y:720,size:10,font:bold,color:navy}); page.drawText(`Patient: ${safe(patientDisplay)}`,{x:220,y:720,size:10,font:regular,color:ink}); y=700;
   for (const block of blocks(chart)) { if (block.title === 'Body Map - Documented Findings') ensure(231); section(block.title); if (block.title === 'Body Map - Documented Findings') bodyMap((block.columns ?? []).slice(1)); else { if (block.rows?.length) fieldRows(block.rows); if (block.columns?.length) table(block.columns); if (block.narrative) for (const entry of block.narrative.split(/\n+/).filter(Boolean)) paragraph(entry, 9); } }
-  const pages = pdf.getPages(); pages.forEach((item,index) => { page=item; drawHeader(item); page.drawLine({start:{x:margin,y:38},end:{x:574,y:38},color:line,thickness:0.5}); page.drawText(`ApolloEMS | Report ${safe(reportNumber)}`,{x:margin,y:24,size:7.5,font:regular,color:muted}); const footer=`Page ${index+1} of ${pages.length}`; page.drawText(footer,{x:574-regular.widthOfTextAtSize(footer,7.5),y:24,size:7.5,font:regular,color:muted}); });
+  if (y < 70) newPage();
+  const pages = pdf.getPages(); pages.forEach((item,index) => {
+    page = item;
+    drawHeader(item);
+    if (index === pages.length - 1) {
+      const notice = 'CONFIDENTIALITY NOTICE: This document contains Protected Health Information (PHI). It must be stored, transmitted, accessed, and disposed of securely in accordance with applicable privacy laws and agency policies.';
+      const noticeLines = wrapText(notice, bold, 6.8, contentWidth - 12);
+      noticeLines.forEach((entry, lineIndex) => {
+        page.drawText(entry, { x: margin + 6, y: 51 - lineIndex * 8, size: 6.8, font: bold, color: navy });
+      });
+    }
+    page.drawLine({start:{x:margin,y:38},end:{x:574,y:38},color:line,thickness:0.5});
+    page.drawText(`ApolloEMS | Report ${safe(reportNumber)}`,{x:margin,y:24,size:7.5,font:regular,color:muted});
+    const footer=`Page ${index+1} of ${pages.length}`;
+    page.drawText(footer,{x:574-regular.widthOfTextAtSize(footer,7.5),y:24,size:7.5,font:regular,color:muted});
+  });
   return Buffer.from(await pdf.save());
 }
