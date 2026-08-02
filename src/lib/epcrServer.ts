@@ -11,11 +11,12 @@ export function epcrAdminClient() {
   return createClient(URL, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export async function currentEpcrMembership() {
+export async function currentEpcrMembership(requireDedicatedSession = false) {
   const cookieStore = await cookies();
   const auth = createServerClient(URL, KEY, { cookies: { getAll: () => cookieStore.getAll(), setAll() {} } });
   const { data: { user } } = await auth.auth.getUser();
   if (!user?.id || !user.email) return null;
+  if (requireDedicatedSession && cookieStore.get('apollo_epcr_session')?.value !== user.id) return null;
   const db = epcrAdminClient();
   const { data } = await db.from('epcr_memberships').select('*, apollo_agencies(name,slug,enabled_modules,status)').eq('auth_user_id', user.id).in('status', ['INVITED', 'ACTIVE']).maybeSingle();
   if (!data) return null;

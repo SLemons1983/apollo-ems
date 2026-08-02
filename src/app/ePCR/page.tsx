@@ -3,7 +3,7 @@ import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 import EPCRClient from './components/EPCRClient';
 
 export default async function EPCRPage({ searchParams }: { searchParams: Promise<{ report?: string }> }) {
-  const access = await currentEpcrMembership();
+  const access = await currentEpcrMembership(true);
   if (!access) redirect('/epcr-account/login');
 
   const agency = Array.isArray(access.membership.apollo_agencies)

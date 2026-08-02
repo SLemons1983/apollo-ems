@@ -23,7 +23,14 @@ export default function EpcrLogin() {
       setWorking(false);
       return;
     }
-    window.location.href = '/epcr/dashboard';
+    const sessionResponse = await fetch('/api/epcr/session', { method: 'POST' });
+    if (!sessionResponse.ok) {
+      await supabase.auth.signOut({ scope: 'local' });
+      setMessage('This account does not have active ePCR access.');
+      setWorking(false);
+      return;
+    }
+    window.location.href = '/epcr-dashboard';
   }
 
   async function reset() {

@@ -3,7 +3,7 @@ import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 import { patientDisplay, safeReportNumber } from '@/lib/epcrReports';
 
 export async function POST(request: NextRequest) {
-  const access = await currentEpcrMembership();
+  const access = await currentEpcrMembership(true);
   if (!access || access.membership.status !== 'ACTIVE') return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
   const input = await request.json().catch(() => null) as { chart?: unknown; action?: string; report_id?: string } | null;
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const access = await currentEpcrMembership();
+  const access = await currentEpcrMembership(true);
   if (!access || !['PRIMARY_ADMIN', 'ADMIN', 'REVIEWER'].includes(access.membership.role)) {
     return NextResponse.json({ error: 'Reviewer access required.' }, { status: 403 });
   }

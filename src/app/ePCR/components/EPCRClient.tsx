@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import {
   ChangeEvent,
   useCallback,
@@ -14,6 +12,7 @@ import PCRProgress from "./PCRProgress";
 import PCRSection from "./PCRSection";
 import PatientHandoffRail from "./PatientHandoffRail";
 import QuickToolsPanel from "./QuickToolsPanel";
+import ReportReviewActions from "@/components/epcr/ReportReviewActions";
 import AciSuggestionFooter from "../clinical/components/intelligence/AciSuggestionFooter";
 import AssessmentSection from "../sections/AssessmentSection";
 import BillingSection from "../sections/BillingSection";
@@ -154,17 +153,20 @@ function mergeAssessmentWithDefaults(
 
 type EditableReport = {
   id: string;
-  status: 'DRAFT' | 'REJECTED';
+  status: string;
   chart: Record<string, unknown>;
 } | null;
 
-export default function EPCRClient({ initialReport = null }: { initialReport?: EditableReport }) {
+export default function EPCRClient({ initialReport = null, reviewMode = false, reviewStatus = '' }: { initialReport?: EditableReport; reviewMode?: boolean; reviewStatus?: string }) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedSection, setExpandedSection] = useState<string>("");
   const [fileStatus, setFileStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reportId, setReportId] = useState(initialReport?.id ?? '');
+  const reportIdRef = useRef(initialReport?.id ?? '');
+  const chartRef = useRef<Record<string, unknown>>({});
+  const lastSavedRef = useRef('');
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
@@ -739,8 +741,8 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
       : 0;
   const pcrReadyToSubmit = overallProgress === 100;
 
-  const currentChart = () => ({
-        call: callForm,
+  const chartSnapshot = useMemo(() => ({
+    call: callForm,
         patient: patientForm,
         complaint: complaintForm,
         assessment: assessmentForm,
@@ -748,13 +750,19 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
         treatments: treatmentsForm,
         billing: billingForm,
         narrative: narrativeForm,
-        signature: signatureForm,
-  });
+    signature: signatureForm,
+  }), [callForm, patientForm, complaintForm, assessmentForm, vitalsForm, treatmentsForm, billingForm, narrativeForm, signatureForm]);
+  const currentChart = () => chartSnapshot;
 
-  async function savePCR() {
+  useEffect(() => {
+    chartRef.current = chartSnapshot;
+    reportIdRef.current = reportId;
+  }, [chartSnapshot, reportId]);
+
+  async function savePCR(silent = false) {
     if (saving || submitting) return;
     if (!callForm.emsResponseNumber.trim()) {
-      setFileStatus('Enter the EMS response number before saving this PCR.');
+      if (!silent) setFileStatus('Enter the EMS response number before saving this PCR.');
       return;
     }
     setSaving(true);
@@ -767,11 +775,46 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? 'Unable to save draft.');
       setReportId(result.report.id);
-      setFileStatus('Draft saved. It is now available in My Reports.');
+      reportIdRef.current = result.report.id;
+      lastSavedRef.current = JSON.stringify(chartRef.current);
+      if (!silent) setFileStatus('Draft saved. It is now available in My Reports.');
     } catch (error) {
       setFileStatus(error instanceof Error ? error.message : 'Unable to save draft.');
     } finally { setSaving(false); }
   }
+
+  async function saveAndLeave(destination: string, endSession: boolean, fullSignOut = false) {
+    if (callForm.emsResponseNumber.trim()) await savePCR(true);
+    if (endSession) await fetch(`/api/epcr/session${fullSignOut ? '?full=1' : ''}`, { method: 'DELETE' }).catch(() => null);
+    window.location.assign(destination);
+  }
+
+  useEffect(() => {
+    if (reviewMode) return;
+    const persist = () => {
+      const chart = chartRef.current;
+      const call = chart.call as CallForm | undefined;
+      const serialized = JSON.stringify(chart);
+      if (!call?.emsResponseNumber?.trim() || serialized === lastSavedRef.current) return;
+      void fetch('/api/epcr/reports', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ action: 'SAVE_DRAFT', report_id: reportIdRef.current || undefined, chart }),
+      }).then(async (response) => {
+        if (!response.ok) return;
+        const result = await response.json();
+        reportIdRef.current = result.report.id;
+        setReportId(result.report.id);
+        lastSavedRef.current = serialized;
+      }).catch(() => null);
+    };
+    const timer = window.setInterval(persist, 30000);
+    const leave = () => {
+      persist();
+      void fetch('/api/epcr/session', { method: 'DELETE', keepalive: true }).catch(() => null);
+    };
+    window.addEventListener('pagehide', leave);
+    return () => { window.clearInterval(timer); window.removeEventListener('pagehide', leave); };
+  }, [reviewMode]);
 
   async function submitPCR() {
     if (!pcrReadyToSubmit || submitting) return;
@@ -921,20 +964,30 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
                 className="h-24 w-auto max-w-[15rem] shrink-0 object-contain sm:h-28 sm:max-w-[18rem]"
               />
               <h1 className="border-l border-blue-950/20 pl-5 text-3xl font-black tracking-tight text-blue-950 sm:text-4xl">
-                ePCR
+                {reviewMode ? 'ePCR Review' : 'ePCR'}
               </h1>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/epcr-dashboard"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 shadow transition hover:bg-blue-50"
-            >
-              Back to Dashboard
-            </Link>
             <button
               type="button"
-              onClick={savePCR}
+              onClick={() => void saveAndLeave(reviewMode ? '/epcr-dashboard/reports' : '/epcr-dashboard', !reviewMode)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 shadow transition hover:bg-blue-50"
+            >
+              {reviewMode ? 'Back to Submitted Reports' : 'Return to Dashboard'}
+            </button>
+            {!reviewMode && <button
+              type="button"
+              onClick={() => void saveAndLeave('/epcr-account/login', true, true)}
+              disabled={saving || submitting}
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-800 shadow transition hover:bg-red-100"
+            >
+              Sign Out
+            </button>}
+            {!reviewMode && <>
+            <button
+              type="button"
+              onClick={() => void savePCR()}
               disabled={saving || submitting}
               className="rounded-lg bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110"
             >
@@ -975,6 +1028,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
               onChange={uploadPCRFromFile}
               className="hidden"
             />
+            </>}
           </div>
           </div>
         </div>
@@ -1000,7 +1054,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
             onClick={() => setMobileDrawer("quick-tools")}
             className="rounded-lg border border-blue-950/30 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-200"
           >
-            Quick Tools ☰
+            {reviewMode ? 'Review Decision ☰' : 'Quick Tools ☰'}
           </button>
         </div>
 
@@ -1016,7 +1070,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
               gridTemplateColumns: `${
                 patientSummaryOpen ? "minmax(280px, 320px)" : "52px"
               } minmax(0, 1fr) ${
-                quickToolsOpen ? "minmax(280px, 320px)" : "52px"
+                reviewMode || quickToolsOpen ? "minmax(280px, 320px)" : "52px"
               }`,
             }}
           >
@@ -1069,7 +1123,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
               )}
             </aside>
 
-            <div className="min-w-0 space-y-4">
+            <div className={`min-w-0 space-y-4 ${reviewMode ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_canvas]:pointer-events-none' : ''}`}>
               {sections.map((section) => {
                 const sectionProgress = progressSections.find(
                   (progressSection) => progressSection.title === section,
@@ -1170,7 +1224,9 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
             </div>
 
             <aside className="sticky top-4 min-w-0">
-              {quickToolsOpen ? (
+              {reviewMode ? (
+                reviewStatus === 'SUBMITTED' ? <ReportReviewActions reportId={initialReport?.id ?? ''} /> : <div className="rounded-2xl border border-slate-200 bg-slate-100 p-5 shadow-lg"><h2 className="text-xl font-black text-slate-950">Review complete</h2><p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p></div>
+              ) : quickToolsOpen ? (
                 <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
                   <div className="flex items-center justify-between bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-3 text-white">
                     <button
@@ -1219,7 +1275,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
             </aside>
           </div>
 
-          <div className="min-w-0 space-y-4 xl:hidden">
+          <div className={`min-w-0 space-y-4 xl:hidden ${reviewMode ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_canvas]:pointer-events-none' : ''}`}>
             {sections.map((section) => {
               const sectionProgress = progressSections.find(
                 (progressSection) => progressSection.title === section,
@@ -1372,7 +1428,7 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
                   <h2 className="text-lg font-bold">
                     {mobileDrawer === "patient-summary"
                       ? "Patient Handoff"
-                      : "Quick Tools"}
+                      : reviewMode ? "Review Decision" : "Quick Tools"}
                   </h2>
                 </div>
                 <button
@@ -1392,6 +1448,8 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
                     complaintForm={complaintForm}
                     vitalsForm={vitalsForm}
                   />
+                ) : reviewMode ? (
+                  reviewStatus === 'SUBMITTED' ? <ReportReviewActions reportId={initialReport?.id ?? ''} /> : <div className="rounded-xl bg-white p-4"><h2 className="font-black">Review complete</h2><p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p></div>
                 ) : (
                   <QuickToolsPanel
                     assessmentForm={assessmentForm}
