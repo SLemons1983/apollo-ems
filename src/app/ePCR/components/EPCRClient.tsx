@@ -706,7 +706,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
       ],
     },
     { title: "Narrative", completedFields: narrativeForm.text.trim() ? 1 : 0, totalFields: 1 },
-    { title: "Signatures", completedFields: signatureForm.imageData && signatureForm.sourceFingerprint === signedSourceFingerprint ? 1 : 0, totalFields: 1 },
+    { title: "Signatures", completedFields: signatureForm.imageData && (reviewMode || signatureForm.sourceFingerprint === signedSourceFingerprint) ? 1 : 0, totalFields: 1 },
     ...sections
       .filter(
         (section) =>
@@ -1123,7 +1123,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
               )}
             </aside>
 
-            <div className={`min-w-0 space-y-4 ${reviewMode ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_canvas]:pointer-events-none' : ''}`}>
+            <fieldset disabled={reviewMode} className="min-w-0 space-y-4 disabled:opacity-100">
               {sections.map((section) => {
                 const sectionProgress = progressSections.find(
                   (progressSection) => progressSection.title === section,
@@ -1221,7 +1221,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                   </PCRSection>
                 );
               })}
-            </div>
+            </fieldset>
 
             <aside className="sticky top-4 min-w-0">
               {reviewMode ? (
@@ -1275,7 +1275,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
             </aside>
           </div>
 
-          <div className={`min-w-0 space-y-4 xl:hidden ${reviewMode ? '[&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none [&_canvas]:pointer-events-none' : ''}`}>
+          <fieldset disabled={reviewMode} className="min-w-0 space-y-4 disabled:opacity-100 xl:hidden">
             {sections.map((section) => {
               const sectionProgress = progressSections.find(
                 (progressSection) => progressSection.title === section,
@@ -1373,7 +1373,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                 </PCRSection>
               );
             })}
-          </div>
+          </fieldset>
         </div>
 
         <AciSuggestionFooter

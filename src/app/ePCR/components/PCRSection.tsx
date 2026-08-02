@@ -52,7 +52,9 @@ export default function PCRSection({
         <span className="text-2xl text-slate-700">{expanded ? '−' : '+'}</span>
       </button>
 
-      {expanded && <div className="border-t bg-slate-100 p-6">{children}</div>}
+      <div className={`${expanded ? '' : 'hidden'} border-t bg-slate-100 p-6`} aria-hidden={!expanded}>
+        {children}
+      </div>
     </section>
   );
 }

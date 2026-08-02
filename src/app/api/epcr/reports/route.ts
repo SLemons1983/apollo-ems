@@ -124,3 +124,29 @@ export async function PATCH(request: NextRequest) {
   });
   return NextResponse.json({ report });
 }
+
+export async function DELETE(request: NextRequest) {
+  const access = await currentEpcrMembership(true);
+  if (!access || access.membership.status !== 'ACTIVE') {
+    return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+  const reportId = new URL(request.url).searchParams.get('id');
+  if (!reportId) return NextResponse.json({ error: 'A report is required.' }, { status: 400 });
+
+  const db = epcrAdminClient();
+  const { data: report, error: lookupError } = await db.from('epcr_reports')
+    .select('id,status')
+    .eq('id', reportId)
+    .eq('agency_id', access.membership.agency_id)
+    .eq('submitted_by_membership_id', access.membership.id)
+    .maybeSingle();
+  if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 });
+  if (!report) return NextResponse.json({ error: 'Report not found.' }, { status: 404 });
+
+  const { error } = await db.from('epcr_reports').delete()
+    .eq('id', report.id)
+    .eq('agency_id', access.membership.agency_id)
+    .eq('submitted_by_membership_id', access.membership.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ deleted: true });
+}
