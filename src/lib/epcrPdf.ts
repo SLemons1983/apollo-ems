@@ -84,7 +84,9 @@ const ink = rgb(0.12, 0.16, 0.2);
 const muted = rgb(0.38, 0.43, 0.48);
 const alert = rgb(0.85, 0.18, 0.18);
 
-function safe(value: string) { return value.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function safe(value: unknown) {
+  return text(value).replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim();
+}
 function wrapText(value: string, font: PDFFont, size: number, width: number) {
   const words = safe(value).split(' ').filter(Boolean); const result: string[] = []; let current = '';
   for (const word of words) { const next = current ? `${current} ${word}` : word; if (font.widthOfTextAtSize(next, size) <= width || !current) current = next; else { result.push(current); current = word; } }
