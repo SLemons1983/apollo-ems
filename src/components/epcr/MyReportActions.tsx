@@ -6,7 +6,41 @@ import { useState } from 'react';
 export default function MyReportActions({ reportId, reportNumber, status }: { reportId: string; reportNumber: string; status: string }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
+
+  async function downloadReport() {
+    setDownloading(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/epcr/reports/${encodeURIComponent(reportId)}/pdf`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!response.ok || !contentType.toLowerCase().includes('application/pdf')) {
+        const result = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(result.error ?? 'Unable to download the completed report PDF.');
+      }
+      const blob = await response.blob();
+      const signature = await blob.slice(0, 5).text();
+      if (signature !== '%PDF-') throw new Error('The server did not return a valid PDF file.');
+      const disposition = response.headers.get('content-disposition') ?? '';
+      const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1] ?? `ApolloEMS-PCR-${reportNumber}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to download the completed report PDF.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function deleteReport() {
     const completedWarning = status === 'COMPLETED'
@@ -28,7 +62,7 @@ export default function MyReportActions({ reportId, reportNumber, status }: { re
 
   return <div className="mt-5 flex flex-wrap items-center gap-3">
     {['DRAFT', 'REJECTED'].includes(status) && <a href={`/ePCR?report=${reportId}`} className={`inline-flex rounded-xl px-4 py-2 text-sm font-black text-white ${status === 'REJECTED' ? 'bg-red-700 hover:bg-red-800' : 'bg-blue-700 hover:bg-blue-800'}`}>{status === 'REJECTED' ? 'Open & Correct' : 'Continue Draft'}</a>}
-    {status === 'COMPLETED' && <a href={`/api/epcr/reports/${reportId}/pdf`} download className="inline-flex rounded-xl bg-emerald-700 px-4 py-2 text-sm font-black text-white hover:bg-emerald-800">Download Report</a>}
+    {status === 'COMPLETED' && <button type="button" disabled={downloading} onClick={() => void downloadReport()} className="inline-flex rounded-xl bg-emerald-700 px-4 py-2 text-sm font-black text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">{downloading ? 'Preparing PDF…' : 'Download Report'}</button>}
     <button type="button" disabled={deleting} onClick={() => void deleteReport()} className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-black text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">{deleting ? 'Deleting…' : 'Delete Report'}</button>
     {error && <p className="w-full text-sm font-semibold text-red-700">{error}</p>}
   </div>;

@@ -33,6 +33,7 @@ const fourLeadRhythms = [
   'Third-Degree AV Block',
   'Paced Rhythm',
   'Pulseless Electrical Activity',
+  'ST Elevation',
   'Other',
 ];
 
