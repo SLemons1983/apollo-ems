@@ -18,8 +18,8 @@ export default function AgencyUserManager() {
     else setMessage(result.error);
   }, []);
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => { void load(); }, 0);
-    return () => window.clearTimeout(timeoutId);
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function invite(event: FormEvent) {
@@ -51,27 +51,30 @@ export default function AgencyUserManager() {
     { value: 'ADMIN', label: 'Admin / Instructor' }, { value: 'REVIEWER', label: 'Reviewer' }, { value: 'CLINICIAN', label: 'Clinician / Student' },
   ];
 
-  return <main className="min-h-screen bg-slate-100 p-6"><div className="mx-auto max-w-6xl">
-    <a href="/epcr-dashboard" className="font-bold text-blue-700">&larr; Agency Admin</a>
-    <h1 className="mt-4 text-4xl font-black">Manage users</h1>
-    <p className="mt-2 text-slate-600">Invite administrators and users for your agency. Access to other agencies is never shown here.</p>
-    <section className="mt-8 rounded-3xl bg-white p-6 shadow">
-      <h2 className="text-xl font-black">Add a user</h2>
+  return <main className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-8 text-slate-900 sm:px-6"><div className="mx-auto max-w-6xl">
+    <header className="rounded-3xl border border-white/50 bg-white p-6 shadow-2xl sm:p-8">
+      <a href="/epcr-dashboard" className="font-black text-blue-700 transition hover:text-blue-900">&larr; Agency Admin</a>
+      <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-blue-700">Agency administration</p>
+      <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Manage users</h1>
+      <p className="mt-2 text-slate-600">Invite administrators and users for your agency. Access to other agencies is never shown here.</p>
+    </header>
+    <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
+      <h2 className="text-xl font-black text-slate-950">Add a user</h2>
       <form onSubmit={invite} className="mt-5 grid gap-3 md:grid-cols-4">
-        <input required placeholder="First name" className="rounded-xl border p-3" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })}/>
-        <input required placeholder="Last name" className="rounded-xl border p-3" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })}/>
-        <input required type="email" placeholder="Email" className="rounded-xl border p-3" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}/>
-        <select className="rounded-xl border p-3" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as EpcrRole })}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select>
-        <button className="rounded-xl bg-blue-700 px-5 py-3 font-black text-white md:col-span-4 md:justify-self-start">Send secure invitation</button>
+        <input required placeholder="First name" className="rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })}/>
+        <input required placeholder="Last name" className="rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })}/>
+        <input required type="email" placeholder="Email" className="rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}/>
+        <select className="rounded-xl border border-slate-300 bg-white p-3 text-slate-900 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as EpcrRole })}>{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select>
+        <button className="rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] px-5 py-3 font-black text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 md:col-span-4 md:justify-self-start">Send secure invitation</button>
       </form>
-      {message && <p className="mt-4 rounded-xl bg-slate-100 p-4 font-bold">{message}</p>}
+      {message && <p role="status" className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4 font-bold text-blue-950">{message}</p>}
     </section>
-    <section className="mt-6 rounded-3xl bg-white p-6 shadow">
-      <h2 className="text-xl font-black">Agency users</h2>
-      <div className="mt-5 space-y-3">{members.map((member) => <div key={member.id} className="rounded-2xl border p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3"><span><b>{member.first_name} {member.last_name}</b><br/><span className="text-sm text-slate-600">{member.email} &middot; @{member.username}</span>{member.status === 'REVOKED' && member.revoked_at && <><br/><span className="text-xs text-slate-500">Revoked {new Date(member.revoked_at).toLocaleString()}{member.revoked_by ? ` by ${member.revoked_by}` : ''}</span></>}</span><b className="text-sm">{member.status}</b></div>
+    <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
+      <h2 className="text-xl font-black text-slate-950">Agency users</h2>
+      <div className="mt-5 space-y-3">{members.map((member) => <div key={member.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3"><span><b className="text-slate-950">{member.first_name} {member.last_name}</b><br/><span className="text-sm text-slate-600">{member.email} &middot; @{member.username}</span>{member.status === 'REVOKED' && member.revoked_at && <><br/><span className="text-xs text-slate-500">Revoked {new Date(member.revoked_at).toLocaleString()}{member.revoked_by ? ` by ${member.revoked_by}` : ''}</span></>}</span><b className="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-900">{member.status}</b></div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select aria-label={`Role for ${member.first_name} ${member.last_name}`} disabled={!canManage(member) || workingId === member.id || member.id === actor?.id} className="rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50" value={member.role} onChange={(e) => void update(member, 'SET_ROLE', e.target.value as EpcrRole)}>
+          <select aria-label={`Role for ${member.first_name} ${member.last_name}`} disabled={!canManage(member) || workingId === member.id || member.id === actor?.id} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900 disabled:opacity-50" value={member.role} onChange={(e) => void update(member, 'SET_ROLE', e.target.value as EpcrRole)}>
             {!roles.some((role) => role.value === member.role) && <option value={member.role}>{member.role.replaceAll('_', ' ')}</option>}{roles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
           </select>
           {member.status === 'INVITED' && canManage(member) && <><button disabled={workingId === member.id} onClick={() => void update(member, 'REINVITE')} className="rounded-lg border border-blue-700 px-3 py-2 text-sm font-black text-blue-700 disabled:opacity-40">Replace invitation</button><button disabled={workingId === member.id || member.id === actor?.id} onClick={() => void update(member, 'REVOKE')} className="rounded-lg border border-red-700 px-3 py-2 text-sm font-black text-red-700 disabled:opacity-40">Cancel invitation</button></>}

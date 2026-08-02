@@ -10,5 +10,5 @@ export default function EpcrSignOutButton() {
     await supabase.auth.signOut({ scope: 'local' });
     window.location.replace('/epcr/login');
   }
-  return <button type="button" disabled={working} onClick={() => void signOut()} className="rounded-xl border border-slate-300 bg-white px-4 py-2 font-black text-slate-700 shadow-sm disabled:opacity-50">{working ? 'Signing out…' : 'Sign out'}</button>;
+  return <button type="button" disabled={working} onClick={() => void signOut()} className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 font-black text-blue-800 shadow-sm transition hover:bg-blue-100 disabled:opacity-50">{working ? 'Signing out...' : 'Sign out'}</button>;
 }

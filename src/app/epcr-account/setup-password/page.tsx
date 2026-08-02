@@ -1,13 +1,20 @@
 'use client';
 
+import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 type SessionState = 'checking' | 'ready' | 'invalid';
 
+const inputClasses =
+  'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100';
+
 export default function SetupPassword() {
-  const [password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[message,setMessage]=useState('');
-  const [sessionState,setSessionState]=useState<SessionState>('checking');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [message, setMessage] = useState('');
+  const [working, setWorking] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>('checking');
 
   useEffect(() => {
     let active = true;
@@ -24,7 +31,11 @@ export default function SetupPassword() {
         error = result.error ?? (result.data.session ? null : new Error('This password link is invalid or has expired.'));
       }
       if (!active) return;
-      if (error) { setMessage(error.message); setSessionState('invalid'); return; }
+      if (error) {
+        setMessage(error.message);
+        setSessionState('invalid');
+        return;
+      }
       window.history.replaceState({}, document.title, '/epcr/setup-password');
       setSessionState('ready');
     }
@@ -32,6 +43,53 @@ export default function SetupPassword() {
     return () => { active = false; };
   }, []);
 
-  async function save(e:FormEvent){e.preventDefault();if(sessionState!=='ready')return;if(password.length<12){setMessage('Use at least 12 characters.');return;}if(password!==confirm){setMessage('Passwords do not match.');return;}setMessage('Saving password…');const {error}=await supabase.auth.updateUser({password});if(error){setMessage(error.message);return;}window.location.href='/epcr/dashboard';}
-  return <main className="min-h-screen bg-slate-950 p-6"><form onSubmit={save} className="mx-auto mt-20 max-w-md rounded-3xl bg-white p-8"><h1 className="text-3xl font-black">Create your password</h1><p className="mt-2 text-slate-600">Choose a private password for your ePCR account. Apollo administrators cannot view it.</p>{sessionState==='checking'&&<p className="mt-6 rounded-xl bg-slate-100 p-4 font-bold">Verifying your secure link…</p>}{sessionState==='ready'&&<><input required type="password" placeholder="New password" className="mt-6 w-full rounded-xl border p-3" value={password} onChange={(e)=>setPassword(e.target.value)}/><input required type="password" placeholder="Confirm password" className="mt-3 w-full rounded-xl border p-3" value={confirm} onChange={(e)=>setConfirm(e.target.value)}/><button className="mt-5 w-full rounded-xl bg-blue-700 p-3 font-black text-white">Save password</button></>}{sessionState==='invalid'&&<a href="/epcr/login" className="mt-6 block rounded-xl bg-blue-700 p-3 text-center font-black text-white">Return to ePCR sign in</a>}{message&&<p className="mt-4 text-sm font-bold text-red-700">{message}</p>}</form></main>;
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (sessionState !== 'ready') return;
+    if (password.length < 12) {
+      setMessage('Use at least 12 characters.');
+      return;
+    }
+    if (password !== confirm) {
+      setMessage('Passwords do not match.');
+      return;
+    }
+    setWorking(true);
+    setMessage('Saving password...');
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) {
+      setMessage(error.message);
+      setWorking(false);
+      return;
+    }
+    window.location.href = '/epcr/dashboard';
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-10 text-slate-900">
+      <form onSubmit={save} className="w-full max-w-md rounded-3xl border border-white/60 bg-white p-8 shadow-2xl sm:p-10">
+        <Image src="/apollo-logo.png" alt="Apollo EMS Management" width={190} height={190} priority className="mx-auto h-auto w-full max-w-[165px]" />
+        <p className="mt-5 text-center text-xs font-black uppercase tracking-[0.22em] text-blue-700">Secure account setup</p>
+        <h1 className="mt-2 text-center text-3xl font-black tracking-tight text-slate-950">Create your password</h1>
+        <p className="mt-3 text-center text-sm leading-6 text-slate-600">Choose a private password for your ePCR account. Apollo administrators cannot view it.</p>
+
+        {sessionState === 'checking' && <p className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-4 text-center font-bold text-blue-950">Verifying your secure link...</p>}
+        {sessionState === 'ready' && <>
+          <label className="mt-7 block text-sm font-bold text-slate-800">
+            New password
+            <input required autoComplete="new-password" type="password" placeholder="At least 12 characters" className={inputClasses} value={password} onChange={(event) => setPassword(event.target.value)} />
+          </label>
+          <label className="mt-4 block text-sm font-bold text-slate-800">
+            Confirm password
+            <input required autoComplete="new-password" type="password" placeholder="Re-enter your password" className={inputClasses} value={confirm} onChange={(event) => setConfirm(event.target.value)} />
+          </label>
+          <button disabled={working} className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] px-4 py-3.5 font-black text-white shadow-lg shadow-blue-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+            {working ? 'Saving...' : 'Save password'}
+          </button>
+        </>}
+        {sessionState === 'invalid' && <a href="/epcr/login" className="mt-6 block rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] p-3.5 text-center font-black text-white">Return to ePCR sign in</a>}
+        {message && <p role="status" className={`mt-4 rounded-xl border p-3 text-sm font-bold ${sessionState === 'invalid' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-blue-50 text-blue-950'}`}>{message}</p>}
+      </form>
+    </main>
+  );
 }
