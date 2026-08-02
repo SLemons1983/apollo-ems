@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   ChangeEvent,
   useCallback,
@@ -924,6 +926,12 @@ export default function EPCRClient({ initialReport = null }: { initialReport?: E
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/epcr-dashboard"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 shadow transition hover:bg-blue-50"
+            >
+              Back to Dashboard
+            </Link>
             <button
               type="button"
               onClick={savePCR}

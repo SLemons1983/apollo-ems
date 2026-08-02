@@ -895,6 +895,15 @@ export default function AssessmentSection({
       >,
     );
 
+  const physicalAssessmentComplete = (
+    Object.keys(apolloBodyRegionDetails) as ApolloBodyRegionKey[]
+  ).every((region) => {
+    const status = getBodyRegionAssessmentStatusFromSubregions(
+      assessmentForm.bodyMap.subregionFindings[region],
+    );
+    return status === 'unremarkable' || status === 'abnormal' || status === 'complete';
+  });
+
   const normalizedComplaintSummary = complaintSummary.toLowerCase();
   const chestPainDocumented =
     painAssessment.painPresent === 'Yes' &&
@@ -1313,6 +1322,12 @@ export default function AssessmentSection({
       });
     }
 
+    taskProgress.push({
+      title: 'Physical Assessment',
+      completedFields: physicalAssessmentComplete ? 1 : 0,
+      totalFields: 1,
+    });
+
     onProgressChange({
       completedFields: taskProgress.reduce(
         (total, task) => total + task.completedFields,
@@ -1338,6 +1353,7 @@ export default function AssessmentSection({
     revisedTraumaScore,
     ecgAssessment,
     poisoningAssessment, seizureAssessment, apgarAssessment,
+    physicalAssessmentComplete,
     providerScope,
     onProgressChange,
   ]);
@@ -1603,7 +1619,7 @@ export default function AssessmentSection({
 
       <PCRCard
         title="Physical Assessment"
-        completedFields={0}
+        completedFields={physicalAssessmentComplete ? 1 : 0}
         totalFields={1}
         expanded={physicalAssessmentExpanded}
         onToggle={() =>
