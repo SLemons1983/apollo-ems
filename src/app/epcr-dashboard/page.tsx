@@ -1,13 +1,19 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import EpcrSignOutButton from '@/components/epcr/EpcrSignOutButton';
-import { currentEpcrMembership } from '@/lib/epcrServer';
+import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 
 export default async function EpcrDashboard() {
   const access = await currentEpcrMembership();
   if (!access) redirect('/epcr/login');
   const membership = access.membership;
   const agency = Array.isArray(membership.apollo_agencies) ? membership.apollo_agencies[0] : membership.apollo_agencies;
+  const db = epcrAdminClient();
+  const [{ count: myReportCount }, { count: submittedCount }] = await Promise.all([
+    db.from('epcr_reports').select('id', { count: 'exact', head: true }).eq('agency_id', membership.agency_id).eq('submitted_by_membership_id', membership.id),
+    db.from('epcr_reports').select('id', { count: 'exact', head: true }).eq('agency_id', membership.agency_id).eq('status', 'SUBMITTED'),
+  ]);
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-8 text-slate-900 sm:px-6">
@@ -32,16 +38,16 @@ export default async function EpcrDashboard() {
             <h2 className="mt-3 text-xl font-black text-white">Start new ePCR</h2>
             <p className="mt-2 leading-6 text-blue-100">Open the current Apollo report editor.</p>
           </a>
-          <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Coming next</p>
+          <Link href="/epcr-dashboard/my-reports" className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">{myReportCount ?? 0} total</p>
             <h2 className="mt-3 text-xl font-black text-slate-950">My reports</h2>
-            <p className="mt-2 leading-6 text-slate-600">Report saving and submission arrive in the next controlled release.</p>
-          </div>
-          {membership.role !== 'CLINICIAN' && <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Clinical oversight</p>
-            <h2 className="mt-3 text-xl font-black text-slate-950">Review queue</h2>
-            <p className="mt-2 leading-6 text-slate-600">Correction, completion, and feedback workflow arrives after secure report storage.</p>
-          </div>}
+            <p className="mt-2 leading-6 text-slate-600">Track report status and reviewer messages.</p>
+          </Link>
+          {membership.role !== 'CLINICIAN' && <Link href="/epcr-dashboard/reports" className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">{submittedCount ?? 0} awaiting review</p>
+            <h2 className="mt-3 text-xl font-black text-slate-950">Submitted Reports</h2>
+            <p className="mt-2 leading-6 text-slate-600">Open reports, mark them completed, or return them for corrections.</p>
+          </Link>}
           {['PRIMARY_ADMIN', 'ADMIN'].includes(membership.role) && <a href="/epcr-dashboard/users" className="rounded-3xl border border-slate-200 bg-white p-7 shadow-xl transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-2xl">
             <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Agency administration</p>
             <h2 className="mt-3 text-xl font-black text-slate-950">Manage users</h2>

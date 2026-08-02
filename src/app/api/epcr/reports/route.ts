@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
+import { patientDisplay, safeReportNumber } from '@/lib/epcrReports';
+
+export async function POST(request: NextRequest) {
+  const access = await currentEpcrMembership();
+  if (!access || access.membership.status !== 'ACTIVE') return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+
+  const input = await request.json().catch(() => null) as { chart?: unknown } | null;
+  if (!input?.chart || typeof input.chart !== 'object' || Array.isArray(input.chart)) {
+    return NextResponse.json({ error: 'A valid ePCR chart is required.' }, { status: 400 });
+  }
+  const chart = input.chart as Record<string, unknown>;
+  const call = chart.call && typeof chart.call === 'object' ? chart.call as Record<string, unknown> : {};
+  const reportNumber = safeReportNumber(call.emsResponseNumber);
+  if (!reportNumber) return NextResponse.json({ error: 'EMS response number is required.' }, { status: 400 });
+
+  const db = epcrAdminClient();
+  const { data: prior } = await db.from('epcr_reports')
+    .select('id,status,revision')
+    .eq('agency_id', access.membership.agency_id)
+    .eq('report_number', reportNumber)
+    .eq('submitted_by_membership_id', access.membership.id)
+    .order('revision', { ascending: false }).limit(1).maybeSingle();
+
+  if (prior && prior.status !== 'REJECTED') {
+    return NextResponse.json({ error: 'This report number has already been submitted.' }, { status: 409 });
+  }
+
+  const revision = prior ? prior.revision + 1 : 1;
+  const { data: report, error } = await db.from('epcr_reports').insert({
+    agency_id: access.membership.agency_id,
+    submitted_by_membership_id: access.membership.id,
+    submitted_by_auth_user_id: access.user.id,
+    report_number: reportNumber,
+    incident_number: safeReportNumber(call.emsIncidentNumber) || null,
+    patient_display: patientDisplay(chart),
+    chart,
+    revision,
+  }).select('id,report_number,status,revision').single();
+  if (error || !report) return NextResponse.json({ error: error?.message ?? 'Unable to submit report.' }, { status: 500 });
+
+  await db.from('epcr_report_review_events').insert({
+    report_id: report.id,
+    agency_id: access.membership.agency_id,
+    actor_membership_id: access.membership.id,
+    event_type: prior ? 'RESUBMITTED' : 'SUBMITTED',
+    report_revision: revision,
+  });
+
+  return NextResponse.json({ report });
+}
+
+export async function PATCH(request: NextRequest) {
+  const access = await currentEpcrMembership();
+  if (!access || !['PRIMARY_ADMIN', 'ADMIN', 'REVIEWER'].includes(access.membership.role)) {
+    return NextResponse.json({ error: 'Reviewer access required.' }, { status: 403 });
+  }
+  const input = await request.json().catch(() => null) as { report_id?: string; action?: string; message?: string } | null;
+  const action = input?.action === 'COMPLETE' ? 'COMPLETED' : input?.action === 'REJECT' ? 'REJECTED' : null;
+  const message = String(input?.message ?? '').trim().slice(0, 2000);
+  if (!input?.report_id || !action) return NextResponse.json({ error: 'A report and review action are required.' }, { status: 400 });
+  if (action === 'REJECTED' && !message) return NextResponse.json({ error: 'A correction message is required when rejecting a report.' }, { status: 400 });
+
+  const db = epcrAdminClient();
+  const reviewedAt = new Date().toISOString();
+  const { data: report, error } = await db.from('epcr_reports').update({
+    status: action,
+    reviewed_at: reviewedAt,
+    reviewed_by_membership_id: access.membership.id,
+    reviewer_message: message || null,
+  }).eq('id', input.report_id).eq('agency_id', access.membership.agency_id).eq('status', 'SUBMITTED')
+    .select('id,revision,status').maybeSingle();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!report) return NextResponse.json({ error: 'Report is no longer awaiting review.' }, { status: 409 });
+
+  await db.from('epcr_report_review_events').insert({
+    report_id: report.id,
+    agency_id: access.membership.agency_id,
+    actor_membership_id: access.membership.id,
+    event_type: action,
+    message: message || null,
+    report_revision: report.revision,
+  });
+  return NextResponse.json({ report });
+}

@@ -157,6 +157,7 @@ export default function EPCRClient() {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedSection, setExpandedSection] = useState<string>("");
   const [fileStatus, setFileStatus] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
@@ -172,14 +173,15 @@ export default function EPCRClient() {
     const savedQuickTools = window.localStorage.getItem(
       "apollo-epcr-quick-tools-open",
     );
-    if (savedPatientSummary !== null) {
-      setPatientSummaryOpen(savedPatientSummary === "true");
-    }
-
-    if (savedQuickTools !== null) {
-      setQuickToolsOpen(savedQuickTools === "true");
-    }
-
+    const restorePreferences = window.setTimeout(() => {
+      if (savedPatientSummary !== null) {
+        setPatientSummaryOpen(savedPatientSummary === "true");
+      }
+      if (savedQuickTools !== null) {
+        setQuickToolsOpen(savedQuickTools === "true");
+      }
+    }, 0);
+    return () => window.clearTimeout(restorePreferences);
   }, []);
 
   useEffect(() => {
@@ -764,6 +766,31 @@ export default function EPCRClient() {
     setFileStatus("PCR saved to local file.");
   }
 
+  async function submitPCR() {
+    if (!pcrReadyToSubmit || submitting) return;
+    const confirmed = window.confirm(`Submit report ${callForm.emsResponseNumber} for agency review? Once submitted, this copy cannot be edited unless a reviewer rejects it.`);
+    if (!confirmed) return;
+    setSubmitting(true);
+    setFileStatus('Submitting report securely...');
+    try {
+      const response = await fetch('/api/epcr/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chart: {
+          call: callForm, patient: patientForm, complaint: complaintForm,
+          assessment: assessmentForm, vitals: vitalsForm, treatments: treatmentsForm,
+          billing: billingForm, narrative: narrativeForm, signature: signatureForm,
+        } }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? 'Unable to submit report.');
+      window.location.assign('/epcr-dashboard/my-reports');
+    } catch (error) {
+      setFileStatus(error instanceof Error ? error.message : 'Unable to submit report.');
+      setSubmitting(false);
+    }
+  }
+
   async function uploadPCRFromFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -914,11 +941,12 @@ export default function EPCRClient() {
 
             <button
               type="button"
-              disabled={!pcrReadyToSubmit}
-              aria-disabled={!pcrReadyToSubmit}
+              onClick={submitPCR}
+              disabled={!pcrReadyToSubmit || submitting}
+              aria-disabled={!pcrReadyToSubmit || submitting}
               title={
                 pcrReadyToSubmit
-                  ? "PCR complete — submission workflow coming next build"
+                  ? "Submit this completed PCR for agency review"
                   : `Complete all required fields before submission (${overallProgress}%)`
               }
               className={`rounded-lg px-4 py-2 text-sm font-bold shadow transition ${
@@ -927,7 +955,7 @@ export default function EPCRClient() {
                   : "cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500 shadow-none"
               }`}
             >
-              Submit PCR
+              {submitting ? 'Submitting...' : 'Submit PCR'}
             </button>
 
             <input
