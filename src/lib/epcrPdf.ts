@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 type Row = { label: string; value: string };
 type Block = { title: string; rows?: Row[]; columns?: string[][]; narrative?: string };
@@ -97,14 +99,25 @@ export async function reportPdf(chart: Record<string, unknown>, reportNumber: st
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const patient = asObject(chart.patient);
+  const gender = text(patient.gender).toLowerCase();
+  const bodyMapFile = gender.includes('female')
+    ? 'apollo-body-female.png'
+    : 'apollo-body-male.png';
+  const [logoBytes, bodyMapBytes] = await Promise.all([
+    readFile(path.join(process.cwd(), 'public', 'apollo-logo.png')),
+    readFile(path.join(process.cwd(), 'public', 'epcr', 'body-map', bodyMapFile)),
+  ]);
+  const logoImage = await pdf.embedPng(logoBytes);
+  const bodyMapImage = await pdf.embedPng(bodyMapBytes);
   const margin = 38, contentWidth = 536; let page!: PDFPage; let y = 0;
   const newPage = () => { page = pdf.addPage([612, 792]); y = 730; return page; };
   const ensure = (height: number) => { if (y - height < 48) newPage(); };
   const drawHeader = (target: PDFPage) => {
-    target.drawRectangle({ x: 0, y: 748, width: 612, height: 44, color: navy });
-    target.drawText('APOLLO', { x: margin, y: 765, size: 17, font: bold, color: rgb(1,1,1) });
-    target.drawText('EMS', { x: margin + 69, y: 765, size: 17, font: bold, color: rgb(0.36,0.72,0.94) });
-    target.drawText('PATIENT CARE REPORT', { x: 333, y: 766, size: 11, font: bold, color: rgb(1,1,1) });
+    target.drawRectangle({ x: 0, y: 748, width: 612, height: 44, color: rgb(1,1,1) });
+    target.drawImage(logoImage, { x: margin, y: 752, width: 54, height: 36 });
+    target.drawText('PATIENT CARE REPORT', { x: 414, y: 767, size: 10.5, font: bold, color: navy });
+    target.drawRectangle({ x: 0, y: 748, width: 612, height: 3, color: blue });
   };
   const section = (title: string) => { ensure(28); page.drawRectangle({ x: margin, y: y - 19, width: contentWidth, height: 20, color: navy }); page.drawText(title.toUpperCase(), { x: margin + 8, y: y - 14, size: 9.5, font: bold, color: rgb(1,1,1) }); y -= 26; };
   const paragraph = (value: string, size = 8.5, indent = 0) => { const lines = wrapText(value, regular, size, contentWidth - indent - 12); ensure(lines.length * 11 + 7); lines.forEach((entry) => { page.drawText(entry, { x: margin + 6 + indent, y, size, font: regular, color: ink }); y -= 11; }); y -= 3; };
@@ -121,19 +134,19 @@ export async function reportPdf(chart: Record<string, unknown>, reportNumber: st
     data.forEach((sourceRow, rowIndex) => { const wrapped = Array.from({length:columns}, (_, column) => wrapText(sourceRow[column] ?? '', rowIndex === 0 ? bold : regular, rowIndex === 0 ? 7.1 : 7.5, cellWidth - 10)); const height = Math.max(...wrapped.map((entry) => entry.length)) * 9 + 9; ensure(height); page.drawRectangle({ x:margin, y:y-height+3, width:contentWidth, height, color:rowIndex === 0 ? paleBlue : rowIndex % 2 ? rgb(1,1,1) : rgb(0.97,0.98,0.99), borderColor:line, borderWidth:0.5 }); wrapped.forEach((cell,column) => { if(column) page.drawLine({start:{x:margin+column*cellWidth,y:y+3},end:{x:margin+column*cellWidth,y:y-height+3},color:line,thickness:0.4}); cell.forEach((entry,lineIndex) => page.drawText(entry,{x:margin+column*cellWidth+5,y:y-7-lineIndex*9,size:rowIndex===0?7.1:7.5,font:rowIndex===0?bold:regular,color:rowIndex===0?navy:ink})); }); y -= height; }); y -= 6;
   };
   const bodyMap = (findings: string[][]) => {
-    ensure(205); const affected = new Set(findings.map((entry) => entry[0])); const ox = margin + 15, oy = y - 178;
-    const figure = (x:number, back:boolean) => {
-      const fill = (label:string) => affected.has(label) ? alert : rgb(0.9,0.92,0.94); const border = rgb(0.45,0.5,0.55);
-      page.drawCircle({x:x+40,y:oy+151,size:12,color:fill('Head'),borderColor:border,borderWidth:0.8});
-      page.drawRectangle({x:x+32,y:oy+132,width:16,height:8,color:fill('Neck'),borderColor:border,borderWidth:0.6});
-      page.drawRectangle({x:x+22,y:oy+83,width:36,height:49,color:fill(back?'Back':'Chest'),borderColor:border,borderWidth:0.8});
-      if(!back) page.drawRectangle({x:x+22,y:oy+65,width:36,height:18,color:fill('Abdomen'),borderColor:border,borderWidth:0.6});
-      page.drawRectangle({x:x+20,y:oy+52,width:40,height:14,color:fill('Pelvis'),borderColor:border,borderWidth:0.6});
-      page.drawRectangle({x:x+7,y:oy+73,width:13,height:55,color:fill('Right Arm'),borderColor:border,borderWidth:0.6}); page.drawRectangle({x:x+60,y:oy+73,width:13,height:55,color:fill('Left Arm'),borderColor:border,borderWidth:0.6});
-      page.drawRectangle({x:x+22,y:oy,width:16,height:52,color:fill('Right Leg'),borderColor:border,borderWidth:0.6}); page.drawRectangle({x:x+42,y:oy,width:16,height:52,color:fill('Left Leg'),borderColor:border,borderWidth:0.6});
-      page.drawText(back?'BACK':'FRONT',{x:x+25,y:oy-12,size:7,font:bold,color:muted});
+    ensure(205); const affected = new Set(findings.map((entry) => entry[0])); const ox = margin + 4, oy = y - 174;
+    const imageWidth = 194, imageHeight = 134;
+    page.drawImage(bodyMapImage, { x: ox, y: oy + 20, width: imageWidth, height: imageHeight });
+    const marker = (label:string, x:number, markerY:number, width:number, height:number) => {
+      if (!affected.has(label)) return;
+      page.drawRectangle({ x: ox + x, y: oy + markerY, width, height, color: alert, opacity: 0.28, borderColor: alert, borderWidth: 0.8, borderOpacity: 0.8 });
     };
-    figure(ox,false); figure(ox+92,true); page.drawRectangle({x:ox,y:oy+172,width:10,height:10,color:alert}); page.drawText('Documented finding',{x:ox+15,y:oy+173,size:7.5,font:regular,color:ink});
+    marker('Head', 45, 132, 18, 18); marker('Face', 48, 125, 13, 10); marker('Neck', 48, 116, 13, 8);
+    marker('Chest', 38, 91, 31, 25); marker('Abdomen', 40, 76, 27, 15); marker('Pelvis', 40, 65, 28, 12);
+    marker('Right Arm', 25, 73, 14, 43); marker('Left Arm', 68, 73, 14, 43);
+    marker('Right Leg', 42, 23, 13, 43); marker('Left Leg', 57, 23, 13, 43);
+    marker('Back', 131, 77, 31, 39);
+    page.drawRectangle({x:ox,y:oy+5,width:10,height:10,color:alert,opacity:0.35,borderColor:alert,borderWidth:0.8}); page.drawText('Documented finding',{x:ox+15,y:oy+7,size:7.5,font:regular,color:ink});
     const findingsX = margin + 220; page.drawText('DOCUMENTED REGIONS',{x:findingsX,y:y-10,size:7.5,font:bold,color:blue}); let fy = y - 24;
     if (!findings.length) page.drawText('No abnormal mapped regions documented.',{x:findingsX,y:fy,size:8,font:regular,color:muted});
     findings.forEach(([region, detail]) => { const lines = wrapText(detail, regular, 7.8, 335); page.drawText(region,{x:findingsX,y:fy,size:8,font:bold,color:ink}); fy -= 10; lines.slice(0,5).forEach((entry) => { page.drawText(entry,{x:findingsX+8,y:fy,size:7.8,font:regular,color:ink}); fy -= 9; }); fy -= 3; }); y -= 196;
