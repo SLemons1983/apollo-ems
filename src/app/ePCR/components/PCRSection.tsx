@@ -55,9 +55,25 @@ export default function PCRSection({
       </button>
 
       <div className={`${expanded ? '' : 'hidden'} border-t bg-slate-100 p-6`} aria-hidden={!expanded}>
-        <fieldset disabled={contentDisabled} className="min-w-0 disabled:opacity-100">
-          {children}
-        </fieldset>
+        {contentDisabled ? (
+          <div
+            className="min-w-0 [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none"
+            onClickCapture={(event) => {
+              const target = event.target as HTMLElement;
+              const button = target.closest('button');
+              if (button && !button.dataset.reviewNavigation && button.getAttribute('aria-expanded') === null) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
+            }}
+            onChangeCapture={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            {children}
+          </div>
+        ) : children}
       </div>
     </section>
   );

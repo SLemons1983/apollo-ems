@@ -39,6 +39,7 @@ export default function PCRCard({
     <div className="overflow-visible rounded-xl border border-slate-300 bg-slate-50 shadow-sm">
       <button
         type="button"
+        data-review-navigation="true"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-slate-100"
       >

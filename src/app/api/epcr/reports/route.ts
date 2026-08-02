@@ -146,6 +146,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'A report awaiting review cannot be deleted.' }, { status: 409 });
   }
 
+  const { error: reviewHistoryError } = await db.from('epcr_report_review_events')
+    .delete()
+    .eq('report_id', report.id)
+    .eq('agency_id', access.membership.agency_id);
+  if (reviewHistoryError) return NextResponse.json({ error: reviewHistoryError.message }, { status: 500 });
+
   const { error } = await db.from('epcr_reports').delete()
     .eq('id', report.id)
     .eq('agency_id', access.membership.agency_id)

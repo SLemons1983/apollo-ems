@@ -22,6 +22,7 @@ export default function AssessmentWorkflowCard({
   return (
     <button
       type="button"
+      data-review-navigation="true"
       onClick={onClick}
       className={`flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition ${
         selected ? 'bg-slate-900 text-white' : 'bg-white hover:bg-slate-50'
