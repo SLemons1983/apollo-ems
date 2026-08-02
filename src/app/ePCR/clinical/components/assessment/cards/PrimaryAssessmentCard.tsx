@@ -35,7 +35,7 @@ const primarySurveyGroups: {
     field: 'generalImpression',
     label: 'General Impression',
     prompt: 'How does the patient appear on first contact?',
-    options: ['Stable', 'Ill', 'Critical', 'Unable to Determine'],
+    options: ['Stable', 'Sick', 'Critical', 'Unable to Determine'],
   },
   {
     field: 'airway',
