@@ -4,6 +4,7 @@ type PCRSectionProps = {
   totalFields: number;
   expanded: boolean;
   onToggle: () => void;
+  contentDisabled?: boolean;
   children: React.ReactNode;
 };
 
@@ -13,6 +14,7 @@ export default function PCRSection({
   totalFields,
   expanded,
   onToggle,
+  contentDisabled = false,
   children,
 }: PCRSectionProps) {
   const complete = totalFields > 0 && completedFields === totalFields;
@@ -53,7 +55,9 @@ export default function PCRSection({
       </button>
 
       <div className={`${expanded ? '' : 'hidden'} border-t bg-slate-100 p-6`} aria-hidden={!expanded}>
-        {children}
+        <fieldset disabled={contentDisabled} className="min-w-0 disabled:opacity-100">
+          {children}
+        </fieldset>
       </div>
     </section>
   );

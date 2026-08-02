@@ -1123,7 +1123,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
               )}
             </aside>
 
-            <fieldset disabled={reviewMode} className="min-w-0 space-y-4 disabled:opacity-100">
+            <div className="min-w-0 space-y-4">
               {sections.map((section) => {
                 const sectionProgress = progressSections.find(
                   (progressSection) => progressSection.title === section,
@@ -1141,6 +1141,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                         expandedSection === section ? "" : section,
                       )
                     }
+                    contentDisabled={reviewMode}
                   >
                     {section === "Call" ? (
                       <CallSection
@@ -1221,7 +1222,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                   </PCRSection>
                 );
               })}
-            </fieldset>
+            </div>
 
             <aside className="sticky top-4 min-w-0">
               {reviewMode ? (
@@ -1275,7 +1276,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
             </aside>
           </div>
 
-          <fieldset disabled={reviewMode} className="min-w-0 space-y-4 disabled:opacity-100 xl:hidden">
+          <div className="min-w-0 space-y-4 xl:hidden">
             {sections.map((section) => {
               const sectionProgress = progressSections.find(
                 (progressSection) => progressSection.title === section,
@@ -1293,6 +1294,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                       expandedSection === section ? "" : section,
                     )
                   }
+                  contentDisabled={reviewMode}
                 >
                   {section === "Call" ? (
                     <CallSection
@@ -1373,7 +1375,7 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                 </PCRSection>
               );
             })}
-          </fieldset>
+          </div>
         </div>
 
         <AciSuggestionFooter

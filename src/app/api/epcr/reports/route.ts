@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const access = await currentEpcrMembership(true);
+  const access = await currentEpcrMembership();
   if (!access || access.membership.status !== 'ACTIVE') {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
@@ -142,6 +142,9 @@ export async function DELETE(request: NextRequest) {
     .maybeSingle();
   if (lookupError) return NextResponse.json({ error: lookupError.message }, { status: 500 });
   if (!report) return NextResponse.json({ error: 'Report not found.' }, { status: 404 });
+  if (report.status === 'SUBMITTED') {
+    return NextResponse.json({ error: 'A report awaiting review cannot be deleted.' }, { status: 409 });
+  }
 
   const { error } = await db.from('epcr_reports').delete()
     .eq('id', report.id)

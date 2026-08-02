@@ -3,7 +3,7 @@ import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 import { reportPdf } from '@/lib/epcrPdf';
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const access = await currentEpcrMembership(true);
+  const access = await currentEpcrMembership();
   if (!access || access.membership.status !== 'ACTIVE') return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   const { id } = await params;
   const db = epcrAdminClient();
