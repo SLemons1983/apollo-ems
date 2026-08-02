@@ -57,7 +57,7 @@ export default function PCRSection({
       <div className={`${expanded ? '' : 'hidden'} border-t bg-slate-100 p-6`} aria-hidden={!expanded}>
         {contentDisabled ? (
           <div
-            className="min-w-0 [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-none"
+            className="min-w-0 [&_input]:pointer-events-none [&_select]:pointer-events-none [&_textarea]:pointer-events-auto"
             onClickCapture={(event) => {
               const target = event.target as HTMLElement;
               const button = target.closest('button');

@@ -1,3 +1,5 @@
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+
 type Row = { label: string; value: string };
 type Block = { title: string; rows?: Row[]; columns?: string[][]; narrative?: string };
 
@@ -10,7 +12,7 @@ const dateTime = (value: unknown) => {
   const raw = text(value);
   if (!raw) return '';
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return Number.isNaN(parsed.getTime()) ? raw : parsed.toLocaleString('en-US', { timeZone: 'America/Los_Angeles', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 };
 const row = (label: string, value: unknown): Row | null => text(value) ? { label, value: text(value) } : null;
 const rows = (...items: (Row | null)[]) => items.filter((item): item is Row => Boolean(item));
@@ -74,22 +76,69 @@ function blocks(chart: Record<string, unknown>): Block[] {
   ].filter((block) => block.narrative || block.columns?.length || block.rows?.length);
 }
 
-function clean(value: string) { return value.replace(/[^\x20-\x7E]/g, '').replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); }
-function wrap(value: string, width: number) { const words = value.replace(/\s+/g, ' ').trim().split(' '); const result: string[] = []; let line = ''; for (const word of words) { if (!line) line = word; else if (`${line} ${word}`.length <= width) line += ` ${word}`; else { result.push(line); line = word; } } if (line) result.push(line); return result.length ? result : ['']; }
+const navy = rgb(0.055, 0.16, 0.28);
+const blue = rgb(0.09, 0.39, 0.62);
+const paleBlue = rgb(0.91, 0.95, 0.98);
+const line = rgb(0.76, 0.81, 0.86);
+const ink = rgb(0.12, 0.16, 0.2);
+const muted = rgb(0.38, 0.43, 0.48);
+const alert = rgb(0.85, 0.18, 0.18);
 
-export function reportPdf(chart: Record<string, unknown>, reportNumber: string, patientDisplay: string) {
-  const pages: string[][] = [[]]; let used = 0;
-  const addLine = (style: 'H'|'S'|'R'|'L', value: string) => { const capacity = style === 'H' ? 38 : style === 'S' ? 72 : 96; for (const line of wrap(value, capacity)) { const cost = style === 'H' ? 2.1 : style === 'S' ? 1.6 : 1; if (used + cost > 51) { pages.push([]); used = 0; } pages.at(-1)!.push(`${style}|${line}`); used += cost; } };
-  addLine('H', 'ApolloEMS Patient Care Report'); addLine('R', `Report ${reportNumber}   Patient: ${patientDisplay}`);
-  for (const block of blocks(chart)) {
-    addLine('S', block.title);
-    for (const item of block.rows ?? []) addLine('R', `${item.label}: ${item.value}`);
-    for (const tableRow of block.columns ?? []) addLine(tableRow === block.columns?.[0] ? 'L' : 'R', tableRow.filter(Boolean).join('   |   '));
-    if (block.narrative) for (const paragraph of block.narrative.split(/\n+/).filter(Boolean)) addLine('R', paragraph);
-  }
-  const objects: string[] = []; const add = (body: string) => { objects.push(body); return objects.length; };
-  const catalogId = add(''), pagesId = add(''); const regular = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'); const bold = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'); const pageIds: number[] = [];
-  pages.forEach((page, pageIndex) => { const commands = ['BT', '42 758 Td']; let first = true; for (const encoded of page) { const [style, ...rest] = encoded.split('|'); const value = rest.join('|'); const size = style === 'H' ? 18 : style === 'S' ? 12 : style === 'L' ? 8 : 9; const leading = style === 'H' ? 25 : style === 'S' ? 20 : 13; if (!first) commands.push(`0 -${leading} Td`); commands.push(`/${style === 'R' ? 'F1' : 'F2'} ${size} Tf (${clean(value)}) Tj`); first = false; } commands.push('ET', `BT 42 28 Td /F1 8 Tf (Page ${pageIndex + 1} of ${pages.length}) Tj ET`); const stream = commands.join('\n'); const contentId = add(`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`); pageIds.push(add(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${regular} 0 R /F2 ${bold} 0 R >> >> /Contents ${contentId} 0 R >>`)); });
-  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`; objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
-  let output = '%PDF-1.4\n'; const offsets = [0]; objects.forEach((body, index) => { offsets.push(Buffer.byteLength(output)); output += `${index + 1} 0 obj\n${body}\nendobj\n`; }); const xref = Buffer.byteLength(output); output += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xref}\n%%EOF`; return Buffer.from(output, 'binary');
+function safe(value: string) { return value.replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function wrapText(value: string, font: PDFFont, size: number, width: number) {
+  const words = safe(value).split(' ').filter(Boolean); const result: string[] = []; let current = '';
+  for (const word of words) { const next = current ? `${current} ${word}` : word; if (font.widthOfTextAtSize(next, size) <= width || !current) current = next; else { result.push(current); current = word; } }
+  if (current) result.push(current); return result.length ? result : [''];
+}
+
+export async function reportPdf(chart: Record<string, unknown>, reportNumber: string, patientDisplay: string) {
+  const pdf = await PDFDocument.create();
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const margin = 38, contentWidth = 536; let page!: PDFPage; let y = 0;
+  const newPage = () => { page = pdf.addPage([612, 792]); y = 730; return page; };
+  const ensure = (height: number) => { if (y - height < 48) newPage(); };
+  const drawHeader = (target: PDFPage) => {
+    target.drawRectangle({ x: 0, y: 748, width: 612, height: 44, color: navy });
+    target.drawText('APOLLO', { x: margin, y: 765, size: 17, font: bold, color: rgb(1,1,1) });
+    target.drawText('EMS', { x: margin + 69, y: 765, size: 17, font: bold, color: rgb(0.36,0.72,0.94) });
+    target.drawText('PATIENT CARE REPORT', { x: 333, y: 766, size: 11, font: bold, color: rgb(1,1,1) });
+  };
+  const section = (title: string) => { ensure(28); page.drawRectangle({ x: margin, y: y - 19, width: contentWidth, height: 20, color: navy }); page.drawText(title.toUpperCase(), { x: margin + 8, y: y - 14, size: 9.5, font: bold, color: rgb(1,1,1) }); y -= 26; };
+  const paragraph = (value: string, size = 8.5, indent = 0) => { const lines = wrapText(value, regular, size, contentWidth - indent - 12); ensure(lines.length * 11 + 7); lines.forEach((entry) => { page.drawText(entry, { x: margin + 6 + indent, y, size, font: regular, color: ink }); y -= 11; }); y -= 3; };
+  const fieldRows = (items: Row[]) => {
+    for (let index = 0; index < items.length; index += 2) {
+      const pair = items.slice(index, index + 2); const rendered = pair.map((item) => wrapText(item.value, regular, 8.3, 180)); const height = Math.max(...rendered.map((entry) => entry.length)) * 10 + 19; ensure(height);
+      page.drawRectangle({ x: margin, y: y - height + 4, width: contentWidth, height, color: index % 4 === 0 ? rgb(0.97,0.98,0.99) : rgb(1,1,1), borderColor: line, borderWidth: 0.45 });
+      pair.forEach((item, column) => { const x = margin + 8 + column * 268; page.drawText(safe(item.label).toUpperCase(), { x, y: y - 8, size: 6.8, font: bold, color: blue }); rendered[column].forEach((entry, rowIndex) => page.drawText(entry, { x, y: y - 19 - rowIndex * 10, size: 8.3, font: regular, color: ink })); if (column === 0) page.drawLine({ start:{x:margin+268,y:y+4}, end:{x:margin+268,y:y-height+4}, color:line, thickness:0.4 }); });
+      y -= height;
+    } y -= 5;
+  };
+  const table = (data: string[][]) => {
+    if (!data.length) return; const columns = Math.max(...data.map((entry) => entry.length)); const cellWidth = contentWidth / columns;
+    data.forEach((sourceRow, rowIndex) => { const wrapped = Array.from({length:columns}, (_, column) => wrapText(sourceRow[column] ?? '', rowIndex === 0 ? bold : regular, rowIndex === 0 ? 7.1 : 7.5, cellWidth - 10)); const height = Math.max(...wrapped.map((entry) => entry.length)) * 9 + 9; ensure(height); page.drawRectangle({ x:margin, y:y-height+3, width:contentWidth, height, color:rowIndex === 0 ? paleBlue : rowIndex % 2 ? rgb(1,1,1) : rgb(0.97,0.98,0.99), borderColor:line, borderWidth:0.5 }); wrapped.forEach((cell,column) => { if(column) page.drawLine({start:{x:margin+column*cellWidth,y:y+3},end:{x:margin+column*cellWidth,y:y-height+3},color:line,thickness:0.4}); cell.forEach((entry,lineIndex) => page.drawText(entry,{x:margin+column*cellWidth+5,y:y-7-lineIndex*9,size:rowIndex===0?7.1:7.5,font:rowIndex===0?bold:regular,color:rowIndex===0?navy:ink})); }); y -= height; }); y -= 6;
+  };
+  const bodyMap = (findings: string[][]) => {
+    ensure(205); const affected = new Set(findings.map((entry) => entry[0])); const ox = margin + 15, oy = y - 178;
+    const figure = (x:number, back:boolean) => {
+      const fill = (label:string) => affected.has(label) ? alert : rgb(0.9,0.92,0.94); const border = rgb(0.45,0.5,0.55);
+      page.drawCircle({x:x+40,y:oy+151,size:12,color:fill('Head'),borderColor:border,borderWidth:0.8});
+      page.drawRectangle({x:x+32,y:oy+132,width:16,height:8,color:fill('Neck'),borderColor:border,borderWidth:0.6});
+      page.drawRectangle({x:x+22,y:oy+83,width:36,height:49,color:fill(back?'Back':'Chest'),borderColor:border,borderWidth:0.8});
+      if(!back) page.drawRectangle({x:x+22,y:oy+65,width:36,height:18,color:fill('Abdomen'),borderColor:border,borderWidth:0.6});
+      page.drawRectangle({x:x+20,y:oy+52,width:40,height:14,color:fill('Pelvis'),borderColor:border,borderWidth:0.6});
+      page.drawRectangle({x:x+7,y:oy+73,width:13,height:55,color:fill('Right Arm'),borderColor:border,borderWidth:0.6}); page.drawRectangle({x:x+60,y:oy+73,width:13,height:55,color:fill('Left Arm'),borderColor:border,borderWidth:0.6});
+      page.drawRectangle({x:x+22,y:oy,width:16,height:52,color:fill('Right Leg'),borderColor:border,borderWidth:0.6}); page.drawRectangle({x:x+42,y:oy,width:16,height:52,color:fill('Left Leg'),borderColor:border,borderWidth:0.6});
+      page.drawText(back?'BACK':'FRONT',{x:x+25,y:oy-12,size:7,font:bold,color:muted});
+    };
+    figure(ox,false); figure(ox+92,true); page.drawRectangle({x:ox,y:oy+172,width:10,height:10,color:alert}); page.drawText('Documented finding',{x:ox+15,y:oy+173,size:7.5,font:regular,color:ink});
+    const findingsX = margin + 220; page.drawText('DOCUMENTED REGIONS',{x:findingsX,y:y-10,size:7.5,font:bold,color:blue}); let fy = y - 24;
+    if (!findings.length) page.drawText('No abnormal mapped regions documented.',{x:findingsX,y:fy,size:8,font:regular,color:muted});
+    findings.forEach(([region, detail]) => { const lines = wrapText(detail, regular, 7.8, 335); page.drawText(region,{x:findingsX,y:fy,size:8,font:bold,color:ink}); fy -= 10; lines.slice(0,5).forEach((entry) => { page.drawText(entry,{x:findingsX+8,y:fy,size:7.8,font:regular,color:ink}); fy -= 9; }); fy -= 3; }); y -= 196;
+  };
+
+  newPage(); page.drawText(`Report ${safe(reportNumber)}`,{x:margin,y:720,size:10,font:bold,color:navy}); page.drawText(`Patient: ${safe(patientDisplay)}`,{x:220,y:720,size:10,font:regular,color:ink}); y=700;
+  for (const block of blocks(chart)) { if (block.title === 'Body Map - Documented Findings') ensure(231); section(block.title); if (block.title === 'Body Map - Documented Findings') bodyMap((block.columns ?? []).slice(1)); else { if (block.rows?.length) fieldRows(block.rows); if (block.columns?.length) table(block.columns); if (block.narrative) for (const entry of block.narrative.split(/\n+/).filter(Boolean)) paragraph(entry, 9); } }
+  const pages = pdf.getPages(); pages.forEach((item,index) => { page=item; drawHeader(item); page.drawLine({start:{x:margin,y:38},end:{x:574,y:38},color:line,thickness:0.5}); page.drawText(`ApolloEMS | Report ${safe(reportNumber)}`,{x:margin,y:24,size:7.5,font:regular,color:muted}); const footer=`Page ${index+1} of ${pages.length}`; page.drawText(footer,{x:574-regular.widthOfTextAtSize(footer,7.5),y:24,size:7.5,font:regular,color:muted}); });
+  return Buffer.from(await pdf.save());
 }
