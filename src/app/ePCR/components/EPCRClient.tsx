@@ -25,7 +25,6 @@ import SignatureSection, { createDefaultSignatureForm, type SignatureForm } from
 import { createDefaultNarrativeForm, generateNarrative, getNarrativeReviewIssues, narrativeFingerprint, type NarrativeForm, type NarrativeFormat } from "../clinical/narrative/narrative";
 import type { CallForm, ComplaintForm, PatientForm } from "../types";
 import {
-  createDefaultBillingForm,
   getBillingProgress,
   mergeBillingWithDefaults,
   type BillingForm,
@@ -49,14 +48,12 @@ import {
   getPatientRequiredFields,
 } from "../utils";
 import {
-  createDefaultVitalsForm,
   getAciVitalAlerts,
   getVitalsProgress,
   mergeVitalsWithDefaults,
   type VitalsForm,
 } from "../clinical/vitals/vitals";
 import {
-  createDefaultTreatmentsForm,
   getTreatmentsProgress,
   mergeTreatmentsWithDefaults,
   type TreatmentsForm,
@@ -153,11 +150,19 @@ function mergeAssessmentWithDefaults(
   return merged;
 }
 
-export default function EPCRClient() {
+type EditableReport = {
+  id: string;
+  status: 'DRAFT' | 'REJECTED';
+  chart: Record<string, unknown>;
+} | null;
+
+export default function EPCRClient({ initialReport = null }: { initialReport?: EditableReport }) {
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const [expandedSection, setExpandedSection] = useState<string>("");
   const [fileStatus, setFileStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reportId, setReportId] = useState(initialReport?.id ?? '');
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
   const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
@@ -199,28 +204,28 @@ export default function EPCRClient() {
   }, [quickToolsOpen]);
 
   const [callForm, setCallForm] = useState<CallForm>(() =>
-    createDefaultCallForm(),
+    ({ ...createDefaultCallForm(), ...((initialReport?.chart.call as Partial<CallForm>) ?? {}) }),
   );
   const [patientForm, setPatientForm] = useState<PatientForm>(() =>
-    createDefaultPatientForm(),
+    ({ ...createDefaultPatientForm(), ...((initialReport?.chart.patient as Partial<PatientForm>) ?? {}) }),
   );
   const [complaintForm, setComplaintForm] = useState<ComplaintForm>(() =>
-    createDefaultComplaintForm(),
+    ({ ...createDefaultComplaintForm(), ...((initialReport?.chart.complaint as Partial<ComplaintForm>) ?? {}) }),
   );
   const [assessmentForm, setAssessmentForm] = useState<AssessmentForm>(() =>
-    createDefaultAssessmentForm(),
+    mergeAssessmentWithDefaults(initialReport?.chart.assessment),
   );
   const [vitalsForm, setVitalsForm] = useState<VitalsForm>(() =>
-    createDefaultVitalsForm(),
+    mergeVitalsWithDefaults(initialReport?.chart.vitals),
   );
   const [treatmentsForm, setTreatmentsForm] = useState<TreatmentsForm>(() =>
-    createDefaultTreatmentsForm(),
+    mergeTreatmentsWithDefaults(initialReport?.chart.treatments),
   );
   const [billingForm, setBillingForm] = useState<BillingForm>(() =>
-    createDefaultBillingForm(),
+    mergeBillingWithDefaults(initialReport?.chart.billing),
   );
-  const [narrativeForm, setNarrativeForm] = useState<NarrativeForm>(() => createDefaultNarrativeForm());
-  const [signatureForm, setSignatureForm] = useState<SignatureForm>(() => createDefaultSignatureForm());
+  const [narrativeForm, setNarrativeForm] = useState<NarrativeForm>(() => ({ ...createDefaultNarrativeForm(), ...((initialReport?.chart.narrative as Partial<NarrativeForm>) ?? {}) }));
+  const [signatureForm, setSignatureForm] = useState<SignatureForm>(() => ({ ...createDefaultSignatureForm(), ...((initialReport?.chart.signature as Partial<SignatureForm>) ?? {}) }));
   const [assessmentProgress, setAssessmentProgress] = useState({
     completedFields: 0,
     totalFields: 0,
@@ -732,13 +737,7 @@ export default function EPCRClient() {
       : 0;
   const pcrReadyToSubmit = overallProgress === 100;
 
-  function savePCRToFile() {
-    const savedPCR = {
-      fileType: "ApolloEMS Mock ePCR",
-      fileVersion: 1,
-      savedAt: new Date().toISOString(),
-      expandedSection,
-      chart: {
+  const currentChart = () => ({
         call: callForm,
         patient: patientForm,
         complaint: complaintForm,
@@ -748,22 +747,28 @@ export default function EPCRClient() {
         billing: billingForm,
         narrative: narrativeForm,
         signature: signatureForm,
-      },
-    };
+  });
 
-    const blob = new Blob([JSON.stringify(savedPCR, null, 2)], {
-      type: "application/json",
-    });
-
-    const downloadUrl = URL.createObjectURL(blob);
-    const downloadLink = document.createElement("a");
-
-    downloadLink.href = downloadUrl;
-    downloadLink.download = `ApolloEMS-ePCR-${callForm.emsResponseNumber}.apolloepcr`;
-    downloadLink.click();
-
-    URL.revokeObjectURL(downloadUrl);
-    setFileStatus("PCR saved to local file.");
+  async function savePCR() {
+    if (saving || submitting) return;
+    if (!callForm.emsResponseNumber.trim()) {
+      setFileStatus('Enter the EMS response number before saving this PCR.');
+      return;
+    }
+    setSaving(true);
+    setFileStatus('Saving draft securely...');
+    try {
+      const response = await fetch('/api/epcr/reports', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SAVE_DRAFT', report_id: reportId || undefined, chart: currentChart() }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error ?? 'Unable to save draft.');
+      setReportId(result.report.id);
+      setFileStatus('Draft saved. It is now available in My Reports.');
+    } catch (error) {
+      setFileStatus(error instanceof Error ? error.message : 'Unable to save draft.');
+    } finally { setSaving(false); }
   }
 
   async function submitPCR() {
@@ -776,11 +781,7 @@ export default function EPCRClient() {
       const response = await fetch('/api/epcr/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chart: {
-          call: callForm, patient: patientForm, complaint: complaintForm,
-          assessment: assessmentForm, vitals: vitalsForm, treatments: treatmentsForm,
-          billing: billingForm, narrative: narrativeForm, signature: signatureForm,
-        } }),
+        body: JSON.stringify({ report_id: reportId || undefined, chart: currentChart() }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error ?? 'Unable to submit report.');
@@ -925,10 +926,11 @@ export default function EPCRClient() {
             <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={savePCRToFile}
+              onClick={savePCR}
+              disabled={saving || submitting}
               className="rounded-lg bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110"
             >
-              Save PCR
+              {saving ? 'Saving...' : 'Save PCR'}
             </button>
 
             <button

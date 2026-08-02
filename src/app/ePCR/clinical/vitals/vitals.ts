@@ -15,6 +15,8 @@ export type AciVitalAlert = VitalAssessment & {
 
 export type VitalSetDraft = {
   recordedAt: string;
+  unableToAssess: string;
+  unableToAssessReason: string;
   source: VitalSource;
   bloodPressureMethod: BloodPressureMethod;
   systolic: string;
@@ -61,6 +63,8 @@ export function createEmptyVitalSet(
 ): VitalSetDraft {
   return {
     recordedAt,
+    unableToAssess: '',
+    unableToAssessReason: '',
     source: 'Manual',
     bloodPressureMethod: 'Auscultated',
     systolic: '',
@@ -127,8 +131,11 @@ export function mergeVitalsWithDefaults(
 
 export function getVitalRequiredValues(
   vital: VitalSetDraft,
-  providerScope: ProviderScope,
+  _providerScope: ProviderScope,
 ) {
+  if (vital.unableToAssess === 'Yes') {
+    return [vital.recordedAt, vital.unableToAssessReason];
+  }
   return [
     vital.recordedAt,
     vital.bloodPressureMethod,
@@ -206,6 +213,9 @@ export function getVitalFieldError(
 }
 
 export function getVitalValidationErrors(vital: VitalSetDraft) {
+  if (vital.unableToAssess === 'Yes') {
+    return vital.unableToAssessReason.trim() ? [] : ['Document why vital signs could not be assessed.'];
+  }
   const errors = Object.keys(numericLimits)
     .map((field) => getVitalFieldError(vital, field as keyof VitalSetDraft))
     .filter(Boolean);

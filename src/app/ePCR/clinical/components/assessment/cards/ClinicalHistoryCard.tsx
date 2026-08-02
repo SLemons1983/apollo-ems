@@ -258,6 +258,7 @@ export default function ClinicalHistoryCard({
             value={patientForm.lastOralIntake}
             placeholder="Enter last oral intake or document unknown"
             inputType="datetime-local"
+            quickChoice={{ label: 'Unknown', value: 'Unknown' }}
             onChange={(nextValue) =>
               onPatientChange('lastOralIntake', nextValue)
             }

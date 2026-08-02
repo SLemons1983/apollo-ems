@@ -219,6 +219,23 @@ export default function VitalSetForm({
           </div>
         </Field>
 
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:col-span-2 lg:col-span-3">
+          <button
+            type="button"
+            aria-pressed={value.unableToAssess === 'Yes'}
+            onClick={() => onChange('unableToAssess', value.unableToAssess === 'Yes' ? '' : 'Yes')}
+            className={`w-full rounded-lg border px-4 py-3 text-sm font-black transition ${value.unableToAssess === 'Yes' ? 'border-amber-700 bg-amber-700 text-white' : 'border-amber-400 bg-white text-amber-900 hover:bg-amber-100'}`}
+          >
+            {value.unableToAssess === 'Yes' ? '✓ Unable to Assess Vital Signs' : 'Unable to Assess Vital Signs'}
+          </button>
+          {value.unableToAssess === 'Yes' && <label className="mt-3 block">
+            <span className="mb-1 block text-xs font-black uppercase text-amber-900">Required explanation</span>
+            <textarea value={value.unableToAssessReason} onChange={(event) => onChange('unableToAssessReason', event.target.value)} rows={3} placeholder="Document why vital signs could not be obtained." className={inputClass} />
+          </label>}
+        </div>
+
+        {value.unableToAssess !== 'Yes' && <>
+
         <Field label="Entry Source">
           <select
             value={value.source}
@@ -520,6 +537,7 @@ export default function VitalSetForm({
             className={inputClass}
           />
         </Field>
+        </>}
       </div>
 
       {!complete && (

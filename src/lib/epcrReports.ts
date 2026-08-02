@@ -1,4 +1,4 @@
-export const EPCR_REPORT_STATUSES = ['SUBMITTED', 'REJECTED', 'COMPLETED'] as const;
+export const EPCR_REPORT_STATUSES = ['DRAFT', 'SUBMITTED', 'REJECTED', 'COMPLETED'] as const;
 export type EpcrReportStatus = typeof EPCR_REPORT_STATUSES[number];
 
 export type EpcrReportRow = {

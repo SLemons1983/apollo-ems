@@ -936,14 +936,8 @@ export default function PatientSection({
             <span className="mb-1 block text-sm font-semibold text-slate-700">
               Last Oral Intake
             </span>
-            <input
-              type="datetime-local"
-              value={patientForm.lastOralIntake}
-              onChange={(event) =>
-                updatePatientForm('lastOralIntake', event.target.value)
-              }
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
-            />
+            <button type="button" onClick={() => updatePatientForm('lastOralIntake', patientForm.lastOralIntake === 'Unknown' ? '' : 'Unknown')} className={`mb-2 w-full rounded-lg border px-3 py-2 text-sm font-bold ${patientForm.lastOralIntake === 'Unknown' ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'}`}>{patientForm.lastOralIntake === 'Unknown' ? '✓ Unknown' : 'Unknown'}</button>
+            {patientForm.lastOralIntake !== 'Unknown' && <input type="datetime-local" value={patientForm.lastOralIntake} onChange={(event) => updatePatientForm('lastOralIntake', event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm" />}
           </label>
         </div>
       </PCRCard>

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
-import { currentEpcrMembership } from '@/lib/epcrServer';
+import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 import EPCRClient from './components/EPCRClient';
 
-export default async function EPCRPage() {
+export default async function EPCRPage({ searchParams }: { searchParams: Promise<{ report?: string }> }) {
   const access = await currentEpcrMembership();
   if (!access) redirect('/epcr-account/login');
 
@@ -15,5 +15,19 @@ export default async function EPCRPage() {
 
   if (!hasActiveMembership || !hasEpcrModule) redirect('/epcr-dashboard');
 
-  return <EPCRClient />;
+  const { report: reportId } = await searchParams;
+  type InitialReport = { id: string; status: 'DRAFT' | 'REJECTED'; chart: Record<string, unknown> };
+  let initialReport: InitialReport | null = null;
+  if (reportId) {
+    const { data } = await epcrAdminClient().from('epcr_reports')
+      .select('id,status,chart')
+      .eq('id', reportId)
+      .eq('agency_id', access.membership.agency_id)
+      .eq('submitted_by_membership_id', access.membership.id)
+      .in('status', ['DRAFT', 'REJECTED'])
+      .maybeSingle();
+    if (data) initialReport = data as InitialReport;
+  }
+
+  return <EPCRClient initialReport={initialReport} />;
 }
