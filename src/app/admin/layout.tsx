@@ -5,6 +5,29 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { isPlatformOwner } from '@/lib/platformOwner';
 
+async function signOut() {
+  'use server';
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    'https://xyrusrspvyuwpplhhett.supabase.co',
+    'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+
+  await supabase.auth.signOut();
+  redirect('/login');
+}
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -32,10 +55,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Image src="/apollo-logo.png" alt="ApolloEMS" width={48} height={48} className="h-11 w-11 rounded-xl bg-white object-contain p-1" />
             <div><p className="text-lg font-black">ApolloEMS</p><p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-200">Owner Administration</p></div>
           </Link>
-          <nav className="flex items-center gap-2 text-sm font-bold">
+          <nav className="flex flex-wrap items-center justify-end gap-2 text-sm font-bold">
             <Link href="/admin" className="rounded-xl px-4 py-2 hover:bg-white/10">Overview</Link>
             <Link href="/admin/agencies" className="rounded-xl px-4 py-2 hover:bg-white/10">Agencies</Link>
             <Link href="/dashboard" className="rounded-xl border border-white/25 px-4 py-2 hover:bg-white/10">SSC Dashboard</Link>
+            <form action={signOut}>
+              <button type="submit" className="rounded-xl border border-red-300/60 px-4 py-2 text-red-100 transition hover:bg-red-500/20 hover:text-white">Sign Out</button>
+            </form>
           </nav>
         </div>
       </header>
