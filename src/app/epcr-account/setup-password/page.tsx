@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { FormEvent, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-type SessionState = 'checking' | 'ready' | 'invalid';
+type SessionState = 'checking' | 'ready' | 'invalid' | 'complete';
 
 const inputClasses =
   'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100';
@@ -19,16 +19,27 @@ export default function SetupPassword() {
   useEffect(() => {
     let active = true;
     async function establishSession() {
+      const query = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.slice(1));
+      const code = query.get('code');
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
+      const linkType = hash.get('type');
       let error: Error | null = null;
-      if (accessToken && refreshToken) {
+
+      // Never allow an unrelated session that was already active in this browser
+      // to authorize a password change. A recovery credential from the link is
+      // required every time this page is opened.
+      await supabase.auth.signOut({ scope: 'local' });
+
+      if (code) {
+        const result = await supabase.auth.exchangeCodeForSession(code);
+        error = result.error;
+      } else if (accessToken && refreshToken && ['recovery', 'invite', 'signup'].includes(linkType ?? '')) {
         const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         error = result.error;
       } else {
-        const result = await supabase.auth.getSession();
-        error = result.error ?? (result.data.session ? null : new Error('This password link is invalid or has expired.'));
+        error = new Error('This password reset link is invalid or has expired. Request a new link and try again.');
       }
       if (!active) return;
       if (error) {
@@ -36,7 +47,7 @@ export default function SetupPassword() {
         setSessionState('invalid');
         return;
       }
-      window.history.replaceState({}, document.title, '/epcr/setup-password');
+      window.history.replaceState({}, document.title, '/epcr-account/setup-password');
       setSessionState('ready');
     }
     void establishSession();
@@ -62,7 +73,13 @@ export default function SetupPassword() {
       setWorking(false);
       return;
     }
-    window.location.href = '/epcr/dashboard';
+    await fetch('/api/epcr/session?full=1', { method: 'DELETE' }).catch(() => undefined);
+    await supabase.auth.signOut({ scope: 'local' });
+    setPassword('');
+    setConfirm('');
+    setMessage('Your password was updated successfully. Sign in with your new password.');
+    setSessionState('complete');
+    setWorking(false);
   }
 
   return (
@@ -88,6 +105,7 @@ export default function SetupPassword() {
           </button>
         </>}
         {sessionState === 'invalid' && <a href="/epcr/login" className="mt-6 block rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] p-3.5 text-center font-black text-white">Return to ePCR sign in</a>}
+        {sessionState === 'complete' && <a href="/epcr-account/login" className="mt-6 block rounded-xl bg-gradient-to-r from-[#0b1f4d] to-[#0878d1] p-3.5 text-center font-black text-white">Sign in with new password</a>}
         {message && <p role="status" className={`mt-4 rounded-xl border p-3 text-sm font-bold ${sessionState === 'invalid' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-blue-50 text-blue-950'}`}>{message}</p>}
       </form>
     </main>
