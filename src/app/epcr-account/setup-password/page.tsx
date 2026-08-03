@@ -25,20 +25,30 @@ export default function SetupPassword() {
       const accessToken = hash.get('access_token');
       const refreshToken = hash.get('refresh_token');
       const linkType = hash.get('type');
+      const serverRecovery = query.get('server_recovery') === '1';
+      const recoveryError = query.get('recovery_error') === '1';
       let error: Error | null = null;
 
-      // Never allow an unrelated session that was already active in this browser
-      // to authorize a password change. A recovery credential from the link is
-      // required every time this page is opened.
-      await supabase.auth.signOut({ scope: 'local' });
+      if (recoveryError) {
+        error = new Error('This password reset link is invalid or has expired. Request a new link and try again.');
+      } else if (serverRecovery) {
+        const response = await fetch('/api/epcr/password-recovery', { method: 'GET', cache: 'no-store' });
+        if (!response.ok) {
+          error = new Error('This password reset link is invalid or has expired. Request a new link and try again.');
+        }
+      } else {
+        // Direct and legacy links must bring their own credential. Clear any
+        // unrelated browser session before attempting to use that credential.
+        await supabase.auth.signOut({ scope: 'local' });
+      }
 
-      if (code) {
+      if (!error && !serverRecovery && code) {
         const result = await supabase.auth.exchangeCodeForSession(code);
         error = result.error;
-      } else if (accessToken && refreshToken && ['recovery', 'invite', 'signup'].includes(linkType ?? '')) {
+      } else if (!error && !serverRecovery && accessToken && refreshToken && ['recovery', 'invite', 'signup'].includes(linkType ?? '')) {
         const result = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
         error = result.error;
-      } else {
+      } else if (!error && !serverRecovery) {
         error = new Error('This password reset link is invalid or has expired. Request a new link and try again.');
       }
       if (!active) return;

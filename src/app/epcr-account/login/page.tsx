@@ -40,10 +40,13 @@ export default function EpcrLogin() {
     }
     setWorking(true);
     setMessage('Sending password reset link...');
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/epcr/setup-password`,
+    const response = await fetch('/api/epcr/password-recovery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-    setMessage(error?.message ?? 'Password reset link sent.');
+    const result = await response.json().catch(() => ({})) as { error?: string };
+    setMessage(response.ok ? 'Password reset link sent.' : (result.error ?? 'Unable to send the password reset link.'));
     setWorking(false);
   }
 

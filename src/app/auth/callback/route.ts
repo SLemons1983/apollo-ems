@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   const requestedNext = requestUrl.searchParams.get('next');
+  const recoveryFlow = requestUrl.searchParams.get('flow') === 'epcr-recovery';
   const next = requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext
     : '/dashboard';
@@ -79,7 +80,13 @@ export async function GET(request: NextRequest) {
       },
     );
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (exchangeError && recoveryFlow) {
+      const failed = NextResponse.redirect(new URL('/epcr-account/setup-password?recovery_error=1', request.url));
+      response.cookies.getAll().forEach((cookie) => failed.cookies.set(cookie));
+      return failed;
+    }
 
     const {
       data: { user },
@@ -87,6 +94,15 @@ export async function GET(request: NextRequest) {
 
     if (user) {
       await syncEmployeeAuthProfile(user);
+      if (recoveryFlow) {
+        response.cookies.set('apollo_epcr_recovery', user.id, {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 10 * 60,
+          path: '/',
+        });
+      }
     }
   }
 
