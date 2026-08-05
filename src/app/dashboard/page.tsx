@@ -433,17 +433,6 @@ type TimecardWarningDialog = {
   messages: string[];
 };
 
-type ActiveShiftInfo = {
-  date: Date;
-  dateKey: string;
-  label: string;
-  slot: EmployeeSlot;
-  locationLabel: string;
-  latitude: number;
-  longitude: number;
-  radiusFeet: number;
-};
-
 type GeofenceLocation = {
   label: string;
   latitude: number;
@@ -1189,20 +1178,6 @@ function getShiftDateTimeRange(date: Date, slot: EmployeeSlot): { start: Date; e
   return { start, end };
 }
 
-function getDistanceFeet(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const earthRadiusFeet = 20902231;
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-
-  const deltaLat = toRadians(lat2 - lat1);
-  const deltaLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusFeet * c;
-}
-
 function formatDateTime(date: Date): string {
   return date.toLocaleString('en-US', {
     month: 'numeric',
@@ -1284,7 +1259,6 @@ export default function DashboardPage() {
     acknowledgedTimecardWarnings,
     setAcknowledgedTimecardWarnings,
   ] = useState<Record<string, boolean>>({});
-  const [isPunching, setIsPunching] = useState(false);
   const [showFullSchedule, setShowFullSchedule] = useState(false);
   const [showShiftTradeModal, setShowShiftTradeModal] = useState(false);
   const [showVacationRangeModal, setShowVacationRangeModal] = useState(false);
@@ -2574,76 +2548,6 @@ export default function DashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [timePunches, currentEmployeeId]);
 
-  const lastPunch = currentEmployeePunches[0] ?? null;
-  const isClockedIn = lastPunch?.type === 'CLOCK_IN';
-
-  const activeShift = useMemo((): ActiveShiftInfo | null => {
-    const now = new Date();
-    const earlyWindowMinutes = 60;
-    const lateWindowMinutes = 60;
-    const continuousShiftClockOutWindowHours = 72;
-
-    const buildActiveShift = (
-      date: Date,
-      dateKey: string,
-      label: string,
-      slot: EmployeeSlot,
-    ): ActiveShiftInfo => {
-      const configuredGeofence = systemConfig.geofences.find((item) => item.shiftLabel === label);
-      const fallbackGeofence = SHIFT_GEOFENCES[label] ?? SHIFT_GEOFENCES['Reedley 1'];
-
-      return {
-        date,
-        dateKey,
-        label,
-        slot,
-        locationLabel: configuredGeofence?.locationLabel ?? fallbackGeofence.label,
-        latitude: configuredGeofence?.latitude ?? fallbackGeofence.latitude,
-        longitude: configuredGeofence?.longitude ?? fallbackGeofence.longitude,
-        radiusFeet: configuredGeofence?.radiusFeet ?? fallbackGeofence.radiusFeet,
-      };
-    };
-
-    if (lastPunch?.type === 'CLOCK_IN') {
-      const clockInTime = new Date(lastPunch.timestamp);
-      const clockOutWindowEnd = new Date(
-        clockInTime.getTime() + continuousShiftClockOutWindowHours * 60 * 60 * 1000,
-      );
-
-      if (now <= clockOutWindowEnd) {
-        const clockInDate = parseDateKey(lastPunch.shiftDateKey);
-        const dayAssignments = assignmentsByDate[lastPunch.shiftDateKey] ?? [];
-        const assignment = dayAssignments.find((item) => item.label === lastPunch.shiftLabel);
-        const slot = assignment?.slots.find((item) => item.employeeId === currentEmployeeId);
-
-        if (assignment && slot) {
-          return buildActiveShift(clockInDate, lastPunch.shiftDateKey, assignment.label, slot);
-        }
-      }
-    }
-
-    for (const date of dates) {
-      const dateKey = toDateKey(date);
-      const dayAssignments = assignmentsByDate[dateKey] ?? [];
-
-      for (const assignment of dayAssignments) {
-        const slot = assignment.slots.find((item) => item.employeeId === currentEmployeeId);
-        if (!slot) {
-          continue;
-        }
-
-        const { start, end } = getShiftDateTimeRange(date, slot);
-        const earliestClockIn = new Date(start.getTime() - earlyWindowMinutes * 60 * 1000);
-        const latestClockOut = new Date(end.getTime() + lateWindowMinutes * 60 * 1000);
-
-        if (now >= earliestClockIn && now <= latestClockOut) {
-          return buildActiveShift(date, dateKey, assignment.label, slot);
-        }
-      }
-    }
-
-    return null;
-  }, [assignmentsByDate, dates, lastPunch, systemConfig.geofences]);
 
   const payPeriodPunches = useMemo(() => {
     const start = new Date(selectedPayPeriod.start);
@@ -2656,33 +2560,6 @@ export default function DashboardPage() {
       return timestamp >= start && timestamp <= end;
     });
   }, [currentEmployeePunches, selectedPayPeriod]);
-
-  async function saveTimePunches(nextPunches: TimePunch[]) {
-    setTimePunches(nextPunches);
-
-    const payload = nextPunches.map((punch) => ({
-      id: punch.id,
-      employee_id: punch.employeeId,
-      type: punch.type,
-      timestamp: punch.timestamp,
-      shift_date_key: punch.shiftDateKey,
-      shift_label: punch.shiftLabel,
-      location_label: punch.locationLabel,
-      latitude: punch.latitude,
-      longitude: punch.longitude,
-      distance_feet: punch.distanceFeet,
-      geofence_status: punch.geofenceStatus,
-    }));
-
-    const { error } = await supabase
-      .from('time_punches')
-      .upsert(payload, { onConflict: 'id' });
-
-    if (error) {
-      console.error('Failed to save time punches:', error);
-      window.alert(`Time punch save failed: ${error.message}`);
-    }
-  }
 
   function getTimecardNoteKey(): string {
     return `${currentEmployeeId}-${selectedPayPeriod.key}`;
@@ -3994,226 +3871,6 @@ export default function DashboardPage() {
     return [...standardAssignments, ...extraAssignments].find((assignment) =>
       assignment.slots.some((slot) => slot.employeeId === currentEmployeeId),
     ) ?? null;
-  }
-
-  function getCurrentPosition(): Promise<GeolocationPosition> {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not available in this browser.'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 12000,
-        maximumAge: 0,
-      });
-    });
-  }
-
-  function getPunchTimingNotice(
-    type: 'CLOCK_IN' | 'CLOCK_OUT',
-    punchTime: Date,
-    shiftInfo: ActiveShiftInfo,
-  ): string {
-    if (!shiftInfo.slot.employeeId) {
-      return '';
-    }
-
-    const scheduledRange = getShiftDateTimeRange(
-      shiftInfo.date,
-      shiftInfo.slot,
-    );
-
-    if (
-      type === 'CLOCK_IN' &&
-      punchTime.getTime() < scheduledRange.start.getTime()
-    ) {
-      return 'You clocked in before the scheduled start of your shift. Employees are not expected to begin work before their scheduled start time. If this early start was approved by the on-duty supervisor, please contact that supervisor so your scheduled start time can be adjusted.';
-    }
-
-    if (
-      type === 'CLOCK_OUT' &&
-      punchTime.getTime() > scheduledRange.end.getTime()
-    ) {
-      return 'You clocked out after your scheduled shift end. Please add an Employee Note explaining the reason for the late clock-out and include any associated EMS run numbers.';
-    }
-
-    return '';
-  }
-
-  async function handlePunch(type: 'CLOCK_IN' | 'CLOCK_OUT') {
-    const punchShiftContext =
-      activeShift ??
-      (type === 'CLOCK_OUT' && lastPunch?.type === 'CLOCK_IN'
-        ? (() => {
-            const fallbackGeofence =
-              SHIFT_GEOFENCES[lastPunch.shiftLabel] ??
-              SHIFT_GEOFENCES['Reedley 1'];
-            const fallbackDate = parseDateKey(
-              lastPunch.shiftDateKey,
-            );
-            const fallbackAssignment = (
-              assignmentsByDate[lastPunch.shiftDateKey] ?? []
-            ).find(
-              (assignment) =>
-                assignment.label === lastPunch.shiftLabel,
-            );
-            const fallbackSlot =
-              fallbackAssignment?.slots.find(
-                (slot) =>
-                  slot.employeeId === currentEmployeeId,
-              ) ?? createEmptyEmployeeSlot();
-
-            return {
-              date: fallbackDate,
-              dateKey: lastPunch.shiftDateKey,
-              label: lastPunch.shiftLabel,
-              slot: fallbackSlot,
-              locationLabel: fallbackGeofence.label,
-              latitude: fallbackGeofence.latitude,
-              longitude: fallbackGeofence.longitude,
-              radiusFeet: fallbackGeofence.radiusFeet,
-            };
-          })()
-        : null);
-
-    if (!punchShiftContext) {
-      setTimecardStatus('No active assigned shift was found for the current time window.');
-      return;
-    }
-
-    setIsPunching(true);
-    setTimecardStatus('Checking location...');
-
-    const punchShift =
-      type === 'CLOCK_OUT' && lastPunch?.type === 'CLOCK_IN'
-        ? {
-            dateKey: lastPunch.shiftDateKey,
-            label: lastPunch.shiftLabel,
-          }
-        : {
-            dateKey: punchShiftContext.dateKey,
-            label: punchShiftContext.label,
-          };
-
-    try {
-      const position = await getCurrentPosition();
-      const latitude = position.coords.latitude;
-      const longitude = position.coords.longitude;
-      const distanceFeet = getDistanceFeet(latitude, longitude, punchShiftContext.latitude, punchShiftContext.longitude);
-      const approved = distanceFeet <= punchShiftContext.radiusFeet;
-
-      const punch: TimePunch = {
-        id: `punch-${Date.now()}`,
-        employeeId: currentEmployeeId,
-        type,
-        timestamp: new Date().toISOString(),
-        shiftDateKey: punchShift.dateKey,
-        shiftLabel: punchShift.label,
-        locationLabel: punchShiftContext.locationLabel,
-        latitude,
-        longitude,
-        distanceFeet,
-        geofenceStatus: approved ? 'APPROVED' : 'OUTSIDE_GEOFENCE',
-      };
-
-      const punchTime = new Date(punch.timestamp);
-      const timingNotice = getPunchTimingNotice(
-        type,
-        punchTime,
-        punchShiftContext,
-      );
-
-      const punchStatus = approved
-        ? `${type === 'CLOCK_IN' ? 'Clock in' : 'Clock out'} recorded successfully.`
-        : `Punch recorded as outside geofence. Distance: ${Math.round(distanceFeet)} ft from ${punchShiftContext.locationLabel}.`;
-
-      setTimecardStatus(
-        [punchStatus, timingNotice].filter(Boolean).join(' '),
-      );
-
-      if (timingNotice) {
-        setTimecardWarningDialog({
-          title:
-            type === 'CLOCK_IN'
-              ? 'Early Clock-In Warning'
-              : 'Late Clock-Out Warning',
-          messages: [timingNotice],
-        });
-      }
-
-      saveTimePunches([punch, ...timePunches]);
-      updateEditableRow(parseDateKey(punch.shiftDateKey), {
-        shiftLabel: punch.shiftLabel,
-        ...(type === 'CLOCK_IN'
-          ? {
-              clockInDate: getIsoDateInputValue(punchTime),
-              clockInTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
-            }
-          : {
-              clockOutDate: getIsoDateInputValue(punchTime),
-              clockOutTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
-            }),
-      });
-    } catch (error) {
-      const punch: TimePunch = {
-        id: `punch-${Date.now()}`,
-        employeeId: currentEmployeeId,
-        type,
-        timestamp: new Date().toISOString(),
-        shiftDateKey: punchShift.dateKey,
-        shiftLabel: punchShift.label,
-        locationLabel: punchShiftContext.locationLabel,
-        latitude: null,
-        longitude: null,
-        distanceFeet: null,
-        geofenceStatus: 'LOCATION_UNAVAILABLE',
-      };
-
-      saveTimePunches([punch, ...timePunches]);
-
-      const punchTime = new Date(punch.timestamp);
-      const timingNotice = getPunchTimingNotice(
-        type,
-        punchTime,
-        punchShiftContext,
-      );
-
-      updateEditableRow(parseDateKey(punch.shiftDateKey), {
-        shiftLabel: punch.shiftLabel,
-        ...(type === 'CLOCK_IN'
-          ? {
-              clockInDate: getIsoDateInputValue(punchTime),
-              clockInTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
-            }
-          : {
-              clockOutDate: getIsoDateInputValue(punchTime),
-              clockOutTime: `${punchTime.getHours()}`.padStart(2, '0') + ':' + `${punchTime.getMinutes()}`.padStart(2, '0'),
-            }),
-      });
-
-      setTimecardStatus(
-        [
-          'Location was unavailable. Punch was recorded for supervisor review.',
-          timingNotice,
-        ]
-          .filter(Boolean)
-          .join(' '),
-      );
-
-      if (timingNotice) {
-        setTimecardWarningDialog({
-          title:
-            type === 'CLOCK_IN'
-              ? 'Early Clock-In Warning'
-              : 'Late Clock-Out Warning',
-          messages: [timingNotice],
-        });
-      }
-    } finally {
-      setIsPunching(false);
-    }
   }
 
   function isOpenShiftSlot(employeeId: string): boolean {
@@ -5865,9 +5522,7 @@ export default function DashboardPage() {
           {renderTile(
             'timecard',
             'Timecard',
-            isClockedIn
-              ? 'You are currently clocked in.'
-              : 'Review punches, approve the pay period timecard, request corrections, and clock in/out.',
+            'Enter your time manually, review the pay period, and submit it for supervisor approval.',
             <div>
               <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -5903,49 +5558,12 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Clock In / Clock Out</div>
-                    <div className="mt-1 text-sm text-slate-600">
-                      {activeShift
-                        ? `${activeShift.label} • ${formatShortDate(activeShift.date)} • ${activeShift.slot.startTime} - ${activeShift.slot.endTime}`
-                        : 'No active assigned shift found for the current time window.'}
-                    </div>
-                    {activeShift && (
-                      <div className="mt-1 text-xs text-slate-500">
-                        {activeShift.locationLabel} • {activeShift.radiusFeet} ft geofence
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div
-                      className={`rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wide ${
-                        isClockedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {isClockedIn ? 'Clocked In' : 'Off Duty'}
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={!activeShift || isClockedIn || isPunching}
-                      onClick={() => handlePunch('CLOCK_IN')}
-                      className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      {isPunching ? 'Checking...' : 'Clock In'}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={!isClockedIn || isPunching}
-                      onClick={() => handlePunch('CLOCK_OUT')}
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    >
-                      {isPunching ? 'Checking...' : 'Clock Out'}
-                    </button>
-                  </div>
+              <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <div className="text-sm font-semibold uppercase tracking-wide text-blue-800">
+                  Manual Time Entry
+                </div>
+                <div className="mt-1 text-sm leading-6 text-blue-950">
+                  Enter or correct your clock-in and clock-out dates and times in the timecard below. Review all entries and totals before submitting the pay period for supervisor approval.
                 </div>
 
                 {timecardWarningDialog && (
@@ -6527,11 +6145,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                Browser location permission is required for geofence approval. Approved clock-in locations are Reedley, Parlier, and Orange Cove stations. If location is unavailable or outside the geofence, the punch is saved for supervisor review.
-              </div>
             </div>,
-            isClockedIn,
+            false,
           )}
 
           {renderTile(
