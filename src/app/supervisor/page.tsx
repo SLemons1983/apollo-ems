@@ -211,6 +211,30 @@ type SubmittedTimecard = {
   reviewedBy?: string;
 };
 
+type SupervisorTimecardEditRow = {
+  id: string;
+  shiftDateKey: string;
+  shiftLabel: string;
+  payType: TimecardPayType;
+  clockInValue: string;
+  clockOutValue: string;
+  clockInId: string | null;
+  clockOutId: string | null;
+};
+
+type PayrollStatus =
+  | 'NOT_SUBMITTED'
+  | 'PENDING_REVIEW'
+  | 'PENDING_RESUBMISSION'
+  | 'APPROVED';
+
+type PayrollStatusRow = {
+  employeeId: string;
+  employeeName: string;
+  status: PayrollStatus;
+  submittedAt: string | null;
+};
+
 type IncidentReport = {
   id: string;
   incident_number: string;
@@ -573,13 +597,89 @@ function makeDateInputValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function escapePrintHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function formatDateTimeLocalInput(timestamp: string | undefined): string {
+  if (!timestamp) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function getNthWeekdayOfMonth(
+  year: number,
+  monthIndex: number,
+  weekday: number,
+  nth: number,
+): Date {
+  const date = new Date(year, monthIndex, 1);
+
+  while (date.getDay() !== weekday) {
+    date.setDate(date.getDate() + 1);
+  }
+
+  date.setDate(date.getDate() + (nth - 1) * 7);
+  return date;
+}
+
+function getLastWeekdayOfMonth(
+  year: number,
+  monthIndex: number,
+  weekday: number,
+): Date {
+  const date = new Date(year, monthIndex + 1, 0);
+
+  while (date.getDay() !== weekday) {
+    date.setDate(date.getDate() - 1);
+  }
+
+  return date;
+}
+
+function getCompanyHolidayDateKeys(year: number): string[] {
+  return [
+    makeDateInputValue(new Date(year, 0, 1)),
+    makeDateInputValue(getLastWeekdayOfMonth(year, 4, 1)),
+    makeDateInputValue(new Date(year, 6, 4)),
+    makeDateInputValue(getNthWeekdayOfMonth(year, 8, 1, 1)),
+    makeDateInputValue(getNthWeekdayOfMonth(year, 10, 4, 4)),
+    makeDateInputValue(new Date(year, 11, 25)),
+  ];
+}
+
+function isCompanyHoliday(date: Date): boolean {
+  return getCompanyHolidayDateKeys(date.getFullYear()).includes(
+    makeDateInputValue(date),
+  );
+}
+
 export default function SupervisorPage() {
   const [activeTile, setActiveTile] = useState<string | null>(null);
 
   const [showEmployeesNotSubmitted, setShowEmployeesNotSubmitted] = useState(false);
   const [showPendingReview, setShowPendingReview] = useState(false);
+  const [showPendingResubmission, setShowPendingResubmission] = useState(false);
   const [showReviewedTimecards, setShowReviewedTimecards] = useState(false);
+  const [showPayrollStatusTracker, setShowPayrollStatusTracker] = useState(true);
   const [selectedTimecardId, setSelectedTimecardId] = useState<string | null>(null);
+  const [editingTimecardId, setEditingTimecardId] = useState<string | null>(null);
+  const [supervisorEditRows, setSupervisorEditRows] = useState<SupervisorTimecardEditRow[]>([]);
+  const [supervisorEditReason, setSupervisorEditReason] = useState('');
+  const [isSavingSupervisorEdit, setIsSavingSupervisorEdit] = useState(false);
   const [showScheduleBuilder, setShowScheduleBuilder] = useState(false);
   const [showEula, setShowEula] = useState(false);
   const [announcements, setAnnouncements] = useState<CompanyAnnouncement[]>([]);
@@ -1389,9 +1489,15 @@ export default function SupervisorPage() {
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
-  const reviewedTimecards = useMemo(() => {
+  const pendingResubmissionTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
-      .filter((timecard) => timecard.status !== 'PENDING_SUPERVISOR_REVIEW')
+      .filter((timecard) => timecard.status === 'RETURNED')
+      .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
+  }, [selectedPayPeriodTimecards]);
+
+  const approvedTimecards = useMemo(() => {
+    return selectedPayPeriodTimecards
+      .filter((timecard) => timecard.status === 'APPROVED')
       .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
@@ -1410,6 +1516,50 @@ export default function SupervisorPage() {
     const submittedEmployeeIds = new Set(selectedPayPeriodTimecards.map((timecard) => timecard.employeeId));
 
     return employees.filter((employee) => scheduledEmployeeIds.has(employee.id) && !submittedEmployeeIds.has(employee.id));
+  }, [employees, scheduledEmployeeIds, selectedPayPeriodTimecards]);
+
+  const payrollStatusRows = useMemo<PayrollStatusRow[]>(() => {
+    const latestTimecardByEmployeeId = new Map<string, SubmittedTimecard>();
+
+    selectedPayPeriodTimecards.forEach((timecard) => {
+      const current = latestTimecardByEmployeeId.get(timecard.employeeId);
+
+      if (!current || new Date(timecard.submittedAt) > new Date(current.submittedAt)) {
+        latestTimecardByEmployeeId.set(timecard.employeeId, timecard);
+      }
+    });
+
+    const participatingEmployeeIds = new Set<string>([
+      ...scheduledEmployeeIds,
+      ...latestTimecardByEmployeeId.keys(),
+    ]);
+
+    const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+
+    return [...participatingEmployeeIds]
+      .map((employeeId) => {
+        const timecard = latestTimecardByEmployeeId.get(employeeId);
+        let status: PayrollStatus = 'NOT_SUBMITTED';
+
+        if (timecard?.status === 'PENDING_SUPERVISOR_REVIEW') {
+          status = 'PENDING_REVIEW';
+        } else if (timecard?.status === 'RETURNED') {
+          status = 'PENDING_RESUBMISSION';
+        } else if (timecard?.status === 'APPROVED') {
+          status = 'APPROVED';
+        }
+
+        return {
+          employeeId,
+          employeeName:
+            employeeById.get(employeeId)?.name ??
+            timecard?.employeeName ??
+            employeeId,
+          status,
+          submittedAt: timecard?.submittedAt ?? null,
+        };
+      })
+      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
   }, [employees, scheduledEmployeeIds, selectedPayPeriodTimecards]);
 
   function sendTimecardReminders() {
@@ -2635,6 +2785,527 @@ export default function SupervisorPage() {
     }
   }
 
+  function normalizeSupervisorEditPayType(
+    value: string | undefined,
+  ): TimecardPayType {
+    if (
+      value === 'DAILY_OT_DT' ||
+      value === 'TWENTY_FOUR_HOUR' ||
+      value === 'CALL_IN' ||
+      value === 'SICK_TIME' ||
+      value === 'VACATION' ||
+      value === 'JURY_DUTY'
+    ) {
+      return value;
+    }
+
+    return 'DAILY_OT_DT';
+  }
+
+  function buildSupervisorTimecardEditRows(
+    timecard: SubmittedTimecard,
+  ): SupervisorTimecardEditRow[] {
+    const grouped = new Map<string, TimePunch[]>();
+
+    [...timecard.punches]
+      .sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      )
+      .forEach((punch) => {
+        const groupKey = punch.id
+          .replace(/^editable-clock-in-/, '')
+          .replace(/^editable-clock-out-/, '');
+
+        grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), punch]);
+      });
+
+    return [...grouped.entries()]
+      .map(([id, group]) => {
+        const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+        const clockOut =
+          [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ??
+          null;
+
+        return {
+          id,
+          shiftDateKey:
+            clockIn?.shiftDateKey ?? clockOut?.shiftDateKey ?? '',
+          shiftLabel: clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '',
+          payType: normalizeSupervisorEditPayType(
+            clockIn?.payType ?? clockOut?.payType,
+          ),
+          clockInValue: formatDateTimeLocalInput(clockIn?.timestamp),
+          clockOutValue: formatDateTimeLocalInput(clockOut?.timestamp),
+          clockInId: clockIn?.id ?? null,
+          clockOutId: clockOut?.id ?? null,
+        };
+      })
+      .filter((row) => row.shiftDateKey)
+      .sort((a, b) =>
+        `${a.shiftDateKey}|${a.clockInValue}`.localeCompare(
+          `${b.shiftDateKey}|${b.clockInValue}`,
+        ),
+      );
+  }
+
+  function startSupervisorTimecardEdit(timecard: SubmittedTimecard) {
+    const rows = buildSupervisorTimecardEditRows(timecard);
+
+    if (rows.length === 0) {
+      window.alert(
+        'This submitted timecard has no punch rows to edit. Return it to the employee so the missing shift can be entered.',
+      );
+      return;
+    }
+
+    setEditingTimecardId(timecard.id);
+    setSupervisorEditRows(rows);
+    setSupervisorEditReason('');
+  }
+
+  function cancelSupervisorTimecardEdit() {
+    setEditingTimecardId(null);
+    setSupervisorEditRows([]);
+    setSupervisorEditReason('');
+  }
+
+  function updateSupervisorTimecardEditRow(
+    rowId: string,
+    updates: Partial<SupervisorTimecardEditRow>,
+  ) {
+    setSupervisorEditRows((current) =>
+      current.map((row) => (row.id === rowId ? { ...row, ...updates } : row)),
+    );
+  }
+
+  function getSupervisorEditRowHours(
+    row: SupervisorTimecardEditRow,
+  ): number {
+    if (!row.clockInValue || !row.clockOutValue) {
+      return 0;
+    }
+
+    const start = new Date(row.clockInValue);
+    const end = new Date(row.clockOutValue);
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      end <= start
+    ) {
+      return 0;
+    }
+
+    return (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  }
+
+  function calculateSupervisorEditPayBreakdown(
+    timecard: SubmittedTimecard,
+    rows: SupervisorTimecardEditRow[],
+  ): PayBreakdown {
+    let week1 = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 };
+    let week2 = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 };
+    const weeklyOtTrackedHours = [0, 0];
+    let holidayPremiumHours = 0;
+    const payPeriodStartKey = makeDateInputValue(
+      new Date(timecard.payPeriodStart),
+    );
+    const payPeriodStart = new Date(`${payPeriodStartKey}T12:00:00`);
+
+    [...rows]
+      .sort((a, b) =>
+        `${a.shiftDateKey}|${a.clockInValue}`.localeCompare(
+          `${b.shiftDateKey}|${b.clockInValue}`,
+        ),
+      )
+      .forEach((row) => {
+        const hours = getSupervisorEditRowHours(row);
+
+        if (!hours || !row.shiftLabel.trim()) {
+          return;
+        }
+
+        const shiftDate = new Date(`${row.shiftDateKey}T12:00:00`);
+        const dayIndex = Math.round(
+          (shiftDate.getTime() - payPeriodStart.getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        const weekIndex = dayIndex < 7 ? 0 : 1;
+        const targetWeek = weekIndex === 0 ? week1 : week2;
+        let nextWeek = targetWeek;
+
+        if (
+          row.payType === 'SICK_TIME' ||
+          row.payType === 'VACATION' ||
+          row.payType === 'JURY_DUTY'
+        ) {
+          nextWeek = {
+            ...targetWeek,
+            regularHours: targetWeek.regularHours + hours,
+          };
+        } else if (
+          row.payType === 'DAILY_OT_DT' ||
+          row.payType === 'CALL_IN'
+        ) {
+          const doubleTimeHours = Math.max(0, hours - 12);
+          const nonDoubleTimeHours = Math.max(0, hours - doubleTimeHours);
+          const dailyOvertimeFloor = Math.max(
+            0,
+            Math.min(nonDoubleTimeHours, 12) - 8,
+          );
+          const weeklyRegularRemaining = Math.max(
+            0,
+            40 - weeklyOtTrackedHours[weekIndex],
+          );
+          const regularHours = Math.min(
+            nonDoubleTimeHours - dailyOvertimeFloor,
+            weeklyRegularRemaining,
+          );
+          const overtimeHours = Math.max(
+            0,
+            nonDoubleTimeHours - regularHours,
+          );
+
+          weeklyOtTrackedHours[weekIndex] += nonDoubleTimeHours;
+          nextWeek = {
+            regularHours: targetWeek.regularHours + regularHours,
+            overtimeHours: targetWeek.overtimeHours + overtimeHours,
+            doubleTimeHours: targetWeek.doubleTimeHours + doubleTimeHours,
+          };
+        } else {
+          const regularRemainingThisWeek = Math.max(
+            0,
+            40 - weeklyOtTrackedHours[weekIndex],
+          );
+          const regularHours = Math.min(hours, regularRemainingThisWeek);
+          const overtimeHours = Math.max(0, hours - regularHours);
+
+          weeklyOtTrackedHours[weekIndex] += hours;
+          nextWeek = {
+            regularHours: targetWeek.regularHours + regularHours,
+            overtimeHours: targetWeek.overtimeHours + overtimeHours,
+            doubleTimeHours: targetWeek.doubleTimeHours,
+          };
+        }
+
+        if (isCompanyHoliday(shiftDate)) {
+          if (row.payType === 'TWENTY_FOUR_HOUR') {
+            holidayPremiumHours += 12;
+          } else if (row.payType === 'DAILY_OT_DT') {
+            holidayPremiumHours += 6;
+          }
+        }
+
+        if (weekIndex === 0) {
+          week1 = nextWeek;
+        } else {
+          week2 = nextWeek;
+        }
+      });
+
+    return {
+      regularHours: week1.regularHours + week2.regularHours,
+      overtimeHours: week1.overtimeHours + week2.overtimeHours,
+      doubleTimeHours: week1.doubleTimeHours + week2.doubleTimeHours,
+      holidayPremiumHours,
+      missedMealPenaltyHours: timecard.missedMealBreaks.length,
+      week1,
+      week2,
+    };
+  }
+
+  function payBreakdownChanged(
+    previous: PayBreakdown,
+    next: PayBreakdown,
+  ): boolean {
+    const values = [
+      [previous.regularHours, next.regularHours],
+      [previous.overtimeHours, next.overtimeHours],
+      [previous.doubleTimeHours, next.doubleTimeHours],
+      [previous.holidayPremiumHours, next.holidayPremiumHours],
+      [previous.missedMealPenaltyHours, next.missedMealPenaltyHours],
+      [previous.week1.regularHours, next.week1.regularHours],
+      [previous.week1.overtimeHours, next.week1.overtimeHours],
+      [previous.week1.doubleTimeHours, next.week1.doubleTimeHours],
+      [previous.week2.regularHours, next.week2.regularHours],
+      [previous.week2.overtimeHours, next.week2.overtimeHours],
+      [previous.week2.doubleTimeHours, next.week2.doubleTimeHours],
+    ];
+
+    return values.some(([before, after]) => Math.abs(before - after) > 0.001);
+  }
+
+  function formatSupervisorEditAuditValue(value: string): string {
+    if (!value) {
+      return 'Missing';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  async function saveSupervisorTimecardEdit(timecard: SubmittedTimecard) {
+    const reason = supervisorEditReason.trim();
+
+    if (!reason) {
+      window.alert('Enter a required correction reason before saving.');
+      return;
+    }
+
+    const invalidRow = supervisorEditRows.find((row) => {
+      if (!row.shiftLabel.trim() || !row.clockInValue || !row.clockOutValue) {
+        return true;
+      }
+
+      return getSupervisorEditRowHours(row) <= 0;
+    });
+
+    if (invalidRow) {
+      window.alert(
+        `Complete a valid shift, clock-in, and clock-out for ${invalidRow.shiftDateKey}. Clock-out must be after clock-in.`,
+      );
+      return;
+    }
+
+    const originalPunchById = new Map(
+      timecard.punches.map((punch) => [punch.id, punch]),
+    );
+    const changeDescriptions: string[] = [];
+    const correctedPunches: TimePunch[] = [];
+    let compensationRelevantChangeDetected = false;
+
+    supervisorEditRows.forEach((row) => {
+      const originalClockIn = row.clockInId
+        ? originalPunchById.get(row.clockInId) ?? null
+        : null;
+      const originalClockOut = row.clockOutId
+        ? originalPunchById.get(row.clockOutId) ?? null
+        : null;
+      const originalShiftLabel =
+        originalClockIn?.shiftLabel ?? originalClockOut?.shiftLabel ?? '';
+      const originalPayType = normalizeSupervisorEditPayType(
+        originalClockIn?.payType ?? originalClockOut?.payType,
+      );
+      const originalClockInValue = formatDateTimeLocalInput(
+        originalClockIn?.timestamp,
+      );
+      const originalClockOutValue = formatDateTimeLocalInput(
+        originalClockOut?.timestamp,
+      );
+      const rowChanges: string[] = [];
+
+      if (originalShiftLabel !== row.shiftLabel.trim()) {
+        rowChanges.push(
+          `shift “${originalShiftLabel || 'Missing'}” → “${row.shiftLabel.trim()}”`,
+        );
+      }
+
+      if (originalPayType !== row.payType) {
+        compensationRelevantChangeDetected = true;
+        rowChanges.push(
+          `pay type ${getPayTypeLabel(originalPayType)} → ${getPayTypeLabel(row.payType)}`,
+        );
+      }
+
+      if (originalClockInValue !== row.clockInValue) {
+        compensationRelevantChangeDetected = true;
+        rowChanges.push(
+          `clock-in ${formatSupervisorEditAuditValue(originalClockInValue)} → ${formatSupervisorEditAuditValue(row.clockInValue)}`,
+        );
+      }
+
+      if (originalClockOutValue !== row.clockOutValue) {
+        compensationRelevantChangeDetected = true;
+        rowChanges.push(
+          `clock-out ${formatSupervisorEditAuditValue(originalClockOutValue)} → ${formatSupervisorEditAuditValue(row.clockOutValue)}`,
+        );
+      }
+
+      const rowWasChanged = rowChanges.length > 0;
+
+      if (rowWasChanged) {
+        changeDescriptions.push(
+          `${row.shiftDateKey}: ${rowChanges.join(', ')}`,
+        );
+      }
+
+      const buildCorrectedPunch = (
+        type: TimePunch['type'],
+        value: string,
+        originalPunch: TimePunch | null,
+      ): TimePunch => ({
+        id:
+          originalPunch?.id ??
+          `editable-${type === 'CLOCK_IN' ? 'clock-in' : 'clock-out'}-${row.id}`,
+        employeeId: timecard.employeeId,
+        type,
+        timestamp:
+          originalPunch &&
+          formatDateTimeLocalInput(originalPunch.timestamp) === value
+            ? originalPunch.timestamp
+            : new Date(value).toISOString(),
+        shiftDateKey: row.shiftDateKey,
+        shiftLabel: row.shiftLabel.trim(),
+        payType: row.payType,
+        locationLabel: rowWasChanged
+          ? 'Supervisor corrected timecard'
+          : originalPunch?.locationLabel ?? 'Submitted timecard',
+        latitude: originalPunch?.latitude ?? null,
+        longitude: originalPunch?.longitude ?? null,
+        distanceFeet: originalPunch?.distanceFeet ?? null,
+        geofenceStatus: rowWasChanged
+          ? 'LOCATION_UNAVAILABLE'
+          : originalPunch?.geofenceStatus ?? 'LOCATION_UNAVAILABLE',
+      });
+
+      correctedPunches.push(
+        buildCorrectedPunch('CLOCK_IN', row.clockInValue, originalClockIn),
+        buildCorrectedPunch('CLOCK_OUT', row.clockOutValue, originalClockOut),
+      );
+    });
+
+    if (changeDescriptions.length === 0) {
+      window.alert('No timecard changes were detected.');
+      return;
+    }
+
+    const previousPayBreakdown = getPayBreakdown(timecard);
+    const recalculatedPayBreakdown = calculateSupervisorEditPayBreakdown(
+      timecard,
+      supervisorEditRows,
+    );
+    const recalculatedTotalHours = supervisorEditRows.reduce(
+      (total, row) => total + getSupervisorEditRowHours(row),
+      0,
+    );
+    const affectsCompensation =
+      compensationRelevantChangeDetected &&
+      (Math.abs(recalculatedTotalHours - timecard.totalHours) > 0.001 ||
+        payBreakdownChanged(previousPayBreakdown, recalculatedPayBreakdown));
+    const nextPayBreakdown = compensationRelevantChangeDetected
+      ? recalculatedPayBreakdown
+      : previousPayBreakdown;
+    const nextTotalHours = compensationRelevantChangeDetected
+      ? recalculatedTotalHours
+      : timecard.totalHours;
+    const correctedAt = new Date().toISOString();
+    const correctedBy = currentEmployee?.name ?? 'Supervisor';
+    const correctionType = affectsCompensation
+      ? 'Compensation-affecting correction'
+      : 'Administrative correction';
+    const supervisorComment =
+      `${correctionType} by ${correctedBy} on ${new Date(correctedAt).toLocaleString('en-US')}.\n` +
+      `Reason: ${reason}\n` +
+      `Changes: ${changeDescriptions.join(' | ')}`;
+    const correctedTimecard: SubmittedTimecard = {
+      ...timecard,
+      totalHours: nextTotalHours,
+      payBreakdown: nextPayBreakdown,
+      punches: correctedPunches,
+      submissionAcknowledgement: affectsCompensation
+        ? null
+        : timecard.submissionAcknowledgement,
+      status: affectsCompensation ? 'RETURNED' : 'PENDING_SUPERVISOR_REVIEW',
+      supervisorComment,
+      reviewedAt: affectsCompensation ? correctedAt : undefined,
+      reviewedBy: affectsCompensation ? correctedBy : undefined,
+    };
+    const auditEntry: AuditLogEntry = {
+      id: `audit-timecard-edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: correctedAt,
+      actor: correctedBy,
+      action: 'TIMECARD_SUPERVISOR_EDITED',
+      details:
+        `${timecard.employeeName} — ${correctionType}. Reason: ${reason}. ` +
+        `Total hours ${timecard.totalHours.toFixed(2)} → ${nextTotalHours.toFixed(2)}. ` +
+        `Original and corrected values: ${changeDescriptions.join(' | ')}`,
+    };
+
+    setIsSavingSupervisorEdit(true);
+
+    try {
+      await saveSubmittedTimecard(correctedTimecard);
+
+      const { error: auditError } = await supabase.from('audit_logs').insert({
+        id: auditEntry.id,
+        timestamp: auditEntry.timestamp,
+        actor: auditEntry.actor,
+        action: auditEntry.action,
+        details: auditEntry.details,
+      });
+
+      if (auditError) {
+        try {
+          await saveSubmittedTimecard(timecard);
+        } catch (rollbackError) {
+          console.error('Failed to roll back timecard after audit error:', rollbackError);
+        }
+
+        throw new Error(
+          `The correction audit could not be saved, so Apollo restored the original timecard. ${auditError.message}`,
+        );
+      }
+
+      setAuditLog((current) => [auditEntry, ...current].slice(0, 250));
+
+      if (affectsCompensation) {
+        const message: ApolloMessage = {
+          id: `timecard-supervisor-edit-${Date.now()}`,
+          conversationId: `timecard-${timecard.id}`,
+          senderId: CURRENT_SUPERVISOR_ID,
+          senderName: correctedBy,
+          senderRole: 'SUPERVISOR',
+          recipients: [
+            {
+              employeeId: timecard.employeeId,
+              deliveredAt: correctedAt,
+              readAt: null,
+            },
+          ],
+          audienceLabel: timecard.employeeName,
+          title: 'Timecard Correction Requires Acknowledgement',
+          body:
+            `A supervisor corrected your timecard for ${formatShortDate(new Date(timecard.payPeriodStart))} to ${formatShortDate(new Date(timecard.payPeriodEnd))}.\n\n` +
+            `Reason: ${reason}\n\n` +
+            `Your corrected timecard is pending resubmission. Please review the corrected hours, acknowledge the timecard, and resubmit it for supervisor approval.`,
+          createdAt: correctedAt,
+          relatedType: 'TIMECARD_RETURNED',
+          relatedId: timecard.id,
+          priority: 'IMPORTANT',
+        };
+
+        saveApolloMessages([message, ...apolloMessages]);
+        setShowPendingResubmission(true);
+      }
+
+      cancelSupervisorTimecardEdit();
+      setSelectedTimecardId(null);
+      window.alert(
+        affectsCompensation
+          ? 'The correction was saved and moved to Pending Resubmission for employee acknowledgement.'
+          : 'The administrative correction was saved. The timecard remains pending review and may now be approved.',
+      );
+    } catch (error) {
+      console.error('Failed to save supervisor timecard correction:', error);
+      const message = error instanceof Error ? error.message : 'Unknown database error';
+      window.alert(`Timecard correction failed: ${message}`);
+    } finally {
+      setIsSavingSupervisorEdit(false);
+    }
+  }
+
   function getPunchPairForDate(timecard: SubmittedTimecard, dateKey: string) {
     const pairs = getPunchPairsForDate(timecard, dateKey);
     return pairs[0] ?? { clockIn: null, clockOut: null, shiftLabel: '' };
@@ -2719,6 +3390,12 @@ export default function SupervisorPage() {
     return timecard.punches.some((punch) => punch.locationLabel === 'Employee edited timecard');
   }
 
+  function hasSupervisorEditFlag(timecard: SubmittedTimecard): boolean {
+    return timecard.punches.some(
+      (punch) => punch.locationLabel === 'Supervisor corrected timecard',
+    );
+  }
+
   function hasGeofenceReviewFlag(timecard: SubmittedTimecard): boolean {
     return timecard.punches.some((punch) => punch.geofenceStatus !== 'APPROVED');
   }
@@ -2739,6 +3416,7 @@ export default function SupervisorPage() {
   function getScheduleMatchStatus(timecard: SubmittedTimecard): 'MATCH' | 'REVIEW' {
     if (
       hasManualEditFlag(timecard) ||
+      hasSupervisorEditFlag(timecard) ||
       hasGeofenceReviewFlag(timecard) ||
       timecard.missedMealBreaks.length > 0
     ) {
@@ -3191,9 +3869,7 @@ export default function SupervisorPage() {
   }
 
   function submitPayroll() {
-    const approvedCount = reviewedTimecards.filter(
-      (timecard) => timecard.status === 'APPROVED'
-    ).length;
+    const approvedCount = approvedTimecards.length;
 
     if (employeesNotSubmitted.length > 0) {
       window.alert('Payroll cannot be submitted. Employees still have missing timecards.');
@@ -3202,6 +3878,13 @@ export default function SupervisorPage() {
 
     if (pendingTimecards.length > 0) {
       window.alert('Payroll cannot be submitted. Timecards are still pending review.');
+      return;
+    }
+
+    if (pendingResubmissionTimecards.length > 0) {
+      window.alert(
+        'Payroll cannot be submitted. Timecards are still pending employee resubmission.',
+      );
       return;
     }
 
@@ -3269,15 +3952,17 @@ export default function SupervisorPage() {
       });
   }
 
-  function printAllTimecards() {
-    const approvedCards = reviewedTimecards.filter((timecard) => timecard.status === 'APPROVED');
-
-    if (approvedCards.length === 0) {
-      window.alert('No approved timecards available for printing.');
+  function printTimecardPacket(
+    packetCards: SubmittedTimecard[],
+    packetTitle: string,
+    emptyMessage: string,
+  ) {
+    if (packetCards.length === 0) {
+      window.alert(emptyMessage);
       return;
     }
 
-    const html = approvedCards
+    const html = packetCards
       .map((timecard) => {
         const element = document.getElementById(`printable-${timecard.id}`);
         if (!element) return '';
@@ -3300,7 +3985,7 @@ export default function SupervisorPage() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Payroll Packet</title>
+          <title>${escapePrintHtml(packetTitle)}</title>
           <style>
             @page {
               size: letter landscape;
@@ -3415,6 +4100,102 @@ export default function SupervisorPage() {
     printWindow.print();
   }
 
+  function printAllTimecards() {
+    printTimecardPacket(
+      approvedTimecards,
+      'Approved Payroll Packet',
+      'No approved timecards are available for printing.',
+    );
+  }
+
+  function printPendingResubmissions() {
+    printTimecardPacket(
+      pendingResubmissionTimecards,
+      'Pending Resubmission Timecards — Not Approved',
+      'No timecards are pending employee resubmission.',
+    );
+  }
+
+  function getPayrollStatusLabel(status: PayrollStatus): string {
+    const labels: Record<PayrollStatus, string> = {
+      NOT_SUBMITTED: 'Not Submitted',
+      PENDING_REVIEW: 'Pending Review',
+      PENDING_RESUBMISSION: 'Pending Resubmission',
+      APPROVED: 'Approved',
+    };
+
+    return labels[status];
+  }
+
+  function printPayrollStatusTracker() {
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      window.alert(
+        'Unable to open the payroll status tracker. Please allow pop-ups for ApolloEMS.',
+      );
+      return;
+    }
+
+    const tableRows = payrollStatusRows
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapePrintHtml(row.employeeName)}</td>
+            <td class="status status-${row.status.toLowerCase()}">${escapePrintHtml(getPayrollStatusLabel(row.status))}</td>
+            <td>${row.submittedAt ? escapePrintHtml(new Date(row.submittedAt).toLocaleString('en-US')) : '—'}</td>
+          </tr>
+        `,
+      )
+      .join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Payroll Status Tracker</title>
+          <style>
+            @page { size: letter portrait; margin: 0.5in; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; }
+            h1 { font-size: 22px; margin: 0 0 6px; }
+            .period { color: #475569; font-size: 13px; margin-bottom: 18px; }
+            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+            .summary div { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; font-size: 12px; }
+            .summary strong { display: block; font-size: 18px; margin-top: 3px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th, td { border: 1px solid #94a3b8; padding: 7px; text-align: left; }
+            th { background: #e2e8f0; }
+            .status { font-weight: 700; }
+            .status-not_submitted { color: #b91c1c; }
+            .status-pending_review { color: #1d4ed8; }
+            .status-pending_resubmission { color: #b45309; }
+            .status-approved { color: #047857; }
+            .footer { color: #64748b; font-size: 10px; margin-top: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>ApolloEMS Payroll Status Tracker</h1>
+          <div class="period">Pay Period: ${escapePrintHtml(formatShortDate(selectedPayPeriod.start))} to ${escapePrintHtml(formatShortDate(selectedPayPeriod.end))}</div>
+          <div class="summary">
+            <div>Not Submitted<strong>${employeesNotSubmitted.length}</strong></div>
+            <div>Pending Review<strong>${pendingTimecards.length}</strong></div>
+            <div>Pending Resubmission<strong>${pendingResubmissionTimecards.length}</strong></div>
+            <div>Approved<strong>${approvedTimecards.length}</strong></div>
+          </div>
+          <table>
+            <thead><tr><th>Employee</th><th>Status</th><th>Last Submitted</th></tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+          <div class="footer">Generated ${escapePrintHtml(new Date().toLocaleString('en-US'))}. Pending resubmission timecards are not approved payroll records.</div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
   function renderSubmittedTimecard(timecard: SubmittedTimecard) {
     const payPeriodStart = new Date(timecard.payPeriodStart);
     const allDates = Array.from({ length: 14 }, (_, index) => addDays(payPeriodStart, index));
@@ -3425,15 +4206,22 @@ export default function SupervisorPage() {
 
     const breakdown = getPayBreakdown(timecard);
     const hasManualEdits = hasManualEditFlag(timecard);
+    const hasSupervisorEdits = hasSupervisorEditFlag(timecard);
     const hasGeofenceFlags = hasGeofenceReviewFlag(timecard);
     const hasMissingPunches = hasMissingPunchFlag(timecard, weeks);
     const hasMissedMeals = timecard.missedMealBreaks.length > 0;
-    const hasFlags = hasManualEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
+    const hasFlags = hasManualEdits || hasSupervisorEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
     const isOwnSupervisorTimecard = timecard.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID;
     const scheduleMatchStatus = getScheduleMatchStatus(timecard);
 
     return (
       <div id={`printable-${timecard.id}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+        {timecard.status === 'RETURNED' && (
+          <div className="mb-4 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-3 text-center text-sm font-black uppercase tracking-wide text-amber-900">
+            Pending Resubmission — Not Approved
+          </div>
+        )}
+
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -3491,13 +4279,15 @@ export default function SupervisorPage() {
                 Own Timecard — Needs Another Approver
               </div>
             )}
-            {timecard.status === 'APPROVED' && (
+            {(timecard.status === 'APPROVED' || timecard.status === 'RETURNED') && (
               <button
                 type="button"
                 onClick={() => printTimecard(timecard.id)}
                 className="no-print rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
               >
-                Print / Save PDF
+                {timecard.status === 'RETURNED'
+                  ? 'Print Pending Copy'
+                  : 'Print / Save PDF'}
               </button>
             )}
           </div>
@@ -3552,6 +4342,11 @@ export default function SupervisorPage() {
               {hasManualEdits && (
                 <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
                   Manual Edit Detected
+                </span>
+              )}
+              {hasSupervisorEdits && (
+                <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+                  Supervisor Correction Recorded
                 </span>
               )}
               {hasGeofenceFlags && (
@@ -3615,6 +4410,10 @@ export default function SupervisorPage() {
                           pair.clockIn?.locationLabel === 'Employee edited timecard' ||
                             pair.clockOut?.locationLabel === 'Employee edited timecard',
                         );
+                        const hasSupervisorEdit = Boolean(
+                          pair.clockIn?.locationLabel === 'Supervisor corrected timecard' ||
+                            pair.clockOut?.locationLabel === 'Supervisor corrected timecard',
+                        );
 
                         return (
                           <tr key={`${timecard.id}-${week.label}-${dateKey}-${pairIndex}`} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}>
@@ -3639,6 +4438,8 @@ export default function SupervisorPage() {
                                 <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-700">Geofence</span>
                               ) : hasManualEdit ? (
                                 <span className="rounded-full bg-blue-100 px-2 py-0.5 font-bold text-blue-700">Edited</span>
+                              ) : hasSupervisorEdit ? (
+                                <span className="rounded-full bg-violet-100 px-2 py-0.5 font-bold text-violet-700">Supervisor</span>
                               ) : pair.shiftLabel ? (
                                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-bold text-emerald-700">OK</span>
                               ) : null}
@@ -3944,9 +4745,143 @@ export default function SupervisorPage() {
           </div>
         </div>
 
+        {timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
+          editingTimecardId === timecard.id && (
+            <div className="no-print mt-4 rounded-xl border-2 border-blue-300 bg-blue-50 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="text-base font-bold text-blue-950">
+                    Supervisor Timecard Correction
+                  </div>
+                  <div className="mt-1 text-sm text-blue-800">
+                    Edit submitted shift details and punch times. Apollo will
+                    recalculate regular, overtime, double-time, and holiday
+                    hours before saving.
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-800">
+                  Pay-changing edits require employee acknowledgement.
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {supervisorEditRows.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid gap-3 rounded-xl border border-blue-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-[140px_1fr_180px_1fr_1fr]"
+                  >
+                    <label className="text-xs font-semibold text-slate-600">
+                      Shift Date
+                      <input
+                        value={row.shiftDateKey}
+                        readOnly
+                        className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Shift
+                      <input
+                        value={row.shiftLabel}
+                        onChange={(event) =>
+                          updateSupervisorTimecardEditRow(row.id, {
+                            shiftLabel: event.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Pay Type
+                      <select
+                        value={row.payType}
+                        onChange={(event) =>
+                          updateSupervisorTimecardEditRow(row.id, {
+                            payType: event.target.value as TimecardPayType,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                      >
+                        <option value="DAILY_OT_DT">Non 24-Shift</option>
+                        <option value="TWENTY_FOUR_HOUR">24-Hour Shift</option>
+                        <option value="CALL_IN">Call In</option>
+                        <option value="SICK_TIME">Sick Time</option>
+                        <option value="VACATION">Vacation</option>
+                        <option value="JURY_DUTY">Jury Duty</option>
+                      </select>
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Clock In
+                      <input
+                        type="datetime-local"
+                        value={row.clockInValue}
+                        onChange={(event) =>
+                          updateSupervisorTimecardEditRow(row.id, {
+                            clockInValue: event.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-slate-600">
+                      Clock Out
+                      <input
+                        type="datetime-local"
+                        value={row.clockOutValue}
+                        onChange={(event) =>
+                          updateSupervisorTimecardEditRow(row.id, {
+                            clockOutValue: event.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+
+              <label className="mt-4 block text-xs font-semibold text-slate-700">
+                Required Correction Reason
+                <textarea
+                  value={supervisorEditReason}
+                  onChange={(event) => setSupervisorEditReason(event.target.value)}
+                  rows={3}
+                  placeholder="Explain why the submitted timecard is being corrected..."
+                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                />
+              </label>
+
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingSupervisorEdit}
+                  onClick={cancelSupervisorTimecardEdit}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isSavingSupervisorEdit}
+                  onClick={() => void saveSupervisorTimecardEdit(timecard)}
+                  className="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isSavingSupervisorEdit
+                    ? 'Saving Correction...'
+                    : 'Save Audited Correction'}
+                </button>
+              </div>
+            </div>
+          )}
+
         {timecard.status === 'PENDING_SUPERVISOR_REVIEW' && (
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
               <textarea
                 value={returnComments[timecard.id] ?? ''}
                 onChange={(event) =>
@@ -3962,20 +4897,53 @@ export default function SupervisorPage() {
 
               <button
                 type="button"
-                disabled={payrollLocked}
-                onClick={() => returnTimecard(timecard.id)}
-                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                disabled={
+                  isOwnSupervisorTimecard ||
+                  payrollLocked ||
+                  editingTimecardId === timecard.id
+                }
+                onClick={() => startSupervisorTimecardEdit(timecard)}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
               >
-                {payrollLocked ? 'Payroll Locked' : 'Return for Correction'}
+                {payrollLocked
+                  ? 'Payroll Locked'
+                  : isOwnSupervisorTimecard
+                    ? 'Needs Other Supervisor'
+                    : editingTimecardId === timecard.id
+                      ? 'Editing'
+                      : 'Edit Timecard'}
               </button>
 
               <button
                 type="button"
-                disabled={isOwnSupervisorTimecard || payrollLocked}
+                disabled={payrollLocked || editingTimecardId === timecard.id}
+                onClick={() => returnTimecard(timecard.id)}
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {payrollLocked
+                  ? 'Payroll Locked'
+                  : editingTimecardId === timecard.id
+                    ? 'Finish Editing First'
+                    : 'Return for Correction'}
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  isOwnSupervisorTimecard ||
+                  payrollLocked ||
+                  editingTimecardId === timecard.id
+                }
                 onClick={() => approveTimecard(timecard.id)}
                 className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
-                {payrollLocked ? 'Payroll Locked' : isOwnSupervisorTimecard ? 'Needs Other Approver' : 'Approve'}
+                {payrollLocked
+                  ? 'Payroll Locked'
+                  : isOwnSupervisorTimecard
+                    ? 'Needs Other Approver'
+                    : editingTimecardId === timecard.id
+                      ? 'Finish Editing First'
+                      : 'Approve'}
               </button>
             </div>
           </div>
@@ -6532,8 +7500,8 @@ export default function SupervisorPage() {
           {renderTile(
             'timecard-review',
             'Timecard Review',
-            pendingTimecards.length > 0
-              ? `${pendingTimecards.length} timecard${pendingTimecards.length === 1 ? '' : 's'} pending supervisor review.`
+            pendingTimecards.length + pendingResubmissionTimecards.length > 0
+              ? `${pendingTimecards.length} pending review; ${pendingResubmissionTimecards.length} pending employee resubmission.`
               : 'Review, approve, or return submitted employee timecards.',
             <div className="space-y-5">
               <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
@@ -6577,12 +7545,16 @@ export default function SupervisorPage() {
 
               <div
                 className={`rounded-xl border p-4 ${
-                  employeesNotSubmitted.length === 0 && pendingTimecards.length === 0
+                  employeesNotSubmitted.length === 0 &&
+                  pendingTimecards.length === 0 &&
+                  pendingResubmissionTimecards.length === 0
                     ? 'border-emerald-300 bg-emerald-50'
                     : 'border-amber-300 bg-amber-50'
                 }`}
               >
-                {employeesNotSubmitted.length === 0 && pendingTimecards.length === 0 ? (
+                {employeesNotSubmitted.length === 0 &&
+                pendingTimecards.length === 0 &&
+                pendingResubmissionTimecards.length === 0 ? (
                   <>
                     <div className="text-lg font-bold text-emerald-800">
                       ✅ PAYROLL READY
@@ -6599,6 +7571,10 @@ export default function SupervisorPage() {
                     <div className="text-sm text-emerald-700">
                       Pending Reviews: 0
                     </div>
+
+                    <div className="text-sm text-emerald-700">
+                      Pending Resubmissions: 0
+                    </div>
                   </>
                 ) : (
                   <>
@@ -6612,6 +7588,10 @@ export default function SupervisorPage() {
 
                     <div className="text-sm text-amber-700">
                       Pending Reviews: {pendingTimecards.length}
+                    </div>
+
+                    <div className="text-sm text-amber-700">
+                      Pending Resubmissions: {pendingResubmissionTimecards.length}
                     </div>
                   </>
                 )}
@@ -6651,7 +7631,24 @@ export default function SupervisorPage() {
                   onClick={printAllTimecards}
                   className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-slate-700"
                 >
-                  Save All PDF
+                  Save Approved PDF
+                </button>
+
+                <button
+                  type="button"
+                  disabled={pendingResubmissionTimecards.length === 0}
+                  onClick={printPendingResubmissions}
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Save Pending Resubmissions PDF
+                </button>
+
+                <button
+                  type="button"
+                  onClick={printPayrollStatusTracker}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Print Status Tracker
                 </button>
 
                 <button
@@ -6665,9 +7662,125 @@ export default function SupervisorPage() {
               </div>
 
               <div className="hidden">
-                {reviewedTimecards
-                  .filter((timecard) => timecard.status === 'APPROVED')
-                  .map((timecard) => renderSubmittedTimecard(timecard))}
+                {[...approvedTimecards, ...pendingResubmissionTimecards].map(
+                  (timecard) => renderSubmittedTimecard(timecard),
+                )}
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowPayrollStatusTracker((current) => !current)
+                  }
+                  className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-left transition hover:bg-slate-200"
+                >
+                  <span className="text-sm font-bold text-slate-900">
+                    Payroll Status Tracker ({payrollStatusRows.length})
+                  </span>
+
+                  <span className="text-xs font-bold text-slate-500">
+                    {showPayrollStatusTracker ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {showPayrollStatusTracker && (
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-red-700">
+                          Not Submitted
+                        </div>
+                        <div className="mt-1 text-2xl font-black text-red-800">
+                          {employeesNotSubmitted.length}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                          Pending Review
+                        </div>
+                        <div className="mt-1 text-2xl font-black text-blue-800">
+                          {pendingTimecards.length}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                          Pending Resubmission
+                        </div>
+                        <div className="mt-1 text-2xl font-black text-amber-800">
+                          {pendingResubmissionTimecards.length}
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          Approved
+                        </div>
+                        <div className="mt-1 text-2xl font-black text-emerald-800">
+                          {approvedTimecards.length}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="min-w-full divide-y divide-slate-200 text-sm">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                              Employee
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                              Status
+                            </th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                              Last Submitted
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {payrollStatusRows.map((row) => (
+                            <tr key={row.employeeId}>
+                              <td className="px-3 py-2 font-semibold text-slate-900">
+                                {row.employeeName}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${
+                                    row.status === 'APPROVED'
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : row.status === 'PENDING_REVIEW'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : row.status === 'PENDING_RESUBMISSION'
+                                          ? 'bg-amber-100 text-amber-700'
+                                          : 'bg-red-100 text-red-700'
+                                  }`}
+                                >
+                                  {getPayrollStatusLabel(row.status)}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600">
+                                {row.submittedAt
+                                  ? new Date(row.submittedAt).toLocaleString(
+                                      'en-US',
+                                      {
+                                        month: 'numeric',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                        hour: 'numeric',
+                                        minute: '2-digit',
+                                      },
+                                    )
+                                  : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -6766,11 +7879,77 @@ export default function SupervisorPage() {
               <div>
                 <button
                   type="button"
+                  onClick={() =>
+                    setShowPendingResubmission((current) => !current)
+                  }
+                  className="mb-2 flex w-full items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:bg-amber-100"
+                >
+                  <span className="text-sm font-semibold text-amber-900">
+                    Pending Resubmission ({pendingResubmissionTimecards.length})
+                  </span>
+
+                  <span className="text-xs font-bold text-amber-700">
+                    {showPendingResubmission ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {showPendingResubmission && (
+                  <>
+                    {pendingResubmissionTimecards.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                        No timecards are awaiting employee correction and
+                        resubmission.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                          These timecards are not approved. They remain visible
+                          and printable while employees make corrections or
+                          acknowledge supervisor-adjusted paid hours.
+                        </div>
+
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {pendingResubmissionTimecards.map((timecard) => (
+                            <button
+                              key={timecard.id}
+                              type="button"
+                              onClick={() =>
+                                setSelectedTimecardId(
+                                  selectedTimecardId === timecard.id
+                                    ? null
+                                    : timecard.id,
+                                )
+                              }
+                              className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                                selectedTimecardId === timecard.id
+                                  ? 'border-amber-400 bg-amber-100 text-amber-900'
+                                  : 'border-amber-200 bg-white text-slate-800 hover:bg-amber-50'
+                              }`}
+                            >
+                              {timecard.employeeName}
+                            </button>
+                          ))}
+                        </div>
+
+                        {pendingResubmissionTimecards.map((timecard) =>
+                          selectedTimecardId === timecard.id
+                            ? renderSubmittedTimecard(timecard)
+                            : null,
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div>
+                <button
+                  type="button"
                   onClick={() => setShowReviewedTimecards((current) => !current)}
                   className="mb-2 flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
                 >
                   <span className="text-sm font-semibold text-slate-900">
-                    Reviewed Timecards ({reviewedTimecards.length})
+                    Approved ({approvedTimecards.length})
                   </span>
 
                   <span className="text-xs font-bold text-slate-500">
@@ -6780,14 +7959,14 @@ export default function SupervisorPage() {
 
                 {showReviewedTimecards && (
                   <>
-                    {reviewedTimecards.length === 0 ? (
+                    {approvedTimecards.length === 0 ? (
                       <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
-                        No reviewed timecards yet.
+                        No timecards have been approved for this pay period.
                       </div>
                     ) : (
                       <div className="space-y-3">
                         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                          {reviewedTimecards.map((timecard) => (
+                          {approvedTimecards.map((timecard) => (
                             <button
                               key={timecard.id}
                               type="button"
@@ -6803,7 +7982,7 @@ export default function SupervisorPage() {
                           ))}
                         </div>
 
-                        {reviewedTimecards.map((timecard) =>
+                        {approvedTimecards.map((timecard) =>
                           selectedTimecardId === timecard.id ? renderSubmittedTimecard(timecard) : null
                         )}
                       </div>
@@ -6812,7 +7991,7 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
-            pendingTimecards.length > 0,
+            pendingTimecards.length + pendingResubmissionTimecards.length > 0,
           )}
 
           {renderTile(
