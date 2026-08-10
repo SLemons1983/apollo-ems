@@ -13,6 +13,64 @@ type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type ShiftCategory = 'UNIT' | 'SUPERVISOR';
 type VehicleValue = string;
 
+type InspectionResult = '' | 'PASS' | 'FAIL' | 'N/A';
+type InspectionChecklistKey =
+  | 'vehicleCondition'
+  | 'mechanicalChecks'
+  | 'oxygenLevels'
+  | 'alsSupplies'
+  | 'blsSupplies'
+  | 'otherSupplies';
+type InspectionPhotoKey = 'frontPhoto' | 'driverPhoto' | 'rearPhoto' | 'passengerPhoto';
+
+const UNIT_INSPECTION_CHECKLIST: Array<{
+  key: InspectionChecklistKey;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: 'vehicleCondition',
+    label: 'Vehicle Condition',
+    description: 'Cleanliness, appearance, and overall readiness for service.',
+  },
+  {
+    key: 'mechanicalChecks',
+    label: 'Mechanical & Safety',
+    description: 'Fluids, tires, brakes, steering, lights, mirrors, wipers, Code 3 lights, and siren.',
+  },
+  {
+    key: 'oxygenLevels',
+    label: 'Oxygen Systems',
+    description: 'Main and portable cylinders, regulators, related equipment, and adequate levels.',
+  },
+  {
+    key: 'alsSupplies',
+    label: 'ALS Equipment & Supplies',
+    description: 'Medications, airway equipment, monitor/defibrillator, IV/IO, suction, and ALS stock.',
+  },
+  {
+    key: 'blsSupplies',
+    label: 'BLS Equipment & Supplies',
+    description: 'Trauma, splinting, infection control, airway, and immobilization equipment.',
+  },
+  {
+    key: 'otherSupplies',
+    label: 'Other Assigned Equipment',
+    description: 'Radios, iPad, chargers, fuel card, documentation supplies, and unit accessories.',
+  },
+];
+
+const UNIT_INSPECTION_PHOTOS: Array<{
+  key: InspectionPhotoKey;
+  label: string;
+  shortLabel: string;
+}> = [
+  { key: 'frontPhoto', label: 'Front of Vehicle', shortLabel: 'Front' },
+  { key: 'driverPhoto', label: 'Driver Side of Vehicle', shortLabel: 'Driver Side' },
+  { key: 'rearPhoto', label: 'Rear of Vehicle', shortLabel: 'Rear' },
+  { key: 'passengerPhoto', label: 'Passenger Side of Vehicle', shortLabel: 'Passenger Side' },
+];
+
 type CertificationDocument = {
   path: string;
   filename: string;
@@ -1278,6 +1336,20 @@ export default function DashboardPage() {
   const [inspectionVehicle, setInspectionVehicle] = useState('');
   const [inspectionMileage, setInspectionMileage] = useState('');
   const [inspectionDeficiencies, setInspectionDeficiencies] = useState('');
+  const [inspectionChecklist, setInspectionChecklist] = useState<
+    Record<InspectionChecklistKey, InspectionResult>
+  >({
+    vehicleCondition: '',
+    mechanicalChecks: '',
+    oxygenLevels: '',
+    alsSupplies: '',
+    blsSupplies: '',
+    otherSupplies: '',
+  });
+  const [inspectionPhotoPreviews, setInspectionPhotoPreviews] = useState<
+    Partial<Record<InspectionPhotoKey, string>>
+  >({});
+  const [inspectionAcknowledged, setInspectionAcknowledged] = useState(false);
   const [incidentReportCategory, setIncidentReportCategory] = useState('General Incident Report');
   const [incidentReportSupervisorNotified, setIncidentReportSupervisorNotified] = useState('No');
   const [incidentReportSupervisorName, setIncidentReportSupervisorName] = useState('');
@@ -1712,8 +1784,21 @@ export default function DashboardPage() {
     setUnitInspectionStatus('Submitting inspection...');
 
     try {
+      if (!inspectionVehicle) {
+        setUnitInspectionStatus('Select the unit being inspected.');
+        return;
+      }
+
       if (!/^\d+$/.test(inspectionMileage.trim())) {
         setUnitInspectionStatus('Mileage must contain numbers only.');
+        return;
+      }
+
+      const incompleteCheck = UNIT_INSPECTION_CHECKLIST.find(
+        ({ key }) => !inspectionChecklist[key],
+      );
+      if (incompleteCheck) {
+        setUnitInspectionStatus(`Complete the ${incompleteCheck.label} check.`);
         return;
       }
 
@@ -1732,6 +1817,14 @@ export default function DashboardPage() {
         }
       }
 
+      const missingPhoto = UNIT_INSPECTION_PHOTOS.find(
+        ({ key }) => !inspectionPhotoPreviews[key],
+      );
+      if (missingPhoto) {
+        setUnitInspectionStatus(`Add the required ${missingPhoto.label.toLowerCase()} photo.`);
+        return;
+      }
+
       const hasFailedInspectionItem = [
         'vehicleCondition',
         'mechanicalChecks',
@@ -1743,6 +1836,12 @@ export default function DashboardPage() {
 
       if (hasFailedInspectionItem && !inspectionDeficiencies.trim()) {
         setUnitInspectionStatus('Deficiency notes are required when any checklist item is marked FAIL.');
+        return;
+      }
+
+
+      if (!inspectionAcknowledged) {
+        setUnitInspectionStatus('Accept the inspection certification before submitting.');
         return;
       }
 
@@ -1768,6 +1867,19 @@ export default function DashboardPage() {
       setInspectionVehicle('');
       setInspectionMileage('');
       setInspectionDeficiencies('');
+      setInspectionChecklist({
+        vehicleCondition: '',
+        mechanicalChecks: '',
+        oxygenLevels: '',
+        alsSupplies: '',
+        blsSupplies: '',
+        otherSupplies: '',
+      });
+      setInspectionPhotoPreviews((current) => {
+        Object.values(current).forEach((preview) => preview && URL.revokeObjectURL(preview));
+        return {};
+      });
+      setInspectionAcknowledged(false);
       form.reset();
 
       setUnitInspectionStatus('Inspection submitted successfully.');
@@ -6791,108 +6903,264 @@ export default function DashboardPage() {
             'unit-inspection',
             'Daily Unit Inspection',
             'Complete the daily ambulance checklist and submit required vehicle photos.',
-            <form className="space-y-4" onSubmit={handleUnitInspectionSubmit}>
-              <div className="grid gap-3 md:grid-cols-3">
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.name ?? ''} readOnly />
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.phone ?? ''} readOnly />
-                <input className="rounded-lg border border-slate-300 px-3 py-2 text-sm" value={currentEmployee?.email ?? authEmail} readOnly />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <select
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  value={inspectionVehicle}
-                  onChange={(event) => setInspectionVehicle(event.target.value)}
-                  required
-                >
-                  <option value="">Select Vehicle</option>
-                  <option value="305">305</option>
-                  <option value="310">310</option>
-                  <option value="315">315</option>
-                  <option value="320">320</option>
-                  <option value="325">325</option>
-                  <option value="330">330</option>
-                  <option value="335">335</option>
-                </select>
-                <input
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  value={inspectionMileage}
-                  onChange={(event) => setInspectionMileage(event.target.value)}
-                  placeholder="Vehicle mileage"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
-                />
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2">
-                {[
-                  ['vehicleCondition','Vehicle Clean / Operating Condition','The vehicle was inspected for cleanliness, appearance, and overall readiness for service.'],
-                  ['mechanicalChecks','Mechanical Checks','All mechanical components of the unit were inspected, including but not limited to the transmission, engine belts and hoses, brakes, steering, suspension, fluid levels, tires, mirrors, windshield and wipers, headlights, taillights, turn signals, interior and exterior lighting, and all emergency warning devices including Code 3 lights and siren.'],
-                  ['oxygenLevels','Oxygen Levels','All onboard oxygen systems were inspected, including main and portable oxygen cylinders, regulators, and related equipment. Oxygen levels were verified to be adequate for service.'],
-                  ['alsSupplies','ALS Supplies','All required ALS equipment and supplies were checked, including medications, airway equipment, cardiac monitor/defibrillator, IV/IO supplies, suction equipment, and other ALS-specific items assigned to the unit.'],
-                  ['blsSupplies','BLS Supplies','All required BLS equipment and supplies were inspected, including bandaging materials, splints, trauma supplies, infection control supplies, airway equipment, and immobilization devices.'],
-                  ['otherSupplies','Other Supplies','All additional assigned equipment and supplies were checked, including radios, mobile data/iPad, chargers, fuel card, documentation supplies, and other unit-specific accessories.'],
-                ].map(([name, label, description]) => (
-                  <label key={name} className="text-xs font-semibold text-slate-600">
-                    <div>{label}</div>
-                    <div className="mt-1 text-xs font-normal text-slate-500">
-                      {description}
+            <form className="space-y-6" onSubmit={handleUnitInspectionSubmit}>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">Inspection Progress</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">Complete every check and add all four vehicle photos.</p>
                     </div>
-                    <select name={name} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" required>
-                      <option value="PASS">PASS</option>
-                      <option value="FAIL">FAIL</option>
-                      <option value="N/A">N/A</option>
-                    </select>
-                  </label>
-                ))}
+                    <div className="flex gap-2 text-xs font-bold">
+                      <span className="rounded-full bg-blue-100 px-3 py-1.5 text-blue-700">
+                        {Object.values(inspectionChecklist).filter(Boolean).length} of 6 checks
+                      </span>
+                      <span className="rounded-full bg-violet-100 px-3 py-1.5 text-violet-700">
+                        {Object.keys(inspectionPhotoPreviews).length} of 4 photos
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                      style={{
+                        width: `${((Object.values(inspectionChecklist).filter(Boolean).length + Object.keys(inspectionPhotoPreviews).length) / 10) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_1.2fr]">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Inspector</div>
+                    <div className="mt-2 font-bold text-slate-900">{currentEmployee?.name ?? 'Employee unavailable'}</div>
+                    <div className="mt-1 text-sm text-slate-600">{currentEmployee?.phone || 'No phone on file'}</div>
+                    <div className="break-all text-sm text-slate-600">{currentEmployee?.email ?? authEmail}</div>
+                    <div className="mt-3 text-xs font-semibold text-slate-500">
+                      {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="text-sm font-bold text-slate-700">
+                      Unit <span className="text-red-600">*</span>
+                      <select
+                        className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base font-semibold text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        value={inspectionVehicle}
+                        onChange={(event) => setInspectionVehicle(event.target.value)}
+                        required
+                      >
+                        <option value="">Select unit</option>
+                        {['305', '310', '315', '320', '325', '330', '335'].map((unit) => (
+                          <option key={unit} value={unit}>Unit {unit}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-sm font-bold text-slate-700">
+                      Current Mileage <span className="text-red-600">*</span>
+                      <input
+                        className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-3 text-base font-semibold text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                        value={inspectionMileage}
+                        onChange={(event) => setInspectionMileage(event.target.value.replace(/\D/g, ''))}
+                        placeholder="Enter odometer"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        required
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
 
-              <textarea
-                className="min-h-[120px] w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                value={inspectionDeficiencies}
-                onChange={(event) => setInspectionDeficiencies(event.target.value)}
-                placeholder="Deficiencies / notes. Enter None if no issues are found."
-              />
+              <section>
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Readiness Checklist</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">Select one result for every category.</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500">
+                    {Object.values(inspectionChecklist).filter(Boolean).length}/6 complete
+                  </span>
+                </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-xs font-semibold text-slate-600">
-                  Front of Vehicle
-                  <input className="mt-1 w-full text-sm" type="file" name="frontPhoto" accept="image/*" capture="environment" required />
-                </label>
-                <label className="text-xs font-semibold text-slate-600">
-                  Driver Side of Vehicle
-                  <input className="mt-1 w-full text-sm" type="file" name="driverPhoto" accept="image/*" capture="environment" required />
-                </label>
-                <label className="text-xs font-semibold text-slate-600">
-                  Rear of Vehicle
-                  <input className="mt-1 w-full text-sm" type="file" name="rearPhoto" accept="image/*" capture="environment" required />
-                </label>
-                <label className="text-xs font-semibold text-slate-600">
-                  Passenger Side of Vehicle
-                  <input className="mt-1 w-full text-sm" type="file" name="passengerPhoto" accept="image/*" capture="environment" required />
-                </label>
-              </div>
+                <div className="space-y-3">
+                  {UNIT_INSPECTION_CHECKLIST.map(({ key, label, description }, index) => (
+                    <fieldset key={key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                      <legend className="sr-only">{label}</legend>
+                      <div className="flex gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-black text-slate-600">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-slate-900">{label}</div>
+                          <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p>
+                          <div className="mt-4 grid grid-cols-3 gap-2">
+                            {(['PASS', 'FAIL', 'N/A'] as const).map((result) => {
+                              const selected = inspectionChecklist[key] === result;
+                              const selectedClasses =
+                                result === 'PASS'
+                                  ? 'border-emerald-600 bg-emerald-600 text-white ring-emerald-100'
+                                  : result === 'FAIL'
+                                    ? 'border-red-600 bg-red-600 text-white ring-red-100'
+                                    : 'border-slate-700 bg-slate-700 text-white ring-slate-200';
+                              return (
+                                <label
+                                  key={result}
+                                  className={`cursor-pointer rounded-xl border px-2 py-2.5 text-center text-sm font-black transition ${
+                                    selected
+                                      ? `${selectedClasses} ring-4`
+                                      : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={key}
+                                    value={result}
+                                    checked={selected}
+                                    onChange={() => {
+                                      setInspectionChecklist((current) => ({ ...current, [key]: result }));
+                                      setUnitInspectionStatus('');
+                                    }}
+                                    className="sr-only"
+                                    required
+                                  />
+                                  {result === 'PASS' ? 'Pass' : result === 'FAIL' ? 'Fail' : 'N/A'}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
 
-              <label className="block rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+              <section className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
+                Object.values(inspectionChecklist).includes('FAIL')
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-slate-200 bg-white'
+              }`}>
+                <label className="block text-sm font-bold text-slate-900">
+                  Deficiencies & Notes
+                  {Object.values(inspectionChecklist).includes('FAIL') && (
+                    <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">Required for failed items</span>
+                  )}
+                  <textarea
+                    className="mt-2 min-h-[110px] w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-normal text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    value={inspectionDeficiencies}
+                    onChange={(event) => setInspectionDeficiencies(event.target.value)}
+                    placeholder={Object.values(inspectionChecklist).includes('FAIL')
+                      ? 'Describe each deficiency, safety concern, or missing item...'
+                      : 'Optional notes about this inspection...'}
+                    required={Object.values(inspectionChecklist).includes('FAIL')}
+                  />
+                </label>
+              </section>
+
+              <section>
+                <div className="mb-3 flex items-end justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Vehicle Photos</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">Take or upload one current photo from each angle.</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500">{Object.keys(inspectionPhotoPreviews).length}/4 added</span>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {UNIT_INSPECTION_PHOTOS.map(({ key, label, shortLabel }) => {
+                    const preview = inspectionPhotoPreviews[key];
+                    return (
+                      <label
+                        key={key}
+                        className={`group relative min-h-44 cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed transition ${
+                          preview
+                            ? 'border-emerald-400 bg-emerald-50'
+                            : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
+                      >
+                        {preview ? (
+                          <>
+                            <img src={preview} alt={`${label} preview`} className="h-48 w-full object-cover" />
+                            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-slate-950/75 px-3 py-2 text-sm font-bold text-white">
+                              <span>✓ {shortLabel} added</span>
+                              <span className="text-xs">Change</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex min-h-44 flex-col items-center justify-center px-4 py-6 text-center">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl shadow-sm">📷</div>
+                            <div className="mt-3 font-bold text-slate-800">{label}</div>
+                            <div className="mt-1 text-xs font-semibold text-blue-700">Tap to take or choose photo</div>
+                          </div>
+                        )}
+                        <input
+                          className="sr-only"
+                          type="file"
+                          name={key}
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (!file) return;
+                            setInspectionPhotoPreviews((current) => {
+                              const existing = current[key];
+                              if (existing) URL.revokeObjectURL(existing);
+                              return { ...current, [key]: URL.createObjectURL(file) };
+                            });
+                            setUnitInspectionStatus('');
+                          }}
+                          required
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <label className={`flex cursor-pointer gap-3 rounded-2xl border p-4 transition sm:p-5 ${
+                inspectionAcknowledged
+                  ? 'border-blue-300 bg-blue-50'
+                  : 'border-slate-300 bg-slate-50 hover:border-slate-400'
+              }`}>
                 <input
                   type="checkbox"
                   name="inspectionAcknowledgement"
-                  className="mr-2"
+                  checked={inspectionAcknowledged}
+                  onChange={(event) => setInspectionAcknowledged(event.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
                   required
                 />
-                I acknowledge that I have personally completed this inspection in its entirety for the assigned unit on the date indicated. I affirm that all listed items were checked and found to be present, operational, and within normal operating parameters unless otherwise noted. I understand that this inspection is mandatory, must be completed daily, and that submitting inaccurate or incomplete information may result in corrective action. I further acknowledge my responsibility to promptly report any deficiencies, safety concerns, or equipment issues identified during this inspection to a supervisor in accordance with company policy.
+                <span>
+                  <span className="block text-sm font-bold text-slate-900">Inspection Certification</span>
+                  <span className="mt-1 block text-sm leading-5 text-slate-600">
+                    I certify that I personally completed this inspection, accurately documented all results, and will promptly report identified deficiencies or safety concerns to a supervisor.
+                  </span>
+                </span>
               </label>
 
-              {unitInspectionStatus && <p className="text-sm font-semibold text-slate-700">{unitInspectionStatus}</p>}
-
-              <button
-                type="submit"
-                disabled={isSubmittingUnitInspection}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:bg-slate-400"
-              >
-                {isSubmittingUnitInspection ? 'Submitting...' : 'Submit Inspection'}
-              </button>
+              <div className="sticky bottom-3 z-10 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:p-4">
+                {unitInspectionStatus && (
+                  <div
+                    role="status"
+                    className={`mb-3 rounded-xl px-3 py-2.5 text-sm font-bold ${
+                      unitInspectionStatus === 'Inspection submitted successfully.'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : unitInspectionStatus === 'Submitting inspection...'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {unitInspectionStatus}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSubmittingUnitInspection}
+                  className="w-full rounded-xl bg-blue-600 px-5 py-3.5 text-base font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                >
+                  {isSubmittingUnitInspection ? 'Submitting Inspection...' : 'Submit Daily Inspection'}
+                </button>
+              </div>
             </form>,
           )}
 
