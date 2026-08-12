@@ -242,7 +242,7 @@ const SHIFT_DISPLAY_NAMES: Record<ShiftName, string> = {
 
 const SHIFT_TABLE_LABELS: Record<ShiftName, string> = {
   R1: 'R1 (311)',
-  R2: 'R2 (312)',
+  R2: 'R2 (313)',
   P: 'P (316)',
   OC: 'OC (318)',
   GM: 'GM',
@@ -1083,10 +1083,18 @@ function getStaffingLevel(category: ShiftCategory, shift: AssignmentRef['shift']
     return 'SUP';
   }
 
-  const employee1 = getEmployeeById(shift.employee1.employeeId, employees);
-  const employee2 = getEmployeeById(shift.employee2.employeeId, employees);
+  const workingEmployees = getAssignedSlotsForAssignment(category, shift)
+    .filter(
+      (slot) =>
+        !isOpenShiftSlot(slot.employeeId) &&
+        slot.shiftType !== 'SICK' &&
+        slot.shiftType !== 'VACATION' &&
+        slot.shiftType !== 'LEAVE',
+    )
+    .map((slot) => getEmployeeById(slot.employeeId, employees))
+    .filter((employee): employee is EmployeeOption => Boolean(employee));
 
-  if (employee1?.scope === 'ALS' || employee2?.scope === 'ALS') {
+  if (workingEmployees.some((employee) => employee.scope === 'ALS')) {
     return 'ALS';
   }
 
