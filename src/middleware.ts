@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin', '/ePCR', '/epcr/dashboard', '/epcr-dashboard'];
+const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin', '/ePCR', '/epcr/dashboard', '/epcr-dashboard', '/MDT'];
 const supervisorRoutes = ['/employees', '/schedule', '/supervisor'];
 
 function isPlatformOwner(email?: string | null): boolean {
@@ -115,5 +115,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*', '/admin/:path*', '/ePCR/:path*', '/epcr/dashboard/:path*', '/epcr-dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/employees/:path*', '/schedule/:path*', '/supervisor/:path*', '/admin/:path*', '/ePCR/:path*', '/epcr/dashboard/:path*', '/epcr-dashboard/:path*', '/MDT/:path*'],
 };

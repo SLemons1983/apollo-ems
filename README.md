@@ -1,4 +1,19 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ApolloEMS
+
+ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.0 adds the operational `/MDT` route and secure CAD integration.
+
+## MDT deployment requirements
+
+1. Apply `supabase/migrations/202608150001_create_mdt_operations.sql` to the production Supabase project.
+2. Configure these Vercel environment variables:
+   - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+   - `APOLLO_CAD_BASE_URL` (normally `https://apollo-cad-simulator.vercel.app`)
+   - `APOLLO_INTEGRATION_SECRET` (the exact same secret configured in CAD)
+   - `SUPABASE_SERVICE_ROLE_KEY` (already used by other ApolloEMS server routes)
+3. Set the CAD deployment's `APOLLO_MDT_BASE_URL` to `https://apolloems.org`.
+4. Deploy ApolloEMS, then open `https://apolloems.org/MDT` while signed into an active ApolloEMS account.
+
+Only active supervisors can log a vehicle on, change its crew, or log it off. Regular authenticated users can operate an already assigned MDT. Out of Service is displayed by the MDT but remains controlled exclusively by CAD.
 
 ## Getting Started
 
