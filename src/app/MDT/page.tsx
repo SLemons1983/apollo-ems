@@ -15,8 +15,10 @@ type RideAlongType = "None"|"Paramedic Intern"|"EMT Student"|"Other Ride Along";
 type DeviceAssignment = { id:string; vehicle:string; cadId:string; station:string; level:"SUP"|"ALS"|"BLS"; crewMembers:CrewMember[]; rideAlongType:RideAlongType; rideAlongName?:string; outOfServiceReason?:string };
 type Unit = { cadId:string; vehicle:string; station:string; status:Status; lat:number; lng:number; emergency?:boolean };
 type Note = { id:number; text:string; author:string; time:string };
-type Msg = { id:number; from:string; to:string; text:string; time:string };
+type Msg = { id:number|string; from:string; to:string; text:string; time:string };
+type ReceivedMsg = { id:string; sender:string; recipient:string; body:string; created_at:string };
 type LiveCadCall = { eventType:string; radioIdentifier:string; callNumber:string; emsNumber:string; priority:string; zone?:string; nature:string; facility?:string; address:string; city:string; state:string; zip?:string; suite?:string; holdBackRequired:boolean; dispatchComments?:string; premiseNotes?:string; cautionNotes?:string; status:string; cadTimestamp:string };
+type MdtAlert = { id:string; tone:"call"|"message"|"comments"|"holdback"; eyebrow:string; title:string; body:string };
 
 type NavigationKind = "crew"|"dispatch"|"hospital"|"unit";
 type NavigationSession = {
@@ -89,7 +91,7 @@ export default function MDT(){
   const[selectedUnit,setSelectedUnit]=useState<Unit|null>(null); const[emergency,setEmergency]=useState(false); const[emergencyHold,setEmergencyHold]=useState(false); const[emergencyProgress,setEmergencyProgress]=useState(0);
   const emergencyTimer=useRef<number|null>(null); const emergencyTick=useRef<number|null>(null);
   const googleMapRef=useRef<HTMLDivElement|null>(null); const googleMapObjectRef=useRef<any>(null); const googleMarkersRef=useRef<any[]>([]); const googleMarkerUnitIdsRef=useRef<string[]>([]); const trafficLayerRef=useRef<any>(null);
-  const routePolylinesRef=useRef<any[]>([]); const routeMarkersRef=useRef<any[]>([]);
+  const routePolylinesRef=useRef<any[]>([]); const routeMarkersRef=useRef<any[]>([]); const activeRouteRef=useRef<any|null>(null);
   const[googleReady,setGoogleReady]=useState(false); const[mapGeneration,setMapGeneration]=useState(0); const[googleMapError,setGoogleMapError]=useState(""); const[trafficEnabled,setTrafficEnabled]=useState(true);
   const[devicePosition,setDevicePosition]=useState<{lat:number;lng:number}|null>(null); const[gpsAccuracy,setGpsAccuracy]=useState<number|null>(null);
   const[navigation,setNavigation]=useState<NavigationSession|null>(null); const[previousCrewNavigation,setPreviousCrewNavigation]=useState<NavigationSession|null>(null);
@@ -97,11 +99,31 @@ export default function MDT(){
   const[events,setEvents]=useState<{id:number;time:string;label:string;source:Source}[]>([]);
   const[liveCall,setLiveCall]=useState<LiveCadCall>({eventType:"NONE",radioIdentifier:"",callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:"Unit Available",cadTimestamp:""});
   const[integrationState,setIntegrationState]=useState<"LOCAL"|"CONNECTED"|"ERROR">("LOCAL");
+  const[alertQueue,setAlertQueue]=useState<MdtAlert[]>([]); const seenAlertKeysRef=useRef<Set<string>>(new Set()); const acknowledgedAlertKeysRef=useRef<Set<string>>(new Set());
 
   useEffect(()=>{const tick=()=>{setClock(pt());const h=Number(new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"2-digit",hour12:false}).format(new Date()));setAutoNight(h>=19||h<7)};tick();const t=window.setInterval(tick,1000);return()=>window.clearInterval(t)},[]);
+  useEffect(()=>{
+    try{acknowledgedAlertKeysRef.current=new Set(JSON.parse(window.localStorage.getItem("apollo-mdt-acknowledged-alerts")??"[]"))}catch{}
+  },[]);
 
   function rowToAssignment(row:any):DeviceAssignment{return {id:row.id,vehicle:row.physical_vehicle,cadId:row.radio_identifier,station:row.station,level:row.level,crewMembers:row.crew_members??[],rideAlongType:row.ride_along_type??"None",rideAlongName:row.ride_along_name??"",outOfServiceReason:row.out_of_service_reason??""}}
   function rowsToUnits(rows:any[]):Unit[]{return rows.map((row,index)=>({cadId:row.radio_identifier,vehicle:row.physical_vehicle,station:row.station,status:row.status,lat:row.latitude??36.5965+(index*.003),lng:row.longitude??-119.4512-(index*.003),emergency:Boolean(row.emergency_active)}))}
+  function enqueueAlert(key:string,alert:Omit<MdtAlert,"id">){
+    if(seenAlertKeysRef.current.has(key)||acknowledgedAlertKeysRef.current.has(key))return;
+    seenAlertKeysRef.current.add(key);
+    setBlackout(false);
+    setAlertQueue(current=>[...current,{...alert,id:key}]);
+  }
+  function acknowledgeAlert(){
+    const current=alertQueue[0];
+    if(!current)return;
+    acknowledgedAlertKeysRef.current.add(current.id);
+    try{
+      const acknowledged=Array.from(acknowledgedAlertKeysRef.current).slice(-150);
+      window.localStorage.setItem("apollo-mdt-acknowledged-alerts",JSON.stringify(acknowledged));
+    }catch{}
+    setAlertQueue(queue=>queue.slice(1));
+  }
 
   async function refreshMdt(openIfUnassigned=false){
     setRefreshing(true);
@@ -140,9 +162,24 @@ export default function MDT(){
         }
         if(data.call){
           setLiveCall((previous)=>{
-            if(previous.callNumber!==data.call.callNumber){
-              setBlackout(false);
+            const isNewCall=previous.callNumber!==data.call.callNumber;
+            if(isNewCall){
               log(`NEW CAD CALL — EMS ${data.call.emsNumber}`,"CAD");
+              enqueueAlert(`call:${data.call.callNumber}`,{
+                tone:"call",eyebrow:"NEW CAD CALL",title:`EMS ${data.call.emsNumber} · Priority ${data.call.priority}`,
+                body:`${data.call.nature}\n${data.call.address}, ${data.call.city}`
+              });
+            }else if((previous.dispatchComments??"")!==(data.call.dispatchComments??"")&&data.call.dispatchComments?.trim()){
+              enqueueAlert(`comments:${data.call.callNumber}:${data.call.dispatchComments}`,{
+                tone:"comments",eyebrow:"DISPATCH COMMENTS UPDATED",title:`EMS ${data.call.emsNumber}`,
+                body:data.call.dispatchComments
+              });
+            }
+            if(!previous.holdBackRequired&&data.call.holdBackRequired){
+              enqueueAlert(`holdback:${data.call.callNumber}:${data.call.cadTimestamp||"active"}`,{
+                tone:"holdback",eyebrow:"SAFETY ALERT",title:"HOLD BACK REQUIRED",
+                body:"Do not enter the scene until Dispatch advises that the unit is cleared to proceed."
+              });
             }
             return data.call;
           });
@@ -151,6 +188,16 @@ export default function MDT(){
         }else if(["Unit Available","En Route Post","In Area","At Post","Out of Service"].includes(data.session?.status)){
           setLiveCall({eventType:"NONE",radioIdentifier:assignment.cadId,callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:data.session?.status??"Unit Available",cadTimestamp:""});
           setHoldBack(false);setSelectedHospital(null);setCallInDone(false);
+        }
+        for(const message of (data.messages??[]) as ReceivedMsg[]){
+          enqueueAlert(`message:${message.id}`,{
+            tone:"message",eyebrow:"MESSAGE RECEIVED",title:`From ${message.sender}`,
+            body:message.body
+          });
+          setMessages(current=>current.some(item=>String(item.id)===message.id)?current:[{
+            id:message.id,from:message.sender,to:message.recipient,
+            text:message.body,time:new Date(message.created_at).toLocaleTimeString("en-US",{hour12:false})
+          },...current]);
         }
       }catch{setIntegrationState("ERROR")}
     };
@@ -416,8 +463,24 @@ export default function MDT(){
     routeMarkersRef.current=[];
   }
 
+  function renderActiveRoute(map:any,fit=true){
+    const route=activeRouteRef.current;
+    if(!route||!map)return;
+    clearRouteRendering();
+    const polylines=route.createPolylines();
+    for(const polyline of polylines){polyline.setMap(map)}
+    routePolylinesRef.current=polylines;
+    if(fit&&route.viewport)map.fitBounds(route.viewport,48);
+  }
+
+  useEffect(()=>{
+    if(!googleReady||!navigation||!activeRouteRef.current||!googleMapObjectRef.current)return;
+    renderActiveRoute(googleMapObjectRef.current,true);
+  },[googleReady,mapGeneration,fullMap]);
+
   function endNavigation(){
     clearRouteRendering();
+    activeRouteRef.current=null;
     setNavigation(null);
     setRouteError("");
   }
@@ -450,10 +513,8 @@ export default function MDT(){
       });
       if(!routes?.length)throw new Error("No route returned");
       const route=routes[0];
-      const polylines=route.createPolylines();
-      for(const p of polylines){p.setMap(googleMapObjectRef.current)}
-      routePolylinesRef.current=polylines;
-      if(route.viewport)googleMapObjectRef.current.fitBounds(route.viewport,48);
+      activeRouteRef.current=route;
+      renderActiveRoute(googleMapObjectRef.current,true);
       const etaMinutes=typeof route.durationMillis==="number"?Math.max(1,Math.round(route.durationMillis/60000)):null;
       const distanceMiles=typeof route.distanceMeters==="number"?Math.round((route.distanceMeters/1609.344)*10)/10:null;
       setNavigation({kind,label,destination,etaMinutes,distanceMiles,locked:kind==="dispatch"||kind==="hospital"});
@@ -507,7 +568,14 @@ export default function MDT(){
   function emergencyDown(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(true);setEmergencyProgress(0);const start=Date.now();emergencyTick.current=window.setInterval(()=>setEmergencyProgress(Math.min(100,(Date.now()-start)/30)),50);emergencyTimer.current=window.setTimeout(()=>{if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(false);setEmergencyProgress(100);setEmergency(true);setBlackout(false);log("EMERGENCY ACTIVATED","MDT MANUAL");if(assignment?.cadId){void fetch("/api/integration/mdt/send-emergency",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,active:true,timestamp:new Date().toISOString(),latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}},3000)}
   function emergencyUp(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);emergencyTimer.current=null;emergencyTick.current=null;if(!emergency)setEmergencyProgress(0);setEmergencyHold(false)}
   function addNote(){if(!newNote.trim())return;setResponseNotes(n=>[{id:Date.now(),text:newNote.trim(),author:assignment?.cadId||"MDT",time:`Today ${pt()}`},...n]);setNewNote("");setNoteModal(false)}
-  function sendMsg(){if(!msgText.trim())return;setMessages(m=>[{id:Date.now(),from:assignment?.cadId||"MDT",to:msgTo,text:msgText.trim(),time:pt()},...m]);setMsgText("");setMsgModal(false)}
+  async function sendMsg(){
+    const text=msgText.trim();if(!text||!assignment?.cadId)return;
+    const response=await fetch("/api/mdt/messages",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({sender:assignment.cadId,recipient:msgTo,body:text})});
+    const data=await response.json();
+    if(!response.ok||!data.ok)return;
+    setMessages(current=>[{id:data.message.id,from:data.message.sender,to:data.message.recipient,text:data.message.body,time:new Date(data.message.created_at).toLocaleTimeString("en-US",{hour12:false})},...current]);
+    setMsgText("");setMsgModal(false);
+  }
   function saveDelay(){if(!delay)return;const text=`${delay}${delayNote?` — ${delayNote}`:""}`;setActiveDelay(text);log(`Delay: ${text}`,"MDT MANUAL");setDelay("");setDelayNote("");setDelayModal(false)}
   function read(title:string,body:string){setReadCard({title,body})}
 
@@ -561,7 +629,10 @@ export default function MDT(){
   </div>;
 
   if(blackout)return <main className="mdt-root blackout" onClick={()=>setBlackout(false)}><Moon size={28}/><strong>BLACKOUT</strong><span>Tap anywhere to restore display</span><small>{assignment?.cadId||"UNASSIGNED"} · {status} · {clock}</small></main>;
-  if(fullMap)return <main className={`mdt-root fullMap ${night?"night":""}`}><button className="mapReturn" onClick={()=>setFullMap(false)}><ArrowLeft size={19}/>RETURN TO MDT</button>{map}<div className="floatBar"><div><strong>{assignment?.cadId||"UNASSIGNED"}</strong><span>EMS {liveCall.emsNumber} · {status}</span></div><button onClick={()=>setStatusModal(true)}>{status}</button></div></main>;
+  const activeAlert=alertQueue[0]??null;
+  const alertBanner=activeAlert&&<div className="mdtAlertBackdrop"><section className={`mdtAlert ${activeAlert.tone}`} role="alertdialog" aria-live="assertive" aria-modal="true"><div className="mdtAlertIcon">{activeAlert.tone==="holdback"?<ShieldAlert size={44}/>:activeAlert.tone==="message"?<MessageSquareText size={44}/>:<Siren size={44}/>}</div><span>{activeAlert.eyebrow}</span><h2>{activeAlert.title}</h2><p>{activeAlert.body}</p><button autoFocus onClick={acknowledgeAlert}><Check size={19}/>ACKNOWLEDGE{alertQueue.length>1?` · ${alertQueue.length-1} MORE`:""}</button></section></div>;
+
+  if(fullMap)return <main className={`mdt-root fullMap ${night?"night":""}`}><button className="mapReturn" onClick={()=>setFullMap(false)}><ArrowLeft size={19}/>RETURN TO MDT</button>{map}<div className="floatBar"><div><strong>{assignment?.cadId||"UNASSIGNED"}</strong><span>{navigation?`${navigation.label} · ${navigation.etaMinutes??"—"} min`:`EMS ${liveCall.emsNumber} · ${status}`}</span></div>{navigation&&<button onClick={endNavigation}>END NAVIGATION</button>}<button onClick={()=>setStatusModal(true)}>{status}</button></div>{alertBanner}</main>;
 
   return <main className={`mdt-root shell ${night?"night":"day"}`} style={{filter:`brightness(${brightness/100})`}}>
     <header><div className="identity"><div className="logo"><Radio size={20}/></div><div><span>APOLLO MDT</span><strong>{assignment?.cadId||"DEVICE UNASSIGNED"}</strong><small>{assignment?`Vehicle ${assignment.vehicle} · ${assignment.level} · ${assignment.station}`:"Supervisor pairing required"}</small></div></div>
@@ -610,8 +681,9 @@ export default function MDT(){
       <div className="modalActions"><button className="secondary" onClick={()=>setDestModal(false)}>Cancel</button><button className="primary" disabled={!selectedHospital} onClick={confirmDepart}><Navigation size={16}/>Confirm Depart Scene</button></div>
     </section></div>}
     {noteModal&&<div className="backdrop"><section className="modal"><div className="modalHead"><div><span>APOLLO INTERNAL</span><h2>Add Response Note</h2><p>Location/access knowledge for future agency responders.</p></div><button onClick={()=>setNoteModal(false)}><X/></button></div><textarea value={newNote} onChange={e=>setNewNote(e.target.value)} placeholder="Gate, driveway, parking, building access, best approach..."/><div className="modalActions"><button className="secondary" onClick={()=>setNoteModal(false)}>Cancel</button><button className="primary" onClick={addNote}>Save Response Note</button></div></section></div>}
-    {msgModal&&<div className="backdrop"><section className="modal"><div className="modalHead"><div><span>APOLLO INTERNAL MESSAGING</span><h2>Send Message</h2><p>This workflow is independent of the county CAD interface.</p></div><button onClick={()=>setMsgModal(false)}><X/></button></div><label>To<select value={msgTo} onChange={e=>setMsgTo(e.target.value)}><option>All Units</option><option>Dispatch</option><option>Supervisors</option>{units.map(u=><option key={u.cadId}>{u.cadId}</option>)}</select></label><textarea value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message..."/><div className="modalActions"><button className="secondary" onClick={()=>setMsgModal(false)}>Cancel</button><button className="primary" onClick={sendMsg}>Send Message</button></div>{messages.length>0&&<div className="msgHistory">{messages.slice(0,4).map(m=><div key={m.id}><strong>{m.time} · {m.from} → {m.to}</strong><span>{m.text}</span></div>)}</div>}</section></div>}
+    {msgModal&&<div className="backdrop"><section className="modal"><div className="modalHead"><div><span>APOLLO INTERNAL MESSAGING</span><h2>Send Message</h2><p>This workflow is independent of the county CAD interface.</p></div><button onClick={()=>setMsgModal(false)}><X/></button></div><label>To<select value={msgTo} onChange={e=>setMsgTo(e.target.value)}><option>All Units</option><option>Dispatch</option><option>Supervisors</option>{units.map(u=><option key={u.cadId}>{u.cadId}</option>)}</select></label><textarea value={msgText} onChange={e=>setMsgText(e.target.value)} placeholder="Message..."/><div className="modalActions"><button className="secondary" onClick={()=>setMsgModal(false)}>Cancel</button><button className="primary" onClick={()=>void sendMsg()}>Send Message</button></div>{messages.length>0&&<div className="msgHistory">{messages.slice(0,4).map(m=><div key={m.id}><strong>{m.time} · {m.from} → {m.to}</strong><span>{m.text}</span></div>)}</div>}</section></div>}
     {delayModal&&<div className="backdrop"><section className="modal"><div className="modalHead"><div><span>OPERATIONAL EXCEPTION</span><h2>Report Delay</h2><p>Timestamped Apollo operational event.</p></div><button onClick={()=>setDelayModal(false)}><X/></button></div><div className="delayGrid">{delayOptions.map(d=><button key={d} className={delay===d?"selected":""} onClick={()=>setDelay(d)}>{d}</button>)}</div><textarea value={delayNote} onChange={e=>setDelayNote(e.target.value)} placeholder="Optional note"/><div className="modalActions"><button className="secondary" onClick={()=>setDelayModal(false)}>Cancel</button><button className="primary" onClick={saveDelay}>Report Delay</button></div></section></div>}
     {emergency&&<div className="emergencyOverlay"><section><Siren size={44}/><span>EMERGENCY ACTIVATED</span><h2>{assignment?.cadId||"MDT"}</h2><p>Emergency sent to CAD through the secure Apollo integration API.</p><button onClick={()=>{setEmergency(false);if(assignment?.cadId)void fetch("/api/integration/mdt/send-emergency",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,active:false,timestamp:new Date().toISOString(),latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}}>CLEAR EMERGENCY / RETURN</button></section></div>}
+    {alertBanner}
   </main>;
 }

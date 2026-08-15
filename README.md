@@ -1,10 +1,10 @@
 # ApolloEMS
 
-ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.6 adds the operational full-screen iPad `/MDT` route, shared CAD unit sessions, secure CAD integration, synchronized Google Maps initialization and markers, reliable full-screen map transitions, and high-contrast Night-mode reading views.
+ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.7 adds large acknowledged MDT notifications for new calls, received messages, updated Dispatch Comments, and Hold Back Required, plus uninterrupted embedded navigation when switching between the standard MDT and full-screen map.
 
 ## MDT deployment requirements
 
-1. Apply `supabase/migrations/202608150001_create_mdt_operations.sql` to the production Supabase project.
+1. Apply `supabase/migrations/202608150001_create_mdt_operations.sql` and `supabase/migrations/202608150002_create_mdt_messages.sql` to the production Supabase project.
 2. Configure these Vercel environment variables:
    - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
    - `APOLLO_CAD_BASE_URL` (normally `https://apollo-cad-simulator.vercel.app`)
