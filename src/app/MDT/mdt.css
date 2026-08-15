@@ -111,3 +111,12 @@ footer{height:50px;background:#0b2742;color:#bdd0df;display:flex;justify-content
 .night .searchPredictions button{background:#10283b;color:#e8f0f6;border-color:#29435a}
 .night .searchPredictions button:hover{background:#173d5d}
 .night .searchPredictions span{color:#a9bbc9}
+
+/* Driver-oriented navigation */
+.driverGuidance{position:absolute;z-index:24;left:14px;right:14px;top:58px;min-height:82px;border:1px solid rgba(255,255,255,.35);border-radius:13px;background:rgba(7,35,59,.96);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.28);display:grid;grid-template-columns:58px minmax(0,1fr) 76px;align-items:center;gap:10px;padding:9px 12px}
+.maneuverIcon{width:52px;height:52px;border-radius:11px;background:#1673c7;display:grid;place-items:center}.maneuverIcon svg{transform:rotate(-35deg)}
+.guidanceCopy{min-width:0}.guidanceCopy>span{display:block;color:#7fc8ff;font-size:12px;font-weight:950;letter-spacing:.04em}.guidanceCopy>strong{display:block;font-size:18px;line-height:1.15;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.guidanceCopy>small{display:block;font-size:9px;color:#b9d0e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.guidanceEta{text-align:right;border-left:1px solid rgba(255,255,255,.18);padding-left:10px}.guidanceEta>strong{font-size:25px;line-height:1}.guidanceEta>span{display:block;font-size:8px;font-weight:900;color:#8fc9ef}.guidanceEta>small{display:block;font-size:9px;color:#d4e3ee;margin-top:3px}
+.driverGuidance~.mapSearch{top:150px}.driverGuidance~.searchPredictions{top:196px}.driverGuidance~.crewPlaceCard,.driverGuidance~.searchError{top:200px}
+.fullMap .driverGuidance{top:76px;left:94px}.fullMap .driverGuidance~.mapSearch{top:168px}.fullMap .driverGuidance~.searchPredictions{top:214px}.fullMap .driverGuidance~.crewPlaceCard,.fullMap .driverGuidance~.searchError{top:218px}
+@media(max-width:720px){.driverGuidance{grid-template-columns:48px minmax(0,1fr) 62px}.maneuverIcon{width:44px;height:44px}.guidanceCopy>strong{font-size:15px}.guidanceEta>strong{font-size:21px}}

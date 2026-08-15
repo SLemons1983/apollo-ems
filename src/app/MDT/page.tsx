@@ -28,6 +28,9 @@ type NavigationSession = {
   etaMinutes:number|null;
   distanceMiles:number|null;
   locked:boolean;
+  instruction:string;
+  maneuver:string;
+  stepDistanceMeters:number|null;
 };
 type CrewPlace = { name:string; address:string; lat:number; lng:number };
 
@@ -69,6 +72,30 @@ const delayOptions = ["Traffic","Road Construction","Weather","Road Closure","Ra
 
 function pt(){return new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date())}
 function mapsUrl(lat:number,lng:number){return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
+function point(value:any){
+  const source=value?.latLng??value?.location??value;
+  const lat=typeof source?.lat==="function"?source.lat():source?.lat;
+  const lng=typeof source?.lng==="function"?source.lng():source?.lng;
+  return typeof lat==="number"&&typeof lng==="number"?{lat,lng}:null;
+}
+function metersBetween(a:{lat:number;lng:number},b:{lat:number;lng:number}){
+  const radius=6371000,toRad=(degrees:number)=>degrees*Math.PI/180;
+  const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);
+  const h=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 2*radius*Math.asin(Math.sqrt(h));
+}
+function bearingBetween(a:{lat:number;lng:number},b:{lat:number;lng:number}){
+  const toRad=(degrees:number)=>degrees*Math.PI/180,toDeg=(radians:number)=>radians*180/Math.PI;
+  const lat1=toRad(a.lat),lat2=toRad(b.lat),deltaLng=toRad(b.lng-a.lng);
+  const y=Math.sin(deltaLng)*Math.cos(lat2);
+  const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(deltaLng);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+function stepDistanceLabel(meters:number|null){
+  if(meters===null)return "";
+  if(meters<305){const feet=meters*3.28084;return `${Math.max(25,Math.round(feet/25)*25)} ft`}
+  return `${(meters/1609.344).toFixed(1)} mi`;
+}
 
 export default function MDT(){
   const[clock,setClock]=useState("--:--:--");
@@ -93,13 +120,14 @@ export default function MDT(){
   const googleMapRef=useRef<HTMLDivElement|null>(null); const googleMapObjectRef=useRef<any>(null); const googleMarkersRef=useRef<any[]>([]); const googleMarkerUnitIdsRef=useRef<string[]>([]); const trafficLayerRef=useRef<any>(null);
   const routePolylinesRef=useRef<any[]>([]); const routeMarkersRef=useRef<any[]>([]); const activeRouteRef=useRef<any|null>(null);
   const[googleReady,setGoogleReady]=useState(false); const[mapGeneration,setMapGeneration]=useState(0); const[googleMapError,setGoogleMapError]=useState(""); const[trafficEnabled,setTrafficEnabled]=useState(true);
-  const[devicePosition,setDevicePosition]=useState<{lat:number;lng:number}|null>(null); const[gpsAccuracy,setGpsAccuracy]=useState<number|null>(null);
+  const[devicePosition,setDevicePosition]=useState<{lat:number;lng:number}|null>(null); const[gpsAccuracy,setGpsAccuracy]=useState<number|null>(null); const[deviceHeading,setDeviceHeading]=useState<number|null>(null);
   const[navigation,setNavigation]=useState<NavigationSession|null>(null); const[previousCrewNavigation,setPreviousCrewNavigation]=useState<NavigationSession|null>(null);
   const[crewPlace,setCrewPlace]=useState<CrewPlace|null>(null); const[routeError,setRouteError]=useState(""); const[searchError,setSearchError]=useState(""); const[searchQuery,setSearchQuery]=useState(""); const[searchPredictions,setSearchPredictions]=useState<any[]>([]); const[searchLoading,setSearchLoading]=useState(false);
   const[events,setEvents]=useState<{id:number;time:string;label:string;source:Source}[]>([]);
   const[liveCall,setLiveCall]=useState<LiveCadCall>({eventType:"NONE",radioIdentifier:"",callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:"Unit Available",cadTimestamp:""});
   const[integrationState,setIntegrationState]=useState<"LOCAL"|"CONNECTED"|"ERROR">("LOCAL");
   const[alertQueue,setAlertQueue]=useState<MdtAlert[]>([]); const seenAlertKeysRef=useRef<Set<string>>(new Set()); const acknowledgedAlertKeysRef=useRef<Set<string>>(new Set());
+  const pendingStatusRef=useRef<{status:Status;expiresAt:number}|null>(null); const navigationStepsRef=useRef<any[]>([]); const navigationStepIndexRef=useRef(0);
 
   useEffect(()=>{const tick=()=>{setClock(pt());const h=Number(new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"2-digit",hour12:false}).format(new Date()));setAutoNight(h>=19||h<7)};tick();const t=window.setInterval(tick,1000);return()=>window.clearInterval(t)},[]);
   useEffect(()=>{
@@ -158,7 +186,10 @@ export default function MDT(){
         if(data.session){
           const nextAssignment=rowToAssignment(data.session);
           setAssignment(current=>JSON.stringify(current)===JSON.stringify(nextAssignment)?current:nextAssignment);
-          setStatus(data.session.status as Status);
+          const serverStatus=data.session.status as Status;
+          const pending=pendingStatusRef.current;
+          if(pending?.status===serverStatus){pendingStatusRef.current=null;setStatus(serverStatus)}
+          else if(!pending||pending.expiresAt<=Date.now()){pendingStatusRef.current=null;setStatus(serverStatus)}
         }
         if(data.call){
           setLiveCall((previous)=>{
@@ -184,7 +215,6 @@ export default function MDT(){
             return data.call;
           });
           setHoldBack(Boolean(data.call.holdBackRequired));
-          if(data.call.status&&status!==data.call.status&&["Dispatched","Holding Back"].includes(data.call.status))setStatus(data.call.status as Status);
         }else if(["Unit Available","En Route Post","In Area","At Post","Out of Service"].includes(data.session?.status)){
           setLiveCall({eventType:"NONE",radioIdentifier:assignment.cadId,callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:data.session?.status??"Unit Available",cadTimestamp:""});
           setHoldBack(false);setSelectedHospital(null);setCallInDone(false);
@@ -217,7 +247,7 @@ export default function MDT(){
   useEffect(()=>{
     if(!navigator.geolocation)return;
     const id=navigator.geolocation.watchPosition(
-      pos=>{setDevicePosition({lat:pos.coords.latitude,lng:pos.coords.longitude});setGpsAccuracy(Math.round(pos.coords.accuracy))},
+      pos=>{setDevicePosition({lat:pos.coords.latitude,lng:pos.coords.longitude});setGpsAccuracy(Math.round(pos.coords.accuracy));if(typeof pos.coords.heading==="number"&&!Number.isNaN(pos.coords.heading))setDeviceHeading(pos.coords.heading)},
       ()=>{},
       {enableHighAccuracy:true,maximumAge:3000,timeout:10000}
     );
@@ -245,13 +275,18 @@ export default function MDT(){
           throw new Error("google.maps is unavailable after Maps JavaScript API callback");
         }
 
-        const {Map}=await g.maps.importLibrary("maps");
+        const {Map,RenderingType}=await g.maps.importLibrary("maps");
         if(cancelled||!googleMapRef.current)return;
 
         const map=new Map(googleMapRef.current,{
           center:{lat:myUnit.lat,lng:myUnit.lng},
-          zoom:13,
+          zoom:navigation?18.5:15,
           mapId:"DEMO_MAP_ID",
+          renderingType:RenderingType.VECTOR,
+          tilt:navigation?60:35,
+          heading:deviceHeading??0,
+          tiltInteractionEnabled:true,
+          headingInteractionEnabled:true,
           disableDefaultUI:true,
           zoomControl:true,
           streetViewControl:false,
@@ -261,6 +296,7 @@ export default function MDT(){
         });
 
         googleMapObjectRef.current=map;
+        if(navigation)map.moveCamera({center:{lat:myUnit.lat,lng:myUnit.lng},zoom:18.5,tilt:60,heading:deviceHeading??0});
         setMapGeneration(current=>current+1);
         const traffic=new g.maps.TrafficLayer();
         trafficLayerRef.current=traffic;
@@ -478,9 +514,40 @@ export default function MDT(){
     renderActiveRoute(googleMapObjectRef.current,true);
   },[googleReady,mapGeneration,fullMap]);
 
+  useEffect(()=>{
+    if(!navigation||!devicePosition||!googleMapObjectRef.current)return;
+    const map=googleMapObjectRef.current;
+    const steps=navigationStepsRef.current;
+    if(!steps.length){map.moveCamera({center:devicePosition,zoom:18.5,tilt:60,heading:deviceHeading??map.getHeading?.()??0});return}
+    let index=Math.min(navigationStepIndexRef.current,steps.length-1);
+    let destination=point(steps[index]?.endLocation);
+    let remaining=destination?metersBetween(devicePosition,destination):null;
+    if(remaining!==null&&remaining<35&&index<steps.length-1){
+      index+=1;navigationStepIndexRef.current=index;destination=point(steps[index]?.endLocation);
+      remaining=destination?metersBetween(devicePosition,destination):null;
+    }
+    const step=steps[index];
+    const instruction=step?.instructions||"Continue on the highlighted route";
+    const maneuver=step?.maneuver||"STRAIGHT";
+    const rounded=remaining===null?null:Math.round(remaining);
+    const routeHeading=destination?bearingBetween(devicePosition,destination):null;
+    map.moveCamera({center:devicePosition,zoom:18.5,tilt:60,heading:deviceHeading??routeHeading??map.getHeading?.()??0});
+    const futureMeters=steps.slice(index+1).reduce((total:number,item:any)=>total+(typeof item?.distanceMeters==="number"?item.distanceMeters:0),0);
+    const remainingMeters=(remaining??(typeof step?.distanceMeters==="number"?step.distanceMeters:0))+futureMeters;
+    const distanceMiles=Math.round((remainingMeters/1609.344)*10)/10;
+    setNavigation(current=>!current||(
+      current.instruction===instruction&&current.maneuver===maneuver&&current.stepDistanceMeters===rounded&&current.distanceMiles===distanceMiles
+    )?current:{...current,instruction,maneuver,stepDistanceMeters:rounded,distanceMiles,
+      etaMinutes:current.distanceMiles&&current.etaMinutes
+        ?Math.max(1,Math.round(current.etaMinutes*(distanceMiles/current.distanceMiles)))
+        :current.etaMinutes});
+  },[devicePosition?.lat,devicePosition?.lng,deviceHeading,navigation?.label,mapGeneration]);
+
   function endNavigation(){
     clearRouteRendering();
     activeRouteRef.current=null;
+    navigationStepsRef.current=[];
+    navigationStepIndexRef.current=0;
     setNavigation(null);
     setRouteError("");
   }
@@ -509,15 +576,19 @@ export default function MDT(){
         destination,
         travelMode:"DRIVING",
         routingPreference:"TRAFFIC_AWARE",
-        fields:["path","distanceMeters","durationMillis","viewport"]
+        fields:["path","distanceMeters","durationMillis","viewport","legs"]
       });
       if(!routes?.length)throw new Error("No route returned");
       const route=routes[0];
       activeRouteRef.current=route;
+      navigationStepsRef.current=route.legs?.flatMap((leg:any)=>leg.steps??[])??[];
+      navigationStepIndexRef.current=0;
       renderActiveRoute(googleMapObjectRef.current,true);
       const etaMinutes=typeof route.durationMillis==="number"?Math.max(1,Math.round(route.durationMillis/60000)):null;
       const distanceMiles=typeof route.distanceMeters==="number"?Math.round((route.distanceMeters/1609.344)*10)/10:null;
-      setNavigation({kind,label,destination,etaMinutes,distanceMiles,locked:kind==="dispatch"||kind==="hospital"});
+      const firstStep=navigationStepsRef.current[0];
+      setNavigation({kind,label,destination,etaMinutes,distanceMiles,locked:kind==="dispatch"||kind==="hospital",instruction:firstStep?.instructions||"Proceed to the highlighted route",maneuver:firstStep?.maneuver||"STRAIGHT",stepDistanceMeters:typeof firstStep?.distanceMeters==="number"?firstStep.distanceMeters:null});
+      googleMapObjectRef.current.moveCamera({center:origin,zoom:18.5,tilt:60,heading:deviceHeading??0});
       log(`${kind.toUpperCase()} navigation → ${label}`,"APOLLO");
     }catch(err){
       console.error("[Apollo MDT] Route computation error:",err);
@@ -545,6 +616,7 @@ export default function MDT(){
   function log(label:string,source:Source){setEvents(e=>[{id:Date.now(),time:pt(),label,source},...e])}
   async function sendStatus(next:Status,source:Source="MDT MANUAL"){
     if(!assignment?.cadId)return;
+    pendingStatusRef.current={status:next,expiresAt:Date.now()+12000};
     try{await fetch("/api/integration/mdt/send-status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,emsNumber:liveCall.emsNumber,status:next,timestamp:new Date().toISOString(),source,latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}catch{}
   }
   function setManual(next:Status){setStatus(next);log(next,"MDT MANUAL");void sendStatus(next,"MDT MANUAL");setStatusModal(false);if(blackout)setBlackout(false);if(next==="Dispatched"||next==="En Route"){startDispatchNavigation(`EMS ${liveCall.emsNumber} Scene`,`${liveCall.address}, ${liveCall.city}, ${liveCall.state} ${liveCall.zip??""}`)}}
@@ -584,6 +656,7 @@ export default function MDT(){
     {!googleReady&&<><div className="mapGrid"/><div className="road r1">Manning Ave</div><div className="road r2">G Street</div><div className="routeLine a"/><div className="routeLine b"/><div className="scene"><MapPin size={17}/>SCENE</div>
       {mapUnits.map((u,i)=><button key={u.cadId} className={`unitMarker u${i} ${u.emergency?"unitEmergency":""} ${u.cadId===assignment?.cadId?"mine":""}`} onClick={()=>setSelectedUnit(u)}><Ambulance size={17}/><b>{u.cadId.replace("Medic ","")}</b><small>{u.emergency?"EMERGENCY":u.status}</small></button>)}
     </>}
+    {navigation&&<div className="driverGuidance"><div className="maneuverIcon"><Navigation size={30}/></div><div className="guidanceCopy"><span>{stepDistanceLabel(navigation.stepDistanceMeters)}</span><strong>{navigation.instruction}</strong><small>{navigation.label}</small></div><div className="guidanceEta"><strong>{navigation.etaMinutes??"—"}</strong><span>MIN</span><small>{navigation.distanceMiles!==null?`${navigation.distanceMiles} mi`:""}</small></div></div>}
     <div className="mapTop">
       <div className="mapTopRoute"><Navigation size={15}/><span>{navigation?navigation.label:`${liveCall.address}, ${liveCall.city}`}</span></div>
       {navigation&&<div className="navMetrics"><strong>{navigation.etaMinutes!==null?`${navigation.etaMinutes} min`:"ETA —"}</strong><span>{navigation.distanceMiles!==null?`${navigation.distanceMiles} mi`:""}</span></div>}

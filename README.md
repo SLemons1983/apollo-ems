@@ -1,6 +1,6 @@
 # ApolloEMS
 
-ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.7 adds large acknowledged MDT notifications for new calls, received messages, updated Dispatch Comments, and Hold Back Required, plus uninterrupted embedded navigation when switching between the standard MDT and full-screen map.
+ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.8 stabilizes MDT status synchronization and adds driver-oriented vector navigation with 3D tilt, heading-up GPS tracking, route continuity, maneuver instructions, step distance, ETA, and remaining distance.
 
 ## MDT deployment requirements
 
