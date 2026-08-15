@@ -88,9 +88,9 @@ export default function MDT(){
   const[delayModal,setDelayModal]=useState(false); const[delay,setDelay]=useState(""); const[delayNote,setDelayNote]=useState(""); const[activeDelay,setActiveDelay]=useState<string|null>(null);
   const[selectedUnit,setSelectedUnit]=useState<Unit|null>(null); const[emergency,setEmergency]=useState(false); const[emergencyHold,setEmergencyHold]=useState(false); const[emergencyProgress,setEmergencyProgress]=useState(0);
   const emergencyTimer=useRef<number|null>(null); const emergencyTick=useRef<number|null>(null);
-  const googleMapRef=useRef<HTMLDivElement|null>(null); const googleMapObjectRef=useRef<any>(null); const googleMarkersRef=useRef<any[]>([]); const trafficLayerRef=useRef<any>(null);
+  const googleMapRef=useRef<HTMLDivElement|null>(null); const googleMapObjectRef=useRef<any>(null); const googleMarkersRef=useRef<any[]>([]); const googleMarkerUnitIdsRef=useRef<string[]>([]); const trafficLayerRef=useRef<any>(null);
   const routePolylinesRef=useRef<any[]>([]); const routeMarkersRef=useRef<any[]>([]);
-  const[googleReady,setGoogleReady]=useState(false); const[googleMapError,setGoogleMapError]=useState(""); const[trafficEnabled,setTrafficEnabled]=useState(true);
+  const[googleReady,setGoogleReady]=useState(false); const[mapGeneration,setMapGeneration]=useState(0); const[googleMapError,setGoogleMapError]=useState(""); const[trafficEnabled,setTrafficEnabled]=useState(true);
   const[devicePosition,setDevicePosition]=useState<{lat:number;lng:number}|null>(null); const[gpsAccuracy,setGpsAccuracy]=useState<number|null>(null);
   const[navigation,setNavigation]=useState<NavigationSession|null>(null); const[previousCrewNavigation,setPreviousCrewNavigation]=useState<NavigationSession|null>(null);
   const[crewPlace,setCrewPlace]=useState<CrewPlace|null>(null); const[routeError,setRouteError]=useState(""); const[searchError,setSearchError]=useState(""); const[searchQuery,setSearchQuery]=useState(""); const[searchPredictions,setSearchPredictions]=useState<any[]>([]); const[searchLoading,setSearchLoading]=useState(false);
@@ -186,6 +186,7 @@ export default function MDT(){
   useEffect(()=>{
     const key=process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if(!key){setGoogleMapError("Google Maps API key not configured");return}
+    setGoogleReady(false);
     let cancelled=false;
     const callbackName="__apolloGoogleMapsReady";
 
@@ -213,6 +214,7 @@ export default function MDT(){
         });
 
         googleMapObjectRef.current=map;
+        setMapGeneration(current=>current+1);
         const traffic=new g.maps.TrafficLayer();
         trafficLayerRef.current=traffic;
         if(trafficEnabled)traffic.setMap(map);
@@ -349,6 +351,7 @@ export default function MDT(){
       try{
         for(const marker of googleMarkersRef.current){marker.map=null}
         googleMarkersRef.current=[];
+        googleMarkerUnitIdsRef.current=[];
         const {AdvancedMarkerElement,PinElement}=await g.maps.importLibrary("marker");
         if(!active)return;
         for(const u of mapUnits){
@@ -367,14 +370,15 @@ export default function MDT(){
             content:pin.element,
             gmpClickable:true
           });
-          marker.__apolloCadId=u.cadId;
           marker.addListener("click",()=>setSelectedUnit(u));
           googleMarkersRef.current.push(marker);
+          googleMarkerUnitIdsRef.current.push(u.cadId);
         }
         if(liveCall.callNumber){
           const scenePin=new PinElement({background:"#c83d3d",borderColor:"#7f1d1d",glyphColor:"#ffffff",glyph:"!"});
           const sceneMarker=new AdvancedMarkerElement({map,position:{lat:36.5987,lng:-119.4540},title:`EMS ${liveCall.emsNumber} Scene — ${liveCall.address}`,content:scenePin.element});
           googleMarkersRef.current.push(sceneMarker);
+          googleMarkerUnitIdsRef.current.push("");
         }
       }catch{
         setGoogleMapError("Google Maps markers failed to load");
@@ -382,15 +386,15 @@ export default function MDT(){
     };
     void renderMarkers();
     return()=>{active=false}
-  },[googleReady,markerSignature,assignment?.cadId,fullMap]);
+  },[googleReady,mapGeneration,markerSignature,assignment?.cadId]);
 
   useEffect(()=>{
-    for(const marker of googleMarkersRef.current){
-      const cadId=marker.__apolloCadId;
-      if(!cadId)continue;
+    googleMarkersRef.current.forEach((marker,index)=>{
+      const cadId=googleMarkerUnitIdsRef.current[index];
+      if(!cadId)return;
       const unit=mapUnits.find(item=>item.cadId===cadId);
       if(unit)marker.position={lat:unit.lat,lng:unit.lng};
-    }
+    });
   },[mapUnits]);
 
   useEffect(()=>{

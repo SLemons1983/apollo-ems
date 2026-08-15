@@ -1,6 +1,6 @@
 # ApolloEMS
 
-ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.5 adds the operational full-screen iPad `/MDT` route, shared CAD unit sessions, secure CAD integration, persistent Google Maps markers, reliable full-screen map transitions, and high-contrast Night-mode reading views.
+ApolloEMS is a Next.js operations platform backed by Supabase. Version 0.2.6 adds the operational full-screen iPad `/MDT` route, shared CAD unit sessions, secure CAD integration, synchronized Google Maps initialization and markers, reliable full-screen map transitions, and high-contrast Night-mode reading views.
 
 ## MDT deployment requirements
 
