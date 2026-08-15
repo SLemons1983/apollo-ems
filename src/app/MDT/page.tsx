@@ -77,7 +77,7 @@ export default function MDT(){
   const[units,setUnits]=useState<Unit[]>([]);
  const availableRadioIdentifiers=useMemo(()=>radioIdentifiersForVehicle(selectedVehicle),[selectedVehicle]);
   const[status,setStatus]=useState<Status>("Unit Available"); const[autoStatus,setAutoStatus]=useState(true); const[holdBack,setHoldBack]=useState(false);
-  const[displayMode,setDisplayMode]=useState<"Auto"|"Day"|"Night">("Auto"); const[autoNight,setAutoNight]=useState(false); const[brightness,setBrightness]=useState(82); const[blackout,setBlackout]=useState(false);
+  const[displayMode,setDisplayMode]=useState<"Auto"|"Day"|"Night">("Auto"); const[autoNight,setAutoNight]=useState(false); const[brightness,setBrightness]=useState(100); const[blackout,setBlackout]=useState(false);
   const[fullMap,setFullMap]=useState(false); const[readCard,setReadCard]=useState<{title:string;body:string}|null>(null); const[statusModal,setStatusModal]=useState(false);
   const[destModal,setDestModal]=useState(false); const[destinationNeed,setDestinationNeed]=useState<DestinationNeed>("General Hospital");
   const[selectedHospital,setSelectedHospital]=useState<HospitalRecord|null>(null); const[transportMode,setTransportMode]=useState<"Code 2"|"Code 3">("Code 2");
