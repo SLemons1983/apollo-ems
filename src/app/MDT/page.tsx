@@ -164,6 +164,7 @@ export default function MDT(){
   const hasActiveCall=!['Unit Available','En Route Post','In Area','At Post','Out of Service'].includes(status);
   const nextStatus=useMemo(()=>{if(status==="Dispatched")return {label:"En Route" as Status,note:"Begin response"};if(status==="En Route")return holdBack?{label:"Holding Back" as Status,note:"Hold Back Required by Dispatch"}:{label:"At Scene" as Status,note:autoStatus?"GPS automation armed":"Manual status available"};if(status==="Holding Back")return {label:"At Scene" as Status,note:"Use when cleared to enter"};if(status==="At Scene")return {label:"Depart Scene" as Status,note:"Destination workflow"};if(status==="Depart Scene")return {label:"At Destination" as Status,note:"GPS arrival automation available"};if(status==="At Destination")return {label:"Pending Paperwork" as Status,note:"Complete documentation"};if(status==="Pending Paperwork")return {label:"Unit Available" as Status,note:"Return unit to service"};if(status==="Unit Available")return {label:"En Route Post" as Status,note:"Return / move to post"};if(status==="En Route Post")return {label:"In Area" as Status,note:"Arrived in response area"};if(status==="In Area")return {label:"At Post" as Status,note:"Arrived at assigned post"};return null},[status,holdBack,autoStatus]);
   const mapUnits=useMemo(()=>units.map(u=>u.cadId===assignment?.cadId?{...u,status,emergency,lat:devicePosition?.lat??u.lat,lng:devicePosition?.lng??u.lng}:u),[units,assignment?.cadId,status,emergency,devicePosition?.lat,devicePosition?.lng]);
+  const markerSignature=useMemo(()=>`${mapUnits.map(u=>`${u.cadId}|${u.status}|${u.emergency}`).join(";")}|${liveCall.callNumber}`,[mapUnits,liveCall.callNumber]);
   const myUnit=mapUnits.find(u=>u.cadId===assignment?.cadId)??{cadId:"",vehicle:"",station:"",status:"Unit Available" as Status,lat:36.5965,lng:-119.4512};
 
   useEffect(()=>{
@@ -275,7 +276,7 @@ export default function MDT(){
     return()=>{
       cancelled=true;
     };
-  },[assignment?.cadId]);
+  },[assignment?.cadId,fullMap]);
 
 
 
@@ -366,6 +367,7 @@ export default function MDT(){
             content:pin.element,
             gmpClickable:true
           });
+          marker.__apolloCadId=u.cadId;
           marker.addListener("click",()=>setSelectedUnit(u));
           googleMarkersRef.current.push(marker);
         }
@@ -380,7 +382,16 @@ export default function MDT(){
     };
     void renderMarkers();
     return()=>{active=false}
-  },[googleReady,mapUnits,assignment]);
+  },[googleReady,markerSignature,assignment?.cadId,fullMap]);
+
+  useEffect(()=>{
+    for(const marker of googleMarkersRef.current){
+      const cadId=marker.__apolloCadId;
+      if(!cadId)continue;
+      const unit=mapUnits.find(item=>item.cadId===cadId);
+      if(unit)marker.position={lat:unit.lat,lng:unit.lng};
+    }
+  },[mapUnits]);
 
   useEffect(()=>{
     const traffic=trafficLayerRef.current;
