@@ -46,4 +46,9 @@ export type IncomingCadCall = {
   cautionNotes?: string;
   status: string;
   cadTimestamp: string;
+  dispositionCategory?: "Transport" | "Non-Transport";
+  disposition?: string;
+  dispositionCode?: string;
+  dispositionDetail?: string;
+  dispositionTimestamp?: string;
 };
