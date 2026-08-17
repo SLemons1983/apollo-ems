@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       ride_along_type: event.rideAlongType ?? "None",
       ride_along_name: event.rideAlongName ?? "",
       status: event.status,
+      active_call_number: event.activeCallNumber ?? null,
       out_of_service_reason: event.status === "Out of Service" ? event.outOfServiceReason.trim() : "",
       emergency_active: Boolean(event.emergencyActive),
       logged_on_at: existing?.logged_on_at ?? now,

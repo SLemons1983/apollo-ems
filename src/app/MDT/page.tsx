@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type Status = "Dispatched"|"En Route"|"Holding Back"|"At Scene"|"Depart Scene"|"At Destination"|"Pending Paperwork"|"Unit Available"|"En Route Post"|"In Area"|"At Post"|"Out of Service";
+type Status = "Logged In - Not Available"|"Dispatched"|"En Route"|"Hold Back Required"|"Holding Back"|"Scene Secure"|"At Scene"|"Depart Scene"|"At Destination"|"Pending Paperwork"|"Unit Available"|"En Route Post"|"In Area"|"At Post"|"Out of Service";
 type Source = "MDT MANUAL"|"GPS AUTO"|"CAD"|"APOLLO";
 type CrewMember = { employeeId:string; displayName:string };
 type RideAlongType = "None"|"Paramedic Intern"|"EMT Student"|"Other Ride Along";
@@ -18,7 +18,7 @@ type Note = { id:number; text:string; author:string; time:string };
 type Msg = { id:number|string; from:string; to:string; text:string; time:string };
 type ReceivedMsg = { id:string; sender:string; recipient:string; body:string; created_at:string };
 type LiveCadCall = { eventType:string; radioIdentifier:string; callNumber:string; emsNumber:string; priority:string; zone?:string; nature:string; facility?:string; address:string; city:string; state:string; zip?:string; suite?:string; holdBackRequired:boolean; dispatchComments?:string; premiseNotes?:string; cautionNotes?:string; status:string; cadTimestamp:string };
-type MdtAlert = { id:string; tone:"call"|"message"|"comments"|"holdback"; eyebrow:string; title:string; body:string };
+type MdtAlert = { id:string; tone:"call"|"post"|"message"|"comments"|"holdback"|"secure"; eyebrow:string; title:string; body:string };
 
 type NavigationKind = "crew"|"dispatch"|"hospital"|"unit";
 type NavigationSession = {
@@ -67,10 +67,20 @@ const HOSPITALS: HospitalRecord[] = [
   {name:"Veterans Administration",city:"Fresno",eta:33,needs:["VA"],radio:"Med 6",tone:"969",phone:"241-3600",type:"VA Emergency Department"}
 ];
 
-const statusOptions: Status[] = ["En Route","Holding Back","At Scene","Depart Scene","At Destination","Pending Paperwork","Unit Available","En Route Post","In Area","At Post"];
+const statusOptions: Status[] = ["Logged In - Not Available","Unit Available","En Route","Holding Back","At Scene","Depart Scene","At Destination","Pending Paperwork","En Route Post","In Area","At Post"];
 const delayOptions = ["Traffic","Road Construction","Weather","Road Closure","Railroad Crossing","Access Problem","Law Enforcement","Fire Activity","Mechanical","Hospital Delay","Other"];
 
 function pt(){return new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date())}
+function displayStatus(status:Status,assignment:DeviceAssignment|null){
+  if(!assignment)return "Not Logged In";
+  if(status==="Unit Available")return "Available";
+  if(status==="Dispatched")return "Unit Dispatched";
+  if(status==="En Route Post")return "Available - En Route Post";
+  if(status==="In Area")return "Available - In Area";
+  if(status==="At Post")return "Available - At Post";
+  if(status==="Out of Service")return `Out of Service${assignment.outOfServiceReason?` - ${assignment.outOfServiceReason}`:""}`;
+  return status;
+}
 function mapsUrl(lat:number,lng:number){return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`}
 function point(value:any){
   const source=value?.latLng??value?.location??value;
@@ -105,7 +115,7 @@ export default function MDT(){
   const[employees,setEmployees]=useState<CrewMember[]>([]); const[crewIds,setCrewIds]=useState(["","","",""]); const[rideAlongType,setRideAlongType]=useState<RideAlongType>("None"); const[rideAlongName,setRideAlongName]=useState(""); const[canManageDevice,setCanManageDevice]=useState(false); const[refreshing,setRefreshing]=useState(false);
   const[units,setUnits]=useState<Unit[]>([]);
  const availableRadioIdentifiers=useMemo(()=>radioIdentifiersForVehicle(selectedVehicle),[selectedVehicle]);
-  const[status,setStatus]=useState<Status>("Unit Available"); const[autoStatus,setAutoStatus]=useState(true); const[holdBack,setHoldBack]=useState(false);
+  const[status,setStatus]=useState<Status>("Logged In - Not Available"); const[autoStatus,setAutoStatus]=useState(true); const[holdBack,setHoldBack]=useState(false);
   const[displayMode,setDisplayMode]=useState<"Auto"|"Day"|"Night">("Auto"); const[autoNight,setAutoNight]=useState(false); const[brightness,setBrightness]=useState(100); const[blackout,setBlackout]=useState(false);
   const[fullMap,setFullMap]=useState(false); const[readCard,setReadCard]=useState<{title:string;body:string}|null>(null); const[statusModal,setStatusModal]=useState(false);
   const[destModal,setDestModal]=useState(false); const[destinationNeed,setDestinationNeed]=useState<DestinationNeed>("General Hospital");
@@ -195,10 +205,12 @@ export default function MDT(){
           setLiveCall((previous)=>{
             const isNewCall=previous.callNumber!==data.call.callNumber;
             if(isNewCall){
-              log(`NEW CAD CALL — EMS ${data.call.emsNumber}`,"CAD");
+              const isPost=data.call.eventType==="POST_ASSIGNED";
+              log(isPost?`NEW POST ASSIGNMENT — ${data.call.nature}`:`NEW CAD CALL — EMS ${data.call.emsNumber}`,"CAD");
               enqueueAlert(`call:${data.call.callNumber}`,{
-                tone:"call",eyebrow:"NEW CAD CALL",title:`EMS ${data.call.emsNumber} · Priority ${data.call.priority}`,
-                body:`${data.call.nature}\n${data.call.address}, ${data.call.city}`
+                tone:isPost?"post":"call",eyebrow:isPost?"NEW POST ASSIGNMENT":"NEW CAD CALL",
+                title:isPost?data.call.nature:`EMS ${data.call.emsNumber} · Priority ${data.call.priority}`,
+                body:`${data.call.address}, ${data.call.city}`
               });
             }else if((previous.dispatchComments??"")!==(data.call.dispatchComments??"")&&data.call.dispatchComments?.trim()){
               enqueueAlert(`comments:${data.call.callNumber}:${data.call.dispatchComments}`,{
@@ -212,10 +224,16 @@ export default function MDT(){
                 body:"Do not enter the scene until Dispatch advises that the unit is cleared to proceed."
               });
             }
+            if(previous.callNumber===data.call.callNumber&&previous.holdBackRequired&&!data.call.holdBackRequired){
+              enqueueAlert(`secure:${data.call.callNumber}:${data.call.cadTimestamp||"active"}`,{
+                tone:"secure",eyebrow:"DISPATCH SAFETY UPDATE",title:"SCENE SECURE",
+                body:"Dispatch has cleared the Hold Back requirement. Proceed according to current conditions and agency policy."
+              });
+            }
             return data.call;
           });
           setHoldBack(Boolean(data.call.holdBackRequired));
-        }else if(["Unit Available","En Route Post","In Area","At Post","Out of Service"].includes(data.session?.status)){
+        }else if(["Logged In - Not Available","Unit Available","En Route Post","In Area","At Post","Out of Service"].includes(data.session?.status)){
           setLiveCall({eventType:"NONE",radioIdentifier:assignment.cadId,callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:data.session?.status??"Unit Available",cadTimestamp:""});
           setHoldBack(false);setSelectedHospital(null);setCallInDone(false);
         }
@@ -238,8 +256,9 @@ export default function MDT(){
 
 
   const night=displayMode==="Night"||(displayMode==="Auto"&&autoNight);
-  const hasActiveCall=!['Unit Available','En Route Post','In Area','At Post','Out of Service'].includes(status);
-  const nextStatus=useMemo(()=>{if(status==="Dispatched")return {label:"En Route" as Status,note:"Begin response"};if(status==="En Route")return holdBack?{label:"Holding Back" as Status,note:"Hold Back Required by Dispatch"}:{label:"At Scene" as Status,note:autoStatus?"GPS automation armed":"Manual status available"};if(status==="Holding Back")return {label:"At Scene" as Status,note:"Use when cleared to enter"};if(status==="At Scene")return {label:"Depart Scene" as Status,note:"Destination workflow"};if(status==="Depart Scene")return {label:"At Destination" as Status,note:"GPS arrival automation available"};if(status==="At Destination")return {label:"Pending Paperwork" as Status,note:"Complete documentation"};if(status==="Pending Paperwork")return {label:"Unit Available" as Status,note:"Return unit to service"};if(status==="Unit Available")return {label:"En Route Post" as Status,note:"Return / move to post"};if(status==="En Route Post")return {label:"In Area" as Status,note:"Arrived in response area"};if(status==="In Area")return {label:"At Post" as Status,note:"Arrived at assigned post"};return null},[status,holdBack,autoStatus]);
+  const hasCadAssignment=Boolean(liveCall.callNumber);
+  const hasActiveCall=hasCadAssignment&&liveCall.eventType!=="POST_ASSIGNED";
+  const nextStatus=useMemo(()=>{if(status==="Dispatched")return {label:"En Route" as Status,note:"Begin response"};if(status==="Hold Back Required")return {label:"Holding Back" as Status,note:"Acknowledge and hold back"};if(status==="En Route")return holdBack?{label:"Holding Back" as Status,note:"Hold Back Required by Dispatch"}:{label:"At Scene" as Status,note:autoStatus?"GPS automation armed":"Manual status available"};if(status==="Holding Back"||status==="Scene Secure")return {label:"At Scene" as Status,note:"Use when entering the scene"};if(status==="At Scene")return {label:"Depart Scene" as Status,note:"Destination workflow"};if(status==="Depart Scene")return {label:"At Destination" as Status,note:"GPS arrival automation available"};if(status==="At Destination")return {label:"Pending Paperwork" as Status,note:"Complete documentation"};if(status==="Pending Paperwork")return {label:"Unit Available" as Status,note:"Return unit to service"};if(status==="Unit Available"&&liveCall.eventType==="POST_ASSIGNED")return {label:"En Route Post" as Status,note:"Begin post move"};if(status==="En Route Post")return {label:"In Area" as Status,note:"Arrived in response area"};if(status==="In Area")return {label:"At Post" as Status,note:"Arrived at assigned post"};return null},[status,holdBack,autoStatus,liveCall.eventType]);
   const mapUnits=useMemo(()=>units.map(u=>u.cadId===assignment?.cadId?{...u,status,emergency,lat:devicePosition?.lat??u.lat,lng:devicePosition?.lng??u.lng}:u),[units,assignment?.cadId,status,emergency,devicePosition?.lat,devicePosition?.lng]);
   const markerSignature=useMemo(()=>`${mapUnits.map(u=>`${u.cadId}|${u.status}|${u.emergency}`).join(";")}|${liveCall.callNumber}`,[mapUnits,liveCall.callNumber]);
   const myUnit=mapUnits.find(u=>u.cadId===assignment?.cadId)??{cadId:"",vehicle:"",station:"",status:"Unit Available" as Status,lat:36.5965,lng:-119.4512};
@@ -619,7 +638,7 @@ export default function MDT(){
     pendingStatusRef.current={status:next,expiresAt:Date.now()+12000};
     try{await fetch("/api/integration/mdt/send-status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,emsNumber:liveCall.emsNumber,status:next,timestamp:new Date().toISOString(),source,latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}catch{}
   }
-  function setManual(next:Status){setStatus(next);log(next,"MDT MANUAL");void sendStatus(next,"MDT MANUAL");setStatusModal(false);if(blackout)setBlackout(false);if(next==="Dispatched"||next==="En Route"){startDispatchNavigation(`EMS ${liveCall.emsNumber} Scene`,`${liveCall.address}, ${liveCall.city}, ${liveCall.state} ${liveCall.zip??""}`)}}
+  function setManual(next:Status){setStatus(next);log(next,"MDT MANUAL");void sendStatus(next,"MDT MANUAL");setStatusModal(false);if(blackout)setBlackout(false);if(next==="Unit Available"){setLiveCall({eventType:"NONE",radioIdentifier:assignment?.cadId??"",callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:"Unit Available",cadTimestamp:""});setHoldBack(false);setSelectedHospital(null);setCallInDone(false);if(navigation?.locked)endNavigation()}else if(next==="Dispatched"||next==="En Route"||next==="En Route Post"){startDispatchNavigation(liveCall.eventType==="POST_ASSIGNED"?liveCall.nature:`EMS ${liveCall.emsNumber} Scene`,`${liveCall.address}, ${liveCall.city}, ${liveCall.state} ${liveCall.zip??""}`)}}
   function confirmDepart(){if(!selectedHospital)return;setStatus("Depart Scene");setCallInDone(false);log(`Depart Scene → ${selectedHospital.name} · ${transportMode}${statTransport?" · STAT":""} · ${patientCount} patient${patientCount===1?"":"s"}`,"MDT MANUAL");void sendStatus("Depart Scene","MDT MANUAL");setDestModal(false);void startEmbeddedNavigation("hospital",selectedHospital.name,selectedHospital.navQuery||`${selectedHospital.name}, ${selectedHospital.city}, CA`,true)}
   function advance(){if(!nextStatus)return;if(nextStatus.label==="Depart Scene"){setDestModal(true);return}setManual(nextStatus.label)}
   async function login(){
@@ -629,13 +648,13 @@ export default function MDT(){
     const selectedCrew=crewIds.filter(Boolean).map(id=>employees.find(employee=>employee.employeeId===id)).filter(Boolean) as CrewMember[];
     if(selectedCrew.length<1){setLoginError("Crew Member 1 is required.");return}
     if(new Set(selectedCrew.map(member=>member.employeeId)).size!==selectedCrew.length){setLoginError("The same employee cannot be assigned more than once.");return}
-    const response=await fetch("/api/mdt/session",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:assignment?.id,physicalVehicle:selectedVehicle,radioIdentifier:selectedRadioId,station:radio.station,level:radio.level,crewMembers:selectedCrew,rideAlongType,rideAlongName,status:assignment?.id?status:"Unit Available",loggedOnAt:undefined})});
+    const response=await fetch("/api/mdt/session",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:assignment?.id,physicalVehicle:selectedVehicle,radioIdentifier:selectedRadioId,station:radio.station,level:radio.level,crewMembers:selectedCrew,rideAlongType,rideAlongName,status:assignment?.id?status:"Logged In - Not Available",loggedOnAt:undefined})});
     const data=await response.json();if(!response.ok||!data.ok){setLoginError(data.error||"Unable to assign MDT");return}
     const a=rowToAssignment(data.session);window.localStorage.setItem("apollo-mdt-session-id",a.id);setAssignment(a);setStatus(data.session.status);setLoginOpen(false);log(`Device assigned: Vehicle ${a.vehicle} / ${a.cadId}`,"APOLLO");void refreshMdt();
   }
   async function clearPairing(){
     if(assignment?.id)await fetch(`/api/mdt/session?id=${encodeURIComponent(assignment.id)}`,{method:"DELETE"});
-    window.localStorage.removeItem("apollo-mdt-session-id");setAssignment(null);setStatus("Unit Available");setLoginOpen(true);void refreshMdt();
+    window.localStorage.removeItem("apollo-mdt-session-id");setAssignment(null);setStatus("Logged In - Not Available");setLoginOpen(true);void refreshMdt();
   }
   function emergencyDown(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(true);setEmergencyProgress(0);const start=Date.now();emergencyTick.current=window.setInterval(()=>setEmergencyProgress(Math.min(100,(Date.now()-start)/30)),50);emergencyTimer.current=window.setTimeout(()=>{if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(false);setEmergencyProgress(100);setEmergency(true);setBlackout(false);log("EMERGENCY ACTIVATED","MDT MANUAL");if(assignment?.cadId){void fetch("/api/integration/mdt/send-emergency",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,active:true,timestamp:new Date().toISOString(),latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}},3000)}
   function emergencyUp(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);emergencyTimer.current=null;emergencyTick.current=null;if(!emergency)setEmergencyProgress(0);setEmergencyHold(false)}
@@ -697,18 +716,18 @@ export default function MDT(){
       <button onClick={()=>setFullMap(true)}><Map size={16}/>Full Screen Map</button>
       {navigation
         ? <button className="endNavBtn" onClick={endNavigation}><X size={16}/>End Navigation</button>
-        : <button onClick={()=>startDispatchNavigation(`EMS ${liveCall.emsNumber} Scene`,`${liveCall.address}, ${liveCall.city}, ${liveCall.state} ${liveCall.zip??""}`)}><Route size={16}/>Start Scene Navigation</button>}
+        : hasCadAssignment&&<button onClick={()=>startDispatchNavigation(liveCall.eventType==="POST_ASSIGNED"?liveCall.nature:`EMS ${liveCall.emsNumber} Scene`,`${liveCall.address}, ${liveCall.city}, ${liveCall.state} ${liveCall.zip??""}`)}><Route size={16}/>{liveCall.eventType==="POST_ASSIGNED"?"Start Post Navigation":"Start Scene Navigation"}</button>}
     </div>
   </div>;
 
-  if(blackout)return <main className="mdt-root blackout" onClick={()=>setBlackout(false)}><Moon size={28}/><strong>BLACKOUT</strong><span>Tap anywhere to restore display</span><small>{assignment?.cadId||"UNASSIGNED"} · {status} · {clock}</small></main>;
+  if(blackout)return <main className="mdt-root blackout" onClick={()=>setBlackout(false)}><Moon size={28}/><strong>BLACKOUT</strong><span>Tap anywhere to restore display</span><small>{assignment?.cadId||"UNASSIGNED"} · {displayStatus(status,assignment)} · {clock}</small></main>;
   const activeAlert=alertQueue[0]??null;
-  const alertBanner=activeAlert&&<div className="mdtAlertBackdrop"><section className={`mdtAlert ${activeAlert.tone}`} role="alertdialog" aria-live="assertive" aria-modal="true"><div className="mdtAlertIcon">{activeAlert.tone==="holdback"?<ShieldAlert size={44}/>:activeAlert.tone==="message"?<MessageSquareText size={44}/>:<Siren size={44}/>}</div><span>{activeAlert.eyebrow}</span><h2>{activeAlert.title}</h2><p>{activeAlert.body}</p><button autoFocus onClick={acknowledgeAlert}><Check size={19}/>ACKNOWLEDGE{alertQueue.length>1?` · ${alertQueue.length-1} MORE`:""}</button></section></div>;
+  const alertBanner=activeAlert&&<div className="mdtAlertBackdrop"><section className={`mdtAlert ${activeAlert.tone}`} role="alertdialog" aria-live="assertive" aria-modal="true"><div className="mdtAlertIcon">{activeAlert.tone==="holdback"||activeAlert.tone==="secure"?<ShieldAlert size={44}/>:activeAlert.tone==="message"?<MessageSquareText size={44}/>:<Siren size={44}/>}</div><span>{activeAlert.eyebrow}</span><h2>{activeAlert.title}</h2><p>{activeAlert.body}</p><button autoFocus onClick={acknowledgeAlert}><Check size={19}/>ACKNOWLEDGE{alertQueue.length>1?` · ${alertQueue.length-1} MORE`:""}</button></section></div>;
 
-  if(fullMap)return <main className={`mdt-root fullMap ${night?"night":""}`}><button className="mapReturn" onClick={()=>setFullMap(false)}><ArrowLeft size={19}/>RETURN TO MDT</button>{map}<div className="floatBar"><div><strong>{assignment?.cadId||"UNASSIGNED"}</strong><span>{navigation?`${navigation.label} · ${navigation.etaMinutes??"—"} min`:`EMS ${liveCall.emsNumber} · ${status}`}</span></div>{navigation&&<button onClick={endNavigation}>END NAVIGATION</button>}<button onClick={()=>setStatusModal(true)}>{status}</button></div>{alertBanner}</main>;
+  if(fullMap)return <main className={`mdt-root fullMap ${night?"night":""}`}><div className="statusHeader"><span>CURRENT STATUS</span><strong>{displayStatus(status,assignment)}</strong></div><button className="mapReturn" onClick={()=>setFullMap(false)}><ArrowLeft size={19}/>RETURN TO MDT</button>{map}<div className="floatBar"><div><strong>{assignment?.cadId||"UNASSIGNED"}</strong><span>{navigation?`${navigation.label} · ${navigation.etaMinutes??"—"} min`:hasCadAssignment?`${liveCall.eventType==="POST_ASSIGNED"?"POST":"EMS "+liveCall.emsNumber} · ${displayStatus(status,assignment)}`:displayStatus(status,assignment)}</span></div>{navigation&&<button onClick={endNavigation}>END NAVIGATION</button>}<button onClick={()=>setStatusModal(true)}>{displayStatus(status,assignment)}</button></div>{alertBanner}</main>;
 
   return <main className={`mdt-root shell ${night?"night":"day"}`} style={{filter:`brightness(${brightness/100})`}}>
-    <header><div className="identity"><div className="logo"><Radio size={20}/></div><div><span>APOLLO MDT</span><strong>{assignment?.cadId||"DEVICE UNASSIGNED"}</strong><small>{assignment?`Vehicle ${assignment.vehicle} · ${assignment.level} · ${assignment.station}`:"Supervisor pairing required"}</small></div></div>
+    <div className="statusHeader"><span>CURRENT STATUS</span><strong>{displayStatus(status,assignment)}</strong></div><header><div className="identity"><div className="logo"><Radio size={20}/></div><div><span>APOLLO MDT</span><strong>{assignment?.cadId||"DEVICE UNASSIGNED"}</strong><small>{assignment?`Vehicle ${assignment.vehicle} · ${assignment.level} · ${assignment.station}`:"Supervisor pairing required"}</small></div></div>
       <div className="center"><span><Wifi size={13}/>CAD {integrationState}</span><span><Satellite size={13}/>GPS {gpsAccuracy!==null?`${gpsAccuracy} ft`:"WAIT"}</span><strong>{clock}</strong></div>
       <div className="controls"><div className="modes"><button className={displayMode==="Auto"?"active":""} onClick={()=>setDisplayMode("Auto")}>AUTO</button><button className={displayMode==="Day"?"active":""} onClick={()=>setDisplayMode("Day")}><Sunrise size={13}/>DAY</button><button className={displayMode==="Night"?"active":""} onClick={()=>setDisplayMode("Night")}><Sunset size={13}/>NIGHT</button></div><button onClick={()=>setBlackout(true)}><Moon size={15}/>Blackout</button><label><SunMedium size={15}/><input type="range" min="35" max="100" value={brightness} onChange={e=>setBrightness(+e.target.value)}/></label><button onClick={()=>void refreshMdt()} disabled={refreshing}><RefreshCw size={15}/>{refreshing?"Refreshing":"Refresh"}</button><button onClick={()=>setLoginOpen(true)} disabled={!canManageDevice}><Settings size={15}/>Device</button></div>
       <div className="emergencyZone"><button className={`emergencyBtn ${emergencyHold?"holding":""}`} onPointerDown={emergencyDown} onPointerUp={emergencyUp} onPointerLeave={emergencyUp} onPointerCancel={emergencyUp} style={{"--hold":`${emergencyProgress}%`} as React.CSSProperties}><Siren size={16}/>HOLD 3 SEC</button></div>
@@ -716,7 +735,7 @@ export default function MDT(){
     {callInActive&&<section className="callInBanner"><div><Radio size={20}/><span>CALL IN REMINDER · ETA {navigation!.etaMinutes} MIN</span></div><strong>{selectedHospital!.name}</strong><small>Radio: {selectedHospital!.radio} · Tone {selectedHospital!.tone} · Phone: {selectedHospital!.phone}</small><button onClick={()=>setCallInDone(true)}><Check size={15}/>Call-In Complete</button></section>}
 
     <section className="grid">
-      <aside className="call"><div className="callHead"><span className="p">P{liveCall.priority}</span><div><small>EMS {liveCall.emsNumber}</small><strong>{liveCall.nature}</strong></div><span className="chip">{status}</span></div><div className="callNo">{liveCall.callNumber}</div>
+      <aside className="call">{!hasCadAssignment?<div className="noCadData"><Radio size={28}/><strong>NO CAD ASSIGNMENT</strong><span>Google Maps and location search remain available.</span></div>:<><div className="callHead"><span className="p">{liveCall.eventType==="POST_ASSIGNED"?"POST":`P${liveCall.priority}`}</span><div><small>{liveCall.eventType==="POST_ASSIGNED"?"DEPLOYMENT POST":`EMS ${liveCall.emsNumber}`}</small><strong>{liveCall.nature}</strong></div><span className="chip">{displayStatus(status,assignment)}</span></div><div className="callNo">{liveCall.callNumber}</div>
         <div className="addr"><MapPin size={17}/><div><strong>{liveCall.address}</strong><span>{liveCall.city}, {liveCall.state} {liveCall.zip??""}</span></div></div>
         <button className="readBox" onClick={()=>read(`DISPATCH COMMENTS — EMS ${liveCall.emsNumber}`,liveCall.dispatchComments||"No dispatch comments.")}><div><label>DISPATCH COMMENTS</label><span><Maximize2 size={12}/>Tap to enlarge</span></div><p>{liveCall.dispatchComments||"No dispatch comments."}</p></button>
         <button className="readBox" onClick={()=>read(`PREMISE / CAUTION — EMS ${liveCall.emsNumber}`,[liveCall.premiseNotes,liveCall.cautionNotes].filter(Boolean).join("\n\n")||"No premise or caution notes.")}><div><label>PREMISE / CAUTION</label><span><Maximize2 size={12}/>Tap to enlarge</span></div><p>{[liveCall.premiseNotes,liveCall.cautionNotes].filter(Boolean).join(" · ")||"No premise or caution notes."}</p></button>
@@ -724,11 +743,11 @@ export default function MDT(){
         {activeDelay&&<div className="delay"><Construction size={16}/><div><strong>ACTIVE DELAY</strong><span>{activeDelay}</span></div><button onClick={()=>setActiveDelay(null)}><X size={14}/></button></div>}
         <div className="aci"><ShieldAlert size={16}/><div><strong>ACI READY</strong><span>No active clinical or communications advisory.</span></div></div>
         {status==="Out of Service"&&<div className="oosNotice"><AlertTriangle size={16}/><div><strong>OUT OF SERVICE — CAD CONTROLLED</strong><span>{assignment?.outOfServiceReason||"Reason not provided"}</span></div></div>}
-        <div className="auto"><div><Satellite size={16}/><div><strong>GPS Status Automation</strong><span>Manual override always available</span></div><button className={autoStatus?"tog on":"tog"} onClick={()=>setAutoStatus(!autoStatus)}><i/></button></div><small>{autoStatus?"At Scene geofence armed · target radius 100 ft":"Automatic status changes disabled"}</small>{holdBack&&<div className="hold active"><ShieldAlert size={13}/>HOLD BACK REQUIRED — CAD</div>}</div>
+        <div className="auto"><div><Satellite size={16}/><div><strong>GPS Status Automation</strong><span>Manual override always available</span></div><button className={autoStatus?"tog on":"tog"} onClick={()=>setAutoStatus(!autoStatus)}><i/></button></div><small>{autoStatus?"At Scene geofence armed · target radius 100 ft":"Automatic status changes disabled"}</small>{holdBack&&<div className="hold active"><ShieldAlert size={13}/>HOLD BACK REQUIRED — CAD</div>}</div></>}
       </aside>
 
       <section className="map">{map}</section>
-      <aside className="actions"><section className="current"><label>CURRENT STATUS</label><strong>{status}</strong>{nextStatus&&<button className={holdBack&&status==="En Route"?"next holdback":"next"} onClick={advance}><span>NEXT STATUS</span><b>{nextStatus.label.toUpperCase()}</b><small>{nextStatus.note}</small></button>}<button onClick={()=>setStatusModal(true)} disabled={status==="Out of Service"}><SlidersHorizontal size={15}/>{status==="Out of Service"?"CAD controls this status":"Manual Status Override"}</button></section>
+      <aside className="actions"><section className="current"><label>CURRENT STATUS</label><strong>{displayStatus(status,assignment)}</strong>{nextStatus&&<button className={holdBack&&status==="En Route"?"next holdback":"next"} onClick={advance}><span>NEXT STATUS</span><b>{displayStatus(nextStatus.label,assignment).toUpperCase()}</b><small>{nextStatus.note}</small></button>}<button onClick={()=>setStatusModal(true)} disabled={!assignment||status==="Out of Service"}><SlidersHorizontal size={15}/>{status==="Out of Service"?"CAD controls this status":"Manual Status Override"}</button></section>
         <button className="big blue" onClick={()=>setDestModal(true)} disabled={!hasActiveCall||status==="Out of Service"}><Navigation size={20}/><div><strong>Destination / Depart Scene</strong><span>Select destination need and transport details</span></div></button>
         <button className="big" onClick={()=>setDelayModal(true)}><Construction size={20}/><div><strong>Report Delay</strong><span>Traffic · weather · road construction · access</span></div></button>
         <button className="big" onClick={()=>setMsgModal(true)}><MessageSquareText size={20}/><div><strong>Messages</strong><span>Apollo internal · Dispatch ↔ MDT ↔ MDT</span></div></button>

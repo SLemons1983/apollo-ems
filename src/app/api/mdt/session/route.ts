@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       station: body.station ?? "", level: body.level,
       crew_members: body.crewMembers, ride_along_type: body.rideAlongType ?? "None",
       ride_along_name: body.rideAlongType === "None" ? "" : (body.rideAlongName ?? "").trim(),
-      status: body.status ?? "Unit Available", emergency_active: false,
+      status: body.status ?? "Logged In - Not Available", emergency_active: false,
       logged_on_at: existing?.logged_on_at ?? body.loggedOnAt ?? now, updated_at: now,
     };
     const operation = existing

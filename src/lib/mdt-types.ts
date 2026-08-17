@@ -1,5 +1,5 @@
 export type MdtStatus =
-  | "Dispatched" | "En Route" | "Holding Back" | "At Scene"
+  | "Logged In - Not Available" | "Dispatched" | "En Route" | "Hold Back Required" | "Holding Back" | "Scene Secure" | "At Scene"
   | "Depart Scene" | "At Destination" | "Pending Paperwork"
   | "Unit Available" | "En Route Post" | "In Area" | "At Post"
   | "Out of Service";
