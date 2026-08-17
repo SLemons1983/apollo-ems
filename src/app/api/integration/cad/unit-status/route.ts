@@ -16,8 +16,10 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const { data: existing } = await db.from("mdt_unit_sessions").select("id,logged_on_at").eq("radio_identifier", event.radioIdentifier).eq("active", true).maybeSingle();
     if (event.active === false) {
-      const { error } = await db.from("mdt_unit_sessions").update({ active: false, updated_at: now }).eq("radio_identifier", event.radioIdentifier).eq("active", true);
+      const { error } = await db.from("mdt_unit_sessions").update({ active: false, active_call_number: null, updated_at: now }).eq("radio_identifier", event.radioIdentifier).eq("active", true);
       if (error) throw error;
+      const { error: callError } = await db.from("mdt_cad_calls").update({ active: false, updated_at: now }).eq("radio_identifier", event.radioIdentifier).eq("active", true);
+      if (callError) throw callError;
       return NextResponse.json({ ok: true, receivedAt: now });
     }
     const values = {

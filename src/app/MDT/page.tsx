@@ -163,7 +163,7 @@ export default function MDT(){
     setAlertQueue(queue=>queue.slice(1));
   }
 
-  async function refreshMdt(openIfUnassigned=false){
+  async function refreshMdt(){
     setRefreshing(true);
     try{
       const response=await fetch("/api/mdt/bootstrap",{cache:"no-store"});
@@ -173,13 +173,18 @@ export default function MDT(){
       const savedId=window.localStorage.getItem("apollo-mdt-session-id");
       const row=(data.sessions??[]).find((item:any)=>item.id===savedId);
       if(row){const next=rowToAssignment(row);setAssignment(next);setStatus(row.status);setSelectedVehicle(next.vehicle);setSelectedRadioId(next.cadId);setCrewIds([...next.crewMembers.map(member=>member.employeeId),"","",""].slice(0,4));setRideAlongType(next.rideAlongType);setRideAlongName(next.rideAlongName??"");}
-      else if(openIfUnassigned||!savedId)setLoginOpen(true);
+      else{
+        window.localStorage.removeItem("apollo-mdt-session-id");
+        setAssignment(null);setStatus("Logged In - Not Available");setLoginOpen(false);
+        setLiveCall({eventType:"NONE",radioIdentifier:"",callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:"Logged In - Not Available",cadTimestamp:""});
+        setHoldBack(false);setSelectedHospital(null);setCallInDone(false);
+      }
       setIntegrationState("CONNECTED");
     }catch{setIntegrationState("ERROR");}
     finally{setRefreshing(false)}
   }
 
-  useEffect(()=>{void refreshMdt(true)},[]);
+  useEffect(()=>{void refreshMdt()},[]);
 
   useEffect(()=>{
     if(!assignment?.cadId)return;
@@ -654,7 +659,7 @@ export default function MDT(){
   }
   async function clearPairing(){
     if(assignment?.id)await fetch(`/api/mdt/session?id=${encodeURIComponent(assignment.id)}`,{method:"DELETE"});
-    window.localStorage.removeItem("apollo-mdt-session-id");setAssignment(null);setStatus("Logged In - Not Available");setLoginOpen(true);void refreshMdt();
+    window.localStorage.removeItem("apollo-mdt-session-id");setAssignment(null);setStatus("Logged In - Not Available");setLoginOpen(false);setLiveCall({eventType:"NONE",radioIdentifier:"",callNumber:"",emsNumber:"—",priority:"—",nature:"No Active Call",address:"No incident assigned",city:"",state:"",holdBackRequired:false,status:"Logged In - Not Available",cadTimestamp:""});setHoldBack(false);setSelectedHospital(null);setCallInDone(false);void refreshMdt();
   }
   function emergencyDown(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(true);setEmergencyProgress(0);const start=Date.now();emergencyTick.current=window.setInterval(()=>setEmergencyProgress(Math.min(100,(Date.now()-start)/30)),50);emergencyTimer.current=window.setTimeout(()=>{if(emergencyTick.current)window.clearInterval(emergencyTick.current);setEmergencyHold(false);setEmergencyProgress(100);setEmergency(true);setBlackout(false);log("EMERGENCY ACTIVATED","MDT MANUAL");if(assignment?.cadId){void fetch("/api/integration/mdt/send-emergency",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({radioIdentifier:assignment.cadId,callNumber:liveCall.callNumber,active:true,timestamp:new Date().toISOString(),latitude:devicePosition?.lat,longitude:devicePosition?.lng})})}},3000)}
   function emergencyUp(){if(emergencyTimer.current)window.clearTimeout(emergencyTimer.current);if(emergencyTick.current)window.clearInterval(emergencyTick.current);emergencyTimer.current=null;emergencyTick.current=null;if(!emergency)setEmergencyProgress(0);setEmergencyHold(false)}

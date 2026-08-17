@@ -60,8 +60,14 @@ export async function DELETE(request: Request) {
     const db = await supervisor();
     const id = new URL(request.url).searchParams.get("id");
     if (!id) return NextResponse.json({ ok: false, error: "Session id is required" }, { status: 400 });
-    const { error } = await db.from("mdt_unit_sessions").update({ active: false, updated_at: new Date().toISOString() }).eq("id", id);
+    const now = new Date().toISOString();
+    const { data: session } = await db.from("mdt_unit_sessions").select("radio_identifier").eq("id", id).maybeSingle();
+    const { error } = await db.from("mdt_unit_sessions").update({ active: false, active_call_number: null, updated_at: now }).eq("id", id);
     if (error) throw new Error(error.message);
+    if (session?.radio_identifier) {
+      const { error: callError } = await db.from("mdt_cad_calls").update({ active: false, updated_at: now }).eq("radio_identifier", session.radio_identifier).eq("active", true);
+      if (callError) throw new Error(callError.message);
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "Unable to log off unit" }, { status: 500 });
