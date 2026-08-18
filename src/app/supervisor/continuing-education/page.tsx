@@ -16,11 +16,27 @@ const INSTRUCTOR_TITLE = 'Operations Supervisor/Program Director';
 function employeeName(e: Employee) { return `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() || 'Unnamed Employee'; }
 function credential(e: Employee) {
   const c=e.certifications ?? {};
-  const role=(e.role ?? '').toLowerCase();
-  const isMedic=role.includes('paramedic') || role.includes('supervisor');
-  return isMedic
-    ? { type:'Paramedic', number:(c.californiaParamedicLicenseNumber ?? '').trim() }
-    : { type:'EMT', number:(c.californiaEmtLicenseNumber ?? '').trim() };
+  const paramedicNumber=(c.californiaParamedicLicenseNumber ?? '').trim();
+  const emtNumber=(c.californiaEmtLicenseNumber ?? '').trim();
+
+  if(paramedicNumber && !emtNumber) return { type:'Paramedic', number:paramedicNumber };
+  if(emtNumber && !paramedicNumber) return { type:'EMT', number:emtNumber };
+
+  if(paramedicNumber && emtNumber) {
+    const role=(e.role ?? '').toLowerCase();
+    if(role.includes('paramedic')) return { type:'Paramedic', number:paramedicNumber };
+    if(role.includes('emt')) return { type:'EMT', number:emtNumber };
+    return { type:'Certification Not Set', number:'' };
+  }
+
+  return { type:'Certification Not Set', number:'' };
+}
+
+function currentAttendanceCredential(a:Attendance, employees:Employee[]) {
+  const employee=employees.find(e=>e.id===a.employee_id);
+  if(!employee) return { ...a, credential_type:a.credential_type || 'Certification Not Set', license_number:a.license_number || '' };
+  const current=credential(employee);
+  return { ...a, employee_name:employeeName(employee), credential_type:current.type, license_number:current.number };
 }
 function displayDate(v:string) { const [y,m,d]=v.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US'); }
 function safeName(v:string) { return v.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,''); }
@@ -95,7 +111,15 @@ export default function ContinuingEducationPage(){
   }
   async function download(ce:CeClass,people:Attendance[]){
     if(!people.length)return; setStatus('Generating certificate PDF...');
-    try{const bytes=await buildCertificates(ce,people); const blob=new Blob([bytes as BlobPart],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');a.href=url;a.download=`CE-${ce.class_date}-${safeName(ce.topic)}${people.length===1?`-${safeName(people[0].employee_name)}`:'-All-Certificates'}.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Certificate PDF generated.');}catch(e:any){setStatus(`Unable to generate certificate: ${e.message}`);}
+    try{
+      const currentPeople=people.map(a=>currentAttendanceCredential(a,employees));
+      const unresolved=currentPeople.filter(a=>a.credential_type==='Certification Not Set');
+      if(unresolved.length){
+        setStatus(`Unable to generate certificate: EMS certification is not set for ${unresolved.map(a=>a.employee_name).join(', ')}.`);
+        return;
+      }
+      const bytes=await buildCertificates(ce,currentPeople); const blob=new Blob([bytes as BlobPart],{type:'application/pdf'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');a.href=url;a.download=`CE-${ce.class_date}-${safeName(ce.topic)}${currentPeople.length===1?`-${safeName(currentPeople[0].employee_name)}`:'-All-Certificates'}.pdf`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Certificate PDF generated.');
+    }catch(e:any){setStatus(`Unable to generate certificate: ${e.message}`);}
   }
   return <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6"><div className="mx-auto max-w-6xl space-y-5">
     <div className="rounded-2xl bg-white p-5 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-900">Continuing Education (CE)</h1><p className="mt-1 text-sm text-slate-600">Create CE classes, record attendance, and generate certificates.</p></div><a href="/supervisor" className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Back to Supervisor</a></div></div>
@@ -107,6 +131,6 @@ export default function ContinuingEducationPage(){
     <div className="mt-5"><button onClick={()=>setShowEmployees(v=>!v)} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white">{showEmployees?'Hide Employees':'Add Employee'} ({selected.length} selected)</button></div>
     {showEmployees&&<div className="mt-4 max-h-80 overflow-auto rounded-xl border border-slate-200"><div className="grid gap-1 p-3 md:grid-cols-2">{activeEmployees.map(e=><label key={e.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50"><input type="checkbox" checked={selected.includes(e.id)} onChange={()=>toggle(e.id)}/><span><span className="font-semibold text-slate-900">{employeeName(e)}</span><span className="ml-2 text-xs text-slate-500">{credential(e).type}{credential(e).number?` · ${credential(e).number}`:' · license # not entered'}</span></span></label>)}</div></div>}
     <button disabled={saving} onClick={saveClass} className="mt-5 rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving?'Saving...':'Save CE Class'}</button>{status&&<div className="mt-3 text-sm font-semibold text-slate-700">{status}</div>}</div>
-    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · {ce.course_type==='INSTRUCTOR_BASED'?'Instructor Based':'Non-Instructor Based'}</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=><div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{a.employee_name}</div><div className="text-xs text-slate-500">{a.credential_type}{a.license_number?` · ${a.license_number}`:' · License number not on profile'}</div></div><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button></div>)}</div></div></details>})}</div></div>
+    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · {ce.course_type==='INSTRUCTOR_BASED'?'Instructor Based':'Non-Instructor Based'}</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=>{const current=currentAttendanceCredential(a,employees);return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{current.employee_name}</div><div className="text-xs text-slate-500">{current.credential_type}{current.license_number?` · ${current.license_number}`:' · EMS certification/license not set on profile'}</div></div><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button></div>})}</div></div></details>})}</div></div>
   </div></div>;
 }
