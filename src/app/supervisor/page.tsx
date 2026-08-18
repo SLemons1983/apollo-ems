@@ -6671,20 +6671,6 @@ export default function SupervisorPage() {
 
         <div className="space-y-4">
           {renderTile(
-            'continuing-education',
-            'Continuing Education (CE)',
-            'Create CE classes, record attendance, and generate California EMS CE certificates.',
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <a
-                href="/supervisor/continuing-education"
-                className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
-              >
-                Open Continuing Education
-              </a>
-            </div>,
-          )}
-
-          {renderTile(
             'schedule-management',
             'Schedule Management',
             pendingOpenShiftRequests.length > 0
@@ -7486,6 +7472,20 @@ export default function SupervisorPage() {
               )}
             </div>,
             openIncidentReports.length > 0,
+          )}
+
+          {renderTile(
+            'continuing-education',
+            'Continuing Education (CE)',
+            'Create CE classes, record attendance, and generate California EMS CE certificates.',
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <a
+                href="/supervisor/continuing-education"
+                className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
+              >
+                Open Continuing Education
+              </a>
+            </div>,
           )}
 
           {renderTile(
