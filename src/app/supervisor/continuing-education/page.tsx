@@ -6,12 +6,16 @@ import { supabase } from '@/lib/supabase';
 
 type Certifications = Record<string, string>;
 type Employee = { id:string; first_name:string|null; last_name:string|null; role:string|null; status:string|null; certifications:Certifications|null };
-type CeClass = { id:string; class_date:string; topic:string; ce_hours:number; course_type:'INSTRUCTOR_BASED'|'NON_INSTRUCTOR_BASED'; created_at:string };
+type InstructorKey = 'jose'|'heather';
+type CeClass = { id:string; class_date:string; topic:string; ce_hours:number; course_type:'INSTRUCTOR_BASED'|'NON_INSTRUCTOR_BASED'; instructor_key:InstructorKey; created_at:string };
 type Attendance = { id:string; class_id:string; employee_id:string; employee_name:string; credential_type:string; license_number:string };
 
 const PROVIDER_NUMBER = '61-0026';
-const INSTRUCTOR_NAME = 'Jose A. Hernandez Rosas, EMT-P';
-const INSTRUCTOR_TITLE = 'Operations Supervisor/Program Director';
+const CE_INSTRUCTORS = {
+  jose: { name:'Jose A. Hernandez Rosas, EMT-P', title:'Operations Supervisor/Program Director', signature:'/ce-assets/jose-signature.png' },
+  heather: { name:'Heather Washburn', title:'Operations Supervisor', signature:'/ce-assets/heather-signature.png' },
+} as const;
+function ceInstructor(key:InstructorKey|undefined) { return CE_INSTRUCTORS[key === 'heather' ? 'heather' : 'jose']; }
 
 function employeeName(e: Employee) { return `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() || 'Unnamed Employee'; }
 function credential(e: Employee) {
@@ -51,7 +55,8 @@ async function buildCertificates(ce:CeClass, people:Attendance[]) {
   const sans=await pdf.embedFont(StandardFonts.Helvetica);
   const sansBold=await pdf.embedFont(StandardFonts.HelveticaBold);
   const logo=await pdf.embedJpg(await imageBytes('/ce-assets/ssc-logo-current.jpg'));
-  const signature=await pdf.embedPng(await imageBytes('/ce-assets/jose-signature.png'));
+  const instructor=ceInstructor(ce.instructor_key);
+  const signature=await pdf.embedPng(await imageBytes(instructor.signature));
   const W=792,H=612,navy=rgb(.035,.105,.255),gold=rgb(.86,.64,.12),gray=rgb(.32,.36,.42);
   const center=(page:any,text:string,size:number,font:any,y:number,color=navy)=>page.drawText(text,{x:(W-font.widthOfTextAtSize(text,size))/2,y,size,font,color});
   const fit=(text:string,font:any,max:number,start:number,min=8)=>{let z=start;while(z>min&&font.widthOfTextAtSize(text,z)>max)z-=.5;return z;};
@@ -85,8 +90,8 @@ async function buildCertificates(ce:CeClass, people:Attendance[]) {
     center(page,'Approved California EMS Continuing Education Provider',8.5,sans,132,gray);
     page.drawImage(signature,{x:488,y:61,width:205,height:61});
     page.drawLine({start:{x:478,y:61},end:{x:706,y:61},thickness:.9,color:gold});
-    page.drawText(INSTRUCTOR_NAME,{x:488,y:45,size:8.5,font:sansBold,color:navy});
-    page.drawText(INSTRUCTOR_TITLE,{x:488,y:32,size:8,font:italic,color:gray});
+    page.drawText(instructor.name,{x:488,y:45,size:8.5,font:sansBold,color:navy});
+    page.drawText(instructor.title,{x:488,y:32,size:8,font:italic,color:gray});
     page.drawText('Instructor / Program Director',{x:87,y:56,size:8,font:sansBold,color:navy});
     page.drawText('Sequoia Safety Council',{x:87,y:43,size:8,font:sans,color:gray});
     center(page,'This document must be maintained for no less than four (4) years.',6.8,sans,27,gray);
@@ -98,6 +103,7 @@ export default function ContinuingEducationPage(){
   const [employees,setEmployees]=useState<Employee[]>([]); const [classes,setClasses]=useState<CeClass[]>([]);
   const [attendance,setAttendance]=useState<Record<string,Attendance[]>>({}); const [selected,setSelected]=useState<string[]>([]);
   const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [topic,setTopic]=useState(''); const [hours,setHours]=useState('');
+  const [instructorKey,setInstructorKey]=useState<InstructorKey>('jose');
   const [showEmployees,setShowEmployees]=useState(false);
   const [status,setStatus]=useState(''); const [saving,setSaving]=useState(false);
   const activeEmployees=useMemo(()=>employees.filter(e=>(e.status??'Active').toLowerCase()!=='removed').sort((a,b)=>employeeName(a).localeCompare(employeeName(b))),[employees]);
@@ -119,7 +125,7 @@ export default function ContinuingEducationPage(){
     if(selected.length===0){setStatus('Add at least one employee to the attendance list.');return;}
     setSaving(true); setStatus('Saving CE class...');
     try{
-      const {data,error}=await supabase.from('ce_classes').insert({class_date:date,topic:topic.trim(),ce_hours:Number(hours),course_type:'INSTRUCTOR_BASED'}).select('*').single(); if(error) throw error;
+      const {data,error}=await supabase.from('ce_classes').insert({class_date:date,topic:topic.trim(),ce_hours:Number(hours),course_type:'INSTRUCTOR_BASED',instructor_key:instructorKey}).select('*').single(); if(error) throw error;
       const rows=selected.map(id=>{const e=employees.find(x=>x.id===id)!; const c=credential(e); return {class_id:data.id,employee_id:e.id,employee_name:employeeName(e),credential_type:c.type,license_number:c.number};});
       const r=await supabase.from('ce_attendance').insert(rows); if(r.error) throw r.error;
       setTopic('');setHours('');setSelected([]);setShowEmployees(false);setStatus('CE class saved.');await load();
@@ -143,10 +149,19 @@ export default function ContinuingEducationPage(){
       <label className="text-sm font-semibold text-slate-700">Date<input type="date" value={date} onChange={e=>setDate(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
       <label className="text-sm font-semibold text-slate-700 md:col-span-2">CE Topic<input value={topic} onChange={e=>setTopic(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" placeholder="Enter CE topic"/></label>
       <label className="text-sm font-semibold text-slate-700">CE Hours<input type="number" min="0.25" step="0.25" value={hours} onChange={e=>setHours(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"/></label>
-    </div><div className="mt-4 text-sm font-semibold text-slate-600">Instructor Based</div>
+    </div>
+    <div className="mt-4 grid gap-4 md:grid-cols-2">
+      <label className="text-sm font-semibold text-slate-700">Issuing Instructor
+        <select value={instructorKey} onChange={e=>setInstructorKey(e.target.value as InstructorKey)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+          <option value="jose">Jose A. Hernandez Rosas, EMT-P — Operations Supervisor/Program Director</option>
+          <option value="heather">Heather Washburn — Operations Supervisor</option>
+        </select>
+      </label>
+      <div className="self-end pb-2 text-sm font-semibold text-slate-600">Instructor Based</div>
+    </div>
     <div className="mt-5"><button onClick={()=>setShowEmployees(v=>!v)} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white">{showEmployees?'Hide Employees':'Add Employee'} ({selected.length} selected)</button></div>
     {showEmployees&&<div className="mt-4 max-h-80 overflow-auto rounded-xl border border-slate-200"><div className="grid gap-1 p-3 md:grid-cols-2">{activeEmployees.map(e=><label key={e.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50"><input type="checkbox" checked={selected.includes(e.id)} onChange={()=>toggle(e.id)}/><span><span className="font-semibold text-slate-900">{employeeName(e)}</span><span className="ml-2 text-xs text-slate-500">{credential(e).type}{credential(e).number?` · ${credential(e).number}`:' · license # not entered'}</span></span></label>)}</div></div>}
     <button disabled={saving} onClick={saveClass} className="mt-5 rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving?'Saving...':'Save CE Class'}</button>{status&&<div className="mt-3 text-sm font-semibold text-slate-700">{status}</div>}</div>
-    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · Instructor Based</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=>{const current=currentAttendanceCredential(a,employees);return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{current.employee_name}</div><div className="text-xs text-slate-500">{current.credential_type}{current.license_number?` · ${current.license_number}`:' · EMS certification/license not set on profile'}</div></div><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button></div>})}</div></div></details>})}</div></div>
+    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · Instructor Based · Issued by {ceInstructor(ce.instructor_key).name}</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=>{const current=currentAttendanceCredential(a,employees);return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{current.employee_name}</div><div className="text-xs text-slate-500">{current.credential_type}{current.license_number?` · ${current.license_number}`:' · EMS certification/license not set on profile'}</div></div><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button></div>})}</div></div></details>})}</div></div>
   </div></div>;
 }
