@@ -104,6 +104,7 @@ export default function ContinuingEducationPage(){
   const [attendance,setAttendance]=useState<Record<string,Attendance[]>>({}); const [selected,setSelected]=useState<string[]>([]);
   const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [topic,setTopic]=useState(''); const [hours,setHours]=useState('');
   const [instructorKey,setInstructorKey]=useState<InstructorKey>('jose');
+  const [emailOnSave,setEmailOnSave]=useState(false);
   const [showEmployees,setShowEmployees]=useState(false);
   const [status,setStatus]=useState(''); const [saving,setSaving]=useState(false);
   const activeEmployees=useMemo(()=>employees.filter(e=>(e.status??'Active').toLowerCase()!=='removed').sort((a,b)=>employeeName(a).localeCompare(employeeName(b))),[employees]);
@@ -111,7 +112,7 @@ export default function ContinuingEducationPage(){
   async function load(){
     const [er,cr,ar]=await Promise.all([
       supabase.from('employees').select('id,first_name,last_name,role,status,certifications'),
-      supabase.from('ce_classes').select('*').order('class_date',{ascending:false}).order('created_at',{ascending:false}),
+      supabase.from('ce_classes').select('*').order('created_at',{ascending:false}).order('class_date',{ascending:false}),
       supabase.from('ce_attendance').select('*').order('employee_name',{ascending:true}),
     ]);
     if(er.error) throw er.error; if(cr.error) throw cr.error; if(ar.error) throw ar.error;
@@ -128,9 +129,46 @@ export default function ContinuingEducationPage(){
       const {data,error}=await supabase.from('ce_classes').insert({class_date:date,topic:topic.trim(),ce_hours:Number(hours),course_type:'INSTRUCTOR_BASED',instructor_key:instructorKey}).select('*').single(); if(error) throw error;
       const rows=selected.map(id=>{const e=employees.find(x=>x.id===id)!; const c=credential(e); return {class_id:data.id,employee_id:e.id,employee_name:employeeName(e),credential_type:c.type,license_number:c.number};});
       const r=await supabase.from('ce_attendance').insert(rows); if(r.error) throw r.error;
-      setTopic('');setHours('');setSelected([]);setShowEmployees(false);setStatus('CE class saved.');await load();
+      let emailSummary='CE class saved.';
+      if(emailOnSave){
+        setStatus('CE class saved. Emailing certificates...');
+        let sent=0,failed=0;
+        for(const row of rows){
+          const result=await emailCertificate(data,{id:'',...row},true);
+          if(result.ok)sent++;else failed++;
+        }
+        emailSummary=`CE class saved - ${sent} certificate${sent===1?'':'s'} emailed${failed?`, ${failed} could not be sent`:''}.`;
+      }
+      setTopic('');setHours('');setSelected([]);setShowEmployees(false);setEmailOnSave(false);setStatus(emailSummary);await load();
     }catch(e:any){setStatus(`Unable to save CE class: ${e.message}`);}finally{setSaving(false);}
   }
+  async function emailCertificate(ce:CeClass,person:Attendance,quiet=false){
+    const current=currentAttendanceCredential(person,employees);
+    if(current.credential_type==='Certification Not Set'){
+      if(!quiet)setStatus(`Unable to email certificate: EMS certification is not set for ${current.employee_name}.`);
+      return {ok:false};
+    }
+    try{
+      if(!quiet)setStatus(`Emailing certificate to ${current.employee_name}...`);
+      const bytes=await buildCertificates(ce,[current]);
+      const form=new FormData();
+      form.append('employeeId',current.employee_id);
+      form.append('employeeName',current.employee_name);
+      form.append('topic',ce.topic);
+      form.append('classDate',ce.class_date);
+      form.append('ceHours',String(ce.ce_hours));
+      form.append('certificate',new Blob([bytes as BlobPart],{type:'application/pdf'}),`CE-${ce.class_date}-${safeName(ce.topic)}-${safeName(current.employee_name)}.pdf`);
+      const response=await fetch('/api/continuing-education/email-certificate',{method:'POST',body:form});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||'Certificate email failed.');
+      if(!quiet)setStatus(`Certificate emailed to ${current.employee_name}.`);
+      return {ok:true};
+    }catch(e:any){
+      if(!quiet)setStatus(`Unable to email certificate to ${current.employee_name}: ${e.message}`);
+      return {ok:false};
+    }
+  }
+
   async function download(ce:CeClass,people:Attendance[]){
     if(!people.length)return; setStatus('Generating certificate PDF...');
     try{
@@ -157,11 +195,18 @@ export default function ContinuingEducationPage(){
           <option value="heather">Heather Washburn — Operations Supervisor</option>
         </select>
       </label>
-      <div className="self-end pb-2 text-sm font-semibold text-slate-600">Instructor Based</div>
+      <div className="space-y-2 self-end pb-1">
+        <div className="text-sm font-semibold text-slate-600">Instructor Based</div>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <input type="checkbox" checked={emailOnSave} onChange={e=>setEmailOnSave(e.target.checked)} className="h-4 w-4"/>
+          Email CE certificates to employees
+        </label>
+        <div className="text-xs font-normal text-slate-500">Optional. Each employee receives only their own PDF certificate.</div>
+      </div>
     </div>
     <div className="mt-5"><button onClick={()=>setShowEmployees(v=>!v)} className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white">{showEmployees?'Hide Employees':'Add Employee'} ({selected.length} selected)</button></div>
     {showEmployees&&<div className="mt-4 max-h-80 overflow-auto rounded-xl border border-slate-200"><div className="grid gap-1 p-3 md:grid-cols-2">{activeEmployees.map(e=><label key={e.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50"><input type="checkbox" checked={selected.includes(e.id)} onChange={()=>toggle(e.id)}/><span><span className="font-semibold text-slate-900">{employeeName(e)}</span><span className="ml-2 text-xs text-slate-500">{credential(e).type}{credential(e).number?` · ${credential(e).number}`:' · license # not entered'}</span></span></label>)}</div></div>}
     <button disabled={saving} onClick={saveClass} className="mt-5 rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving?'Saving...':'Save CE Class'}</button>{status&&<div className="mt-3 text-sm font-semibold text-slate-700">{status}</div>}</div>
-    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · Instructor Based · Issued by {ceInstructor(ce.instructor_key).name}</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=>{const current=currentAttendanceCredential(a,employees);return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{current.employee_name}</div><div className="text-xs text-slate-500">{current.credential_type}{current.license_number?` · ${current.license_number}`:' · EMS certification/license not set on profile'}</div></div><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button></div>})}</div></div></details>})}</div></div>
+    <div className="rounded-2xl bg-white p-5 shadow-sm"><h2 className="text-lg font-bold text-slate-900">CE Class History</h2><div className="mt-4 space-y-4">{classes.length===0?<p className="text-sm text-slate-500">No CE classes have been entered yet.</p>:classes.map(ce=>{const people=attendance[ce.id]??[];return <details key={ce.id} className="rounded-xl border border-slate-200"><summary className="cursor-pointer list-none p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-bold text-slate-900">{displayDate(ce.class_date)} — {ce.topic}</div><div className="mt-1 text-sm text-slate-600">{Number(ce.ce_hours)} Hours · {people.length} Attendee{people.length===1?'':'s'} · Instructor Based · Issued by {ceInstructor(ce.instructor_key).name}</div></div><button type="button" onClick={e=>{e.preventDefault();download(ce,people)}} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Generate All Certificates</button></div></summary><div className="border-t border-slate-200 p-4"><div className="space-y-2">{people.map(a=>{const current=currentAttendanceCredential(a,employees);return <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3"><div><div className="font-semibold">{current.employee_name}</div><div className="text-xs text-slate-500">{current.credential_type}{current.license_number?` · ${current.license_number}`:' · EMS certification/license not set on profile'}</div></div><div className="flex flex-wrap gap-2"><button onClick={()=>download(ce,[a])} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold">Generate Certificate</button><button onClick={()=>emailCertificate(ce,a)} className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Email Certificate</button></div></div>})}</div></div></details>})}</div></div>
   </div></div>;
 }
