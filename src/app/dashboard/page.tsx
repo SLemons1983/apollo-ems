@@ -305,6 +305,8 @@ type PersonalCalendarEvent = {
   endTime: string;
   allDay: boolean;
   notes: string;
+  repeatFrequency: 'NONE' | 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'YEARLY';
+  repeatUntil: string;
 };
 
 type DisplayAssignment = {
@@ -1347,6 +1349,9 @@ export default function DashboardPage() {
   const [personalEventEndTime, setPersonalEventEndTime] = useState('10:00');
   const [personalEventAllDay, setPersonalEventAllDay] = useState(false);
   const [personalEventNotes, setPersonalEventNotes] = useState('');
+  const [personalEventRepeatFrequency, setPersonalEventRepeatFrequency] =
+    useState<PersonalCalendarEvent['repeatFrequency']>('NONE');
+  const [personalEventRepeatUntil, setPersonalEventRepeatUntil] = useState('');
   const [printScheduleStart, setPrintScheduleStart] = useState('');
   const [printScheduleEnd, setPrintScheduleEnd] = useState('');
   const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
@@ -4640,7 +4645,7 @@ export default function DashboardPage() {
 
     const { data, error } = await supabase
       .from('personal_calendar_events')
-      .select('id, employee_id, title, date_key, start_time, end_time, all_day, notes')
+      .select('id, employee_id, title, date_key, start_time, end_time, all_day, notes, repeat_frequency, repeat_until')
       .order('date_key', { ascending: true })
       .order('start_time', { ascending: true });
 
@@ -4661,6 +4666,8 @@ export default function DashboardPage() {
         endTime: String(row.end_time ?? '').slice(0, 5),
         allDay: Boolean(row.all_day),
         notes: String(row.notes ?? ''),
+        repeatFrequency: (String(row.repeat_frequency ?? 'NONE') as PersonalCalendarEvent['repeatFrequency']),
+        repeatUntil: row.repeat_until ? String(row.repeat_until) : '',
       })),
     );
   }
@@ -4682,6 +4689,8 @@ export default function DashboardPage() {
     setPersonalEventEndTime('10:00');
     setPersonalEventAllDay(false);
     setPersonalEventNotes('');
+    setPersonalEventRepeatFrequency('NONE');
+    setPersonalEventRepeatUntil('');
     setShowPersonalEventEditor(true);
   }
 
@@ -4693,6 +4702,8 @@ export default function DashboardPage() {
     setPersonalEventEndTime(event.endTime || '10:00');
     setPersonalEventAllDay(event.allDay);
     setPersonalEventNotes(event.notes);
+    setPersonalEventRepeatFrequency(event.repeatFrequency);
+    setPersonalEventRepeatUntil(event.repeatUntil);
     setShowPersonalEventEditor(true);
   }
 
@@ -4707,6 +4718,14 @@ export default function DashboardPage() {
       return;
     }
 
+    if (
+      personalEventRepeatFrequency !== 'NONE' &&
+      (!personalEventRepeatUntil || personalEventRepeatUntil < personalEventDate)
+    ) {
+      window.alert('Choose a repeat end date on or after the event start date.');
+      return;
+    }
+
     const payload = {
       employee_id: currentEmployeeId,
       employee_email: currentEmployee.email.trim().toLowerCase(),
@@ -4716,6 +4735,8 @@ export default function DashboardPage() {
       end_time: personalEventAllDay ? null : personalEventEndTime,
       all_day: personalEventAllDay,
       notes: personalEventNotes.trim(),
+      repeat_frequency: personalEventRepeatFrequency,
+      repeat_until: personalEventRepeatFrequency === 'NONE' ? null : personalEventRepeatUntil,
     };
 
     const query = editingPersonalEventId
@@ -4749,6 +4770,34 @@ export default function DashboardPage() {
 
     await loadPersonalCalendarEvents();
     setShowPersonalEventEditor(false);
+  }
+
+  function personalEventOccursOnDate(event: PersonalCalendarEvent, dateKey: string) {
+    if (dateKey < event.dateKey) return false;
+    if (event.repeatFrequency === 'NONE') return dateKey === event.dateKey;
+    if (!event.repeatUntil || dateKey > event.repeatUntil) return false;
+
+    const start = parseDateKey(event.dateKey);
+    const candidate = parseDateKey(dateKey);
+    const diffDays = Math.round((candidate.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (event.repeatFrequency === 'DAILY') return diffDays >= 0;
+    if (event.repeatFrequency === 'WEEKLY') return diffDays >= 0 && diffDays % 7 === 0;
+    if (event.repeatFrequency === 'BIWEEKLY') return diffDays >= 0 && diffDays % 14 === 0;
+    if (event.repeatFrequency === 'MONTHLY') return candidate.getDate() === start.getDate();
+    if (event.repeatFrequency === 'YEARLY') {
+      return candidate.getMonth() === start.getMonth() && candidate.getDate() === start.getDate();
+    }
+    return false;
+  }
+
+  function getPersonalEventRepeatLabel(event: PersonalCalendarEvent) {
+    if (event.repeatFrequency === 'DAILY') return 'Repeats daily';
+    if (event.repeatFrequency === 'WEEKLY') return 'Repeats weekly';
+    if (event.repeatFrequency === 'BIWEEKLY') return 'Repeats every 2 weeks';
+    if (event.repeatFrequency === 'MONTHLY') return 'Repeats monthly';
+    if (event.repeatFrequency === 'YEARLY') return 'Repeats yearly';
+    return '';
   }
 
   function getMyCalendarAssignments(date: Date) {
@@ -5330,7 +5379,9 @@ export default function DashboardPage() {
                       if (!date) return <div key={`blank-${index}`} className="min-h-36 border border-slate-200 bg-slate-50" />;
                       const dateKey = toDateKey(date);
                       const workAssignments = getMyCalendarAssignments(date);
-                      const personalEvents = personalCalendarEvents.filter((event) => event.dateKey === dateKey).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                      const personalEvents = personalCalendarEvents
+                        .filter((event) => personalEventOccursOnDate(event, dateKey))
+                        .sort((a, b) => a.startTime.localeCompare(b.startTime));
                       const isToday = dateKey === toDateKey(new Date());
                       return (
                         <div key={dateKey} className={`min-h-36 border border-slate-200 p-2 ${isToday ? 'bg-blue-50' : 'bg-white'}`}>
@@ -5350,6 +5401,9 @@ export default function DashboardPage() {
                                 className="block w-full rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-left text-xs text-emerald-950 hover:bg-emerald-100">
                                 <div className="font-bold">{event.title}</div>
                                 <div className="mt-0.5">{event.allDay ? 'All day' : `${event.startTime} - ${event.endTime}`}</div>
+                                {event.repeatFrequency !== 'NONE' && (
+                                  <div className="mt-0.5 font-semibold">{getPersonalEventRepeatLabel(event)}</div>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -5387,6 +5441,50 @@ export default function DashboardPage() {
                 <input type="checkbox" checked={personalEventAllDay} onChange={(event) => setPersonalEventAllDay(event.target.checked)} />
                 All-day event
               </label>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Repeat
+                  <select
+                    value={personalEventRepeatFrequency}
+                    onChange={(event) => {
+                      const value = event.target.value as PersonalCalendarEvent['repeatFrequency'];
+                      setPersonalEventRepeatFrequency(value);
+                      if (value !== 'NONE' && !personalEventRepeatUntil) {
+                        setPersonalEventRepeatUntil(personalEventDate);
+                      }
+                    }}
+                    className="mt-1 w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="NONE">Does not repeat</option>
+                    <option value="DAILY">Daily</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="BIWEEKLY">Every 2 weeks</option>
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                </label>
+
+                {personalEventRepeatFrequency !== 'NONE' && (
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Repeat Until
+                    <input
+                      type="date"
+                      value={personalEventRepeatUntil}
+                      min={personalEventDate}
+                      onChange={(event) => setPersonalEventRepeatUntil(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {editingPersonalEventId && personalEventRepeatFrequency !== 'NONE' && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Editing or deleting this repeating event changes the entire series.
+                </div>
+              )}
+
               {!personalEventAllDay && (
                 <div className="grid grid-cols-2 gap-3">
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
