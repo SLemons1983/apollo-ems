@@ -4902,23 +4902,46 @@ export default function DashboardPage() {
       ...printDates.map((date) => {
         const dateKey = toDateKey(date);
         const assignments = assignmentsByPrintDate.get(dateKey) ?? [];
-        const assignmentHtml = assignments.length
-          ? assignments
-              .map(
-                (assignment) => `
-                  <div class="assignment">
-                    <div class="shift">${escapePrintHtml(assignment.shiftLabel)}</div>
-                    <div class="time">${escapePrintHtml(assignment.startTime)} - ${escapePrintHtml(assignment.endTime)}</div>
-                    ${
-                      assignment.note
-                        ? `<div class="note"><strong>Supervisor note:</strong> ${escapePrintHtml(assignment.note)}</div>`
-                        : ''
-                    }
-                  </div>
-                `,
-              )
-              .join('')
-          : '<div class="off">Not scheduled</div>';
+        const personalEventsForDate = personalCalendarEvents
+          .filter((event) => personalEventOccursOnDate(event, dateKey))
+          .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        const assignmentHtml = assignments
+          .map(
+            (assignment) => `
+              <div class="assignment">
+                <div class="shift">${escapePrintHtml(assignment.shiftLabel)}</div>
+                <div class="time">${escapePrintHtml(assignment.startTime)} - ${escapePrintHtml(assignment.endTime)}</div>
+                ${
+                  assignment.note
+                    ? `<div class="note"><strong>Supervisor note:</strong> ${escapePrintHtml(assignment.note)}</div>`
+                    : ''
+                }
+              </div>
+            `,
+          )
+          .join('');
+
+        const personalEventHtml = personalEventsForDate
+          .map((event) => {
+            const timeLabel = event.allDay ? 'All day' : `${event.startTime} - ${event.endTime}`;
+            const repeatLabel = getPersonalEventRepeatLabel(event);
+
+            return `
+              <div class="personal-event">
+                <div class="personal-title">${escapePrintHtml(event.title)}</div>
+                <div class="time">${escapePrintHtml(timeLabel)}</div>
+                ${repeatLabel ? `<div class="repeat">${escapePrintHtml(repeatLabel)}</div>` : ''}
+                ${event.notes ? `<div class="note">${escapePrintHtml(event.notes)}</div>` : ''}
+              </div>
+            `;
+          })
+          .join('');
+
+        const emptyHtml =
+          assignments.length === 0 && personalEventsForDate.length === 0
+            ? '<div class="off">No events</div>'
+            : '';
 
         return `
           <div class="day">
@@ -4930,6 +4953,8 @@ export default function DashboardPage() {
               }),
             )}</div>
             ${assignmentHtml}
+            ${personalEventHtml}
+            ${emptyHtml}
           </div>
         `;
       }),
@@ -4959,14 +4984,16 @@ export default function DashboardPage() {
             .blank { background: #f8fafc; }
             .date { margin-bottom: 7px; font-size: 11px; font-weight: 700; }
             .assignment { margin-bottom: 7px; border-left: 3px solid #2563eb; background: #eff6ff; padding: 6px; }
-            .shift { font-size: 12px; font-weight: 700; }
+            .personal-event { margin-bottom: 7px; border-left: 3px solid #059669; background: #ecfdf5; padding: 6px; }
+            .shift, .personal-title { font-size: 12px; font-weight: 700; }
             .time { margin-top: 2px; font-size: 11px; }
+            .repeat { margin-top: 2px; font-size: 10px; font-weight: 700; }
             .note { margin-top: 5px; white-space: pre-wrap; font-size: 10px; line-height: 1.3; }
             .off { color: #94a3b8; font-size: 10px; }
           </style>
         </head>
         <body>
-          <h1>${escapePrintHtml(currentEmployee.name)} — Personal Schedule</h1>
+          <h1>${escapePrintHtml(currentEmployee.name)} — Personal Calendar</h1>
           <div class="range">${escapePrintHtml(formatShortDate(startDate))} to ${escapePrintHtml(formatShortDate(endDate))}</div>
           <div class="weekdays">
             ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
