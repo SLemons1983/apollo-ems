@@ -296,6 +296,17 @@ type DaySchedule = {
 
 type ScheduleData = Record<string, DaySchedule>;
 
+type PersonalCalendarEvent = {
+  id: string;
+  employeeId: string;
+  title: string;
+  dateKey: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+  notes: string;
+};
+
 type DisplayAssignment = {
   key: string;
   label: string;
@@ -1322,7 +1333,20 @@ export default function DashboardPage() {
   const [showVacationRangeModal, setShowVacationRangeModal] = useState(false);
   const [vacationRangeStart, setVacationRangeStart] = useState('');
   const [vacationRangeEnd, setVacationRangeEnd] = useState('');
-  const [showPrintScheduleModal, setShowPrintScheduleModal] = useState(false);
+  const [showPersonalCalendar, setShowPersonalCalendar] = useState(false);
+  const [personalCalendarMonth, setPersonalCalendarMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [personalCalendarEvents, setPersonalCalendarEvents] = useState<PersonalCalendarEvent[]>([]);
+  const [showPersonalEventEditor, setShowPersonalEventEditor] = useState(false);
+  const [editingPersonalEventId, setEditingPersonalEventId] = useState<string | null>(null);
+  const [personalEventTitle, setPersonalEventTitle] = useState('');
+  const [personalEventDate, setPersonalEventDate] = useState('');
+  const [personalEventStartTime, setPersonalEventStartTime] = useState('09:00');
+  const [personalEventEndTime, setPersonalEventEndTime] = useState('10:00');
+  const [personalEventAllDay, setPersonalEventAllDay] = useState(false);
+  const [personalEventNotes, setPersonalEventNotes] = useState('');
   const [printScheduleStart, setPrintScheduleStart] = useState('');
   const [printScheduleEnd, setPrintScheduleEnd] = useState('');
   const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
@@ -4608,10 +4632,119 @@ export default function DashboardPage() {
     return status;
   }
 
-  function openPrintScheduleModal() {
-    setPrintScheduleStart(toDateKey(selectedPayPeriod.start));
-    setPrintScheduleEnd(toDateKey(selectedPayPeriod.end));
-    setShowPrintScheduleModal(true);
+  function getPersonalCalendarStorageKey() {
+    return currentEmployeeId ? `apollo-personal-calendar-v1:${currentEmployeeId}` : '';
+  }
+
+  function loadPersonalCalendarEvents() {
+    const storageKey = getPersonalCalendarStorageKey();
+    if (!storageKey) {
+      setPersonalCalendarEvents([]);
+      return;
+    }
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setPersonalCalendarEvents(Array.isArray(parsed) ? parsed : []);
+    } catch (error) {
+      console.error('Failed to load personal calendar events:', error);
+      setPersonalCalendarEvents([]);
+    }
+  }
+
+  function savePersonalCalendarEvents(events: PersonalCalendarEvent[]) {
+    const storageKey = getPersonalCalendarStorageKey();
+    setPersonalCalendarEvents(events);
+    if (storageKey) window.localStorage.setItem(storageKey, JSON.stringify(events));
+  }
+
+  function openPersonalCalendar() {
+    const initialDate = selectedPayPeriod.start;
+    setPersonalCalendarMonth(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+    setPrintScheduleStart(toDateKey(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1)));
+    setPrintScheduleEnd(toDateKey(new Date(initialDate.getFullYear(), initialDate.getMonth() + 1, 0)));
+    loadPersonalCalendarEvents();
+    setShowPersonalCalendar(true);
+  }
+
+  function openNewPersonalEvent(dateKey: string) {
+    setEditingPersonalEventId(null);
+    setPersonalEventTitle('');
+    setPersonalEventDate(dateKey);
+    setPersonalEventStartTime('09:00');
+    setPersonalEventEndTime('10:00');
+    setPersonalEventAllDay(false);
+    setPersonalEventNotes('');
+    setShowPersonalEventEditor(true);
+  }
+
+  function openExistingPersonalEvent(event: PersonalCalendarEvent) {
+    setEditingPersonalEventId(event.id);
+    setPersonalEventTitle(event.title);
+    setPersonalEventDate(event.dateKey);
+    setPersonalEventStartTime(event.startTime || '09:00');
+    setPersonalEventEndTime(event.endTime || '10:00');
+    setPersonalEventAllDay(event.allDay);
+    setPersonalEventNotes(event.notes);
+    setShowPersonalEventEditor(true);
+  }
+
+  function savePersonalEvent() {
+    if (!currentEmployeeId || !personalEventTitle.trim() || !personalEventDate) {
+      window.alert('Enter an event title and date.');
+      return;
+    }
+    const nextEvent: PersonalCalendarEvent = {
+      id: editingPersonalEventId ?? `personal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      employeeId: currentEmployeeId,
+      title: personalEventTitle.trim(),
+      dateKey: personalEventDate,
+      startTime: personalEventAllDay ? '' : personalEventStartTime,
+      endTime: personalEventAllDay ? '' : personalEventEndTime,
+      allDay: personalEventAllDay,
+      notes: personalEventNotes.trim(),
+    };
+    const next = editingPersonalEventId
+      ? personalCalendarEvents.map((item) => item.id === editingPersonalEventId ? nextEvent : item)
+      : [...personalCalendarEvents, nextEvent];
+    savePersonalCalendarEvents(next);
+    setShowPersonalEventEditor(false);
+  }
+
+  function deletePersonalEvent() {
+    if (!editingPersonalEventId || !window.confirm('Delete this personal calendar event?')) return;
+    savePersonalCalendarEvents(personalCalendarEvents.filter((item) => item.id !== editingPersonalEventId));
+    setShowPersonalEventEditor(false);
+  }
+
+  function getMyCalendarAssignments(date: Date) {
+    const day = getDaySchedule(scheduleData, toDateKey(date));
+    const standardAssignments: DisplayAssignment[] = SHIFT_ORDER.map((shiftName) => ({
+      key: `standard-${shiftName}`,
+      label: SHIFT_DISPLAY[shiftName],
+      slots: getAssignedSlots(
+        day.standard[shiftName],
+        shiftName === 'ADMIN_SUP' || shiftName === 'FIELD_SUP' ? 'SUPERVISOR' : 'UNIT',
+      ),
+      hiddenFromEmployees: Boolean(day.standard[shiftName].hiddenFromEmployees),
+    }));
+    const extraAssignments: DisplayAssignment[] = day.extras.map((extra) => ({
+      key: `extra-${extra.id}`,
+      label: extra.label,
+      slots: getAssignedSlots(extra, extra.category),
+      hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
+    }));
+    return [...standardAssignments, ...extraAssignments]
+      .filter((assignment) => !assignment.hiddenFromEmployees)
+      .flatMap((assignment) => assignment.slots
+        .filter((slot) => slot.employeeId === currentEmployeeId)
+        .map((slot) => ({
+          key: `${assignment.key}-${slot.employeeId}-${slot.startTime}`,
+          shiftLabel: assignment.label,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          shiftType: slot.shiftType,
+        })));
   }
 
   function printPersonalSchedule() {
@@ -4763,7 +4896,6 @@ export default function DashboardPage() {
       </html>
     `);
     printWindow.document.close();
-    setShowPrintScheduleModal(false);
   }
 
   function getEligibleTradeTargets() {
@@ -5106,52 +5238,153 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
-      {showPrintScheduleModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-4">
+      {showPersonalCalendar && (
+        <div className="fixed inset-0 z-[110] overflow-y-auto bg-slate-950/70 p-3 md:p-6">
+          <div className="mx-auto w-full max-w-7xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-200 bg-slate-50 p-4 md:p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="text-2xl font-bold text-slate-900">Personal Calendar</div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Your ApolloEMS schedule is locked. Personal entries are editable and stored privately on this device.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => openNewPersonalEvent(toDateKey(new Date()))}
+                    className="rounded-xl border border-blue-700 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                    + Add Personal Event
+                  </button>
+                  <button type="button" onClick={printPersonalSchedule}
+                    className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+                    Print
+                  </button>
+                  <button type="button" onClick={() => setShowPersonalCalendar(false)}
+                    className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+                    Close
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button type="button" onClick={() => setPersonalCalendarMonth(new Date(personalCalendarMonth.getFullYear(), personalCalendarMonth.getMonth() - 1, 1))}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100">Previous</button>
+                <div className="text-lg font-bold text-slate-900">
+                  {personalCalendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </div>
+                <button type="button" onClick={() => setPersonalCalendarMonth(new Date(personalCalendarMonth.getFullYear(), personalCalendarMonth.getMonth() + 1, 1))}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-semibold text-slate-700 hover:bg-slate-100">Next</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto p-3 md:p-5">
+              <div className="min-w-[900px]">
+                <div className="grid grid-cols-7">
+                  {['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((day) => (
+                    <div key={day} className="border border-slate-200 bg-slate-100 px-2 py-2 text-center text-xs font-bold uppercase tracking-wide text-slate-600">{day}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7">
+                  {(() => {
+                    const year = personalCalendarMonth.getFullYear();
+                    const month = personalCalendarMonth.getMonth();
+                    const first = new Date(year, month, 1);
+                    const last = new Date(year, month + 1, 0);
+                    const cells: Array<Date | null> = [
+                      ...Array.from({ length: first.getDay() }, () => null),
+                      ...Array.from({ length: last.getDate() }, (_, index) => new Date(year, month, index + 1)),
+                    ];
+                    while (cells.length % 7 !== 0) cells.push(null);
+                    return cells.map((date, index) => {
+                      if (!date) return <div key={`blank-${index}`} className="min-h-36 border border-slate-200 bg-slate-50" />;
+                      const dateKey = toDateKey(date);
+                      const workAssignments = getMyCalendarAssignments(date);
+                      const personalEvents = personalCalendarEvents.filter((event) => event.dateKey === dateKey).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                      const isToday = dateKey === toDateKey(new Date());
+                      return (
+                        <div key={dateKey} className={`min-h-36 border border-slate-200 p-2 ${isToday ? 'bg-blue-50' : 'bg-white'}`}>
+                          <button type="button" onClick={() => openNewPersonalEvent(dateKey)}
+                            className={`mb-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+                            title="Add personal event">{date.getDate()}</button>
+                          <div className="space-y-1.5">
+                            {workAssignments.map((assignment) => (
+                              <div key={assignment.key} className="rounded-lg border border-blue-200 bg-blue-100 p-2 text-xs text-blue-950">
+                                <div className="font-bold">Locked - {assignment.shiftLabel}</div>
+                                <div className="mt-0.5">{assignment.startTime} - {assignment.endTime}</div>
+                                {assignment.shiftType !== 'REGULAR' && <div className="mt-0.5 font-semibold">{assignment.shiftType}</div>}
+                              </div>
+                            ))}
+                            {personalEvents.map((event) => (
+                              <button key={event.id} type="button" onClick={() => openExistingPersonalEvent(event)}
+                                className="block w-full rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-left text-xs text-emerald-950 hover:bg-emerald-100">
+                                <div className="font-bold">{event.title}</div>
+                                <div className="mt-0.5">{event.allDay ? 'All day' : `${event.startTime} - ${event.endTime}`}</div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600">
+              Locked entries are your official ApolloEMS schedule. Personal entries can be edited or deleted.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPersonalEventEditor && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
-            <div className="text-xl font-bold text-slate-900">Print My Schedule</div>
-            <p className="mt-2 text-sm text-slate-600">
-              Choose the dates to print. The printout includes only your work schedule and supervisor notes.
-            </p>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Start Date
-                <input
-                  type="date"
-                  value={printScheduleStart}
-                  onChange={(event) => setPrintScheduleStart(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
-                />
+            <div className="text-xl font-bold text-slate-900">{editingPersonalEventId ? 'Edit Personal Event' : 'Add Personal Event'}</div>
+            <div className="mt-5 space-y-4">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Event Title
+                <input value={personalEventTitle} onChange={(event) => setPersonalEventTitle(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+                  placeholder="School, appointment, family event..." />
               </label>
-
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                End Date
-                <input
-                  type="date"
-                  value={printScheduleEnd}
-                  min={printScheduleStart}
-                  onChange={(event) => setPrintScheduleEnd(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
-                />
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Date
+                <input type="date" value={personalEventDate} onChange={(event) => setPersonalEventDate(event.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600" />
+              </label>
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <input type="checkbox" checked={personalEventAllDay} onChange={(event) => setPersonalEventAllDay(event.target.checked)} />
+                All-day event
+              </label>
+              {!personalEventAllDay && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Start
+                    <input type="time" value={personalEventStartTime} onChange={(event) => setPersonalEventStartTime(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900" />
+                  </label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    End
+                    <input type="time" value={personalEventEndTime} onChange={(event) => setPersonalEventEndTime(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900" />
+                  </label>
+                </div>
+              )}
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Notes
+                <textarea value={personalEventNotes} onChange={(event) => setPersonalEventNotes(event.target.value)}
+                  className="mt-1 min-h-24 w-full rounded-xl border border-slate-400 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+                  placeholder="Optional notes" />
               </label>
             </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowPrintScheduleModal(false)}
-                className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={printPersonalSchedule}
-                className="rounded-xl border border-blue-700 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                Print Schedule
-              </button>
+            <div className="mt-6 flex flex-wrap justify-between gap-2">
+              <div>{editingPersonalEventId && (
+                <button type="button" onClick={deletePersonalEvent}
+                  className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">Delete</button>
+              )}</div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowPersonalEventEditor(false)}
+                  className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                <button type="button" onClick={savePersonalEvent}
+                  className="rounded-xl border border-blue-700 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save Event</button>
+              </div>
             </div>
           </div>
         </div>
@@ -5384,11 +5617,11 @@ export default function DashboardPage() {
 
                   <button
                     type="button"
-                    onClick={openPrintScheduleModal}
+                    onClick={openPersonalCalendar}
                     disabled={!currentEmployee}
                     className="rounded-xl border border-slate-600 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Print Schedule
+                    Personal Calendar
                   </button>
                 </div>
 
