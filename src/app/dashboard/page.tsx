@@ -5364,7 +5364,28 @@ export default function DashboardPage() {
                     className="rounded-xl border border-blue-700 bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                     + Add Personal Event
                   </button>
-                  <button type="button" onClick={printPersonalSchedule}
+                  <div className="flex flex-wrap items-end gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Print From
+                    <input
+                      type="date"
+                      value={printScheduleStart}
+                      onChange={(event) => setPrintScheduleStart(event.target.value)}
+                      className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Print Through
+                    <input
+                      type="date"
+                      value={printScheduleEnd}
+                      min={printScheduleStart}
+                      onChange={(event) => setPrintScheduleEnd(event.target.value)}
+                      className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                </div>
+                <button type="button" onClick={printPersonalSchedule}
                     className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100">
                     Print
                   </button>
