@@ -4852,13 +4852,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const printDates = Array.from({ length: rangeDays }, (_, index) => addDays(startDate, index));
-    const assignmentsByPrintDate = new Map<
-      string,
-      Array<{ shiftLabel: string; startTime: string; endTime: string; note: string }>
-    >();
-
-    for (const date of printDates) {
+    const assignmentsForDate = (date: Date) => {
       const dateKey = toDateKey(date);
       const day = getDaySchedule(scheduleData, dateKey);
       const standardAssignments: DisplayAssignment[] = SHIFT_ORDER.map((shiftName) => ({
@@ -4876,93 +4870,132 @@ export default function DashboardPage() {
         slots: getAssignedSlots(extra, extra.category),
         hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
       }));
-      const assignments = [...standardAssignments, ...extraAssignments]
+
+      return [...standardAssignments, ...extraAssignments]
         .filter((assignment) => !assignment.hiddenFromEmployees)
         .flatMap((assignment) =>
-        assignment.slots
-          .filter(
-            (slot) =>
-              slot.employeeId === currentEmployeeId &&
-              !['SICK', 'VACATION', 'LEAVE'].includes(slot.shiftType),
-          )
-          .map((slot) => ({
-            shiftLabel: assignment.label,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-            note: slot.note.trim(),
-          })),
+          assignment.slots
+            .filter(
+              (slot) =>
+                slot.employeeId === currentEmployeeId &&
+                !['SICK', 'VACATION', 'LEAVE'].includes(slot.shiftType),
+            )
+            .map((slot) => ({
+              shiftLabel: assignment.label,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              note: slot.note.trim(),
+            })),
         );
+    };
 
-      assignmentsByPrintDate.set(dateKey, assignments);
+    const firstMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const lastMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    const months: Date[] = [];
+
+    for (
+      let month = new Date(firstMonth);
+      month <= lastMonth;
+      month = new Date(month.getFullYear(), month.getMonth() + 1, 1)
+    ) {
+      months.push(new Date(month));
     }
 
-    const leadingBlankDays = startDate.getDay();
-    const calendarCells = [
-      ...Array.from({ length: leadingBlankDays }, () => '<div class="day blank"></div>'),
-      ...printDates.map((date) => {
-        const dateKey = toDateKey(date);
-        const assignments = assignmentsByPrintDate.get(dateKey) ?? [];
-        const personalEventsForDate = personalCalendarEvents
-          .filter((event) => personalEventOccursOnDate(event, dateKey))
-          .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    const monthPages = months
+      .map((monthStart) => {
+        const year = monthStart.getFullYear();
+        const month = monthStart.getMonth();
+        const monthEnd = new Date(year, month + 1, 0);
+        const monthLabel = monthStart.toLocaleDateString('en-US', {
+          month: 'long',
+          year: 'numeric',
+        });
 
-        const assignmentHtml = assignments
-          .map(
-            (assignment) => `
-              <div class="assignment">
-                <div class="shift">${escapePrintHtml(assignment.shiftLabel)}</div>
-                <div class="time">${escapePrintHtml(assignment.startTime)} - ${escapePrintHtml(assignment.endTime)}</div>
-                ${
-                  assignment.note
-                    ? `<div class="note"><strong>Supervisor note:</strong> ${escapePrintHtml(assignment.note)}</div>`
-                    : ''
-                }
-              </div>
-            `,
-          )
-          .join('');
+        const cells: string[] = Array.from(
+          { length: monthStart.getDay() },
+          () => '<div class="day blank"></div>',
+        );
 
-        const personalEventHtml = personalEventsForDate
-          .map((event) => {
+        for (let dayNumber = 1; dayNumber <= monthEnd.getDate(); dayNumber += 1) {
+          const date = new Date(year, month, dayNumber);
+          const dateKey = toDateKey(date);
+          const inSelectedRange = date >= startDate && date <= endDate;
+
+          if (!inSelectedRange) {
+            cells.push(`<div class="day outside-range"><div class="date-number">${dayNumber}</div></div>`);
+            continue;
+          }
+
+          const assignments = assignmentsForDate(date);
+          const personalEventsForDate = personalCalendarEvents
+            .filter((event) => personalEventOccursOnDate(event, dateKey))
+            .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+          const assignmentHtml = assignments.map((assignment) => `
+            <div class="entry assignment">
+              <div class="entry-title">${escapePrintHtml(assignment.shiftLabel)}</div>
+              <div class="time">${escapePrintHtml(assignment.startTime)} - ${escapePrintHtml(assignment.endTime)}</div>
+              ${assignment.note ? `<div class="note"><strong>Supervisor note:</strong> ${escapePrintHtml(assignment.note)}</div>` : ''}
+            </div>
+          `).join('');
+
+          const personalEventHtml = personalEventsForDate.map((event) => {
             const timeLabel = event.allDay ? 'All day' : `${event.startTime} - ${event.endTime}`;
             const repeatLabel = getPersonalEventRepeatLabel(event);
-
             return `
-              <div class="personal-event">
-                <div class="personal-title">${escapePrintHtml(event.title)}</div>
+              <div class="entry personal-event">
+                <div class="entry-title">${escapePrintHtml(event.title)}</div>
                 <div class="time">${escapePrintHtml(timeLabel)}</div>
                 ${repeatLabel ? `<div class="repeat">${escapePrintHtml(repeatLabel)}</div>` : ''}
                 ${event.notes ? `<div class="note">${escapePrintHtml(event.notes)}</div>` : ''}
               </div>
             `;
-          })
-          .join('');
+          }).join('');
 
-        const emptyHtml =
-          assignments.length === 0 && personalEventsForDate.length === 0
-            ? '<div class="off">No events</div>'
-            : '';
+          cells.push(`
+            <div class="day">
+              <div class="date-number">${dayNumber}</div>
+              ${assignmentHtml}
+              ${personalEventHtml}
+            </div>
+          `);
+        }
+
+        while (cells.length % 7 !== 0) {
+          cells.push('<div class="day blank"></div>');
+        }
+
+        const weekCount = cells.length / 7;
 
         return `
-          <div class="day">
-            <div class="date">${escapePrintHtml(
-              date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              }),
-            )}</div>
-            ${assignmentHtml}
-            ${personalEventHtml}
-            ${emptyHtml}
-          </div>
+          <section class="month-page">
+            <header class="month-header">
+              <div>
+                <h1>Personal Calendar</h1>
+                <div class="employee-name">${escapePrintHtml(currentEmployee.name)}</div>
+              </div>
+              <div class="month-title">${escapePrintHtml(monthLabel)}</div>
+            </header>
+            <div class="legend">
+              <span><i class="legend-box work"></i>ApolloEMS schedule</span>
+              <span><i class="legend-box personal"></i>Personal event</span>
+            </div>
+            <div class="weekdays">
+              ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+                .map((day) => `<div class="weekday">${day}</div>`)
+                .join('')}
+            </div>
+            <div class="calendar" style="--week-count: ${weekCount}">
+              ${cells.join('')}
+            </div>
+          </section>
         `;
-      }),
-    ].join('');
+      })
+      .join('');
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-      window.alert('Allow pop-ups for ApolloEMS to print your schedule.');
+      window.alert('Allow pop-ups for ApolloEMS to print your calendar.');
       return;
     }
 
@@ -4971,36 +5004,56 @@ export default function DashboardPage() {
       <html lang="en">
         <head>
           <meta charset="utf-8" />
-          <title>${escapePrintHtml(currentEmployee.name)} Schedule</title>
+          <title>${escapePrintHtml(currentEmployee.name)} Personal Calendar</title>
           <style>
-            @page { size: landscape; margin: 0.4in; }
+            @page { size: landscape; margin: 0.3in; }
             * { box-sizing: border-box; }
-            body { margin: 0; color: #0f172a; font-family: Arial, sans-serif; }
-            h1 { margin: 0; font-size: 22px; }
-            .range { margin: 5px 0 16px; color: #475569; font-size: 12px; }
+            html, body { margin: 0; padding: 0; color: #0f172a; font-family: Arial, sans-serif; }
+            body { background: #fff; }
+            .month-page {
+              height: 7.9in;
+              display: flex;
+              flex-direction: column;
+              break-after: page;
+              page-break-after: always;
+              overflow: hidden;
+            }
+            .month-page:last-child { break-after: auto; page-break-after: auto; }
+            .month-header {
+              display: flex;
+              align-items: flex-end;
+              justify-content: space-between;
+              gap: 20px;
+              padding-bottom: 6px;
+              border-bottom: 2px solid #0f172a;
+            }
+            h1 { margin: 0; font-size: 20px; line-height: 1; }
+            .employee-name { margin-top: 4px; color: #475569; font-size: 11px; font-weight: 600; }
+            .month-title { font-size: 24px; line-height: 1; font-weight: 800; }
+            .legend { display: flex; gap: 18px; align-items: center; min-height: 24px; font-size: 9px; color: #475569; }
+            .legend span { display: inline-flex; align-items: center; gap: 5px; }
+            .legend-box { width: 12px; height: 8px; display: inline-block; border-left: 3px solid; }
+            .legend-box.work { border-color: #2563eb; background: #eff6ff; }
+            .legend-box.personal { border-color: #059669; background: #ecfdf5; }
             .weekdays, .calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-            .weekday { border: 1px solid #64748b; background: #e2e8f0; padding: 7px; text-align: center; font-size: 11px; font-weight: 700; }
-            .day { min-height: 125px; border: 1px solid #94a3b8; padding: 7px; break-inside: avoid; }
-            .blank { background: #f8fafc; }
-            .date { margin-bottom: 7px; font-size: 11px; font-weight: 700; }
-            .assignment { margin-bottom: 7px; border-left: 3px solid #2563eb; background: #eff6ff; padding: 6px; }
-            .personal-event { margin-bottom: 7px; border-left: 3px solid #059669; background: #ecfdf5; padding: 6px; }
-            .shift, .personal-title { font-size: 12px; font-weight: 700; }
-            .time { margin-top: 2px; font-size: 11px; }
-            .repeat { margin-top: 2px; font-size: 10px; font-weight: 700; }
-            .note { margin-top: 5px; white-space: pre-wrap; font-size: 10px; line-height: 1.3; }
-            .off { color: #94a3b8; font-size: 10px; }
+            .weekday { border: 1px solid #64748b; background: #e2e8f0; padding: 5px 4px; text-align: center; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+            .calendar { flex: 1; grid-template-rows: repeat(var(--week-count), minmax(0, 1fr)); min-height: 0; }
+            .day { min-width: 0; min-height: 0; overflow: hidden; border: 1px solid #94a3b8; padding: 5px; background: #fff; }
+            .blank, .outside-range { background: #f8fafc; }
+            .outside-range { color: #cbd5e1; }
+            .date-number { margin-bottom: 4px; font-size: 10px; font-weight: 800; }
+            .entry { margin-bottom: 3px; border-left: 3px solid; padding: 3px 4px; line-height: 1.15; break-inside: avoid; }
+            .assignment { border-color: #2563eb; background: #eff6ff; }
+            .personal-event { border-color: #059669; background: #ecfdf5; }
+            .entry-title { overflow-wrap: anywhere; font-size: 9px; font-weight: 800; }
+            .time { margin-top: 1px; font-size: 8px; }
+            .repeat { margin-top: 1px; color: #64748b; font-size: 7px; font-weight: 600; }
+            .note { margin-top: 2px; padding-top: 2px; border-top: 1px solid rgba(15,23,42,.12); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 7px; line-height: 1.15; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
           </style>
         </head>
         <body>
-          <h1>${escapePrintHtml(currentEmployee.name)} — Personal Calendar</h1>
-          <div class="range">${escapePrintHtml(formatShortDate(startDate))} to ${escapePrintHtml(formatShortDate(endDate))}</div>
-          <div class="weekdays">
-            ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-              .map((day) => `<div class="weekday">${day}</div>`)
-              .join('')}
-          </div>
-          <div class="calendar">${calendarCells}</div>
+          ${monthPages}
           <script>window.addEventListener('load', () => window.print());<\/script>
         </body>
       </html>
