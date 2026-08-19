@@ -4632,30 +4632,37 @@ export default function DashboardPage() {
     return status;
   }
 
-  function getPersonalCalendarStorageKey() {
-    return currentEmployeeId ? `apollo-personal-calendar-v1:${currentEmployeeId}` : '';
-  }
-
-  function loadPersonalCalendarEvents() {
-    const storageKey = getPersonalCalendarStorageKey();
-    if (!storageKey) {
+  async function loadPersonalCalendarEvents() {
+    if (!currentEmployee?.email) {
       setPersonalCalendarEvents([]);
       return;
     }
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      const parsed = raw ? JSON.parse(raw) : [];
-      setPersonalCalendarEvents(Array.isArray(parsed) ? parsed : []);
-    } catch (error) {
-      console.error('Failed to load personal calendar events:', error);
-      setPersonalCalendarEvents([]);
-    }
-  }
 
-  function savePersonalCalendarEvents(events: PersonalCalendarEvent[]) {
-    const storageKey = getPersonalCalendarStorageKey();
-    setPersonalCalendarEvents(events);
-    if (storageKey) window.localStorage.setItem(storageKey, JSON.stringify(events));
+    const { data, error } = await supabase
+      .from('personal_calendar_events')
+      .select('id, employee_id, title, date_key, start_time, end_time, all_day, notes')
+      .order('date_key', { ascending: true })
+      .order('start_time', { ascending: true });
+
+    if (error) {
+      console.error('Failed to load personal calendar events:', error);
+      window.alert('Apollo could not load your personal calendar events.');
+      setPersonalCalendarEvents([]);
+      return;
+    }
+
+    setPersonalCalendarEvents(
+      (data ?? []).map((row) => ({
+        id: String(row.id),
+        employeeId: String(row.employee_id ?? currentEmployeeId),
+        title: String(row.title ?? ''),
+        dateKey: String(row.date_key ?? ''),
+        startTime: String(row.start_time ?? '').slice(0, 5),
+        endTime: String(row.end_time ?? '').slice(0, 5),
+        allDay: Boolean(row.all_day),
+        notes: String(row.notes ?? ''),
+      })),
+    );
   }
 
   function openPersonalCalendar() {
@@ -4663,8 +4670,8 @@ export default function DashboardPage() {
     setPersonalCalendarMonth(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
     setPrintScheduleStart(toDateKey(new Date(initialDate.getFullYear(), initialDate.getMonth(), 1)));
     setPrintScheduleEnd(toDateKey(new Date(initialDate.getFullYear(), initialDate.getMonth() + 1, 0)));
-    loadPersonalCalendarEvents();
     setShowPersonalCalendar(true);
+    void loadPersonalCalendarEvents();
   }
 
   function openNewPersonalEvent(dateKey: string) {
@@ -4689,31 +4696,58 @@ export default function DashboardPage() {
     setShowPersonalEventEditor(true);
   }
 
-  function savePersonalEvent() {
-    if (!currentEmployeeId || !personalEventTitle.trim() || !personalEventDate) {
+  async function savePersonalEvent() {
+    if (!currentEmployeeId || !currentEmployee?.email || !personalEventTitle.trim() || !personalEventDate) {
       window.alert('Enter an event title and date.');
       return;
     }
-    const nextEvent: PersonalCalendarEvent = {
-      id: editingPersonalEventId ?? `personal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      employeeId: currentEmployeeId,
+
+    if (!personalEventAllDay && personalEventEndTime <= personalEventStartTime) {
+      window.alert('The event end time must be after the start time.');
+      return;
+    }
+
+    const payload = {
+      employee_id: currentEmployeeId,
+      employee_email: currentEmployee.email.trim().toLowerCase(),
       title: personalEventTitle.trim(),
-      dateKey: personalEventDate,
-      startTime: personalEventAllDay ? '' : personalEventStartTime,
-      endTime: personalEventAllDay ? '' : personalEventEndTime,
-      allDay: personalEventAllDay,
+      date_key: personalEventDate,
+      start_time: personalEventAllDay ? null : personalEventStartTime,
+      end_time: personalEventAllDay ? null : personalEventEndTime,
+      all_day: personalEventAllDay,
       notes: personalEventNotes.trim(),
     };
-    const next = editingPersonalEventId
-      ? personalCalendarEvents.map((item) => item.id === editingPersonalEventId ? nextEvent : item)
-      : [...personalCalendarEvents, nextEvent];
-    savePersonalCalendarEvents(next);
+
+    const query = editingPersonalEventId
+      ? supabase.from('personal_calendar_events').update(payload).eq('id', editingPersonalEventId)
+      : supabase.from('personal_calendar_events').insert(payload);
+
+    const { error } = await query;
+    if (error) {
+      console.error('Failed to save personal calendar event:', error);
+      window.alert('Apollo could not save this personal event.');
+      return;
+    }
+
+    await loadPersonalCalendarEvents();
     setShowPersonalEventEditor(false);
   }
 
-  function deletePersonalEvent() {
+  async function deletePersonalEvent() {
     if (!editingPersonalEventId || !window.confirm('Delete this personal calendar event?')) return;
-    savePersonalCalendarEvents(personalCalendarEvents.filter((item) => item.id !== editingPersonalEventId));
+
+    const { error } = await supabase
+      .from('personal_calendar_events')
+      .delete()
+      .eq('id', editingPersonalEventId);
+
+    if (error) {
+      console.error('Failed to delete personal calendar event:', error);
+      window.alert('Apollo could not delete this personal event.');
+      return;
+    }
+
+    await loadPersonalCalendarEvents();
     setShowPersonalEventEditor(false);
   }
 
@@ -5246,7 +5280,7 @@ export default function DashboardPage() {
                 <div>
                   <div className="text-2xl font-bold text-slate-900">Personal Calendar</div>
                   <p className="mt-1 text-sm text-slate-600">
-                    Your ApolloEMS schedule is locked. Personal entries are editable and stored privately on this device.
+                    Your ApolloEMS schedule is locked. Personal entries are private to your account and available across your devices.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
