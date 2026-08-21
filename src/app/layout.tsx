@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'ApolloEMS',
-  description: 'Purpose-built EMS workforce and operations management software.',
+  title: {
+    default: 'ApolloEMS | Comprehensive EMS Operations Platform',
+    template: '%s | ApolloEMS',
+  },
+  description: 'ApolloEMS is a comprehensive EMS operations platform connecting workforce, operations, dispatch, field crews, and clinical documentation in one integrated system.',
   icons: {
     icon: '/apollo-logo.png',
     apple: '/apollo-logo.png',
