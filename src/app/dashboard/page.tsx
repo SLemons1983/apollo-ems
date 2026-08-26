@@ -326,6 +326,7 @@ type OpenShiftRequest = {
   payPeriodKey: string;
   requestedAt: string;
   status: 'PENDING' | 'APPROVED' | 'DENIED';
+  employeeNote?: string;
   supervisorNote?: string;
 };
 
@@ -1357,6 +1358,9 @@ export default function DashboardPage() {
   const [selectedTradeShiftKey, setSelectedTradeShiftKey] = useState('');
   const [selectedTradeTargetKey, setSelectedTradeTargetKey] = useState('');
   const [shiftTradeRequestStatus, setShiftTradeRequestStatus] = useState('');
+  const [openShiftRequestDialog, setOpenShiftRequestDialog] = useState<{ date: Date; assignment: DisplayAssignment } | null>(null);
+  const [openShiftRequestComment, setOpenShiftRequestComment] = useState('');
+  const [isSubmittingOpenShiftRequest, setIsSubmittingOpenShiftRequest] = useState(false);
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [certificationDocumentStatus, setCertificationDocumentStatus] =
     useState('');
@@ -2154,6 +2158,7 @@ export default function DashboardPage() {
                 payPeriodKey: row.pay_period_key,
                 requestedAt: row.requested_at,
                 status: row.status,
+                employeeNote: row.employee_note ?? undefined,
                 supervisorNote: row.supervisor_note ?? undefined,
               })),
             );
@@ -4095,10 +4100,8 @@ export default function DashboardPage() {
     );
   }
 
-  async function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
-    setOpenShiftRequests(nextRequests);
-
-    const rows = nextRequests.map((request) => ({
+  async function saveOpenShiftRequest(request: OpenShiftRequest): Promise<boolean> {
+    const row = {
       id: request.id,
       employee_id: request.employeeId,
       employee_name: request.employeeName,
@@ -4108,18 +4111,23 @@ export default function DashboardPage() {
       pay_period_key: request.payPeriodKey,
       requested_at: request.requestedAt,
       status: request.status,
+      employee_note: request.employeeNote?.trim() || null,
       supervisor_note: request.supervisorNote ?? null,
       updated_at: new Date().toISOString(),
-    }));
+    };
 
     const { error } = await supabase
       .from('open_shift_requests')
-      .upsert(rows, { onConflict: 'id' });
+      .upsert(row, { onConflict: 'id' });
 
     if (error) {
       console.error('Failed to save open shift request:', error);
-      window.alert('Failed to save open shift request.');
+      window.alert('Your shift request could not be submitted. Please try again or contact a supervisor.');
+      return false;
     }
+
+    setOpenShiftRequests((current) => [request, ...current.filter((item) => item.id !== request.id)]);
+    return true;
   }
 
   function getMaxSlotsForAssignment(assignment: DisplayAssignment): number {
@@ -4298,13 +4306,26 @@ export default function DashboardPage() {
       return;
     }
 
-    const confirmed = window.confirm(`Request ${assignment.label} on ${formatShortDate(date)}?`);
-    if (!confirmed) {
+    setOpenShiftRequestComment('');
+    setOpenShiftRequestDialog({ date, assignment });
+  }
+
+  async function submitOpenShiftRequest() {
+    if (!openShiftRequestDialog || !currentEmployee || isSubmittingOpenShiftRequest) {
+      return;
+    }
+
+    const { date, assignment } = openShiftRequestDialog;
+    const dateKey = toDateKey(date);
+
+    if (hasCurrentEmployeeRequestedShift(dateKey, assignment.key)) {
+      window.alert('You already have a pending request for this shift.');
+      setOpenShiftRequestDialog(null);
       return;
     }
 
     const request: OpenShiftRequest = {
-      id: `open-shift-${Date.now()}`,
+      id: `open-shift-${Date.now()}-${currentEmployeeId}`,
       employeeId: currentEmployeeId,
       employeeName: currentEmployee.name,
       dateKey,
@@ -4313,9 +4334,18 @@ export default function DashboardPage() {
       payPeriodKey: selectedPayPeriod.key,
       requestedAt: new Date().toISOString(),
       status: 'PENDING',
+      employeeNote: openShiftRequestComment.trim() || undefined,
     };
 
-    await saveOpenShiftRequests([request, ...openShiftRequests]);
+    setIsSubmittingOpenShiftRequest(true);
+    const saved = await saveOpenShiftRequest(request);
+    setIsSubmittingOpenShiftRequest(false);
+
+    if (saved) {
+      setOpenShiftRequestDialog(null);
+      setOpenShiftRequestComment('');
+      window.alert('Your shift request was submitted for supervisor review.');
+    }
   }
 
   async function submitShiftTradeRequest() {
@@ -7835,6 +7865,47 @@ export default function DashboardPage() {
 
         </div>
       </div>
+
+      {openShiftRequestDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="text-lg font-bold text-slate-900">Request Open Shift</div>
+            <div className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              <div className="font-bold">{openShiftRequestDialog.assignment.label}</div>
+              <div className="mt-1">{formatShortDate(openShiftRequestDialog.date)}</div>
+            </div>
+            <label className="mt-4 block text-sm font-semibold text-slate-700">
+              Comment for supervisor <span className="font-normal text-slate-500">(optional)</span>
+              <textarea
+                value={openShiftRequestComment}
+                onChange={(event) => setOpenShiftRequestComment(event.target.value)}
+                placeholder="Example: I can work the day half only."
+                maxLength={500}
+                className="mt-2 min-h-[110px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              />
+            </label>
+            <div className="mt-1 text-right text-xs text-slate-400">{openShiftRequestComment.length}/500</div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isSubmittingOpenShiftRequest}
+                onClick={() => { setOpenShiftRequestDialog(null); setOpenShiftRequestComment(''); }}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSubmittingOpenShiftRequest}
+                onClick={() => void submitOpenShiftRequest()}
+                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:bg-slate-400"
+              >
+                {isSubmittingOpenShiftRequest ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

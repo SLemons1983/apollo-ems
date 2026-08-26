@@ -79,6 +79,7 @@ type ShiftAssignment = {
   showEmployee3: boolean;
   visibleEmployeeSlots: number;
   vehicle: VehicleValue;
+  cardiacMonitor: string;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
   supervisorNote: string;
@@ -98,6 +99,7 @@ type ExtraShiftAssignment = {
   showEmployee3: boolean;
   visibleEmployeeSlots: number;
   vehicle: VehicleValue;
+  cardiacMonitor: string;
   allowExtendedHours: boolean;
   hiddenFromEmployees: boolean;
   supervisorNote: string;
@@ -120,6 +122,7 @@ type AssignmentRef = {
     employee3: EmployeeSlot;
     showEmployee3: boolean;
     vehicle: VehicleValue;
+    cardiacMonitor: string;
     allowExtendedHours: boolean;
   };
 };
@@ -153,6 +156,7 @@ type OpenShiftRequest = {
   payPeriodKey: string;
   requestedAt: string;
   status: 'PENDING' | 'APPROVED' | 'DENIED';
+  employeeNote?: string;
   supervisorNote?: string;
 };
 
@@ -503,6 +507,7 @@ function createEmptyShift(showEmployee3 = false): ShiftAssignment {
     showEmployee3,
     visibleEmployeeSlots: showEmployee3 ? 3 : 2,
     vehicle: '',
+    cardiacMonitor: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
     supervisorNote: '',
@@ -531,6 +536,7 @@ function createAdminSupervisorShift(): ShiftAssignment {
     showEmployee3: false,
     visibleEmployeeSlots: 2,
     vehicle: '',
+    cardiacMonitor: '',
     allowExtendedHours: false,
     hiddenFromEmployees: false,
     supervisorNote: '',
@@ -804,6 +810,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
     showEmployee3: Boolean(maybeShift.showEmployee3 || employee3.employeeId),
     visibleEmployeeSlots,
     vehicle: (maybeShift.vehicle ?? '') as VehicleValue,
+    cardiacMonitor: typeof (maybeShift as any).cardiacMonitor === 'string' ? (maybeShift as any).cardiacMonitor : '',
     allowExtendedHours: Boolean(maybeShift.allowExtendedHours),
     hiddenFromEmployees: Boolean((maybeShift as any).hiddenFromEmployees),
     supervisorNote:
@@ -827,6 +834,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
       showEmployee3: false,
       visibleEmployeeSlots: 2,
       vehicle: '',
+      cardiacMonitor: '',
       allowExtendedHours: false,
       hiddenFromEmployees: false,
       supervisorNote: '',
@@ -849,6 +857,7 @@ function normalizeExtraShift(raw: unknown): ExtraShiftAssignment {
     showEmployee3: normalized.showEmployee3,
     visibleEmployeeSlots: normalized.visibleEmployeeSlots,
     vehicle: normalized.vehicle,
+    cardiacMonitor: normalized.cardiacMonitor,
     allowExtendedHours: normalized.allowExtendedHours,
     hiddenFromEmployees: normalized.hiddenFromEmployees,
     supervisorNote: normalized.supervisorNote,
@@ -1641,10 +1650,11 @@ export default function SchedulePage() {
         }
 
         const shiftFields: Array<{
-          key: 'vehicle' | 'allowExtendedHours' | 'hiddenFromEmployees' | 'supervisorNote' | 'visibleEmployeeSlots';
+          key: 'vehicle' | 'cardiacMonitor' | 'allowExtendedHours' | 'hiddenFromEmployees' | 'supervisorNote' | 'visibleEmployeeSlots';
           label: string;
         }> = [
           { key: 'vehicle', label: 'Vehicle' },
+          { key: 'cardiacMonitor', label: 'Cardiac Monitor' },
           { key: 'allowExtendedHours', label: 'Extended Hours Approved' },
           { key: 'hiddenFromEmployees', label: 'Hidden From Employees' },
           { key: 'supervisorNote', label: 'Supervisor Note' },
@@ -1730,6 +1740,7 @@ export default function SchedulePage() {
                 payPeriodKey: row.pay_period_key,
                 requestedAt: row.requested_at,
                 status: row.status,
+                employeeNote: row.employee_note ?? undefined,
                 supervisorNote: row.supervisor_note ?? undefined,
               })),
             );
@@ -1900,6 +1911,7 @@ export default function SchedulePage() {
                 showEmployee3: false,
                 visibleEmployeeSlots: 2,
                 vehicle: (row.vehicle || '') as VehicleValue,
+                cardiacMonitor: row.cardiac_monitor || '',
                 allowExtendedHours: Boolean(row.allow_extended_hours),
                 hiddenFromEmployees: Boolean(row.hidden_from_employees),
                 supervisorNote: '',
@@ -1910,6 +1922,7 @@ export default function SchedulePage() {
             extra.label = row.shift_label || extra.label;
             extra.category = category;
             extra.vehicle = (row.vehicle || '') as VehicleValue;
+            extra.cardiacMonitor = row.cardiac_monitor || '';
             extra.allowExtendedHours = Boolean(row.allow_extended_hours);
             extra.hiddenFromEmployees = Boolean(row.hidden_from_employees);
 
@@ -1941,6 +1954,7 @@ export default function SchedulePage() {
 
             const shift = day.standard[shiftName];
             shift.vehicle = (row.vehicle || '') as VehicleValue;
+            shift.cardiacMonitor = row.cardiac_monitor || '';
             shift.allowExtendedHours = Boolean(row.allow_extended_hours);
             shift.hiddenFromEmployees = Boolean(row.hidden_from_employees);
 
@@ -2014,6 +2028,7 @@ export default function SchedulePage() {
     slotNumber: number;
     slot: EmployeeSlot;
     vehicle: VehicleValue;
+      cardiacMonitor: string;
     allowExtendedHours: boolean;
     hiddenFromEmployees: boolean;
     defaultEndTime?: string;
@@ -2035,6 +2050,7 @@ export default function SchedulePage() {
       note: params.slot.note || '',
       shift_type: params.slot.shiftType,
       vehicle: params.vehicle || '',
+      cardiac_monitor: params.cardiacMonitor || null,
       allow_extended_hours: Boolean(params.allowExtendedHours),
       hidden_from_employees: Boolean(params.hiddenFromEmployees),
       is_open_slot: isOpenSlot,
@@ -2113,6 +2129,7 @@ export default function SchedulePage() {
             holdover_reason: null,
             note: shift.supervisorNote || '',
             vehicle: shift.vehicle || '',
+            cardiac_monitor: shift.cardiacMonitor || null,
             allow_extended_hours: Boolean(shift.allowExtendedHours),
             hidden_from_employees: Boolean(shift.hiddenFromEmployees),
             is_open_slot: false,
@@ -2137,6 +2154,7 @@ export default function SchedulePage() {
                 slotNumber: index + 1,
                 slot,
                 vehicle: shift.vehicle || '',
+                cardiacMonitor: shift.cardiacMonitor || '',
                 allowExtendedHours: Boolean(shift.allowExtendedHours),
                 hiddenFromEmployees: Boolean(shift.hiddenFromEmployees),
                 defaultEndTime: getDefaultEndTimeForShift(shiftName, slotKey),
@@ -2169,6 +2187,7 @@ export default function SchedulePage() {
             holdover_reason: null,
             note: extra.supervisorNote || '',
             vehicle: extra.vehicle || '',
+            cardiac_monitor: extra.cardiacMonitor || null,
             allow_extended_hours: Boolean(extra.allowExtendedHours),
             hidden_from_employees: Boolean(extra.hiddenFromEmployees),
             is_open_slot: false,
@@ -2193,6 +2212,7 @@ export default function SchedulePage() {
                 slotNumber: index + 1,
                 slot,
                 vehicle: extra.vehicle || '',
+                cardiacMonitor: extra.cardiacMonitor || '',
                 allowExtendedHours: Boolean(extra.allowExtendedHours),
                 hiddenFromEmployees: Boolean(extra.hiddenFromEmployees),
               }),
@@ -2424,6 +2444,7 @@ export default function SchedulePage() {
         showEmployee3: false,
         visibleEmployeeSlots: 2,
         vehicle: '',
+        cardiacMonitor: '',
         allowExtendedHours: false,
         hiddenFromEmployees: false,
         supervisorNote: `Created automatically for ${request.employeeName}'s approved vacation.`,
@@ -3233,6 +3254,7 @@ export default function SchedulePage() {
     field:
       | 'showEmployee3'
       | 'vehicle'
+      | 'cardiacMonitor'
       | 'allowExtendedHours'
       | 'hiddenFromEmployees'
       | 'supervisorNote',
@@ -3502,6 +3524,7 @@ export default function SchedulePage() {
         showEmployee3: false,
         visibleEmployeeSlots: 2,
         vehicle: '',
+        cardiacMonitor: '',
         allowExtendedHours: false,
         hiddenFromEmployees: false,
         supervisorNote: '',
@@ -4453,6 +4476,11 @@ export default function SchedulePage() {
                           <div className="mt-1 text-xs text-slate-500">
                             Requested {new Date(request.requestedAt).toLocaleString()}
                           </div>
+                          {request.employeeNote?.trim() && (
+                            <div className="mt-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+                              <span className="font-semibold">Employee comment:</span> {request.employeeNote.trim()}
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <button type="button" onClick={() => void updateOpenShiftRequestStatus(request.id, 'DENIED')} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
@@ -5172,6 +5200,7 @@ export default function SchedulePage() {
 
                           <div className="flex shrink-0 items-center gap-2">
                             {!isExpanded && (
+                                <>
                               <select
                                 value={shift.vehicle}
                                 aria-label={`Vehicle for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
@@ -5193,6 +5222,24 @@ export default function SchedulePage() {
                                   </option>
                                 ))}
                               </select>
+                              {category === 'UNIT' && (
+                                <select
+                                  value={shift.cardiacMonitor}
+                                  aria-label={`Cardiac monitor for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) => {
+                                    event.stopPropagation();
+                                    handleStandardShiftChange(dateKey, shiftName, 'cardiacMonitor', event.target.value);
+                                  }}
+                                  className="w-[104px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                >
+                                  <option value="">No Monitor</option>
+                                  {['LP35-10', 'LP35-20', 'LP35-30', 'LP35-40', 'LP35-50', 'LP35-60'].map((monitor) => (
+                                    <option key={monitor} value={monitor}>{monitor}</option>
+                                  ))}
+                                </select>
+                              )}
+                                </>
                             )}
 
                             {warningMessages.length > 0 && (
