@@ -157,3 +157,40 @@ footer{height:50px;background:#0b2742;color:#bdd0df;display:flex;justify-content
 .sceneMapMarker::first-letter{transform:rotate(45deg)}
 .hospitalSearchStatus{display:flex;align-items:center;gap:8px;margin:8px 0;padding:10px 12px;border-radius:8px;background:#e9f5ff;color:#075c9e;font-weight:700}.hospitalSearchStatus.error{background:#fff2e5;color:#9a4a00}
 @keyframes ambulanceEmergency{50%{filter:drop-shadow(0 0 10px #ef4444)}}
+
+/* MDT Layout Patch 001 — increase map workspace */
+@media(min-width:1251px){
+  .shell .grid{
+    grid-template-columns:270px minmax(0,1fr) 260px;
+  }
+
+  .call{
+    padding:10px;
+  }
+
+  .actions{
+    padding:9px;
+  }
+
+  .unitCard{
+    right:275px;
+  }
+}
+
+@media(min-width:901px) and (max-width:1250px){
+  .shell .grid{
+    grid-template-columns:250px minmax(0,1fr) 245px;
+  }
+
+  .call{
+    padding:9px;
+  }
+
+  .actions{
+    padding:8px;
+  }
+
+  .unitCard{
+    right:255px;
+  }
+}
