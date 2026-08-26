@@ -5198,60 +5198,68 @@ export default function SchedulePage() {
                             )}
                           </div>
 
-                          <div className="flex shrink-0 items-center gap-2">
-                            {!isExpanded && (
-                                <>
+                            <div className="flex shrink-0 items-center gap-2">
+                              {!isExpanded && (
+                                <select
+                                  value={shift.vehicle}
+                                  aria-label={`Vehicle for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) => {
+                                    event.stopPropagation();
+                                    handleStandardShiftChange(
+                                      dateKey,
+                                      shiftName,
+                                      'vehicle',
+                                      event.target.value,
+                                    );
+                                  }}
+                                  className="w-[92px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                >
+                                  {getVehicleOptions(category).map((vehicle) => (
+                                    <option key={vehicle || 'none'} value={vehicle}>
+                                      {vehicle ? `Unit ${vehicle}` : 'No Unit'}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+
+                              {warningMessages.length > 0 && (
+                                <div
+                                  title={warningMessages.join(' | ')}
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
+                                >
+                                  ⚠
+                                </div>
+                              )}
+                            </div>
+                        </div>
+
+                          {!isExpanded && category === 'UNIT' && (
+                            <div className="mb-2 flex justify-end">
                               <select
-                                value={shift.vehicle}
-                                aria-label={`Vehicle for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
+                                value={shift.cardiacMonitor}
+                                aria-label={`Cardiac monitor for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
                                 onClick={(event) => event.stopPropagation()}
                                 onChange={(event) => {
                                   event.stopPropagation();
                                   handleStandardShiftChange(
                                     dateKey,
                                     shiftName,
-                                    'vehicle',
+                                    'cardiacMonitor',
                                     event.target.value,
                                   );
                                 }}
-                                className="w-[92px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                className="w-[116px] rounded-lg border border-slate-400 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                               >
-                                {getVehicleOptions(category).map((vehicle) => (
-                                  <option key={vehicle || 'none'} value={vehicle}>
-                                    {vehicle ? `Unit ${vehicle}` : 'No Unit'}
+                                <option value="">No Monitor</option>
+                                {['LP35-10', 'LP35-20', 'LP35-30', 'LP35-40', 'LP35-50', 'LP35-60'].map((monitor) => (
+                                  <option key={monitor} value={monitor}>
+                                    {monitor}
                                   </option>
                                 ))}
                               </select>
-                              {category === 'UNIT' && (
-                                <select
-                                  value={shift.cardiacMonitor}
-                                  aria-label={`Cardiac monitor for ${SHIFT_DISPLAY_NAMES[shiftName]} on ${dateKey}`}
-                                  onClick={(event) => event.stopPropagation()}
-                                  onChange={(event) => {
-                                    event.stopPropagation();
-                                    handleStandardShiftChange(dateKey, shiftName, 'cardiacMonitor', event.target.value);
-                                  }}
-                                  className="w-[104px] rounded-lg border border-slate-500 bg-white px-2 py-1 text-xs font-bold text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                                >
-                                  <option value="">No Monitor</option>
-                                  {['LP35-10', 'LP35-20', 'LP35-30', 'LP35-40', 'LP35-50', 'LP35-60'].map((monitor) => (
-                                    <option key={monitor} value={monitor}>{monitor}</option>
-                                  ))}
-                                </select>
-                              )}
-                                </>
-                            )}
-
-                            {warningMessages.length > 0 && (
-                              <div
-                                title={warningMessages.join(' | ')}
-                                className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-sm font-bold text-red-700"
-                              >
-                                ⚠
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                            </div>
+                          )}
 
                         {!isExpanded && (
                           <div className="mb-2 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500">
