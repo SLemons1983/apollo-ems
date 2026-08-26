@@ -1497,7 +1497,6 @@ export default function SchedulePage() {
   const [mounted, setMounted] = useState(false);
   const [expandedShiftKey, setExpandedShiftKey] = useState<string | null>(null);
   const [pendingExpandedShiftKey, setPendingExpandedShiftKey] = useState<string | null>(null);
-  const [visibleScheduleWeek, setVisibleScheduleWeek] = useState<'ALL' | 'WEEK1' | 'WEEK2'>('WEEK1');
   const [expandedWarnings, setExpandedWarnings] = useState<Record<string, boolean>>({});
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -3008,18 +3007,6 @@ export default function SchedulePage() {
     () => Array.from({ length: 14 }, (_, index) => addDays(visiblePayPeriod.start, index)),
     [visiblePayPeriodStartKey],
   );
-
-  const visibleDates = useMemo(() => {
-    if (visibleScheduleWeek === 'WEEK1') {
-      return dates.slice(0, 7);
-    }
-
-    if (visibleScheduleWeek === 'WEEK2') {
-      return dates.slice(7, 14);
-    }
-
-    return dates;
-  }, [dates, visibleScheduleWeek]);
 
   const visiblePayPeriodEndKey = toDateKey(visiblePayPeriod.end);
   const isDateInSelectedPayPeriod = (dateKey: string) =>
@@ -4845,22 +4832,6 @@ export default function SchedulePage() {
         </section>
 
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="min-w-[180px]">
-  <select
-    value={visibleScheduleWeek}
-    onChange={(event) =>
-      setVisibleScheduleWeek(
-        event.target.value as 'WEEK1' | 'WEEK2' | 'ALL'
-      )
-    }
-    className="w-full rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700"
-  >
-    <option value="WEEK1">Week 1</option>
-    <option value="WEEK2">Week 2</option>
-    <option value="ALL">Full Pay Period</option>
-  </select>
-</div>
-
           <button
             type="button"
             onClick={() => setShowScheduleKey((current) => !current)}
@@ -4902,7 +4873,6 @@ export default function SchedulePage() {
                     type="button"
                     onClick={() => {
                       const dateIndex = dates.findIndex((date) => toDateKey(date) === result.dateKey);
-                      setVisibleScheduleWeek(dateIndex >= 7 ? 'WEEK2' : 'WEEK1');
                       setExpandedShiftKey(result.expandedKey);
                     }}
                     className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-left text-xs transition hover:bg-slate-100"
@@ -5019,16 +4989,11 @@ export default function SchedulePage() {
         )}
 
         <div ref={scheduleScrollRef} className="space-y-6">
-          {(visibleScheduleWeek === 'ALL'
-            ? [dates.slice(0, 7), dates.slice(7, 14)]
-            : [visibleDates]
-          ).map((gridDates, gridIndex) => (
+          {[dates.slice(0, 7), dates.slice(7, 14)].map((gridDates, gridIndex) => (
             <section key={`${visiblePayPeriodStartKey}-${gridIndex}`} className="space-y-2">
-              {visibleScheduleWeek === 'ALL' && (
-                <div className="px-1 text-sm font-bold uppercase tracking-wide text-slate-700">
-                  {gridIndex === 0 ? 'Week 1' : 'Week 2'}
-                </div>
-              )}
+              <div className="px-1 text-sm font-bold uppercase tracking-wide text-slate-700">
+                {gridIndex === 0 ? 'Week 1' : 'Week 2'}
+              </div>
               <div className="max-w-full overflow-x-auto rounded-2xl border border-slate-500 bg-white shadow-sm">
                 <div className="grid min-w-[1470px] grid-cols-[100px_repeat(7,minmax(195px,1fr))]">
             <div className="sticky left-0 top-0 z-50 border-b border-r border-slate-400 bg-slate-50 p-4 shadow-sm">
