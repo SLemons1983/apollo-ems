@@ -216,3 +216,23 @@ footer{height:50px;background:#0b2742;color:#bdd0df;display:flex;justify-content
   .shell{--carplay-panel:260px;--carplay-actions:200px}.shell header .controls>button:not(:last-child){display:none}.shell .carplayCallPanel .auto,.shell .carplayCallPanel .aci{display:none}.shell .carplayActions .big{min-height:46px}
 }
 @media (min-width:1400px){.shell{--carplay-panel:310px;--carplay-actions:238px}}
+
+/* MDT CarPlay Layout Patch 002B - final iPad target */
+@media (min-width:901px){
+  .shell .carplayGrid{display:block;position:fixed;inset:64px 0 64px;overflow:hidden;background:#dfe7ec}
+  .shell .carplayMap{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+  .shell .carplayMap .mapSurface{width:100%;height:100%}
+  .shell .carplayCallPanel,.shell .carplayActions{position:absolute;z-index:30;top:12px;bottom:auto;max-height:calc(100% - 84px);margin:0;opacity:0;pointer-events:none;transform:translateY(8px) scale(.985);transition:opacity .16s ease,transform .16s ease}
+  .shell .carplayCallPanel{left:12px;width:min(320px,32vw)}
+  .shell .carplayActions{right:12px;width:min(250px,25vw)}
+  .shell .carplayCallPanel.open,.shell .carplayActions.open{opacity:1;pointer-events:auto;transform:none}
+  .shell .carplayCallPanel.hasCall:not(.open){opacity:1;pointer-events:auto;width:min(286px,29vw);max-height:210px;overflow:hidden;transform:none}
+  .shell .carplayCallPanel.hasCall:not(.open) .readBox,.shell .carplayCallPanel.hasCall:not(.open) .tiny,.shell .carplayCallPanel.hasCall:not(.open) .dispositionNotice,.shell .carplayCallPanel.hasCall:not(.open) .delay,.shell .carplayCallPanel.hasCall:not(.open) .aci,.shell .carplayCallPanel.hasCall:not(.open) .auto,.shell .carplayCallPanel.hasCall:not(.open) .oosNotice{display:none}
+  .shell .carplayMap .mapTop{left:16px;right:16px}
+  .shell .carplayMap .mapSearch{left:16px;width:min(520px,calc(100% - 32px));max-width:520px}
+  .shell .carplayMap .mapTools{right:16px}
+  .shell .carplayMap .mapBottom{left:16px;right:auto;bottom:16px}
+  .shell .unitCard{right:18px;bottom:76px}
+  .shell .callInBanner{left:18px;right:18px}
+  .shell .carplayDock{width:min(620px,calc(100vw - 40px))}
+}
