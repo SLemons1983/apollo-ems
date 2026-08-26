@@ -194,3 +194,25 @@ footer{height:50px;background:#0b2742;color:#bdd0df;display:flex;justify-content
     right:255px;
   }
 }
+
+/* MDT CarPlay Layout Patch 002 */
+@media (min-width:901px){
+  .shell{--carplay-panel:292px;--carplay-actions:224px;position:relative;min-height:100vh;overflow:hidden;background:#0a1827}
+  .shell>.statusHeader{position:fixed;z-index:42;top:10px;left:50%;width:auto;min-width:210px;height:42px;transform:translateX(-50%);border:1px solid rgba(255,255,255,.16);border-radius:13px;background:rgba(7,28,49,.94);box-shadow:0 8px 24px rgba(0,0,0,.22);backdrop-filter:blur(12px)}
+  .shell>header{position:fixed;z-index:40;top:0;left:0;right:0;height:64px;grid-template-columns:minmax(220px,1fr) auto auto;padding:0 12px;background:rgba(7,28,49,.96);border-bottom:1px solid rgba(255,255,255,.1);box-shadow:0 8px 28px rgba(0,0,0,.18);backdrop-filter:blur(14px)}
+  .shell header .center{display:none}.shell header .identity small{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.shell header .controls{justify-self:end}.shell header .controls label,.shell header .modes{display:none}.shell header .emergencyZone{grid-column:3}
+  .shell .callInBanner{position:fixed;z-index:44;top:72px;left:calc(var(--carplay-panel) + 18px);right:calc(var(--carplay-actions) + 18px);border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.2)}
+  .shell .carplayGrid{position:fixed;inset:64px 0 64px;display:grid;grid-template-columns:var(--carplay-panel) minmax(0,1fr) var(--carplay-actions);height:auto;gap:0;background:#dfe7ec}
+  .shell .carplayMap{grid-column:2;grid-row:1;min-width:0;z-index:1;border:0}.shell .carplayMap .mapSurface{height:100%}
+  .shell .carplayCallPanel{grid-column:1;grid-row:1;z-index:8;margin:12px 0 12px 12px;padding:11px;border:1px solid rgba(255,255,255,.68);border-radius:18px;background:rgba(247,249,251,.94);box-shadow:0 14px 36px rgba(13,33,51,.24);backdrop-filter:blur(14px);overflow:auto}
+  .shell .carplayCallPanel .callHead{grid-template-columns:46px minmax(0,1fr)}.shell .carplayCallPanel .callHead .chip{grid-column:1/-1;width:100%;padding:7px 9px;text-align:center;font-size:9px}.shell .carplayCallPanel .callNo{margin-left:54px}.shell .carplayCallPanel .readBox{padding:9px}.shell .carplayCallPanel .readBox p{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .shell .carplayActions{grid-column:3;grid-row:1;z-index:8;margin:12px 12px 12px 0;padding:9px;border:1px solid rgba(255,255,255,.68);border-radius:18px;background:rgba(245,248,251,.94);box-shadow:0 14px 36px rgba(13,33,51,.24);backdrop-filter:blur(14px);overflow:auto}
+  .shell .carplayActions .current{border-radius:14px;padding:10px}.shell .carplayActions .current>strong{font-size:16px}.shell .carplayActions .current .next{min-height:64px;border-radius:12px}.shell .carplayActions .big{min-height:50px;border-radius:12px;padding:8px}.shell .carplayActions .big span,.shell .carplayActions .history{display:none}
+  .shell .carplayMap .mapTop{left:16px;right:16px;top:12px;border-radius:14px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.18)}.shell .carplayMap .mapSearch{max-width:min(520px,calc(100% - 32px))}.shell .carplayMap .mapTools{right:16px}.shell .carplayMap .mapBottom{left:16px;bottom:16px}.shell .carplayMap .mapBottom button{min-height:42px;border-radius:12px;padding:0 12px;font-size:9px;box-shadow:0 7px 20px rgba(0,0,0,.15)}
+  .shell .carplayDock{position:fixed;z-index:45;left:50%;bottom:8px;width:min(600px,calc(100vw - 48px));height:50px;transform:translateX(-50%);justify-content:center;overflow:hidden;border:1px solid rgba(255,255,255,.15);border-radius:16px;background:rgba(7,28,49,.96);box-shadow:0 12px 34px rgba(0,0,0,.28);backdrop-filter:blur(14px)}.shell .carplayDock button{min-width:0;flex:1;height:100%;font-size:9px}.shell .carplayDock button.active{border-top:0;background:#176fb7}
+  .shell .unitCard{z-index:60;right:calc(var(--carplay-actions) + 24px);bottom:76px}
+}
+@media (min-width:901px) and (max-width:1180px){
+  .shell{--carplay-panel:260px;--carplay-actions:200px}.shell header .controls>button:not(:last-child){display:none}.shell .carplayCallPanel .auto,.shell .carplayCallPanel .aci{display:none}.shell .carplayActions .big{min-height:46px}
+}
+@media (min-width:1400px){.shell{--carplay-panel:310px;--carplay-actions:238px}}
