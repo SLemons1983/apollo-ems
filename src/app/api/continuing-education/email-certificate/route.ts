@@ -1,27 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { sendApolloEmail } from '@/lib/email';
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xyrusrspvyuwpplhhett.supabase.co';
-
-async function requireSignedInUser() {
-  const store = await cookies();
-  const auth = createServerClient(
-    SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
-    { cookies: { getAll: () => store.getAll(), setAll() {} } },
-  );
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user?.email) throw new Error('UNAUTHORIZED');
-}
+import { requireSupervisorApi } from '@/lib/supervisorApi';
 
 export async function POST(request: NextRequest) {
   try {
-    await requireSignedInUser();
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
+    const { db: admin } = await requireSupervisorApi(request);
 
     const form = await request.formData();
     const employeeId = String(form.get('employeeId') ?? '').trim();
@@ -41,7 +24,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Certificate attachment is too large.' }, { status: 400 });
     }
 
-    const admin = createClient(SUPABASE_URL, key, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data: employee, error } = await admin.from('employees').select('email').eq('id', employeeId).single();
     if (error) throw error;
 
@@ -74,8 +56,11 @@ Sequoia Safety Council`,
   } catch (error) {
     console.error('CE certificate email error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    if (message === 'UNAUTHORIZED') {
+    if (message === 'SUPERVISOR_API_UNAUTHORIZED') {
       return NextResponse.json({ error: 'You must be signed in to email CE certificates.' }, { status: 401 });
+    }
+    if (message === 'SUPERVISOR_API_FORBIDDEN') {
+      return NextResponse.json({ error: 'Supervisor authorization is required.' }, { status: 403 });
     }
     return NextResponse.json({ error: 'Failed to email CE certificate.' }, { status: 500 });
   }

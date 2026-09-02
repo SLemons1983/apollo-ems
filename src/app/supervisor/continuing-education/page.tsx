@@ -109,15 +109,19 @@ export default function ContinuingEducationPage(){
   const [status,setStatus]=useState(''); const [saving,setSaving]=useState(false);
   const activeEmployees=useMemo(()=>employees.filter(e=>(e.status??'Active').toLowerCase()!=='removed').sort((a,b)=>employeeName(a).localeCompare(employeeName(b))),[employees]);
 
+  async function accessToken(){
+    const {data}=await supabase.auth.getSession();
+    const token=data.session?.access_token;
+    if(!token) throw new Error('Your session expired. Sign in again.');
+    return token;
+  }
   async function load(){
-    const [er,cr,ar]=await Promise.all([
-      supabase.from('employees').select('id,first_name,last_name,role,status,certifications'),
-      supabase.from('ce_classes').select('*').order('created_at',{ascending:false}).order('class_date',{ascending:false}),
-      supabase.from('ce_attendance').select('*').order('employee_name',{ascending:true}),
-    ]);
-    if(er.error) throw er.error; if(cr.error) throw cr.error; if(ar.error) throw ar.error;
-    setEmployees((er.data??[]) as Employee[]); setClasses((cr.data??[]) as CeClass[]);
-    const grouped:Record<string,Attendance[]>={}; for(const a of (ar.data??[]) as Attendance[]) (grouped[a.class_id]??=[]).push(a); setAttendance(grouped);
+    const token=await accessToken();
+    const response=await fetch('/api/continuing-education/records',{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(result.error||'Unable to load CE records.');
+    setEmployees((result.employees??[]) as Employee[]); setClasses((result.classes??[]) as CeClass[]);
+    const grouped:Record<string,Attendance[]>={}; for(const a of (result.attendance??[]) as Attendance[]) (grouped[a.class_id]??=[]).push(a); setAttendance(grouped);
   }
   useEffect(()=>{ load().catch(e=>setStatus(`Unable to load CE records: ${e.message}`)); },[]);
   function toggle(id:string){setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);}
@@ -126,15 +130,18 @@ export default function ContinuingEducationPage(){
     if(selected.length===0){setStatus('Add at least one employee to the attendance list.');return;}
     setSaving(true); setStatus('Saving CE class...');
     try{
-      const {data,error}=await supabase.from('ce_classes').insert({class_date:date,topic:topic.trim(),ce_hours:Number(hours),course_type:'INSTRUCTOR_BASED',instructor_key:instructorKey}).select('*').single(); if(error) throw error;
-      const rows=selected.map(id=>{const e=employees.find(x=>x.id===id)!; const c=credential(e); return {class_id:data.id,employee_id:e.id,employee_name:employeeName(e),credential_type:c.type,license_number:c.number};});
-      const r=await supabase.from('ce_attendance').insert(rows); if(r.error) throw r.error;
+      const token=await accessToken();
+      const response=await fetch('/api/continuing-education/records',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({classDate:date,topic:topic.trim(),ceHours:Number(hours),instructorKey,employeeIds:selected})});
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(result.error||'Unable to save CE class.');
+      const data=result.ceClass as CeClass;
+      const rows=(result.attendance??[]) as Attendance[];
       let emailSummary='CE class saved.';
       if(emailOnSave){
         setStatus('CE class saved. Emailing certificates...');
         let sent=0,failed=0;
         for(const row of rows){
-          const result=await emailCertificate(data,{id:'',...row},true);
+          const result=await emailCertificate(data,row,true);
           if(result.ok)sent++;else failed++;
         }
         emailSummary=`CE class saved - ${sent} certificate${sent===1?'':'s'} emailed${failed?`, ${failed} could not be sent`:''}.`;
@@ -158,7 +165,8 @@ export default function ContinuingEducationPage(){
       form.append('classDate',ce.class_date);
       form.append('ceHours',String(ce.ce_hours));
       form.append('certificate',new Blob([bytes as BlobPart],{type:'application/pdf'}),`CE-${ce.class_date}-${safeName(ce.topic)}-${safeName(current.employee_name)}.pdf`);
-      const response=await fetch('/api/continuing-education/email-certificate',{method:'POST',body:form});
+      const token=await accessToken();
+      const response=await fetch('/api/continuing-education/email-certificate',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:form});
       const result=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(result.error||'Certificate email failed.');
       if(!quiet)setStatus(`Certificate emailed to ${current.employee_name}.`);
