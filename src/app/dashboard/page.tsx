@@ -1364,6 +1364,18 @@ export default function DashboardPage() {
   const [activeTile, setActiveTile] = useState<string | null>(null);
   const [certificationDocumentStatus, setCertificationDocumentStatus] =
     useState('');
+  const [certificationSubmissionType, setCertificationSubmissionType] =
+    useState('');
+  const [certificationSubmissionFile, setCertificationSubmissionFile] =
+    useState<File | null>(null);
+  const [certificationSubmissionNote, setCertificationSubmissionNote] =
+    useState('');
+  const [certificationSubmissionStatus, setCertificationSubmissionStatus] =
+    useState('');
+  const [certificationSubmissionNumber, setCertificationSubmissionNumber] =
+    useState('');
+  const [isSubmittingCertification, setIsSubmittingCertification] =
+    useState(false);
   const [unitInspectionStatus, setUnitInspectionStatus] = useState('');
   const [isSubmittingUnitInspection, setIsSubmittingUnitInspection] = useState(false);
   const [inspectionVehicle, setInspectionVehicle] = useState('');
@@ -1407,6 +1419,9 @@ export default function DashboardPage() {
   const [smsPreferencesLoading, setSmsPreferencesLoading] = useState(false);
   const [smsPreferencesSaving, setSmsPreferencesSaving] = useState(false);
   const [smsPreferencesStatus, setSmsPreferencesStatus] = useState('');
+  const [editingMobileNumber, setEditingMobileNumber] = useState(false);
+  const [mobileNumberDraft, setMobileNumberDraft] = useState('');
+  const [mobileNumberSaving, setMobileNumberSaving] = useState(false);
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
   const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
@@ -1500,6 +1515,75 @@ export default function DashboardPage() {
       [key]: enabled,
     }));
     setSmsPreferencesStatus('');
+  }
+
+  async function saveMobileNumber() {
+    if (!currentEmployee) {
+      setSmsPreferencesStatus('Unable to identify the signed-in employee.');
+      return;
+    }
+
+    const digits = mobileNumberDraft.replace(/\D/g, '');
+    const normalizedDigits =
+      digits.length === 11 && digits.startsWith('1')
+        ? digits.slice(1)
+        : digits;
+
+    if (normalizedDigits.length !== 10) {
+      setSmsPreferencesStatus('A valid 10-digit US mobile number is required.');
+      return;
+    }
+
+    setMobileNumberSaving(true);
+    setSmsPreferencesStatus('Saving mobile number...');
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      const accessToken = session?.access_token ?? '';
+
+      if (!accessToken) {
+        throw new Error('Your ApolloEMS session could not be verified. Please sign in again.');
+      }
+
+      const response = await fetch('/api/employee-profile/phone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          phone: mobileNumberDraft,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || 'Unable to update your mobile number.');
+      }
+
+      const loadedEmployees = await loadEmployeesFromSupabase();
+      setEmployees(loadedEmployees);
+
+      setMobileNumberDraft(result.phone ?? '');
+      setEditingMobileNumber(false);
+      setSmsConsentAcknowledged(false);
+      setSmsPreferencesStatus(
+        'Mobile number updated. If SMS notifications were previously enabled, please authorize the new number below.',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to update your mobile number.';
+
+      setSmsPreferencesStatus(message);
+    } finally {
+      setMobileNumberSaving(false);
+    }
   }
 
   async function enableSmsNotifications() {
@@ -1740,6 +1824,124 @@ export default function DashboardPage() {
       );
     } finally {
       setIsSubmittingCheckRequest(false);
+    }
+  }
+
+  async function handleCertificationSubmission() {
+    if (!currentEmployee) {
+      setCertificationSubmissionStatus(
+        'Your employee profile could not be loaded.',
+      );
+      return;
+    }
+
+    if (!certificationSubmissionType) {
+      setCertificationSubmissionStatus(
+        'Select the certification you are submitting.',
+      );
+      return;
+    }
+
+    if (!certificationSubmissionFile) {
+      setCertificationSubmissionStatus(
+        'Choose a certification document to upload.',
+      );
+      return;
+    }
+
+    const allowedTypes = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+    ]);
+
+    if (!allowedTypes.has(certificationSubmissionFile.type)) {
+      setCertificationSubmissionStatus(
+        'Certification must be a PDF, JPG, JPEG, or PNG file.',
+      );
+      return;
+    }
+
+    if (certificationSubmissionFile.size > 10 * 1024 * 1024) {
+      setCertificationSubmissionStatus(
+        'Certification file must be 10 MB or smaller.',
+      );
+      return;
+    }
+
+    const employeeEmail = currentEmployee.email || authEmail;
+
+    if (!employeeEmail) {
+      setCertificationSubmissionStatus(
+        'Your employee email address could not be found.',
+      );
+      return;
+    }
+
+    setIsSubmittingCertification(true);
+    setCertificationSubmissionStatus('Submitting certification...');
+    setCertificationSubmissionNumber('');
+
+    try {
+      const formData = new FormData();
+
+      formData.append('employeeName', currentEmployee.name);
+      formData.append('employeeEmail', employeeEmail);
+      formData.append(
+        'certificationType',
+        certificationSubmissionType,
+      );
+      formData.append(
+        'note',
+        certificationSubmissionNote.trim(),
+      );
+      formData.append(
+        'certification',
+        certificationSubmissionFile,
+      );
+
+      const response = await fetch(
+        '/api/employee-certifications/submit',
+        {
+          method: 'POST',
+          body: formData,
+        },
+      );
+
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        submissionNumber?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(
+          payload.error || 'Unable to submit certification.',
+        );
+      }
+
+      setCertificationSubmissionNumber(
+        payload.submissionNumber ?? '',
+      );
+      setCertificationSubmissionStatus(
+        'Certification submitted successfully. A supervisor will review your document before your official certification record is updated.',
+      );
+      setCertificationSubmissionType('');
+      setCertificationSubmissionFile(null);
+      setCertificationSubmissionNote('');
+    } catch (error) {
+      console.error(
+        'Failed to submit employee certification:',
+        error,
+      );
+
+      setCertificationSubmissionStatus(
+        error instanceof Error
+          ? error.message
+          : 'Unable to submit certification. Please try again.',
+      );
+    } finally {
+      setIsSubmittingCertification(false);
     }
   }
 
@@ -7069,11 +7271,153 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                Certification records and documents are maintained by authorized
-                personnel on the Employees page. Contact a supervisor when a
-                certification needs to be added, replaced, or corrected.
-              </div>
+              <section className="border-t border-slate-200 pt-6">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="text-lg font-extrabold text-blue-950">
+                      Submit Updated Certification
+                    </h2>
+                    <p className="text-sm leading-6 text-blue-900">
+                      Upload a new or renewed certification here. ApolloEMS will
+                      send your document to the certification review team and
+                      email you a confirmation with a submission number.
+                    </p>
+                    <p className="text-xs font-semibold leading-5 text-blue-800">
+                      Submitting a document does not automatically change your
+                      official certification record. A supervisor must review
+                      the document before your record is updated.
+                    </p>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <label className="block">
+                      <span className="text-sm font-bold text-slate-800">
+                        Certification
+                      </span>
+                      <select
+                        value={certificationSubmissionType}
+                        onChange={(event) => {
+                          setCertificationSubmissionType(
+                            event.target.value,
+                          );
+                          setCertificationSubmissionStatus('');
+                          setCertificationSubmissionNumber('');
+                        }}
+                        disabled={isSubmittingCertification}
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                      >
+                        <option value="">
+                          Select certification...
+                        </option>
+                        {requiredCertificationCards.map(
+                          (certification) => (
+                            <option
+                              key={certification.key}
+                              value={certification.label}
+                            >
+                              {certification.label}
+                            </option>
+                          ),
+                        )}
+                        <option value="Other / Additional Certification">
+                          Other / Additional Certification
+                        </option>
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="text-sm font-bold text-slate-800">
+                        Certification Document
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                        disabled={isSubmittingCertification}
+                        onChange={(event) => {
+                          setCertificationSubmissionFile(
+                            event.target.files?.[0] ?? null,
+                          );
+                          setCertificationSubmissionStatus('');
+                          setCertificationSubmissionNumber('');
+                        }}
+                        className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-sm file:font-bold file:text-blue-800 hover:file:bg-blue-200 disabled:bg-slate-100"
+                      />
+                      <span className="mt-1 block text-xs font-semibold text-slate-500">
+                        PDF, JPG, JPEG, or PNG • Maximum 10 MB
+                      </span>
+                    </label>
+                  </div>
+
+                  <label className="mt-4 block">
+                    <span className="text-sm font-bold text-slate-800">
+                      Note to Certification Reviewer
+                      <span className="ml-1 font-medium text-slate-500">
+                        (optional)
+                      </span>
+                    </span>
+                    <textarea
+                      value={certificationSubmissionNote}
+                      onChange={(event) =>
+                        setCertificationSubmissionNote(
+                          event.target.value,
+                        )
+                      }
+                      disabled={isSubmittingCertification}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="Add any information the reviewer should know..."
+                      className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100"
+                    />
+                  </label>
+
+                  {certificationSubmissionStatus && (
+                    <div
+                      className={`mt-4 rounded-lg border px-4 py-3 text-sm font-semibold ${
+                        certificationSubmissionNumber
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                          : 'border-slate-200 bg-white text-slate-700'
+                      }`}
+                    >
+                      <div>{certificationSubmissionStatus}</div>
+
+                      {certificationSubmissionNumber && (
+                        <div className="mt-2">
+                          Submission Number:{' '}
+                          <span className="font-extrabold">
+                            {certificationSubmissionNumber}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-xs font-semibold leading-5 text-slate-600">
+                      The certification review team will receive the uploaded
+                      document along with your name, email address, submission
+                      number, and note.
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={
+                        isSubmittingCertification ||
+                        !currentEmployee ||
+                        !certificationSubmissionType ||
+                        !certificationSubmissionFile
+                      }
+                      onClick={() =>
+                        void handleCertificationSubmission()
+                      }
+                      className="shrink-0 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                    >
+                      {isSubmittingCertification
+                        ? 'Submitting...'
+                        : 'Submit Certification'}
+                    </button>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
             </div>,
@@ -7108,12 +7452,73 @@ export default function DashboardPage() {
                       <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
                         Mobile number
                       </div>
-                      <div className="mt-2 text-base font-bold text-slate-900">
-                        {currentEmployee?.phone || 'No mobile number on file'}
-                      </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        Mobile numbers are maintained in your employee profile.
-                        Contact a supervisor if this number needs to be changed.
+
+                      {editingMobileNumber ? (
+                        <div className="mt-3 space-y-3">
+                          <input
+                            type="tel"
+                            inputMode="tel"
+                            autoComplete="tel"
+                            value={mobileNumberDraft}
+                            onChange={(event) => {
+                              setMobileNumberDraft(event.target.value);
+                              setSmsPreferencesStatus('');
+                            }}
+                            placeholder="(559) 555-1234"
+                            disabled={mobileNumberSaving}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+                          />
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void saveMobileNumber()}
+                              disabled={mobileNumberSaving}
+                              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+                            >
+                              {mobileNumberSaving
+                                ? 'Saving...'
+                                : 'Save Mobile Number'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingMobileNumber(false);
+                                setMobileNumberDraft(currentEmployee?.phone ?? '');
+                                setSmsPreferencesStatus('');
+                              }}
+                              disabled={mobileNumberSaving}
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-2 text-base font-bold text-slate-900">
+                            {currentEmployee?.phone || 'No mobile number on file'}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMobileNumberDraft(currentEmployee?.phone ?? '');
+                              setEditingMobileNumber(true);
+                              setSmsPreferencesStatus('');
+                            }}
+                            className="mt-3 rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
+                          >
+                            Edit Mobile Number
+                          </button>
+                        </>
+                      )}
+
+                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                        Keep your mobile number current for ApolloEMS operational
+                        notifications. Changing your number requires new SMS
+                        authorization before text notifications resume.
                       </p>
                     </div>
 

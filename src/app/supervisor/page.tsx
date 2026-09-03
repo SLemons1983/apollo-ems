@@ -3214,13 +3214,11 @@ export default function SupervisorPage() {
       totalHours: nextTotalHours,
       payBreakdown: nextPayBreakdown,
       punches: correctedPunches,
-      submissionAcknowledgement: affectsCompensation
-        ? null
-        : timecard.submissionAcknowledgement,
-      status: affectsCompensation ? 'RETURNED' : 'PENDING_SUPERVISOR_REVIEW',
+      submissionAcknowledgement: timecard.submissionAcknowledgement,
+      status: 'PENDING_SUPERVISOR_REVIEW',
       supervisorComment,
-      reviewedAt: affectsCompensation ? correctedAt : undefined,
-      reviewedBy: affectsCompensation ? correctedBy : undefined,
+      reviewedAt: undefined,
+      reviewedBy: undefined,
     };
     const auditEntry: AuditLogEntry = {
       id: `audit-timecard-edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3260,41 +3258,11 @@ export default function SupervisorPage() {
 
       setAuditLog((current) => [auditEntry, ...current].slice(0, 250));
 
-      if (affectsCompensation) {
-        const message: ApolloMessage = {
-          id: `timecard-supervisor-edit-${Date.now()}`,
-          conversationId: `timecard-${timecard.id}`,
-          senderId: CURRENT_SUPERVISOR_ID,
-          senderName: correctedBy,
-          senderRole: 'SUPERVISOR',
-          recipients: [
-            {
-              employeeId: timecard.employeeId,
-              deliveredAt: correctedAt,
-              readAt: null,
-            },
-          ],
-          audienceLabel: timecard.employeeName,
-          title: 'Timecard Correction Requires Acknowledgement',
-          body:
-            `A supervisor corrected your timecard for ${formatShortDate(new Date(timecard.payPeriodStart))} to ${formatShortDate(new Date(timecard.payPeriodEnd))}.\n\n` +
-            `Reason: ${reason}\n\n` +
-            `Your corrected timecard is pending resubmission. Please review the corrected hours, acknowledge the timecard, and resubmit it for supervisor approval.`,
-          createdAt: correctedAt,
-          relatedType: 'TIMECARD_RETURNED',
-          relatedId: timecard.id,
-          priority: 'IMPORTANT',
-        };
-
-        saveApolloMessages([message, ...apolloMessages]);
-        setShowPendingResubmission(true);
-      }
-
       cancelSupervisorTimecardEdit();
       setSelectedTimecardId(null);
       window.alert(
         affectsCompensation
-          ? 'The correction was saved and moved to Pending Resubmission for employee acknowledgement.'
+          ? 'The correction was saved and audited. The timecard remains pending supervisor review and may now be approved.'
           : 'The administrative correction was saved. The timecard remains pending review and may now be approved.',
       );
     } catch (error) {
