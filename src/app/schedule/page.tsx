@@ -4633,6 +4633,47 @@ export default function SchedulePage() {
     return null;
   }
 
+  function addMassChangeCoverageOpenSlot(
+    proposed: ScheduleData,
+    result: GlobalScheduleSearchResult,
+    employee: EmployeeOption,
+    sourceSlot: EmployeeSlot,
+  ): { label?: string; blocked?: string } {
+    const assignment = getMassChangeAssignment(proposed, result);
+    if (!assignment) return { blocked: 'Assignment could not be found for automatic coverage.' };
+
+    // Training intentionally does not create coverage. Automatic ALS/BLS coverage
+    // applies only to operational unit assignments. Supervisor absences remain
+    // documented without creating a unit open-shift placeholder.
+    if (assignment.category !== 'UNIT') return {};
+
+    const shift = assignment.shift as ShiftAssignment | ExtraShiftAssignment;
+    const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+    const openSlotId = employee.scope === 'BLS' ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+
+    // The absent employee remains in their original slot for absence tracking,
+    // so coverage must use a different, empty slot on the same shift.
+    const targetSlotKey = slotKeys.find((slotKey) => slotKey !== result.slotKey && !shift[slotKey]?.employeeId);
+    if (!targetSlotKey) {
+      return { blocked: `No empty employee slot is available to create Open ${employee.scope} coverage.` };
+    }
+
+    const coverageSlot = shift[targetSlotKey];
+    coverageSlot.employeeId = openSlotId;
+    coverageSlot.startTime = sourceSlot.startTime;
+    coverageSlot.endTime = sourceSlot.endTime;
+    coverageSlot.heldOver = false;
+    coverageSlot.holdoverReason = '';
+    coverageSlot.note = '';
+    coverageSlot.shiftType = 'REGULAR';
+
+    const slotNumber = Number(targetSlotKey.replace('employee', ''));
+    shift.visibleEmployeeSlots = Math.max(shift.visibleEmployeeSlots, slotNumber);
+    shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
+
+    return { label: `Create Open ${employee.scope} — ${result.shiftLabel}` };
+  }
+
   function buildMassChangePreview() {
     if (selectedGlobalResults.length === 0) return;
     const proposed = cloneScheduleData(normalizeLoadedData(scheduleData));
@@ -4684,8 +4725,23 @@ export default function SchedulePage() {
       } else if (massChangeAction === 'SHIFT_TYPE') {
         if (result.isOpen) blocked = 'Open shifts do not have an employee shift type.';
         else {
-          slot.shiftType = massShiftType;
-          after = `${result.employeeName} — ${massShiftType === 'REGULAR' ? 'Regular' : massShiftType.charAt(0) + massShiftType.slice(1).toLowerCase()}`;
+          const employee = getEmployeeById(result.employeeId, employees);
+          if (!employee) {
+            blocked = 'Employee could not be found.';
+          } else {
+            const previousShiftType = slot.shiftType;
+            slot.shiftType = massShiftType;
+            const previousLabel = previousShiftType === 'REGULAR' ? 'Regular' : previousShiftType.charAt(0) + previousShiftType.slice(1).toLowerCase();
+            const nextLabel = massShiftType === 'REGULAR' ? 'Regular' : massShiftType.charAt(0) + massShiftType.slice(1).toLowerCase();
+            after = `${previousLabel} → ${nextLabel}`;
+
+            if ((massShiftType === 'SICK' || massShiftType === 'VACATION' || massShiftType === 'LEAVE') &&
+                previousShiftType !== 'SICK' && previousShiftType !== 'VACATION' && previousShiftType !== 'LEAVE') {
+              const coverage = addMassChangeCoverageOpenSlot(proposed, result, employee, slot);
+              if (coverage.blocked) blocked = coverage.blocked;
+              else if (coverage.label) after = `${after}; ${coverage.label}`;
+            }
+          }
         }
       } else if (massChangeAction === 'OPEN') {
         slot.employeeId = massOpenScope === 'ALS' ? OPEN_ALS_SLOT_ID : OPEN_BLS_SLOT_ID;
