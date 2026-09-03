@@ -31,16 +31,35 @@ export function getGlobalPayPeriodStart(date: Date): Date {
   return addDays(sunday, -offsetWithinCycle);
 }
 
+function getFirstPayPeriodStartForYear(year: number): Date {
+  const janFirst = new Date(year, 0, 1);
+  const containingPeriodStart = getGlobalPayPeriodStart(janFirst);
+
+  return containingPeriodStart.getFullYear() === year
+    ? containingPeriodStart
+    : addDays(containingPeriodStart, 14);
+}
+
 export function getPayPeriodInfo(date: Date): PayPeriodOption {
   const periodStart = getGlobalPayPeriodStart(date);
   const periodEnd = addDays(periodStart, 13);
-  const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
-  const diffDays = Math.round((periodStart.getTime() - referenceStart.getTime()) / DAY_MS);
+  const periodYear = periodStart.getFullYear();
+
+  let number: number;
+  if (periodYear === 2026) {
+    const referenceStart = new Date(`${PAY_PERIOD_REFERENCE_START}T00:00:00`);
+    const diffDays = Math.round((periodStart.getTime() - referenceStart.getTime()) / DAY_MS);
+    number = Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER;
+  } else {
+    const firstStart = getFirstPayPeriodStartForYear(periodYear);
+    const diffDays = Math.round((periodStart.getTime() - firstStart.getTime()) / DAY_MS);
+    number = Math.floor(diffDays / 14) + 1;
+  }
 
   return {
-    key: `${periodStart.getFullYear()}-pp-${Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER - 1}`,
-    year: periodStart.getFullYear(),
-    number: Math.floor(diffDays / 14) + PAY_PERIOD_REFERENCE_NUMBER,
+    key: `${periodYear}-pp-${number}`,
+    year: periodYear,
+    number,
     start: periodStart,
     end: periodEnd,
   };
@@ -54,10 +73,8 @@ export function buildPayPeriodOptions(baseDate: Date, count = 28): PayPeriodOpti
 }
 
 export function getPayPeriodsForYear(year: number): PayPeriodOption[] {
-  const janFirst = new Date(year, 0, 1);
-  const nextJanFirst = new Date(year + 1, 0, 1);
-  const firstStart = getGlobalPayPeriodStart(janFirst);
-  const firstStartNextYear = getGlobalPayPeriodStart(nextJanFirst);
+  const firstStart = getFirstPayPeriodStartForYear(year);
+  const firstStartNextYear = getFirstPayPeriodStartForYear(year + 1);
 
   const periods: PayPeriodOption[] = [];
   for (let currentStart = new Date(firstStart); currentStart < firstStartNextYear; currentStart = addDays(currentStart, 14)) {

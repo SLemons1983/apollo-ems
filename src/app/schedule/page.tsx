@@ -3248,7 +3248,7 @@ export default function SchedulePage() {
 
     setExpandedShiftKey(null);
   };
-  const visibleYear = visiblePayPeriod.end.getFullYear();
+  const visibleYear = visiblePayPeriod.start.getFullYear();
   const payPeriodOptions = useMemo(() => {
     const years = [visibleYear - 1, visibleYear, visibleYear + 1];
     return years.flatMap((year) =>
@@ -5472,32 +5472,6 @@ export default function SchedulePage() {
           )}
         </section>
 
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowScheduleKey((current) => !current)}
-            className="rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-          >
-            {showScheduleKey ? 'Hide Key' : 'Show Key'}
-          </button>
-
-        </div>
-
-        {showScheduleKey && (
-          <div className="mb-3 rounded-2xl border border-slate-300 bg-white p-4 shadow-sm">
-            <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-blue-800 bg-blue-200 px-3 py-2 font-semibold text-blue-950">Open ALS shift</div>
-              <div className="rounded-xl border border-red-800 bg-red-200 px-3 py-2 font-semibold text-red-950">Open BLS shift</div>
-              <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Sick / Leave / Vacation employee</div>
-              <div className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">⭐ Employee requested this open shift</div>
-              <div className="rounded-xl border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-800">⚠ Scheduling warning</div>
-              <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 font-semibold text-sky-800">📝 Employee-visible note</div>
-              <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 font-semibold text-violet-800">🔒 Supervisor-only note</div>
-              <div className="rounded-xl border border-emerald-300 bg-emerald-100 px-3 py-2 font-semibold text-emerald-900">Green column = today</div>
-            </div>
-          </div>
-        )}
-
         {showOpenShiftsNeedingCoverage && (
           <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-4">
             <div className="text-sm font-bold text-red-900">Open Shifts Needing Coverage</div>
@@ -6718,6 +6692,38 @@ export default function SchedulePage() {
               })()}
             </div>
           </div>
+        <section className="mt-6 overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowScheduleKey((current) => !current)}
+            aria-expanded={showScheduleKey}
+            className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-slate-50"
+          >
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Schedule Key</h2>
+              <p className="mt-1 text-xs text-slate-500">Colors and symbols used throughout the schedule.</p>
+            </div>
+            <span className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white">
+              {showScheduleKey ? '▲ Hide' : '▼ Show'}
+            </span>
+          </button>
+
+          {showScheduleKey && (
+            <div className="border-t border-slate-200 p-4">
+              <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl border border-blue-800 bg-blue-200 px-3 py-2 font-semibold text-blue-950">Open ALS — paramedic coverage needed</div>
+                <div className="rounded-xl border border-red-800 bg-red-200 px-3 py-2 font-semibold text-red-950">Open BLS — EMT coverage needed</div>
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Sick / Leave / Vacation</div>
+                <div className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">⭐ Employee requested open shift</div>
+                <div className="rounded-xl border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-800">⚠ Scheduling warning</div>
+                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 font-semibold text-sky-800">📝 Employee-visible note</div>
+                <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 font-semibold text-violet-800">🔒 Supervisor-only note</div>
+                <div className="rounded-xl border border-emerald-300 bg-emerald-100 px-3 py-2 font-semibold text-emerald-900">Green column — today</div>
+              </div>
+            </div>
+          )}
+        </section>
+
         </div>
       )}
 
