@@ -4674,6 +4674,56 @@ export default function SchedulePage() {
     return { label: `Create Open ${employee.scope} — ${result.shiftLabel}` };
   }
 
+  function removeMassChangeCoverageOpenSlot(
+    proposed: ScheduleData,
+    result: GlobalScheduleSearchResult,
+    employee: EmployeeOption,
+    sourceSlot: EmployeeSlot,
+  ): { label?: string; blocked?: string } {
+    const assignment = getMassChangeAssignment(proposed, result);
+    if (!assignment) return { blocked: 'Assignment could not be found for automatic coverage reversal.' };
+
+    // Only operational unit absences create automatic ALS/BLS coverage, so only
+    // those assignments participate in the automatic reversal.
+    if (assignment.category !== 'UNIT') return {};
+
+    const shift = assignment.shift as ShiftAssignment | ExtraShiftAssignment;
+    const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+    const openSlotId = employee.scope === 'BLS' ? OPEN_BLS_SLOT_ID : OPEN_ALS_SLOT_ID;
+
+    // Automatic coverage copies the absent employee's times. Matching both the
+    // scope and times keeps the reversal from deleting an unrelated vacancy.
+    const matchingOpenSlotKeys = slotKeys.filter((slotKey) => {
+      if (slotKey === result.slotKey) return false;
+      const candidate = shift[slotKey];
+      return candidate?.employeeId === openSlotId &&
+        candidate.startTime === sourceSlot.startTime &&
+        candidate.endTime === sourceSlot.endTime;
+    });
+
+    if (matchingOpenSlotKeys.length === 0) {
+      return {
+        blocked: `No matching Open ${employee.scope} coverage remains on this shift. It may already have been filled; resolve that coverage manually before returning the employee to Regular.`,
+      };
+    }
+
+    // Open positions are interchangeable coverage placeholders. If more than one
+    // identical vacancy exists, returning one employee should remove exactly one.
+    const targetSlotKey = matchingOpenSlotKeys[0];
+    const coverageSlot = shift[targetSlotKey];
+    coverageSlot.employeeId = '';
+    coverageSlot.startTime = DEFAULT_START_TIME;
+    coverageSlot.endTime = result.assignmentKey.startsWith('standard-')
+      ? getDefaultEndTimeForShift(result.assignmentKey.replace('standard-', '') as ShiftName, targetSlotKey)
+      : DEFAULT_END_TIME;
+    coverageSlot.heldOver = false;
+    coverageSlot.holdoverReason = '';
+    coverageSlot.note = '';
+    coverageSlot.shiftType = 'REGULAR';
+
+    return { label: `Remove Open ${employee.scope} — ${result.shiftLabel}` };
+  }
+
   function buildMassChangePreview() {
     if (selectedGlobalResults.length === 0) return;
     const proposed = cloneScheduleData(normalizeLoadedData(scheduleData));
@@ -4738,6 +4788,11 @@ export default function SchedulePage() {
             if ((massShiftType === 'SICK' || massShiftType === 'VACATION' || massShiftType === 'LEAVE') &&
                 previousShiftType !== 'SICK' && previousShiftType !== 'VACATION' && previousShiftType !== 'LEAVE') {
               const coverage = addMassChangeCoverageOpenSlot(proposed, result, employee, slot);
+              if (coverage.blocked) blocked = coverage.blocked;
+              else if (coverage.label) after = `${after}; ${coverage.label}`;
+            } else if (massShiftType === 'REGULAR' &&
+                (previousShiftType === 'SICK' || previousShiftType === 'VACATION' || previousShiftType === 'LEAVE')) {
+              const coverage = removeMassChangeCoverageOpenSlot(proposed, result, employee, slot);
               if (coverage.blocked) blocked = coverage.blocked;
               else if (coverage.label) after = `${after}; ${coverage.label}`;
             }
