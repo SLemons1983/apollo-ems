@@ -1547,9 +1547,9 @@ export default function SchedulePage() {
   const [scheduleChangeLogLoading, setScheduleChangeLogLoading] = useState(false);
   const [scheduleChangeLogError, setScheduleChangeLogError] = useState('');
   const [scheduleChangeLogFilter, setScheduleChangeLogFilter] = useState<ScheduleChangeLogFilter>('PAY_PERIOD');
+  const [scheduleChangeLogSearch, setScheduleChangeLogSearch] = useState('');
   const [expandedScheduleChangeBatches, setExpandedScheduleChangeBatches] = useState<Record<string, boolean>>({});
   const [currentSupervisorUserId, setCurrentSupervisorUserId] = useState('');
-  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchFromDate, setGlobalSearchFromDate] = useState(() =>
@@ -3318,19 +3318,35 @@ export default function SchedulePage() {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     const sevenDaysAgoKey = toDateKey(sevenDaysAgo);
 
+    const query = scheduleChangeLogSearch.trim().toLowerCase();
+
     return scheduleChangeLog.filter((entry) => {
+      let matchesFilter = true;
       if (scheduleChangeLogFilter === 'TODAY') {
-        return entry.dateKey === todayKey;
+        matchesFilter = entry.dateKey === todayKey;
+      } else if (scheduleChangeLogFilter === 'LAST_7_DAYS') {
+        matchesFilter = entry.dateKey >= sevenDaysAgoKey && entry.dateKey <= todayKey;
+      } else if (scheduleChangeLogFilter === 'MINE_ONLY') {
+        matchesFilter = Boolean(currentSupervisorUserId) && entry.supervisorUserId === currentSupervisorUserId;
       }
-      if (scheduleChangeLogFilter === 'LAST_7_DAYS') {
-        return entry.dateKey >= sevenDaysAgoKey && entry.dateKey <= todayKey;
-      }
-      if (scheduleChangeLogFilter === 'MINE_ONLY') {
-        return Boolean(currentSupervisorUserId) && entry.supervisorUserId === currentSupervisorUserId;
-      }
-      return true;
+
+      if (!matchesFilter || !query) return matchesFilter;
+
+      const searchableText = [
+        entry.supervisorName,
+        entry.supervisorEmail ?? '',
+        entry.dateKey,
+        formatTileDate(entry.dateKey),
+        entry.shiftLabel,
+        entry.shiftKey,
+        entry.fieldChanged,
+        entry.previousValue,
+        entry.newValue,
+      ].join(' ').toLowerCase();
+
+      return searchableText.includes(query);
     });
-  }, [scheduleChangeLog, scheduleChangeLogFilter, currentSupervisorUserId]);
+  }, [scheduleChangeLog, scheduleChangeLogFilter, scheduleChangeLogSearch, currentSupervisorUserId]);
 
   const groupedScheduleChangeLog = useMemo(() => {
     const groups = new Map<string, {
@@ -4390,85 +4406,6 @@ export default function SchedulePage() {
     return [...standardNotes, ...extraNotes];
   });
 
-  const employeeSearchResults = useMemo(() => {
-    const query = employeeSearchQuery.trim().toLowerCase();
-    if (!query) return [];
-
-    const results: Array<{
-      id: string;
-      employeeName: string;
-      dateKey: string;
-      shiftLabel: string;
-      categoryLabel: string;
-      shiftTypeLabel: string;
-      startTime: string;
-      endTime: string;
-      hours: number;
-      vehicle: string;
-      expandedKey: string;
-    }> = [];
-    for (const date of dates) {
-      const dateKey = toDateKey(date);
-      const day = getDaySchedule(scheduleData, dateKey);
-
-      for (const shiftName of SHIFT_ORDER) {
-        const shift = day.standard[shiftName];
-        (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
-          const slot = shift[slotKey];
-          const employee = getEmployeeById(slot.employeeId, employees);
-          if (employee?.name.toLowerCase().includes(query)) {
-            results.push({
-              id: `${dateKey}-${shiftName}-${slotKey}-${employee.id}`,
-              employeeName: employee.name,
-              dateKey,
-              shiftLabel: SHIFT_DISPLAY_NAMES[shiftName],
-              categoryLabel: UNIT_SHIFTS.has(shiftName) ? 'Unit' : 'Supervisor',
-              shiftTypeLabel: slot.shiftType === 'REGULAR'
-                ? 'Regular'
-                : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-              hours: calculateSlotHours(
-                slot.startTime,
-                slot.endTime,
-                isStandardTwentyFourHourShiftKey(shiftName),
-                slot.heldOver,
-              ),
-              vehicle: shift.vehicle || 'No vehicle assigned',
-              expandedKey: `${shiftName}-${dateKey}`,
-            });
-          }
-        });
-      }
-
-      day.extras.forEach((extra) => {
-        (['employee1', 'employee2', 'employee3', 'employee4', 'employee5'] as ScheduleSlotKey[]).forEach((slotKey) => {
-          const slot = extra[slotKey];
-          const employee = getEmployeeById(slot.employeeId, employees);
-          if (employee?.name.toLowerCase().includes(query)) {
-            results.push({
-              id: `${dateKey}-${extra.id}-${slotKey}-${employee.id}`,
-              employeeName: employee.name,
-              dateKey,
-              shiftLabel: extra.label,
-              categoryLabel: extra.category === 'SUPERVISOR' ? 'Supervisor' : 'Unit',
-              shiftTypeLabel: slot.shiftType === 'REGULAR'
-                ? 'Regular'
-                : slot.shiftType.charAt(0) + slot.shiftType.slice(1).toLowerCase(),
-              startTime: slot.startTime,
-              endTime: slot.endTime,
-              hours: calculateSlotHours(slot.startTime, slot.endTime, false, slot.heldOver),
-              vehicle: extra.vehicle || 'No vehicle assigned',
-              expandedKey: `extra-${extra.id}-${dateKey}`,
-            });
-          }
-        });
-      });
-    }
-
-    return results;
-  }, [employeeSearchQuery, scheduleData, employees, dates]);
-
   const globalSearchResults = useMemo(() => {
     const query = globalSearchQuery.trim().toLowerCase();
     if (!query || !globalSearchFromDate || !globalSearchToDate || globalSearchFromDate > globalSearchToDate) {
@@ -5381,7 +5318,7 @@ export default function SchedulePage() {
 
               <p className="mt-1 text-sm text-slate-600">
                 {showScheduleChanges
-                  ? 'The 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.'
+                  ? 'Search and review the 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.'
                   : groupedScheduleChangeLog.length > 0
                     ? `${filteredScheduleChangeLog.length} change${filteredScheduleChangeLog.length === 1 ? '' : 's'} recorded in this view.`
                     : 'No schedule changes recorded in this view.'}
@@ -5395,16 +5332,35 @@ export default function SchedulePage() {
 
           {showScheduleChanges && (
             <div className="border-t border-slate-300 p-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+              <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_240px_auto] lg:items-end">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Search Changes
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="search"
+                      value={scheduleChangeLogSearch}
+                      onChange={(event) => setScheduleChangeLogSearch(event.target.value)}
+                      placeholder="Employee, shift, field, supervisor, old or new value..."
+                      className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-700"
+                    />
+                    {scheduleChangeLogSearch && (
+                      <button type="button" onClick={() => setScheduleChangeLogSearch('')} className="rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Show
                   </label>
-
                   <select
                     value={scheduleChangeLogFilter}
                     onChange={(event) => setScheduleChangeLogFilter(event.target.value as ScheduleChangeLogFilter)}
-                    className="min-w-[220px] rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
+                    className="w-full rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
                   >
                     <option value="PAY_PERIOD">Entire Selected Pay Period</option>
                     <option value="TODAY">Today</option>
@@ -5436,7 +5392,7 @@ export default function SchedulePage() {
               </div>
             ) : groupedScheduleChangeLog.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                No schedule changes match this view.
+                {scheduleChangeLogSearch.trim() ? 'No schedule changes match your search.' : 'No schedule changes match this view.'}
               </div>
             ) : (
               groupedScheduleChangeLog.map((group) => {
@@ -5525,57 +5481,6 @@ export default function SchedulePage() {
             {showScheduleKey ? 'Hide Key' : 'Show Key'}
           </button>
 
-        </div>
-
-        <div className="mb-3 rounded-2xl border border-slate-400 bg-white p-4 shadow-sm">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Search Employees on Schedule
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="search"
-              value={employeeSearchQuery}
-              onChange={(event) => setEmployeeSearchQuery(event.target.value)}
-              placeholder="Type an employee name"
-              className="w-full rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-700"
-            />
-            {employeeSearchQuery && (
-              <button type="button" onClick={() => setEmployeeSearchQuery('')} className="rounded-xl border border-slate-400 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                Clear
-              </button>
-            )}
-          </div>
-
-          {employeeSearchQuery.trim() && (
-            <div className="mt-3">
-              <div className="mb-2 text-xs font-semibold text-slate-600">
-                {employeeSearchResults.length} matching assignment{employeeSearchResults.length === 1 ? '' : 's'}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {employeeSearchResults.map((result) => (
-                  <button
-                    key={result.id}
-                    type="button"
-                    onClick={() => openScheduleSearchResult(result)}
-                    className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-left text-xs transition hover:bg-slate-100"
-                  >
-                    <span className="block font-bold text-slate-900">{result.employeeName}</span>
-                    <span className="mt-1 block text-slate-700">
-                      {formatTileDate(result.dateKey)} • {result.shiftLabel} • {result.categoryLabel}
-                    </span>
-                    <span className="mt-1 block text-slate-600">
-                      {result.shiftTypeLabel} • {result.startTime}-{result.endTime} • {formatHours(result.hours)} hours • {result.vehicle}
-                    </span>
-                  </button>
-                ))}
-                {employeeSearchResults.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                    No scheduled assignments match that employee name.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
         {showScheduleKey && (
