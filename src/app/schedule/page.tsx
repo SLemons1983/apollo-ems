@@ -4570,11 +4570,6 @@ export default function SchedulePage() {
 
   function printGlobalSearchResults() {
     if (globalSearchResults.length === 0) return;
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer');
-    if (!printWindow) {
-      window.alert('Apollo could not open the print window. Please allow pop-ups for ApolloEMS and try again.');
-      return;
-    }
 
     const escapeHtml = (value: string) => value
       .replaceAll('&', '&amp;')
@@ -4593,14 +4588,39 @@ export default function SchedulePage() {
         <td>${escapeHtml(result.vehicle)}</td>
       </tr>`).join('');
 
-    printWindow.document.write(`<!doctype html><html><head><title>ApolloEMS Schedule Search</title><style>
-      body{font-family:Arial,sans-serif;color:#0f172a;margin:28px}h1{margin:0 0 6px;font-size:22px}.meta{font-size:12px;color:#475569;margin-bottom:18px}.summary{margin:12px 0;font-weight:700}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left;vertical-align:top}th{background:#e2e8f0}.num{text-align:right}@media print{body{margin:12mm}button{display:none}}
+    const printFrame = document.createElement('iframe');
+    printFrame.setAttribute('title', 'ApolloEMS Schedule Search Print');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
+    document.body.appendChild(printFrame);
+
+    const printDocument = printFrame.contentDocument;
+    const printWindow = printFrame.contentWindow;
+    if (!printDocument || !printWindow) {
+      printFrame.remove();
+      window.alert('Apollo could not prepare the print report. Please try again.');
+      return;
+    }
+
+    printDocument.open();
+    printDocument.write(`<!doctype html><html><head><title>ApolloEMS Schedule Search</title><style>
+      body{font-family:Arial,sans-serif;color:#0f172a;margin:28px}h1{margin:0 0 6px;font-size:22px}.meta{font-size:12px;color:#475569;margin-bottom:18px}.summary{margin:12px 0;font-weight:700}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left;vertical-align:top}th{background:#e2e8f0}.num{text-align:right}@media print{body{margin:12mm}}
     </style></head><body><h1>ApolloEMS — Schedule Global Search</h1>
     <div class="meta"><strong>Search:</strong> ${escapeHtml(globalSearchQuery.trim())}<br><strong>Date Range:</strong> ${escapeHtml(formatTileDate(globalSearchFromDate))} – ${escapeHtml(formatTileDate(globalSearchToDate))}<br><strong>Generated:</strong> ${escapeHtml(new Date().toLocaleString())}</div>
     <div class="summary">${globalSearchResults.length} result${globalSearchResults.length === 1 ? '' : 's'} • ${escapeHtml(formatHours(globalSearchTotalHours))} total scheduled hours</div>
-    <table><thead><tr><th>Date</th><th>Employee / Status</th><th>Shift</th><th>Type</th><th>Time</th><th>Hours</th><th>Unit</th></tr></thead><tbody>${rows}</tbody></table>
-    <script>window.onload=()=>{window.print();};<\/script></body></html>`);
-    printWindow.document.close();
+    <table><thead><tr><th>Date</th><th>Employee / Status</th><th>Shift</th><th>Type</th><th>Time</th><th>Hours</th><th>Unit</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    printDocument.close();
+
+    window.setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      window.setTimeout(() => printFrame.remove(), 1000);
+    }, 100);
   }
 
   const supervisorNotesSignature = supervisorNotes
