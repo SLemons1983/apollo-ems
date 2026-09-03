@@ -854,6 +854,7 @@ export default function SupervisorPage() {
     payPeriodKey: string;
     approvedCount: number;
   } | null>(null);
+  const [payrollActionPending, setPayrollActionPending] = useState(false);
   const [builderStartDate, setBuilderStartDate] = useState('');
   const [builderEndDate, setBuilderEndDate] = useState('');
   const [builderSchedule, setBuilderSchedule] = useState<BuilderSchedule>({});
@@ -1790,6 +1791,13 @@ export default function SupervisorPage() {
   }
 
   async function approveTimecard(timecardId: string) {
+    if (payrollLocked) {
+      window.alert(
+        'This payroll period has been finalized and is locked. Reopen payroll before changing a timecard.',
+      );
+      return;
+    }
+
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
 
     if (timecard?.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID) {
@@ -2716,6 +2724,13 @@ export default function SupervisorPage() {
   }
 
   async function returnTimecard(timecardId: string) {
+    if (payrollLocked) {
+      window.alert(
+        'This payroll period has been finalized and is locked. Reopen payroll before returning a timecard.',
+      );
+      return;
+    }
+
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
     const comment = (returnComments[timecardId] ?? '').trim();
 
@@ -3057,6 +3072,13 @@ export default function SupervisorPage() {
   }
 
   async function saveSupervisorTimecardEdit(timecard: SubmittedTimecard) {
+    if (payrollLocked) {
+      window.alert(
+        'This payroll period has been finalized and is locked. Reopen payroll before editing a timecard.',
+      );
+      return;
+    }
+
     const reason = supervisorEditReason.trim();
 
     if (!reason) {
@@ -3807,8 +3829,8 @@ export default function SupervisorPage() {
     printWindow.print();
   }
 
-  function reopenPayroll() {
-    if (!payrollLocked) {
+  async function reopenPayroll() {
+    if (!payrollLocked || payrollActionPending) {
       return;
     }
 
@@ -3820,23 +3842,40 @@ export default function SupervisorPage() {
       return;
     }
 
-    supabase
-      .from('payroll_submissions')
-      .delete()
-      .eq('pay_period_key', selectedPayPeriod.key)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to reopen payroll:', error);
-          window.alert(`Payroll reopen failed: ${error.message}`);
-        } else {
-          setPayrollSubmission(null);
-          void addAuditEntry('PAYROLL_REOPENED', `Payroll reopened for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}.`);
-          window.alert('Payroll reopened.');
-        }
-      });
+    setPayrollActionPending(true);
+
+    try {
+      const { error } = await supabase
+        .from('payroll_submissions')
+        .delete()
+        .eq('pay_period_key', selectedPayPeriod.key);
+
+      if (error) {
+        throw error;
+      }
+
+      setPayrollSubmission(null);
+
+      await addAuditEntry(
+        'PAYROLL_REOPENED',
+        `Payroll reopened for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}.`,
+      );
+
+      window.alert('Payroll reopened. Timecard changes are now allowed.');
+    } catch (error) {
+      console.error('Failed to reopen payroll:', error);
+      const message =
+        error instanceof Error ? error.message : 'Unknown database error';
+      window.alert(`Payroll reopen failed: ${message}`);
+    } finally {
+      setPayrollActionPending(false);
+    }
   }
 
-  function submitPayroll() {
+  async function submitPayroll() {
+    if (payrollLocked || payrollActionPending) {
+      return;
+    }
     const approvedCount = approvedTimecards.length;
 
     if (employeesNotSubmitted.length > 0) {
@@ -3874,50 +3913,65 @@ export default function SupervisorPage() {
       approvedCount,
     };
 
-    setPayrollSubmission(submission);
-    void addAuditEntry('PAYROLL_SUBMITTED', `Payroll submitted for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)} (${approvedCount} approved timecards).`);
+    setPayrollActionPending(true);
 
-    supabase
-      .from('payroll_submissions')
-      .upsert(
-        {
-          pay_period_key: submission.payPeriodKey,
-          submitted_by: submission.submittedBy,
-          submitted_at: submission.submittedAt,
-          approved_timecards: submission.approvedCount,
-          updated_at: new Date().toISOString(),
+    try {
+      const { error } = await supabase
+        .from('payroll_submissions')
+        .upsert(
+          {
+            pay_period_key: submission.payPeriodKey,
+            submitted_by: submission.submittedBy,
+            submitted_at: submission.submittedAt,
+            approved_timecards: submission.approvedCount,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'pay_period_key' },
+        );
+
+      if (error) {
+        throw error;
+      }
+
+      setPayrollSubmission(submission);
+
+      await addAuditEntry(
+        'PAYROLL_SUBMITTED',
+        `Payroll submitted for ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)} (${approvedCount} approved timecards).`,
+      );
+
+      void fetch('/api/email/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        { onConflict: 'pay_period_key' },
-      )
-      .then(({ error }) => {
-        if (error) {
-          console.error('Failed to save payroll submission:', error);
-          window.alert(`Payroll submission save failed: ${error.message}`);
-        } else {
-          void fetch('/api/email/message', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              to: 'steve@sscems.org',
-              senderName: submission.submittedBy,
-              subject: `ApolloEMS Payroll Submitted - ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}`,
-              message:
-                `Payroll has been submitted in ApolloEMS.\n\n` +
-                `Pay Period: ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}\n` +
-                `Submitted By: ${submission.submittedBy}\n` +
-                `Submitted At: ${new Date(submission.submittedAt).toLocaleString()}\n` +
-                `Approved Timecards: ${submission.approvedCount}\n\n` +
-                `Please log into ApolloEMS to review the payroll packet.`,
-            }),
-          }).catch((emailError) => {
-            console.error('Payroll submission email failed:', emailError);
-          });
-
-          window.alert('Payroll submission recorded. Kira has been notified by email.');
-        }
+        body: JSON.stringify({
+          to: 'steve@sscems.org',
+          senderName: submission.submittedBy,
+          subject: `ApolloEMS Payroll Submitted - ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}`,
+          message:
+            `Payroll has been submitted in ApolloEMS.\n\n` +
+            `Pay Period: ${formatShortDate(selectedPayPeriod.start)} to ${formatShortDate(selectedPayPeriod.end)}\n` +
+            `Submitted By: ${submission.submittedBy}\n` +
+            `Submitted At: ${new Date(submission.submittedAt).toLocaleString()}\n` +
+            `Approved Timecards: ${submission.approvedCount}\n\n` +
+            `Please log into ApolloEMS to review the payroll packet.`,
+        }),
+      }).catch((emailError) => {
+        console.error('Payroll submission email failed:', emailError);
       });
+
+      window.alert(
+        'Payroll finalized and locked. Kira has been notified by email.',
+      );
+    } catch (error) {
+      console.error('Failed to save payroll submission:', error);
+      const message =
+        error instanceof Error ? error.message : 'Unknown database error';
+      window.alert(`Payroll submission failed: ${message}`);
+    } finally {
+      setPayrollActionPending(false);
+    }
   }
 
   function printTimecardPacket(
@@ -7582,7 +7636,7 @@ export default function SupervisorPage() {
               {payrollSubmission?.payPeriodKey === selectedPayPeriod.key && (
                 <div className="rounded-xl border border-blue-300 bg-blue-50 p-4">
                   <div className="text-lg font-bold text-blue-800">
-                    🔒 PAYROLL LOCKED
+                    🔒 PAYROLL FINALIZED / LOCKED
                   </div>
 
                   <div className="mt-2 text-sm text-blue-700">
@@ -7597,12 +7651,17 @@ export default function SupervisorPage() {
                     Approved Timecards: {payrollSubmission.approvedCount}
                   </div>
 
+                  <div className="mt-2 text-sm text-blue-700">
+                    This pay period is read-only. Reopen payroll only if an authorized correction is required.
+                  </div>
+
                   <button
                     type="button"
-                    onClick={reopenPayroll}
-                    className="mt-3 rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100"
+                    disabled={payrollActionPending}
+                    onClick={() => void reopenPayroll()}
+                    className="mt-3 rounded-xl border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Reopen Payroll
+                    {payrollActionPending ? 'Reopening...' : 'Reopen Payroll'}
                   </button>
                 </div>
               )}
@@ -7635,11 +7694,15 @@ export default function SupervisorPage() {
 
                 <button
                   type="button"
-                  disabled={payrollLocked}
-                  onClick={submitPayroll}
+                  disabled={payrollLocked || payrollActionPending}
+                  onClick={() => void submitPayroll()}
                   className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {payrollLocked ? 'Payroll Locked' : 'Submit Payroll'}
+                  {payrollLocked
+                    ? 'Payroll Finalized / Locked'
+                    : payrollActionPending
+                      ? 'Finalizing Payroll...'
+                      : 'Finalize & Lock Payroll'}
                 </button>
               </div>
 
