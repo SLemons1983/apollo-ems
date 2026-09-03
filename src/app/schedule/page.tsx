@@ -3012,6 +3012,94 @@ export default function SchedulePage() {
   const isDateInSelectedPayPeriod = (dateKey: string) =>
     dateKey >= visiblePayPeriodStartKey && dateKey <= visiblePayPeriodEndKey;
 
+  const employeePayPeriodHoursMap = useMemo(() => {
+    const result: Record<string, number> = {};
+
+    for (const employee of employees) {
+      result[employee.id] = getEmployeePayPeriodHours(
+        scheduleData,
+        visiblePayPeriodStartKey,
+        employee.id,
+        '',
+      );
+    }
+
+    return result;
+  }, [employees, scheduleData, visiblePayPeriodStartKey]);
+
+  const assignmentEligibilityMaps = useMemo(() => {
+    const result: Record<string, Record<string, EligibilityResult>> = {};
+
+    for (const date of dates) {
+      const dateKey = toDateKey(date);
+      const day = getDaySchedule(scheduleData, dateKey);
+
+      for (const shiftName of SHIFT_ORDER) {
+        const shift = day.standard[shiftName];
+        const category: ShiftCategory = UNIT_SHIFTS.has(shiftName)
+          ? 'UNIT'
+          : 'SUPERVISOR';
+
+        const assignmentRef: AssignmentRef = {
+          key: `standard-${shiftName}`,
+          label: SHIFT_DISPLAY_NAMES[shiftName],
+          category,
+          shift,
+        };
+
+        const cacheKey = `${dateKey}|${assignmentRef.key}`;
+
+        result[cacheKey] = Object.fromEntries(
+          employees.map((employee) => [
+            employee.id,
+            getEligibilityForEmployee(
+              scheduleData,
+              dateKey,
+              employee.id,
+              assignmentRef,
+              employees,
+              assignmentRef.key,
+            ),
+          ]),
+        ) as Record<string, EligibilityResult>;
+      }
+
+      for (const extra of day.extras) {
+        const assignmentRef: AssignmentRef = {
+          key: `extra-${extra.id}`,
+          label: extra.label,
+          category: extra.category,
+          shift: extra,
+        };
+
+        const cacheKey = `${dateKey}|${assignmentRef.key}`;
+
+        result[cacheKey] = Object.fromEntries(
+          employees.map((employee) => [
+            employee.id,
+            getEligibilityForEmployee(
+              scheduleData,
+              dateKey,
+              employee.id,
+              assignmentRef,
+              employees,
+              assignmentRef.key,
+            ),
+          ]),
+        ) as Record<string, EligibilityResult>;
+      }
+    }
+
+    return result;
+  }, [dates, employees, scheduleData]);
+
+  function getCachedEligibilityMap(
+    dateKey: string,
+    assignmentKey: string,
+  ): Record<string, EligibilityResult> {
+    return assignmentEligibilityMaps[`${dateKey}|${assignmentKey}`] ?? {};
+  }
+
   const selectedPayPeriodPendingOpenShiftRequests = useMemo(
     () => pendingOpenShiftRequests.filter((request) => isDateInSelectedPayPeriod(request.dateKey)),
     [pendingOpenShiftRequests, visiblePayPeriodStartKey, visiblePayPeriodEndKey],
@@ -5077,12 +5165,10 @@ export default function SchedulePage() {
                     shift,
                   };
 
-                  const sharedEligibilityMap = Object.fromEntries(
-                    employees.map((employee) => [
-                      employee.id,
-                      getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                    ]),
-                  ) as Record<string, EligibilityResult>;
+                  const sharedEligibilityMap = getCachedEligibilityMap(
+                    dateKey,
+                    assignmentRef.key,
+                  );
                   const slotEligibilityMaps = {
                     employee1: sharedEligibilityMap,
                     employee2: sharedEligibilityMap,
@@ -5091,12 +5177,7 @@ export default function SchedulePage() {
                     employee5: sharedEligibilityMap,
                   };
 
-                  const payPeriodHoursMap = Object.fromEntries(
-                    employees.map((employee) => [
-                      employee.id,
-                      getEmployeePayPeriodHours(scheduleData, dateKey, employee.id, assignmentRef.key),
-                    ]),
-                  ) as Record<string, number>;
+                  const payPeriodHoursMap = employeePayPeriodHoursMap;
 
                   const staffingLevel = getStaffingLevel(category, shift, employees);
                   const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
@@ -5474,12 +5555,10 @@ export default function SchedulePage() {
                           shift: extra,
                         };
 
-                        const sharedEligibilityMap = Object.fromEntries(
-                          employees.map((employee) => [
-                            employee.id,
-                            getEligibilityForEmployee(scheduleData, dateKey, employee.id, assignmentRef, employees, assignmentRef.key),
-                          ]),
-                        ) as Record<string, EligibilityResult>;
+                        const sharedEligibilityMap = getCachedEligibilityMap(
+                          dateKey,
+                          assignmentRef.key,
+                        );
                         const slotEligibilityMaps = {
                           employee1: sharedEligibilityMap,
                           employee2: sharedEligibilityMap,
@@ -5488,12 +5567,7 @@ export default function SchedulePage() {
                           employee5: sharedEligibilityMap,
                         };
 
-                        const payPeriodHoursMap = Object.fromEntries(
-                          employees.map((employee) => [
-                            employee.id,
-                            getEmployeePayPeriodHours(scheduleData, dateKey, employee.id, assignmentRef.key),
-                          ]),
-                        ) as Record<string, number>;
+                        const payPeriodHoursMap = employeePayPeriodHoursMap;
 
                         const staffingLevel = getStaffingLevel(extra.category, extra, employees);
                         const employeeMessages = getEmployeeConflictMessages(day, assignmentRef, employees);
@@ -5832,14 +5906,18 @@ export default function SchedulePage() {
                     shift: extra,
                   };
                   const isSupervisorShift = extra.category === 'SUPERVISOR';
+                  const sharedEligibilityMap = getCachedEligibilityMap(
+                    selectedExtraShift.dateKey,
+                    assignmentRef.key,
+                  );
                   const slotEligibilityMaps = {
-                    employee1: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                    employee2: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                    employee3: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                    employee4: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                    employee5: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                    employee1: sharedEligibilityMap,
+                    employee2: sharedEligibilityMap,
+                    employee3: sharedEligibilityMap,
+                    employee4: sharedEligibilityMap,
+                    employee5: sharedEligibilityMap,
                   };
-                  const payPeriodHoursMap = Object.fromEntries(employees.map((employee) => [employee.id, getEmployeePayPeriodHours(scheduleData, selectedExtraShift.dateKey, employee.id, assignmentRef.key)])) as Record<string, number>;
+                  const payPeriodHoursMap = employeePayPeriodHoursMap;
                   const warningMessages = [
                     ...getEmployeeConflictMessages(day, assignmentRef, employees),
                     ...getVehicleConflictMessages(day, assignmentRef),
@@ -6001,14 +6079,18 @@ export default function SchedulePage() {
                         shift: selectedShift.shift,
                       };
                       const isSupervisorShift = selectedShift.category === 'SUPERVISOR';
+                      const sharedEligibilityMap = getCachedEligibilityMap(
+                        selectedShift.dateKey,
+                        assignmentRef.key,
+                      );
                       const slotEligibilityMaps = {
-                        employee1: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                        employee2: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                        employee3: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                        employee4: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
-                        employee5: Object.fromEntries(employees.map((employee) => [employee.id, getEligibilityForEmployee(scheduleData, selectedShift.dateKey, employee.id, assignmentRef, employees, assignmentRef.key)])) as Record<string, EligibilityResult>,
+                        employee1: sharedEligibilityMap,
+                        employee2: sharedEligibilityMap,
+                        employee3: sharedEligibilityMap,
+                        employee4: sharedEligibilityMap,
+                        employee5: sharedEligibilityMap,
                       };
-                      const payPeriodHoursMap = Object.fromEntries(employees.map((employee) => [employee.id, getEmployeePayPeriodHours(scheduleData, selectedShift.dateKey, employee.id, assignmentRef.key)])) as Record<string, number>;
+                      const payPeriodHoursMap = employeePayPeriodHoursMap;
                       const warningMessages = [
                         ...getEmployeeConflictMessages(day, assignmentRef, employees),
                         ...getVehicleConflictMessages(day, assignmentRef),
