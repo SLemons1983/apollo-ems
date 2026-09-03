@@ -243,6 +243,19 @@ type GlobalScheduleSearchResult = {
   isOpen: boolean;
 };
 
+type MassChangeAction = 'REPLACE' | 'SWAP' | 'SHIFT_TYPE' | 'OPEN' | 'REMOVE';
+type MassOpenScope = 'ALS' | 'BLS';
+type MassChangePreviewItem = {
+  id: string;
+  dateKey: string;
+  shiftLabel: string;
+  before: string;
+  after: string;
+  hours: number;
+  blocked?: string;
+  warning?: string;
+};
+
 const STORAGE_KEY = 'apollo-schedule-page-v6';
 const OPEN_SHIFT_REQUESTS_STORAGE_KEY = 'apollo-open-shift-requests-v1';
 const EMPLOYEE_STORAGE_KEY = 'apollo-employee-profiles-v2';
@@ -1546,6 +1559,14 @@ export default function SchedulePage() {
     toDateKey(getPayPeriodInfo(getGlobalPayPeriodStart(new Date())).end),
   );
   const [highlightedShiftKey, setHighlightedShiftKey] = useState<string | null>(null);
+  const [selectedGlobalResultIds, setSelectedGlobalResultIds] = useState<Set<string>>(new Set());
+  const [showMassChanges, setShowMassChanges] = useState(false);
+  const [massChangeAction, setMassChangeAction] = useState<MassChangeAction>('REPLACE');
+  const [massTargetEmployeeId, setMassTargetEmployeeId] = useState('');
+  const [massShiftType, setMassShiftType] = useState<ShiftType>('LEAVE');
+  const [massOpenScope, setMassOpenScope] = useState<MassOpenScope>('ALS');
+  const [massPreview, setMassPreview] = useState<MassChangePreviewItem[]>([]);
+  const [massPreviewSchedule, setMassPreviewSchedule] = useState<ScheduleData | null>(null);
   const [reviewedSupervisorNoteSignature, setReviewedSupervisorNoteSignature] = useState('');
   const dirtyDatesRef = useRef<Set<string>>(new Set());
   const isSavingScheduleRef = useRef(false);
@@ -4550,6 +4571,159 @@ export default function SchedulePage() {
     [globalSearchResults],
   );
 
+  const selectedGlobalResults = useMemo(
+    () => globalSearchResults.filter((result) => selectedGlobalResultIds.has(result.id)),
+    [globalSearchResults, selectedGlobalResultIds],
+  );
+  const selectedGlobalHours = useMemo(
+    () => selectedGlobalResults.reduce((total, result) => total + result.hours, 0),
+    [selectedGlobalResults],
+  );
+
+  function getMassChangeSlot(data: ScheduleData, result: GlobalScheduleSearchResult): EmployeeSlot | null {
+    const day = data[result.dateKey];
+    if (!day) return null;
+    if (result.assignmentKey.startsWith('standard-')) {
+      const shiftName = result.assignmentKey.replace('standard-', '') as ShiftName;
+      return day.standard[shiftName]?.[result.slotKey] ?? null;
+    }
+    if (result.assignmentKey.startsWith('extra-')) {
+      const extraId = result.assignmentKey.replace('extra-', '');
+      return day.extras.find((extra) => extra.id === extraId)?.[result.slotKey] ?? null;
+    }
+    return null;
+  }
+
+  function getMassChangeAssignment(data: ScheduleData, result: GlobalScheduleSearchResult): AssignmentRef | null {
+    const day = data[result.dateKey];
+    if (!day) return null;
+    if (result.assignmentKey.startsWith('standard-')) {
+      const shiftName = result.assignmentKey.replace('standard-', '') as ShiftName;
+      const shift = day.standard[shiftName];
+      if (!shift) return null;
+      return { key: result.assignmentKey, label: SHIFT_DISPLAY_NAMES[shiftName], category: UNIT_SHIFTS.has(shiftName) ? 'UNIT' : 'SUPERVISOR', shift };
+    }
+    if (result.assignmentKey.startsWith('extra-')) {
+      const extraId = result.assignmentKey.replace('extra-', '');
+      const extra = day.extras.find((item) => item.id === extraId);
+      if (!extra) return null;
+      return { key: result.assignmentKey, label: extra.label, category: extra.category, shift: extra };
+    }
+    return null;
+  }
+
+  function findEmployeeAssignmentOnDate(data: ScheduleData, dateKey: string, employeeId: string, excludedId: string) {
+    const day = data[dateKey];
+    if (!day) return null;
+    const slotKeys: ScheduleSlotKey[] = ['employee1', 'employee2', 'employee3', 'employee4', 'employee5'];
+    for (const shiftName of SHIFT_ORDER) {
+      const shift = day.standard[shiftName];
+      for (const slotKey of slotKeys) {
+        if (shift[slotKey]?.employeeId === employeeId) {
+          const id = `${dateKey}-standard-${shiftName}-${slotKey}-${employeeId}`;
+          if (id !== excludedId) return { slot: shift[slotKey], shiftLabel: SHIFT_DISPLAY_NAMES[shiftName] };
+        }
+      }
+    }
+    for (const extra of day.extras) {
+      for (const slotKey of slotKeys) {
+        if (extra[slotKey]?.employeeId === employeeId) return { slot: extra[slotKey], shiftLabel: extra.label };
+      }
+    }
+    return null;
+  }
+
+  function buildMassChangePreview() {
+    if (selectedGlobalResults.length === 0) return;
+    const proposed = cloneScheduleData(normalizeLoadedData(scheduleData));
+    const preview: MassChangePreviewItem[] = [];
+    const targetEmployee = employees.find((employee) => employee.id === massTargetEmployeeId);
+
+    for (const result of selectedGlobalResults) {
+      const slot = getMassChangeSlot(proposed, result);
+      if (!slot || slot.employeeId !== result.employeeId) {
+        preview.push({ id: result.id, dateKey: result.dateKey, shiftLabel: result.shiftLabel, before: result.employeeName, after: 'No change', hours: result.hours, blocked: 'This assignment changed after the search results were loaded.' });
+        continue;
+      }
+      let after = result.employeeName;
+      let blocked = '';
+      let warning = '';
+
+      if (massChangeAction === 'REPLACE') {
+        if (!massTargetEmployeeId || !targetEmployee) blocked = 'Choose a replacement employee.';
+        else if (result.isOpen) blocked = 'Replace Employee requires an employee assignment, not an open slot.';
+        else if (massTargetEmployeeId === result.employeeId) blocked = 'Replacement employee is already assigned here.';
+        else {
+          const assignment = getMassChangeAssignment(proposed, result);
+          if (!assignment) blocked = 'Assignment could not be found.';
+          else {
+            slot.employeeId = '';
+            const eligibility = getEligibilityForEmployee(proposed, result.dateKey, massTargetEmployeeId, assignment, employees, result.assignmentKey);
+            if (!eligibility.eligible) blocked = eligibility.reason;
+            else {
+              slot.employeeId = massTargetEmployeeId;
+              after = targetEmployee.name;
+              warning = eligibility.warning || '';
+            }
+          }
+        }
+      } else if (massChangeAction === 'SWAP') {
+        if (!massTargetEmployeeId || !targetEmployee) blocked = 'Choose the other employee.';
+        else if (result.isOpen) blocked = 'Open shifts cannot be swapped.';
+        else if (massTargetEmployeeId === result.employeeId) blocked = 'Choose a different employee.';
+        else {
+          const partner = findEmployeeAssignmentOnDate(proposed, result.dateKey, massTargetEmployeeId, result.id);
+          if (!partner) blocked = `${targetEmployee.name} has no assignment on this date to swap.`;
+          else {
+            const originalId = slot.employeeId;
+            slot.employeeId = massTargetEmployeeId;
+            partner.slot.employeeId = originalId;
+            after = `${targetEmployee.name} (swapped with ${partner.shiftLabel})`;
+          }
+        }
+      } else if (massChangeAction === 'SHIFT_TYPE') {
+        if (result.isOpen) blocked = 'Open shifts do not have an employee shift type.';
+        else {
+          slot.shiftType = massShiftType;
+          after = `${result.employeeName} — ${massShiftType === 'REGULAR' ? 'Regular' : massShiftType.charAt(0) + massShiftType.slice(1).toLowerCase()}`;
+        }
+      } else if (massChangeAction === 'OPEN') {
+        slot.employeeId = massOpenScope === 'ALS' ? OPEN_ALS_SLOT_ID : OPEN_BLS_SLOT_ID;
+        slot.shiftType = 'REGULAR';
+        after = massOpenScope === 'ALS' ? 'Open ALS' : 'Open BLS';
+      } else if (massChangeAction === 'REMOVE') {
+        slot.employeeId = '';
+        slot.startTime = DEFAULT_START_TIME;
+        slot.endTime = result.assignmentKey.startsWith('standard-')
+          ? getDefaultEndTimeForShift(result.assignmentKey.replace('standard-', '') as ShiftName, result.slotKey)
+          : DEFAULT_END_TIME;
+        slot.heldOver = false;
+        slot.holdoverReason = '';
+        slot.note = '';
+        slot.shiftType = 'REGULAR';
+        after = 'Unassigned';
+      }
+      preview.push({ id: result.id, dateKey: result.dateKey, shiftLabel: result.shiftLabel, before: result.employeeName, after, hours: result.hours, blocked: blocked || undefined, warning: warning || undefined });
+    }
+    setMassPreview(preview);
+    setMassPreviewSchedule(preview.some((item) => item.blocked) ? null : proposed);
+  }
+
+  async function applyMassChanges() {
+    if (!massPreviewSchedule || massPreview.length === 0 || massPreview.some((item) => item.blocked)) return;
+    const affectedDates = Array.from(new Set(selectedGlobalResults.map((result) => result.dateKey)));
+    if (!window.confirm(`Apply ${massPreview.length} mass schedule change${massPreview.length === 1 ? '' : 's'} across ${affectedDates.length} date${affectedDates.length === 1 ? '' : 's'}?`)) return;
+    for (const dateKey of affectedDates) dirtyDatesRef.current.add(dateKey);
+    setScheduleDataSafely(massPreviewSchedule);
+    setHasUnsavedChanges(true);
+    setSaveStatus('Mass changes prepared. Saving schedule...');
+    setMassPreview([]);
+    setMassPreviewSchedule(null);
+    setShowMassChanges(false);
+    setSelectedGlobalResultIds(new Set());
+    window.setTimeout(() => { void saveScheduleToSupabase(); }, 0);
+  }
+
   function openScheduleSearchResult(result: Pick<GlobalScheduleSearchResult, 'dateKey' | 'expandedKey'>) {
     setAnchorDate(getGlobalPayPeriodStart(parseDateKey(result.dateKey)));
     setExpandedShiftKey(result.expandedKey);
@@ -5015,8 +5189,14 @@ export default function SchedulePage() {
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4">
               <div className="text-sm font-semibold text-slate-700">
                 {globalSearchQuery.trim() ? `${globalSearchResults.length} result${globalSearchResults.length === 1 ? '' : 's'} • ${formatHours(globalSearchTotalHours)} total scheduled hours` : 'Enter a search term to search the loaded schedule.'}
+                {selectedGlobalResults.length > 0 && <span className="ml-2 text-indigo-700">• {selectedGlobalResults.length} selected • {formatHours(selectedGlobalHours)} hrs</span>}
               </div>
-              {globalSearchQuery && <button type="button" onClick={() => setGlobalSearchQuery('')} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">Clear Search</button>}
+              <div className="flex flex-wrap gap-2">
+                {globalSearchResults.length > 0 && <button type="button" onClick={() => setSelectedGlobalResultIds(new Set(globalSearchResults.map((result) => result.id)))} className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Select All Results</button>}
+                {selectedGlobalResults.length > 0 && <button type="button" onClick={() => { setSelectedGlobalResultIds(new Set()); setMassPreview([]); setMassPreviewSchedule(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">Clear Selection</button>}
+                {selectedGlobalResults.length > 0 && <button type="button" onClick={() => { setShowMassChanges(true); setMassPreview([]); setMassPreviewSchedule(null); }} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-amber-400">Mass Changes</button>}
+                {globalSearchQuery && <button type="button" onClick={() => { setGlobalSearchQuery(''); setSelectedGlobalResultIds(new Set()); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">Clear Search</button>}
+              </div>
             </div>
 
             {globalSearchQuery.trim() && globalSearchFromDate <= globalSearchToDate && (
@@ -5026,18 +5206,36 @@ export default function SchedulePage() {
                 ) : (
                   <div className="divide-y divide-slate-200">
                     {globalSearchResults.map((result) => (
-                      <button key={result.id} type="button" onClick={() => openScheduleSearchResult(result)} className="grid w-full gap-1 p-3 text-left transition hover:bg-indigo-50 sm:grid-cols-[130px_1.3fr_1fr_1fr] sm:items-center">
+                      <div key={result.id} className={`grid gap-2 p-3 transition hover:bg-indigo-50 sm:grid-cols-[32px_130px_1.3fr_1fr_1fr_70px] sm:items-center ${selectedGlobalResultIds.has(result.id) ? 'bg-indigo-50' : ''}`}>
+                        <input aria-label={`Select ${result.employeeName} on ${result.dateKey}`} type="checkbox" checked={selectedGlobalResultIds.has(result.id)} onChange={(event) => setSelectedGlobalResultIds((current) => { const next = new Set(current); if (event.target.checked) next.add(result.id); else next.delete(result.id); return next; })} className="h-4 w-4 accent-indigo-700" />
                         <span className="text-xs font-bold text-indigo-700">{formatTileDate(result.dateKey)}</span>
                         <span><span className="block text-sm font-bold text-slate-900">{result.employeeName}</span><span className="text-xs text-slate-500">{result.shiftTypeLabel}</span></span>
                         <span className="text-sm font-semibold text-slate-700">{result.shiftLabel}<span className="block text-xs font-normal text-slate-500">{result.categoryLabel}</span></span>
                         <span className="text-xs text-slate-600">{result.startTime}-{result.endTime} • {formatHours(result.hours)} hrs<span className="block">{result.vehicle}</span></span>
-                      </button>
+                        <button type="button" onClick={() => openScheduleSearchResult(result)} className="rounded-lg border border-indigo-300 bg-white px-2 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">Open</button>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
             )}
-            <div className="mt-3 text-xs text-slate-500">Global Search is read-only in this release. Result selection is structured for the upcoming Mass Changes workflow.</div>
+            {showMassChanges && selectedGlobalResults.length > 0 && (
+              <div className="mt-4 rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div><h3 className="text-base font-bold text-slate-900">Mass Changes</h3><p className="text-xs text-slate-600">{selectedGlobalResults.length} assignments selected • {formatHours(selectedGlobalHours)} scheduled hours</p></div>
+                  <button type="button" onClick={() => { setShowMassChanges(false); setMassPreview([]); setMassPreviewSchedule(null); }} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700">Close</button>
+                </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-3">
+                  <div><label className="mb-1 block text-xs font-bold uppercase text-slate-600">Action</label><select value={massChangeAction} onChange={(event) => { setMassChangeAction(event.target.value as MassChangeAction); setMassPreview([]); setMassPreviewSchedule(null); }} className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm"><option value="REPLACE">Replace Employee</option><option value="SWAP">Swap Employees</option><option value="SHIFT_TYPE">Change Shift Type</option><option value="OPEN">Convert to Open Shift</option><option value="REMOVE">Remove From Schedule</option></select></div>
+                  {(massChangeAction === 'REPLACE' || massChangeAction === 'SWAP') && <div><label className="mb-1 block text-xs font-bold uppercase text-slate-600">{massChangeAction === 'SWAP' ? 'Other Employee' : 'Replacement Employee'}</label><select value={massTargetEmployeeId} onChange={(event) => { setMassTargetEmployeeId(event.target.value); setMassPreview([]); setMassPreviewSchedule(null); }} className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm"><option value="">Select employee...</option>{employees.filter((employee) => employee.status === 'Active' || !employee.status).map((employee) => <option key={employee.id} value={employee.id}>{employee.name}</option>)}</select></div>}
+                  {massChangeAction === 'SHIFT_TYPE' && <div><label className="mb-1 block text-xs font-bold uppercase text-slate-600">Shift Type</label><select value={massShiftType} onChange={(event) => { setMassShiftType(event.target.value as ShiftType); setMassPreview([]); setMassPreviewSchedule(null); }} className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm"><option value="REGULAR">Regular</option><option value="SICK">Sick</option><option value="VACATION">Vacation</option><option value="LEAVE">Leave</option><option value="TRAINING">Training</option></select></div>}
+                  {massChangeAction === 'OPEN' && <div><label className="mb-1 block text-xs font-bold uppercase text-slate-600">Open Shift Type</label><select value={massOpenScope} onChange={(event) => { setMassOpenScope(event.target.value as MassOpenScope); setMassPreview([]); setMassPreviewSchedule(null); }} className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm"><option value="ALS">Open ALS</option><option value="BLS">Open BLS</option></select></div>}
+                  <div className="flex items-end"><button type="button" onClick={buildMassChangePreview} className="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800">Preview Changes</button></div>
+                </div>
+                {massPreview.length > 0 && <div className="mt-4 overflow-hidden rounded-xl border border-slate-300 bg-white"><div className="border-b border-slate-200 bg-slate-100 px-3 py-2 text-sm font-bold text-slate-800">Mass Change Preview — review every change before applying</div><div className="max-h-[360px] divide-y divide-slate-200 overflow-auto">{massPreview.map((item) => <div key={item.id} className="grid gap-1 p-3 text-xs md:grid-cols-[110px_1fr_1fr_1fr]"><span className="font-bold text-indigo-700">{formatTileDate(item.dateKey)}</span><span className="font-semibold">{item.shiftLabel}</span><span>{item.before} → <strong>{item.after}</strong></span><span>{item.blocked ? <span className="font-bold text-red-700">Blocked: {item.blocked}</span> : item.warning ? <span className="font-bold text-amber-700">Warning: {item.warning}</span> : <span className="font-bold text-emerald-700">Ready</span>}</span></div>)}</div><div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 p-3"><span className="text-xs font-semibold text-slate-600">{massPreview.filter((item) => !item.blocked).length} ready • {massPreview.filter((item) => item.blocked).length} blocked</span><button type="button" disabled={!massPreviewSchedule || massPreview.some((item) => item.blocked)} onClick={() => void applyMassChanges()} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300">Apply Mass Changes</button></div></div>}
+              </div>
+            )}
+            <div className="mt-3 text-xs text-slate-500">Mass Changes only affect specifically selected results and always require a preview before applying.</div>
           </section>
         )}
 
