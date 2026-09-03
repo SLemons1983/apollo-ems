@@ -3357,19 +3357,32 @@ export default function SchedulePage() {
     const field = entry.fieldChanged;
     const previous = entry.previousValue;
     const next = entry.newValue;
+    const isUnassigned = (value: string) => value === 'None' || value === 'Unassigned';
+    const isOpenCoverage = (value: string) => value === 'Open ALS' || value === 'Open BLS';
 
     if (field.endsWith('— Assignment')) {
-      if (previous === 'None' && next.startsWith('Open ')) return `${next} coverage created`;
-      if (previous.startsWith('Open ') && next === 'None') return `${previous} coverage removed`;
-      if (previous === 'None') return `${next} assigned`;
-      if (next === 'None') return `${previous} removed from schedule`;
-      return `${previous} replaced by ${next}`;
+      if (isUnassigned(previous) && isOpenCoverage(next)) return `${next} coverage created`;
+      if (isOpenCoverage(previous) && isUnassigned(next)) return `${previous} coverage removed`;
+      if (isUnassigned(previous) && !isUnassigned(next)) return `${next} assigned to ${entry.shiftLabel}`;
+      if (!isUnassigned(previous) && isUnassigned(next)) return `${previous} removed from ${entry.shiftLabel}`;
+      if (isOpenCoverage(previous) && !isOpenCoverage(next)) return `${next} filled ${previous}`;
+      if (!isOpenCoverage(previous) && isOpenCoverage(next)) return `${previous} removed — ${next} coverage created`;
+      return `Employee replacement: ${previous} → ${next}`;
     }
 
     if (field.endsWith('— Shift Type')) {
       const employeeMatch = field.match(/\((.+)\)/);
-      const employeeLabel = employeeMatch?.[1] ? `${employeeMatch[1]} — ` : '';
-      return `${employeeLabel}${previous} changed to ${next}`;
+      const employeeName = employeeMatch?.[1] || '';
+      const subject = employeeName ? `${employeeName} ` : '';
+
+      if (previous === 'Regular' && next === 'Leave') return `${subject}placed on Leave`.trim();
+      if (previous === 'Regular' && next === 'Sick') return `${subject}marked Sick`.trim();
+      if (previous === 'Regular' && next === 'Vacation') return `${subject}placed on Vacation`.trim();
+      if (previous === 'Regular' && next === 'Training') return `${subject}changed to Training`.trim();
+      if (next === 'Regular' && ['Leave', 'Sick', 'Vacation', 'Training'].includes(previous)) {
+        return `${subject}returned to Regular assignment`.trim();
+      }
+      return `${subject}${previous} changed to ${next}`.trim();
     }
 
     if (field === 'Vehicle') return `Vehicle changed from ${previous} to ${next}`;
