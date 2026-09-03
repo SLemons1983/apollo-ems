@@ -4721,6 +4721,19 @@ export default function SchedulePage() {
     coverageSlot.note = '';
     coverageSlot.shiftType = 'REGULAR';
 
+    // Automatic coverage may have expanded the card to expose a new employee
+    // slot. If the cleared coverage slot is now the highest visible empty slot,
+    // collapse the card back down without hiding any occupied slot.
+    const targetSlotNumber = Number(targetSlotKey.replace('employee', ''));
+    const highestOccupiedSlot = slotKeys.reduce((highest, slotKey) => {
+      const slotNumber = Number(slotKey.replace('employee', ''));
+      return shift[slotKey].employeeId ? Math.max(highest, slotNumber) : highest;
+    }, 2);
+    if (targetSlotNumber === shift.visibleEmployeeSlots) {
+      shift.visibleEmployeeSlots = Math.max(2, highestOccupiedSlot);
+      shift.showEmployee3 = shift.visibleEmployeeSlots >= 3;
+    }
+
     return { label: `Remove Open ${employee.scope} — ${result.shiftLabel}` };
   }
 
