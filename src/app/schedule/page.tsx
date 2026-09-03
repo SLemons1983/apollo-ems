@@ -1541,7 +1541,6 @@ export default function SchedulePage() {
   const [showSupervisorNotes, setShowSupervisorNotes] = useState(false);
   const [showOnDutyEmployees, setShowOnDutyEmployees] = useState(false);
   const [showOpenShiftsNeedingCoverage, setShowOpenShiftsNeedingCoverage] = useState(false);
-  const [showScheduleKey, setShowScheduleKey] = useState(false);
   const [showScheduleChanges, setShowScheduleChanges] = useState(false);
   const [scheduleChangeLog, setScheduleChangeLog] = useState<ScheduleChangeLogEntry[]>([]);
   const [scheduleChangeLogLoading, setScheduleChangeLogLoading] = useState(false);
@@ -1725,6 +1724,12 @@ export default function SchedulePage() {
           const previousSlot = previousShift[slotKey];
           const nextSlot = nextShift[slotKey];
           const slotLabel = `Employee ${index + 1}`;
+          const slotEmployeeId = nextSlot.employeeId || previousSlot.employeeId;
+          const slotEmployeeName = slotEmployeeId ? getAuditEmployeeName(slotEmployeeId) : '';
+          const identifiedSlotLabel =
+            slotEmployeeName && slotEmployeeName !== 'None'
+              ? `${slotLabel} (${slotEmployeeName})`
+              : slotLabel;
 
           const slotFields: Array<{ key: keyof EmployeeSlot; label: string }> = [
             { key: 'employeeId', label: 'Assignment' },
@@ -1739,7 +1744,7 @@ export default function SchedulePage() {
               dateKey,
               shiftKey,
               shiftLabel,
-              `${slotLabel} — ${field.label}`,
+              `${field.key === 'employeeId' ? slotLabel : identifiedSlotLabel} — ${field.label}`,
               formatAuditValue(field.key, previousSlot[field.key]),
               formatAuditValue(field.key, nextSlot[field.key]),
             );
@@ -3347,6 +3352,38 @@ export default function SchedulePage() {
       return searchableText.includes(query);
     });
   }, [scheduleChangeLog, scheduleChangeLogFilter, scheduleChangeLogSearch, currentSupervisorUserId]);
+
+  function describeScheduleChange(entry: ScheduleChangeLogEntry): string {
+    const field = entry.fieldChanged;
+    const previous = entry.previousValue;
+    const next = entry.newValue;
+
+    if (field.endsWith('— Assignment')) {
+      if (previous === 'None' && next.startsWith('Open ')) return `${next} coverage created`;
+      if (previous.startsWith('Open ') && next === 'None') return `${previous} coverage removed`;
+      if (previous === 'None') return `${next} assigned`;
+      if (next === 'None') return `${previous} removed from schedule`;
+      return `${previous} replaced by ${next}`;
+    }
+
+    if (field.endsWith('— Shift Type')) {
+      const employeeMatch = field.match(/\((.+)\)/);
+      const employeeLabel = employeeMatch?.[1] ? `${employeeMatch[1]} — ` : '';
+      return `${employeeLabel}${previous} changed to ${next}`;
+    }
+
+    if (field === 'Vehicle') return `Vehicle changed from ${previous} to ${next}`;
+    if (field === 'Cardiac Monitor') return `Cardiac monitor changed from ${previous} to ${next}`;
+    if (field === 'Supervisor Note') return 'Supervisor note updated';
+    if (field === 'Extra Shift') return next === 'Created' ? 'Extra shift created' : 'Extra shift removed';
+    if (field === 'Shift Name') return `Shift renamed from ${previous} to ${next}`;
+    if (field === 'Shift Category') return `Shift category changed from ${previous} to ${next}`;
+    if (field === 'Extended Hours Approved') return next === 'Yes' ? 'Extended hours approved' : 'Extended hours approval removed';
+    if (field === 'Hidden From Employees') return next === 'Yes' ? 'Shift hidden from employees' : 'Shift made visible to employees';
+    if (field === 'Visible Employee Slots') return `Visible staffing positions changed from ${previous} to ${next}`;
+
+    return `${field}: ${previous} → ${next}`;
+  }
 
   const groupedScheduleChangeLog = useMemo(() => {
     const groups = new Map<string, {
@@ -5308,23 +5345,20 @@ export default function SchedulePage() {
             className="flex w-full flex-col gap-3 p-4 text-left transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">Schedule Changes</h2>
-
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-lg font-bold text-slate-900">Schedule Activity</h2>
                 <span className="rounded-lg bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">
-                  {groupedScheduleChangeLog.length} save{groupedScheduleChangeLog.length === 1 ? '' : 's'}
+                  {groupedScheduleChangeLog.length} update{groupedScheduleChangeLog.length === 1 ? '' : 's'}
                 </span>
               </div>
-
               <p className="mt-1 text-sm text-slate-600">
                 {showScheduleChanges
-                  ? 'Search and review the 100 most recent schedule changes for the selected pay period, grouped by each confirmed save.'
+                  ? 'See who changed the schedule, what changed, and which shifts were affected.'
                   : groupedScheduleChangeLog.length > 0
-                    ? `${filteredScheduleChangeLog.length} change${filteredScheduleChangeLog.length === 1 ? '' : 's'} recorded in this view.`
-                    : 'No schedule changes recorded in this view.'}
+                    ? `${filteredScheduleChangeLog.length} recorded change${filteredScheduleChangeLog.length === 1 ? '' : 's'} in this view.`
+                    : 'No schedule activity recorded in this view.'}
               </p>
             </div>
-
             <span className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm font-bold text-white">
               {showScheduleChanges ? '▲ Collapse' : '▼ Expand'}
             </span>
@@ -5332,142 +5366,133 @@ export default function SchedulePage() {
 
           {showScheduleChanges && (
             <div className="border-t border-slate-300 p-4">
-              <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_240px_auto] lg:items-end">
+              <div className="grid gap-3 lg:grid-cols-[minmax(280px,1fr)_240px_auto] lg:items-end">
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Search Changes
-                  </label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search Activity</label>
                   <div className="flex gap-2">
                     <input
                       type="search"
                       value={scheduleChangeLogSearch}
                       onChange={(event) => setScheduleChangeLogSearch(event.target.value)}
-                      placeholder="Employee, shift, field, supervisor, old or new value..."
+                      placeholder="Employee, shift, date, supervisor, status..."
                       className="w-full rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-700"
                     />
                     {scheduleChangeLogSearch && (
-                      <button type="button" onClick={() => setScheduleChangeLogSearch('')} className="rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                        Clear
-                      </button>
+                      <button type="button" onClick={() => setScheduleChangeLogSearch('')} className="rounded-xl border border-slate-400 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Clear</button>
                     )}
                   </div>
                 </div>
-
                 <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Show
-                  </label>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Show</label>
                   <select
                     value={scheduleChangeLogFilter}
                     onChange={(event) => setScheduleChangeLogFilter(event.target.value as ScheduleChangeLogFilter)}
                     className="w-full rounded-xl border border-slate-500 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-700"
                   >
-                    <option value="PAY_PERIOD">Entire Selected Pay Period</option>
-                    <option value="TODAY">Today</option>
-                    <option value="LAST_7_DAYS">Last 7 Days</option>
-                    <option value="MINE_ONLY">Mine Only</option>
+                    <option value="PAY_PERIOD">Selected Pay Period</option>
+                    <option value="TODAY">Schedule Date: Today</option>
+                    <option value="LAST_7_DAYS">Schedule Date: Last 7 Days</option>
+                    <option value="MINE_ONLY">Changes Made By Me</option>
                   </select>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => void loadScheduleChangeLog()}
-                  disabled={scheduleChangeLogLoading}
-                  className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {scheduleChangeLogLoading ? 'Refreshing...' : 'Refresh Log'}
+                <button type="button" onClick={() => void loadScheduleChangeLog()} disabled={scheduleChangeLogLoading} className="rounded-xl border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60">
+                  {scheduleChangeLogLoading ? 'Refreshing...' : 'Refresh Activity'}
                 </button>
               </div>
 
-          {scheduleChangeLogError && (
-            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">
-              {scheduleChangeLogError}
-            </div>
-          )}
+              {scheduleChangeLogError && (
+                <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{scheduleChangeLogError}</div>
+              )}
 
-          <div className="mt-4 space-y-3">
-            {scheduleChangeLogLoading && scheduleChangeLog.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                Loading schedule changes...
-              </div>
-            ) : groupedScheduleChangeLog.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                {scheduleChangeLogSearch.trim() ? 'No schedule changes match your search.' : 'No schedule changes match this view.'}
-              </div>
-            ) : (
-              groupedScheduleChangeLog.map((group) => {
-                const isExpanded = Boolean(expandedScheduleChangeBatches[group.saveBatchId]);
-                const scheduleDates = Array.from(new Set(group.entries.map((entry) => entry.dateKey))).sort();
-                const dateSummary =
-                  scheduleDates.length === 1
-                    ? formatTileDate(scheduleDates[0])
-                    : `${formatTileDate(scheduleDates[0])} – ${formatTileDate(scheduleDates[scheduleDates.length - 1])}`;
+              <div className="mt-4 space-y-3">
+                {scheduleChangeLogLoading && scheduleChangeLog.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">Loading schedule activity...</div>
+                ) : groupedScheduleChangeLog.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                    {scheduleChangeLogSearch.trim() ? 'No schedule activity matches your search.' : 'No schedule activity matches this view.'}
+                  </div>
+                ) : (
+                  groupedScheduleChangeLog.map((group) => {
+                    const isExpanded = Boolean(expandedScheduleChangeBatches[group.saveBatchId]);
+                    const scheduleDates = Array.from(new Set(group.entries.map((entry) => entry.dateKey))).sort();
+                    const affectedShifts = new Set(group.entries.map((entry) => `${entry.dateKey}|${entry.shiftKey}`)).size;
+                    const dateSummary = scheduleDates.length === 1
+                      ? formatTileDate(scheduleDates[0])
+                      : `${formatTileDate(scheduleDates[0])} – ${formatTileDate(scheduleDates[scheduleDates.length - 1])}`;
+                    const previewItems = group.entries.slice(0, 3);
 
-                return (
-                  <div key={group.saveBatchId} className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedScheduleChangeBatches((current) => ({
-                          ...current,
-                          [group.saveBatchId]: !current[group.saveBatchId],
-                        }))
-                      }
-                      className="flex w-full flex-col gap-3 p-4 text-left transition hover:bg-slate-100 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <div className="text-sm font-bold text-slate-900">{group.supervisorName}</div>
-                        <div className="mt-1 text-xs text-slate-600">
-                          {new Date(group.createdAt).toLocaleString()} • Schedule date{scheduleDates.length === 1 ? '' : 's'}: {dateSummary}
-                        </div>
-                        {group.supervisorEmail && (
-                          <div className="mt-1 text-xs text-slate-500">{group.supervisorEmail}</div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-lg bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-700">
-                          {group.entries.length} change{group.entries.length === 1 ? '' : 's'}
-                        </span>
-                        <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">
-                          {isExpanded ? 'Hide Details' : 'Show Details'}
-                        </span>
-                      </div>
-                    </button>
-
-                    {isExpanded && (
-                      <div className="border-t border-slate-300 bg-white p-4">
-                        <div className="grid gap-3 lg:grid-cols-2">
-                          {group.entries.map((entry) => (
-                            <div key={entry.id} className="rounded-xl border border-slate-300 bg-slate-50 p-4">
-                              <div className="text-sm font-bold text-slate-900">{entry.fieldChanged}</div>
-                              <div className="mt-1 text-xs font-semibold text-slate-600">
-                                {formatTileDate(entry.dateKey)} • {entry.shiftLabel}
+                    return (
+                      <article key={group.saveBatchId} className="overflow-hidden rounded-xl border border-slate-300 bg-white">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedScheduleChangeBatches((current) => ({ ...current, [group.saveBatchId]: !current[group.saveBatchId] }))}
+                          className="w-full p-4 text-left transition hover:bg-slate-50"
+                        >
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900">
+                                  {group.entries.length > 4 ? 'Schedule Update' : describeScheduleChange(group.entries[0])}
+                                </span>
+                                {group.entries.length > 4 && (
+                                  <span className="rounded-lg bg-indigo-100 px-2 py-0.5 text-xs font-bold text-indigo-800">Multi-change update</span>
+                                )}
                               </div>
-
-                              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                                <div className="rounded-lg border border-slate-300 bg-white p-3">
-                                  <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Previous</div>
-                                  <div className="mt-1 break-words text-sm font-semibold text-slate-700">{entry.previousValue}</div>
-                                </div>
-
-                                <div className="text-center text-lg font-bold text-slate-400">→</div>
-
-                                <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-                                  <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">New</div>
-                                  <div className="mt-1 break-words text-sm font-bold text-emerald-900">{entry.newValue}</div>
-                                </div>
+                              <div className="mt-1 text-xs font-semibold text-slate-600">
+                                {dateSummary} • {affectedShifts} shift{affectedShifts === 1 ? '' : 's'} affected
+                              </div>
+                              <div className="mt-2 text-xs text-slate-500">
+                                Changed by <span className="font-semibold text-slate-700">{group.supervisorName}</span> • {new Date(group.createdAt).toLocaleString()}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{group.entries.length} change{group.entries.length === 1 ? '' : 's'}</span>
+                              <span className="rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-bold text-white">{isExpanded ? 'Hide Details' : 'View Details'}</span>
+                            </div>
+                          </div>
+
+                          {!isExpanded && (
+                            <div className="mt-3 space-y-1 border-t border-slate-100 pt-3">
+                              {previewItems.map((entry) => (
+                                <div key={entry.id} className="text-xs text-slate-700">
+                                  <span className="font-semibold">{formatTileDate(entry.dateKey)} • {entry.shiftLabel}:</span> {describeScheduleChange(entry)}
+                                </div>
+                              ))}
+                              {group.entries.length > previewItems.length && (
+                                <div className="text-xs font-semibold text-slate-500">+ {group.entries.length - previewItems.length} more recorded change{group.entries.length - previewItems.length === 1 ? '' : 's'}</div>
+                              )}
+                            </div>
+                          )}
+                        </button>
+
+                        {isExpanded && (
+                          <div className="border-t border-slate-300 bg-slate-50 p-4">
+                            <div className="mb-3 rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-600">
+                              <span className="font-bold text-slate-800">Activity summary:</span> {group.entries.length} recorded change{group.entries.length === 1 ? '' : 's'} across {affectedShifts} shift{affectedShifts === 1 ? '' : 's'}.
+                              {group.supervisorEmail && <> Supervisor: {group.supervisorEmail}.</>}
+                            </div>
+                            <div className="space-y-2">
+                              {group.entries.map((entry) => (
+                                <div key={entry.id} className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 md:grid-cols-[130px_minmax(150px,0.7fr)_minmax(220px,1fr)] md:items-center">
+                                  <div className="text-xs font-bold text-indigo-700">{formatTileDate(entry.dateKey)}</div>
+                                  <div>
+                                    <div className="text-sm font-bold text-slate-900">{entry.shiftLabel}</div>
+                                    <div className="text-[11px] text-slate-500">{entry.fieldChanged}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-slate-800">{describeScheduleChange(entry)}</div>
+                                    <div className="mt-1 text-[11px] text-slate-500">Previous: {entry.previousValue} • New: {entry.newValue}</div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
         </section>
@@ -6692,37 +6717,6 @@ export default function SchedulePage() {
               })()}
             </div>
           </div>
-        <section className="mt-6 overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowScheduleKey((current) => !current)}
-            aria-expanded={showScheduleKey}
-            className="flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-slate-50"
-          >
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">Schedule Key</h2>
-              <p className="mt-1 text-xs text-slate-500">Colors and symbols used throughout the schedule.</p>
-            </div>
-            <span className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white">
-              {showScheduleKey ? '▲ Hide' : '▼ Show'}
-            </span>
-          </button>
-
-          {showScheduleKey && (
-            <div className="border-t border-slate-200 p-4">
-              <div className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-blue-800 bg-blue-200 px-3 py-2 font-semibold text-blue-950">Open ALS — paramedic coverage needed</div>
-                <div className="rounded-xl border border-red-800 bg-red-200 px-3 py-2 font-semibold text-red-950">Open BLS — EMT coverage needed</div>
-                <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">Sick / Leave / Vacation</div>
-                <div className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-semibold text-slate-800">⭐ Employee requested open shift</div>
-                <div className="rounded-xl border border-red-300 bg-red-100 px-3 py-2 font-semibold text-red-800">⚠ Scheduling warning</div>
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 font-semibold text-sky-800">📝 Employee-visible note</div>
-                <div className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 font-semibold text-violet-800">🔒 Supervisor-only note</div>
-                <div className="rounded-xl border border-emerald-300 bg-emerald-100 px-3 py-2 font-semibold text-emerald-900">Green column — today</div>
-              </div>
-            </div>
-          )}
-        </section>
 
         </div>
       )}
