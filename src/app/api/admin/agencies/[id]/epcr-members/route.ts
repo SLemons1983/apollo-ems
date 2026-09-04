@@ -20,14 +20,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!parsed.data) return NextResponse.json({ error: parsed.error }, { status: 400 });
   const { data: agency } = await owner.db.from('apollo_agencies').select('name,enabled_modules').eq('id', id).maybeSingle();
   if (!agency || !agency.enabled_modules?.includes('ePCR Beta')) return NextResponse.json({ error: 'Enable ePCR Beta for this agency before inviting users.' }, { status: 400 });
+  const { data: sameAgencyMembership } = await owner.db.from('epcr_memberships').select('id,status').eq('agency_id', id).ilike('email', parsed.data.email).in('status', ['INVITED', 'ACTIVE']).maybeSingle();
+  if (sameAgencyMembership) return NextResponse.json({ error: 'This email already has ePCR access for this agency.' }, { status: 409 });
+
   const { count } = await owner.db.from('epcr_memberships').select('id', { count: 'exact', head: true }).eq('agency_id', id).like('username', `${parsed.data.base}%`);
   const username = count ? `${parsed.data.base}${count + 1}` : parsed.data.base;
-  const origin = new URL(request.url).origin;
-  const { data: invited, error: inviteError } = await owner.db.auth.admin.inviteUserByEmail(parsed.data.email, { redirectTo: `${origin}/epcr/setup-password`, data: { first_name: parsed.data.first_name, last_name: parsed.data.last_name, epcr_username: username } });
-  if (inviteError || !invited.user) return NextResponse.json({ error: inviteError?.message ?? 'Unable to send invitation.' }, { status: 400 });
-  const { data: member, error } = await owner.db.from('epcr_memberships').insert({ agency_id: id, auth_user_id: invited.user.id, first_name: parsed.data.first_name, last_name: parsed.data.last_name, email: parsed.data.email, username, role: parsed.data.role, invited_by: owner.user.email }).select().single();
+
+  // An ePCR identity belongs to the person, while memberships belong to agencies.
+  // Reuse an existing Auth identity instead of sending another invitation.
+  const { data: existingMembership } = await owner.db.from('epcr_memberships').select('auth_user_id').ilike('email', parsed.data.email).not('auth_user_id', 'is', null).limit(1).maybeSingle();
+  const existingAuthUserId = existingMembership?.auth_user_id ?? null;
+
+  let authUserId = existingAuthUserId;
+  let status: 'ACTIVE' | 'INVITED' = existingAuthUserId ? 'ACTIVE' : 'INVITED';
+  let invitationSent = false;
+
+  if (!authUserId) {
+    const origin = new URL(request.url).origin;
+    const { data: invited, error: inviteError } = await owner.db.auth.admin.inviteUserByEmail(parsed.data.email, { redirectTo: `${origin}/epcr/setup-password`, data: { first_name: parsed.data.first_name, last_name: parsed.data.last_name, epcr_username: username } });
+    if (inviteError || !invited.user) {
+      const message = inviteError?.message ?? 'Unable to send invitation.';
+      const rateLimited = /rate|limit|too many/i.test(message);
+      return NextResponse.json({ error: rateLimited ? 'Supabase has temporarily limited authentication emails. Existing Apollo ePCR users can still be added to additional agencies without sending another invitation. Please retry new-user invitations after the email limit resets.' : message }, { status: rateLimited ? 429 : 400 });
+    }
+    authUserId = invited.user.id;
+    invitationSent = true;
+  }
+
+  const now = new Date().toISOString();
+  const { data: member, error } = await owner.db.from('epcr_memberships').insert({ agency_id: id, auth_user_id: authUserId, first_name: parsed.data.first_name, last_name: parsed.data.last_name, email: parsed.data.email, username, role: parsed.data.role, status, accepted_at: status === 'ACTIVE' ? now : null, invited_by: owner.user.email }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ member });
+  return NextResponse.json({ member, invitation_sent: invitationSent, reused_existing_account: Boolean(existingAuthUserId) });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

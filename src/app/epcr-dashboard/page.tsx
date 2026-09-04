@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import EpcrSignOutButton from '@/components/epcr/EpcrSignOutButton';
+import EpcrAgencySwitcher from '@/components/epcr/EpcrAgencySwitcher';
 import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 
 export default async function EpcrDashboard() {
@@ -9,6 +10,10 @@ export default async function EpcrDashboard() {
   if (!access) redirect('/epcr/login');
   const membership = access.membership;
   const agency = Array.isArray(membership.apollo_agencies) ? membership.apollo_agencies[0] : membership.apollo_agencies;
+  const agencyOptions = access.memberships.map((item) => {
+    const itemAgency = Array.isArray(item.apollo_agencies) ? item.apollo_agencies[0] : item.apollo_agencies;
+    return { agencyId: item.agency_id, name: itemAgency?.name ?? 'Agency ePCR', role: item.role };
+  });
   const db = epcrAdminClient();
   const [{ count: myReportCount }, { count: submittedCount }] = await Promise.all([
     db.from('epcr_reports').select('id', { count: 'exact', head: true }).eq('agency_id', membership.agency_id).eq('submitted_by_membership_id', membership.id),
@@ -28,7 +33,10 @@ export default async function EpcrDashboard() {
                 <p className="mt-2 text-sm font-semibold text-slate-600">{membership.role.replaceAll('_', ' ')} &middot; @{membership.username}</p>
               </div>
             </div>
-            <EpcrSignOutButton />
+            <div className="flex flex-wrap items-end gap-3">
+              <EpcrAgencySwitcher currentAgencyId={membership.agency_id} agencies={agencyOptions} />
+              <EpcrSignOutButton />
+            </div>
           </div>
         </header>
 

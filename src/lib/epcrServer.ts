@@ -17,13 +17,26 @@ export async function currentEpcrMembership(requireDedicatedSession = false) {
   const { data: { user } } = await auth.auth.getUser();
   if (!user?.id || !user.email) return null;
   if (requireDedicatedSession && cookieStore.get('apollo_epcr_session')?.value !== user.id) return null;
+
   const db = epcrAdminClient();
-  const { data } = await db.from('epcr_memberships').select('*, apollo_agencies(name,slug,enabled_modules,status)').eq('auth_user_id', user.id).in('status', ['INVITED', 'ACTIVE']).maybeSingle();
-  if (!data) return null;
-  if (data.status === 'INVITED') {
+  const { data } = await db
+    .from('epcr_memberships')
+    .select('*, apollo_agencies(name,slug,enabled_modules,status)')
+    .eq('auth_user_id', user.id)
+    .in('status', ['INVITED', 'ACTIVE'])
+    .order('created_at', { ascending: true });
+
+  if (!data?.length) return null;
+
+  const selectedAgencyId = cookieStore.get('apollo_epcr_agency')?.value;
+  const selected = data.find((membership) => membership.agency_id === selectedAgencyId) ?? data[0];
+
+  if (selected.status === 'INVITED') {
     const acceptedAt = new Date().toISOString();
-    await db.from('epcr_memberships').update({ status: 'ACTIVE', accepted_at: acceptedAt }).eq('id', data.id).eq('status', 'INVITED');
-    data.status = 'ACTIVE'; data.accepted_at = acceptedAt;
+    await db.from('epcr_memberships').update({ status: 'ACTIVE', accepted_at: acceptedAt }).eq('id', selected.id).eq('status', 'INVITED');
+    selected.status = 'ACTIVE';
+    selected.accepted_at = acceptedAt;
   }
-  return { user, membership: data };
+
+  return { user, membership: selected, memberships: data };
 }
