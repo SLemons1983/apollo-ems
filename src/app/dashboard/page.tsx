@@ -8169,13 +8169,42 @@ export default function DashboardPage() {
               <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 The current handbook is the Sequoia Safety Council Employee Policy Manual, effective January 1, 2026.
               </div>
-              <iframe
-                src="/Employee Handbook.pdf"
-                title="Employee Handbook"
-                className="h-[720px] w-full rounded-xl border border-slate-200 bg-white"
-              />
-              <div className="mt-3 text-xs text-slate-500">
-                Place the handbook PDF in the project's public folder as: public/Employee Handbook.pdf
+
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
+                  Open the full handbook in your device&apos;s PDF viewer for the most reliable viewing experience.
+                </p>
+                <a
+                  href="/Employee Handbook.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
+                >
+                  Open Full Handbook
+                </a>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 md:hidden">
+                <div className="font-bold text-slate-900">Employee Handbook</div>
+                <p className="mt-1 text-sm text-slate-600">
+                  On phones, the handbook opens in your device&apos;s PDF viewer so you can scroll through every page, zoom, print, or save it normally.
+                </p>
+                <a
+                  href="/Employee Handbook.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-700"
+                >
+                  Open Employee Handbook
+                </a>
+              </div>
+
+              <div className="hidden md:block">
+                <iframe
+                  src="/Employee Handbook.pdf"
+                  title="Employee Handbook"
+                  className="h-[720px] w-full rounded-xl border border-slate-200 bg-white"
+                />
               </div>
             </div>,
           )}
