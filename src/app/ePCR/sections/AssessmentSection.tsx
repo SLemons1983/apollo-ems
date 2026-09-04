@@ -246,6 +246,8 @@ export default function AssessmentSection({
     useState('');
   const [expandedBodySubregionId, setExpandedBodySubregionId] =
     useState('');
+  const [showBodySubregionDetailsId, setShowBodySubregionDetailsId] =
+    useState('');
   const selectedAssessmentRegion = assessmentForm.bodyMap.currentFocus;
   const selectedAssessmentRegions = assessmentForm.bodyMap.selectedRegions;
   const bodyRegionUnremarkable =
@@ -1120,6 +1122,60 @@ export default function AssessmentSection({
     });
   }
 
+  function markBodySubregionCmsIntact(
+    region: ApolloBodyRegionKey,
+    subregionId: string,
+  ) {
+    if (!isAssessmentExtremityRegion(region)) {
+      return;
+    }
+
+    onAssessmentFormChange((current) => {
+      const currentSubregion =
+        current.bodyMap.subregionFindings[region][subregionId];
+
+      if (!currentSubregion) {
+        return current;
+      }
+
+      return {
+        ...current,
+        bodyMap: {
+          ...current.bodyMap,
+          currentFocus: region,
+          selectedRegions: {
+            ...current.bodyMap.selectedRegions,
+            [region]: true,
+          },
+          unremarkableRegions: {
+            ...current.bodyMap.unremarkableRegions,
+            [region]: false,
+          },
+          subregionFindings: {
+            ...current.bodyMap.subregionFindings,
+            [region]: {
+              ...current.bodyMap.subregionFindings[region],
+              [subregionId]: {
+                ...currentSubregion,
+                unremarkable: false,
+                cmsTp: {
+                  ...currentSubregion.cmsTp,
+                  circulation: 'Normal',
+                  motor: 'Intact',
+                  sensation: 'Intact',
+                  tenderness: 'None',
+                  pulses: 'Normal',
+                  skin: 'Normal',
+                  capillaryRefill: 'Less Than 2 Seconds',
+                },
+              },
+            },
+          },
+        },
+      };
+    });
+  }
+
   function updateBodySubregionCmsTp(
     region: ApolloBodyRegionKey,
     subregionId: string,
@@ -1704,7 +1760,7 @@ export default function AssessmentSection({
                                 </div>
   
                                 <p className="mt-1 text-xs font-semibold text-slate-500">
-                                  Address each anatomical subregion individually.
+                                  If the whole region is normal, mark it unremarkable once. Open a subregion only when you need a specific finding.
                                 </p>
                               </div>
   
@@ -1722,7 +1778,7 @@ export default function AssessmentSection({
                                   }}
                                   className="rounded-lg border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-emerald-700"
                                 >
-                                  Mark Region Unremarkable
+                                  ✓ All Unremarkable
                                 </button>
   
                                 <button
@@ -1842,160 +1898,198 @@ export default function AssessmentSection({
   
                                       {subregionExpanded && (
                                         <div className="border-t border-slate-200 bg-white p-4">
-                                          <div className="text-sm font-black uppercase tracking-wide text-slate-700">
-                                            DCAP-BTLS Findings
-                                          </div>
-  
-                                          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                                            {dcapBtlsFindings.map(
-                                              (dcapFinding) => {
-                                                const selected =
-                                                  finding.dcapBtls[
-                                                    dcapFinding.field
-                                                  ];
-  
-                                                return (
-                                                  <button
-                                                    key={
-                                                      dcapFinding.field
-                                                    }
-                                                    type="button"
-                                                    onClick={() =>
-                                                      toggleBodySubregionDcapBtlsFinding(
-                                                        region,
-                                                        subregion.id,
-                                                        dcapFinding.field,
-                                                      )
-                                                    }
-                                                    className={`rounded-lg border px-3 py-3 text-left text-sm font-bold transition ${
-                                                      selected
-                                                        ? 'border-red-300 bg-red-50 text-red-900'
-                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                                                    }`}
-                                                  >
-                                                    {selected ? '✓ ' : ''}
-                                                    {dcapFinding.label}
-                                                  </button>
-                                                );
-                                              },
-                                            )}
-                                          </div>
-  
-                                          {isAssessmentExtremityRegion(region) && (
-                                            <div className="mt-5 border-t border-slate-200 pt-5">
-                                              <div className="text-sm font-black uppercase tracking-wide text-slate-700">
-                                                CMS-TP
-                                              </div>
-  
-                                              <p className="mt-1 text-xs font-semibold text-slate-500">
-                                                Document circulation, motor function,
-                                                sensation, tenderness, pulses, skin,
-                                                and capillary refill.
-                                              </p>
-  
-                                              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                                {cmsTpFields.map((cmsField) => (
-                                                  <label
-                                                    key={cmsField.field}
-                                                    className="block"
-                                                  >
-                                                    <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                                                      {cmsField.label}
-                                                    </span>
-  
-                                                    <select
-                                                      value={
-                                                        finding.cmsTp[
-                                                          cmsField.field
-                                                        ]
-                                                      }
-                                                      onChange={(event) =>
-                                                        updateBodySubregionCmsTp(
-                                                          region,
-                                                          subregion.id,
-                                                          cmsField.field,
-                                                          event.target.value,
-                                                        )
-                                                      }
-                                                      className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-                                                    >
-                                                      <option value="" />
-  
-                                                      {cmsField.options.map(
-                                                        (option) => (
-                                                          <option
-                                                            key={option}
-                                                            value={option}
-                                                          >
-                                                            {option}
-                                                          </option>
-                                                        ),
-                                                      )}
-                                                    </select>
-                                                  </label>
-                                                ))}
-                                              </div>
-  
-                                              <label className="mt-4 block">
-                                                <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                                                  CMS-TP Notes
-                                                </span>
-  
-                                                <textarea
-                                                  value={finding.cmsTp.notes}
-                                                  onChange={(event) =>
-                                                    updateBodySubregionCmsTp(
+                                          <div className="grid gap-3 sm:grid-cols-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                onAssessmentFormChange(
+                                                  (current) =>
+                                                    markAssessmentSubregionUnremarkable(
+                                                      current,
                                                       region,
                                                       subregion.id,
-                                                      'notes',
+                                                    ),
+                                                );
+                                                setShowBodySubregionDetailsId('');
+                                                setExpandedBodySubregionId('');
+                                              }}
+                                              className="min-h-14 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 text-sm font-black uppercase tracking-wide text-emerald-800 hover:bg-emerald-100"
+                                            >
+                                              ✓ Unremarkable
+                                            </button>
+
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setShowBodySubregionDetailsId(
+                                                  `${region}:${subregion.id}`,
+                                                )
+                                              }
+                                              className="min-h-14 rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3 text-sm font-black uppercase tracking-wide text-red-800 hover:bg-red-100"
+                                            >
+                                              ! Abnormal / Document Finding
+                                            </button>
+                                          </div>
+
+                                          <p className="mt-3 text-xs font-semibold text-slate-500">
+                                            One tap is enough for a normal exam. Open details only when something is abnormal or needs clarification.
+                                          </p>
+
+                                          {showBodySubregionDetailsId ===
+                                            `${region}:${subregion.id}` && (
+                                            <div className="mt-5 border-t border-slate-200 pt-5">
+                                              <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                                What did you find?
+                                              </div>
+
+                                              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                                                {dcapBtlsFindings.map(
+                                                  (dcapFinding) => {
+                                                    const selected =
+                                                      finding.dcapBtls[
+                                                        dcapFinding.field
+                                                      ];
+
+                                                    return (
+                                                      <button
+                                                        key={dcapFinding.field}
+                                                        type="button"
+                                                        onClick={() =>
+                                                          toggleBodySubregionDcapBtlsFinding(
+                                                            region,
+                                                            subregion.id,
+                                                            dcapFinding.field,
+                                                          )
+                                                        }
+                                                        className={`rounded-lg border px-3 py-3 text-left text-sm font-bold transition ${
+                                                          selected
+                                                            ? 'border-red-300 bg-red-50 text-red-900'
+                                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                        }`}
+                                                      >
+                                                        {selected ? '✓ ' : ''}
+                                                        {dcapFinding.label}
+                                                      </button>
+                                                    );
+                                                  },
+                                                )}
+                                              </div>
+
+                                              {isAssessmentExtremityRegion(region) && (
+                                                <div className="mt-5 border-t border-slate-200 pt-5">
+                                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <div>
+                                                      <div className="text-sm font-black uppercase tracking-wide text-slate-700">
+                                                        CMS
+                                                      </div>
+                                                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                                                        Use one tap when circulation, motor, sensation, pulses, skin, and capillary refill are normal.
+                                                      </p>
+                                                    </div>
+
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        markBodySubregionCmsIntact(
+                                                          region,
+                                                          subregion.id,
+                                                        )
+                                                      }
+                                                      className="rounded-lg border border-emerald-500 bg-emerald-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-emerald-700"
+                                                    >
+                                                      ✓ CMS Intact
+                                                    </button>
+                                                  </div>
+
+                                                  <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                                    <summary className="cursor-pointer text-xs font-black uppercase tracking-wide text-slate-700">
+                                                      Document CMS Details
+                                                    </summary>
+
+                                                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                                      {cmsTpFields.map((cmsField) => (
+                                                        <label
+                                                          key={cmsField.field}
+                                                          className="block"
+                                                        >
+                                                          <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                                            {cmsField.label}
+                                                          </span>
+
+                                                          <select
+                                                            value={
+                                                              finding.cmsTp[
+                                                                cmsField.field
+                                                              ]
+                                                            }
+                                                            onChange={(event) =>
+                                                              updateBodySubregionCmsTp(
+                                                                region,
+                                                                subregion.id,
+                                                                cmsField.field,
+                                                                event.target.value,
+                                                              )
+                                                            }
+                                                            className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                                                          >
+                                                            <option value="" />
+                                                            {cmsField.options.map(
+                                                              (option) => (
+                                                                <option
+                                                                  key={option}
+                                                                  value={option}
+                                                                >
+                                                                  {option}
+                                                                </option>
+                                                              ),
+                                                            )}
+                                                          </select>
+                                                        </label>
+                                                      ))}
+                                                    </div>
+
+                                                    <label className="mt-4 block">
+                                                      <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                                        CMS Notes
+                                                      </span>
+                                                      <textarea
+                                                        value={finding.cmsTp.notes}
+                                                        onChange={(event) =>
+                                                          updateBodySubregionCmsTp(
+                                                            region,
+                                                            subregion.id,
+                                                            'notes',
+                                                            event.target.value,
+                                                          )
+                                                        }
+                                                        rows={3}
+                                                        className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
+                                                      />
+                                                    </label>
+                                                  </details>
+                                                </div>
+                                              )}
+
+                                              <label className="mt-4 block">
+                                                <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                                  Assessment Notes
+                                                </span>
+                                                <textarea
+                                                  value={finding.notes}
+                                                  onChange={(event) =>
+                                                    updateBodySubregionNotes(
+                                                      region,
+                                                      subregion.id,
                                                       event.target.value,
                                                     )
                                                   }
                                                   rows={3}
+                                                  placeholder="Optional details"
                                                   className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
                                                 />
                                               </label>
                                             </div>
                                           )}
-  
-                                          <label className="mt-4 block">
-                                            <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                                              Assessment Notes
-                                            </span>
-  
-                                            <textarea
-                                              value={finding.notes}
-                                              onChange={(event) =>
-                                                updateBodySubregionNotes(
-                                                  region,
-                                                  subregion.id,
-                                                  event.target.value,
-                                                )
-                                              }
-                                              rows={3}
-                                              className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-500"
-                                            />
-                                          </label>
-  
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              onAssessmentFormChange(
-                                                (current) =>
-                                                  markAssessmentSubregionUnremarkable(
-                                                    current,
-                                                    region,
-                                                    subregion.id,
-                                                  ),
-                                              )
-                                            }
-                                            className="mt-4 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-black uppercase text-emerald-800 hover:bg-emerald-100"
-                                          >
-                                            {subregionStatus ===
-                                            'unremarkable'
-                                              ? '✓ Unremarkable'
-                                              : 'Mark Unremarkable'}
-                                          </button>
                                         </div>
                                       )}
                                     </div>
