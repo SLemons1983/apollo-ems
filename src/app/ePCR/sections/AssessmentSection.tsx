@@ -241,7 +241,7 @@ export default function AssessmentSection({
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const [physicalAssessmentExpanded, setPhysicalAssessmentExpanded] =
-    useState(false);
+    useState(true);
   const [expandedRegionalAssessmentId, setExpandedRegionalAssessmentId] =
     useState('');
   const [expandedBodySubregionId, setExpandedBodySubregionId] =
@@ -1579,46 +1579,8 @@ export default function AssessmentSection({
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="mb-3 rounded-lg bg-blue-100 px-4 py-3 text-sm font-bold uppercase tracking-wide text-blue-900">
-          Initial Assessment and History
-        </div>
-
-        <div className="space-y-4">
-          {[
-            {
-              id: 'primary-assessment',
-              title: 'Primary Assessment',
-            },
-            {
-              id: 'history-taking',
-              title: 'History Assessment / SAMPLE',
-            },
-          ].map((task) => {
-            const progress = getTaskProgress(task.id);
-
-            return (
-              <PCRCard
-                key={task.id}
-                title={task.title}
-                completedFields={progress.completed}
-                totalFields={progress.total}
-                expanded={expandedTaskId === task.id}
-                onToggle={() =>
-                  setExpandedTaskId(
-                    expandedTaskId === task.id ? '' : task.id,
-                  )
-                }
-              >
-                {renderTaskContent(task.id, task.title)}
-              </PCRCard>
-            );
-          })}
-        </div>
-      </div>
-
       <PCRCard
-        title="Physical Assessment"
+        title="Patient Assessment • Body Map"
         completedFields={physicalAssessmentComplete ? 1 : 0}
         totalFields={1}
         expanded={physicalAssessmentExpanded}
@@ -1626,21 +1588,26 @@ export default function AssessmentSection({
           setPhysicalAssessmentExpanded((current) => !current)
         }
       >
-        <div className="mb-4 rounded-lg bg-blue-50 px-4 py-3">
-          <p className="text-sm font-semibold text-blue-900">
-            If the exam is normal, complete it in one tap. Otherwise, tap the
-            affected region and document only what you find.
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
+          <div className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+            3 AM Workflow
+          </div>
+          <p className="mt-1 text-sm font-bold text-blue-950">
+            Start with the patient. Tap where you found a problem. If the physical exam is normal, complete it in one tap.
+          </p>
+          <p className="mt-1 text-xs font-semibold text-blue-800">
+            Apollo only records findings you confirm. Focused assessments remain available below when you need them.
           </p>
         </div>
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <div>
               <div className="text-sm font-black uppercase tracking-wide text-emerald-950">
-                Complete Normal Assessment
+                Normal Exam • One Tap
               </div>
   
               <p className="mt-1 text-xs font-semibold text-emerald-800">
-                Mark every body region and subregion as unremarkable.
+                Use only after you have performed the exam and found no abnormal physical findings.
               </p>
             </div>
   
@@ -1661,7 +1628,7 @@ export default function AssessmentSection({
               }}
               className="rounded-lg border border-emerald-500 bg-emerald-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white transition hover:bg-emerald-700"
             >
-              Complete Normal Physical Assessment
+              Mark Physical Exam Unremarkable
             </button>
           </div>
   
@@ -2046,10 +2013,52 @@ export default function AssessmentSection({
           )}
       </PCRCard>
 
+
+      <div>
+        <div className="mb-3 rounded-lg bg-blue-100 px-4 py-3 text-sm font-bold uppercase tracking-wide text-blue-900">
+          Initial Assessment and History
+        </div>
+
+        <div className="space-y-4">
+          {[
+            {
+              id: 'primary-assessment',
+              title: 'Primary Assessment',
+            },
+            {
+              id: 'history-taking',
+              title: 'History Assessment / SAMPLE',
+            },
+          ].map((task) => {
+            const progress = getTaskProgress(task.id);
+
+            return (
+              <PCRCard
+                key={task.id}
+                title={task.title}
+                completedFields={progress.completed}
+                totalFields={progress.total}
+                expanded={expandedTaskId === task.id}
+                onToggle={() =>
+                  setExpandedTaskId(
+                    expandedTaskId === task.id ? '' : task.id,
+                  )
+                }
+              >
+                {renderTaskContent(task.id, task.title)}
+              </PCRCard>
+            );
+          })}
+        </div>
+      </div>
+
       <div>
         <div className="mb-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-          Suggested for This Patient
+          Recommended Next
         </div>
+        <p className="mb-3 text-sm font-semibold text-slate-600">
+          Based on this patient&apos;s documented context. You decide which assessments are clinically appropriate.
+        </p>
 
         <div className="space-y-4">
           {providerScope === 'ALS' && (
@@ -2090,8 +2099,11 @@ export default function AssessmentSection({
 
       <div>
         <div className="mb-3 rounded-lg bg-slate-200 px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-700">
-          Additional Assessments
+          More Assessments
         </div>
+        <p className="mb-3 text-sm font-semibold text-slate-600">
+          Open an assessment only when it helps document this patient.
+        </p>
 
         <div className="space-y-4">
           {additionalTasks.map((task) => {
