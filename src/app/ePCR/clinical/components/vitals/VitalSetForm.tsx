@@ -347,6 +347,66 @@ export default function VitalSetForm({
           />
         </Field>
 
+        <Field label="Pulse Quality" required>
+          <select
+            value={value.pulseQuality}
+            title={findingTitle('pulseQuality')}
+            onChange={(event) => onChange('pulseQuality', event.target.value)}
+            className={selectClass('pulseQuality')}
+          >
+            <option value="">Select</option>
+            {pulseQualities.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Respiratory Quality" required>
+          <select
+            value={value.respiratoryQuality}
+            title={findingTitle('respiratoryQuality')}
+            onChange={(event) =>
+              onChange('respiratoryQuality', event.target.value)
+            }
+            className={selectClass('respiratoryQuality')}
+          >
+            <option value="">Select</option>
+            {respiratoryQualities.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Skin Color" required>
+          <select
+            value={value.skinColor}
+            title={findingTitle('skinColor')}
+            onChange={(event) => onChange('skinColor', event.target.value)}
+            className={selectClass('skinColor')}
+          >
+            <option value="">Select</option>
+            {skinColors.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Skin Temperature" required>
+          <select
+            value={value.skinTemperature}
+            title={findingTitle('skinTemperature')}
+            onChange={(event) =>
+              onChange('skinTemperature', event.target.value)
+            }
+            className={selectClass('skinTemperature')}
+          >
+            <option value="">Select</option>
+            {skinTemperatures.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Skin Moisture" required>
+          <select
+            value={value.skinMoisture}
+            title={findingTitle('skinMoisture')}
+            onChange={(event) => onChange('skinMoisture', event.target.value)}
+            className={selectClass('skinMoisture')}
+          >
+            <option value="">Select</option>
+            {skinMoistures.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+
         <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -445,42 +505,6 @@ export default function VitalSetForm({
             <option>Device Imported</option>
           </select>
         </Field>
-        <Field label="BP Method" required>
-          <select
-            value={value.bloodPressureMethod}
-            onChange={(event) =>
-              onChange('bloodPressureMethod', event.target.value)
-            }
-            className={inputClass}
-          >
-            <option>Auscultated</option>
-            <option>Palpated</option>
-          </select>
-        </Field>
-        <Field label="Pulse Quality" required>
-          <select
-            value={value.pulseQuality}
-            title={findingTitle('pulseQuality')}
-            onChange={(event) => onChange('pulseQuality', event.target.value)}
-            className={selectClass('pulseQuality')}
-          >
-            <option value="">Select</option>
-            {pulseQualities.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
-        <Field label="Respiratory Quality" required>
-          <select
-            value={value.respiratoryQuality}
-            title={findingTitle('respiratoryQuality')}
-            onChange={(event) =>
-              onChange('respiratoryQuality', event.target.value)
-            }
-            className={selectClass('respiratoryQuality')}
-          >
-            <option value="">Select</option>
-            {respiratoryQualities.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
         <Field label="SpCO % (Optional)" error={getVitalFieldError(value, 'spco')}>
           <input
             type="number"
@@ -542,43 +566,8 @@ export default function VitalSetForm({
           </select>
         </Field>
 
-        <Field label="Skin Color" required>
-          <select
-            value={value.skinColor}
-            title={findingTitle('skinColor')}
-            onChange={(event) => onChange('skinColor', event.target.value)}
-            className={selectClass('skinColor')}
-          >
-            <option value="">Select</option>
-            {skinColors.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
 
-        <Field label="Skin Temperature" required>
-          <select
-            value={value.skinTemperature}
-            title={findingTitle('skinTemperature')}
-            onChange={(event) =>
-              onChange('skinTemperature', event.target.value)
-            }
-            className={selectClass('skinTemperature')}
-          >
-            <option value="">Select</option>
-            {skinTemperatures.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
 
-        <Field label="Skin Moisture" required>
-          <select
-            value={value.skinMoisture}
-            title={findingTitle('skinMoisture')}
-            onChange={(event) => onChange('skinMoisture', event.target.value)}
-            className={selectClass('skinMoisture')}
-          >
-            <option value="">Select</option>
-            {skinMoistures.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
 
         <Field label="Oxygen / Ventilation Device">
           <select
