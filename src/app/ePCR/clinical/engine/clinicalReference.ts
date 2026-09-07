@@ -53,6 +53,13 @@ export function searchClinicalOptions(
     .slice(0, 25);
 }
 
+export function getClinicalDisplayLabel(value: string) {
+  return value
+    .replace(/,?\s+NOS\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function toCodedSelection(option: ClinicalOption | null) {
   if (!option) {
     return null;
@@ -60,6 +67,6 @@ export function toCodedSelection(option: ClinicalOption | null) {
 
   return {
     code: option.code,
-    description: option.suggestedLabel,
+    description: getClinicalDisplayLabel(option.suggestedLabel),
   };
 }

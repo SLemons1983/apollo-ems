@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { getClinicalOptions, searchClinicalOptions, toCodedSelection } from '../engine';
+import { getClinicalDisplayLabel, getClinicalOptions, searchClinicalOptions, toCodedSelection } from '../engine';
 import type { ClinicalOption } from '../engine';
 import type { CodedSelection } from '../../types';
 
@@ -124,7 +124,7 @@ export default function ClinicalSymptomPicker({
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {common.map((option) => (
                       <button key={option.code} type="button" disabled={isSelected(option)} onClick={() => add(option)} className="min-h-12 rounded-xl border border-slate-300 bg-white px-3 py-2 text-left text-sm font-semibold text-slate-800 shadow-sm hover:border-slate-500 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
-                        {isSelected(option) ? '✓ ' : ''}{option.suggestedLabel}
+                        {isSelected(option) ? '✓ ' : ''}{getClinicalDisplayLabel(option.suggestedLabel)}
                       </button>
                     ))}
                   </div>
@@ -135,7 +135,7 @@ export default function ClinicalSymptomPicker({
               <div className="space-y-2">
                 {results.map((option) => (
                   <button key={`${option.code}-${option.suggestedLabel}`} type="button" disabled={isSelected(option)} onClick={() => add(option)} className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left hover:border-slate-400 hover:bg-slate-50 disabled:bg-slate-100">
-                    <span><span className="block text-sm font-semibold text-slate-900">{option.suggestedLabel}</span><span className="block text-xs text-slate-500">{option.category}</span></span>
+                    <span><span className="block text-sm font-semibold text-slate-900">{getClinicalDisplayLabel(option.suggestedLabel)}</span><span className="block text-xs text-slate-500">{option.category}</span></span>
                     <span className="text-sm font-bold text-slate-400">{isSelected(option) ? 'Added' : '+'}</span>
                   </button>
                 ))}

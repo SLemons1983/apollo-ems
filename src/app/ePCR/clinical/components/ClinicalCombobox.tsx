@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import {
+  getClinicalDisplayLabel,
   searchClinicalOptions,
   toCodedSelection,
 } from '../engine';
@@ -100,7 +101,7 @@ export default function ClinicalCombobox({
             key={optionValue(option)}
             value={optionValue(option)}
           >
-            {option.suggestedLabel}
+            {getClinicalDisplayLabel(option.suggestedLabel)}
           </option>
         ))}
       </select>
