@@ -246,9 +246,7 @@ export default function AssessmentSection({
           task.id !== 'primary-assessment' &&
           task.id !== 'history-taking' &&
           task.id !== 'reassessment' &&
-          task.id !== 'extremity-assessment' &&
-          task.id !== 'trauma-assessment' &&
-          !integratedBodyMapTaskIds.has(task.id),
+          task.id !== 'extremity-assessment',
       ),
     [suggestedAssessmentTasks],
   );
@@ -258,9 +256,7 @@ export default function AssessmentSection({
       getAdditionalAssessmentTasksForContext(context).filter(
         (task) =>
           task.id !== 'extremity-assessment' &&
-          task.id !== 'trauma-assessment' &&
-          task.id !== 'reassessment' &&
-          !integratedBodyMapTaskIds.has(task.id),
+          task.id !== 'reassessment',
       ),
     [
       clinicalCategory,
@@ -271,6 +267,7 @@ export default function AssessmentSection({
     ],
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
+  const [moreAssessmentsOpen, setMoreAssessmentsOpen] = useState(false);
   const [physicalAssessmentExpanded, setPhysicalAssessmentExpanded] =
     useState(true);
   const [expandedRegionalAssessmentId, setExpandedRegionalAssessmentId] =
@@ -2144,116 +2141,202 @@ export default function AssessmentSection({
       </PCRCard>
 
 
-      <div>
-        <div className="mb-3 rounded-lg bg-blue-100 px-4 py-3 text-sm font-bold uppercase tracking-wide text-blue-900">
-          Initial Assessment and History
-        </div>
+      <div className="space-y-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedTaskId(
+                expandedTaskId === 'primary-assessment' ? '' : 'primary-assessment',
+              )
+            }
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
+            <div>
+              <div className="text-base font-black text-slate-950">Primary Assessment</div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                Airway • Breathing • Circulation • Disability • Exposure
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-black text-slate-500">
+                {getTaskProgress('primary-assessment').completed}/{getTaskProgress('primary-assessment').total}
+              </span>
+              <span className="text-xl font-black text-slate-500">
+                {expandedTaskId === 'primary-assessment' ? '−' : '+'}
+              </span>
+            </div>
+          </button>
 
-        <div className="space-y-4">
-          {[
-            {
-              id: 'primary-assessment',
-              title: 'Primary Assessment',
-            },
-            {
-              id: 'history-taking',
-              title: 'History Assessment / SAMPLE',
-            },
-          ].map((task) => {
-            const progress = getTaskProgress(task.id);
-
-            return (
-              <PCRCard
-                key={task.id}
-                title={task.title}
-                completedFields={progress.completed}
-                totalFields={progress.total}
-                expanded={expandedTaskId === task.id}
-                onToggle={() =>
-                  setExpandedTaskId(
-                    expandedTaskId === task.id ? '' : task.id,
-                  )
-                }
-              >
-                {renderTaskContent(task.id, task.title)}
-              </PCRCard>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <div className="mb-3 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-          Recommended Next
-        </div>
-        <p className="mb-3 text-sm font-semibold text-slate-600">
-          Based on this patient&apos;s documented context. You decide which assessments are clinically appropriate.
-        </p>
-
-        <div className="space-y-4">
-          {providerScope === 'ALS' && (
-            <PCRCard
-              title="ECG Assessment"
-              completedFields={getTaskProgress('ecg-assessment').completed}
-              totalFields={getTaskProgress('ecg-assessment').total}
-              expanded={expandedTaskId === 'ecg-assessment'}
-              onToggle={() =>
-                setExpandedTaskId(
-                  expandedTaskId === 'ecg-assessment' ? '' : 'ecg-assessment',
-                )
-              }
-            >
-              {renderTaskContent('ecg-assessment', 'ECG Assessment')}
-            </PCRCard>
+          {expandedTaskId === 'primary-assessment' && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              {renderTaskContent('primary-assessment', 'Primary Assessment')}
+            </div>
           )}
-          {suggestedTasks.map((task) => {
-            const progress = getTaskProgress(task.id);
-
-            return (
-              <PCRCard
-                key={task.id}
-                title={task.title}
-                completedFields={progress.completed}
-                totalFields={progress.total}
-                expanded={expandedTaskId === task.id}
-                onToggle={() =>
-                  setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
-                }
-              >
-                {renderTaskContent(task.id, task.title)}
-              </PCRCard>
-            );
-          })}
         </div>
-      </div>
 
-      <div>
-        <div className="mb-3 rounded-lg bg-slate-200 px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-700">
-          More Assessments
+        {(suggestedTasks.length > 0 ||
+          (providerScope === 'ALS' && clinicalCategory === 'Cardiovascular')) && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
+              Suggested for this patient
+            </div>
+            <p className="mt-1 text-xs font-semibold text-emerald-900/70">
+              Based on what you already documented. Use only what is clinically appropriate.
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {providerScope === 'ALS' && clinicalCategory === 'Cardiovascular' && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpandedTaskId(
+                      expandedTaskId === 'ecg-assessment' ? '' : 'ecg-assessment',
+                    )
+                  }
+                  className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
+                >
+                  ECG Assessment
+                </button>
+              )}
+
+              {suggestedTasks.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() =>
+                    setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
+                  }
+                  className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
+                >
+                  {task.title.replace(' Assessment', '').replace(' / ', ' • ')}
+                </button>
+              ))}
+            </div>
+
+            {expandedTaskId === 'ecg-assessment' &&
+              providerScope === 'ALS' &&
+              clinicalCategory === 'Cardiovascular' && (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-4">
+                  {renderTaskContent('ecg-assessment', 'ECG Assessment')}
+                </div>
+              )}
+
+            {suggestedTasks.map((task) =>
+              expandedTaskId === task.id ? (
+                <div
+                  key={`${task.id}-content`}
+                  className="mt-4 rounded-xl border border-emerald-200 bg-white p-4"
+                >
+                  {renderTaskContent(task.id, task.title)}
+                </div>
+              ) : null,
+            )}
+          </div>
+        )}
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() =>
+              setExpandedTaskId(
+                expandedTaskId === 'history-taking' ? '' : 'history-taking',
+              )
+            }
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
+            <div>
+              <div className="text-base font-black text-slate-950">History / SAMPLE</div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                Relevant history when you need it
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-black text-slate-500">
+                {getTaskProgress('history-taking').completed}/{getTaskProgress('history-taking').total}
+              </span>
+              <span className="text-xl font-black text-slate-500">
+                {expandedTaskId === 'history-taking' ? '−' : '+'}
+              </span>
+            </div>
+          </button>
+
+          {expandedTaskId === 'history-taking' && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              {renderTaskContent('history-taking', 'History Assessment / SAMPLE')}
+            </div>
+          )}
         </div>
-        <p className="mb-3 text-sm font-semibold text-slate-600">
-          Open an assessment only when it helps document this patient.
-        </p>
 
-        <div className="space-y-4">
-          {additionalTasks.map((task) => {
-            const progress = getTaskProgress(task.id);
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <button
+            type="button"
+            onClick={() => {
+              setMoreAssessmentsOpen((current) => !current);
+              if (moreAssessmentsOpen) setExpandedTaskId('');
+            }}
+            className="flex w-full items-center justify-between gap-4 text-left"
+          >
+            <div>
+              <div className="text-base font-black text-slate-900">+ More Assessments</div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                Open the full assessment library only when you need it.
+              </div>
+            </div>
+            <span className="text-xl font-black text-slate-500">
+              {moreAssessmentsOpen ? '−' : '+'}
+            </span>
+          </button>
 
-            return (
-              <PCRCard
-                key={task.id}
-                title={task.title}
-                completedFields={progress.completed}
-                totalFields={progress.total}
-                expanded={expandedTaskId === task.id}
-                onToggle={() =>
-                  setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
-                }
-              >
-                {renderTaskContent(task.id, task.title)}
-              </PCRCard>
-            );
-          })}
+          {moreAssessmentsOpen && (
+            <div className="mt-4 border-t border-slate-200 pt-4">
+              <div className="flex flex-wrap gap-2">
+                {providerScope === 'ALS' && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedTaskId(
+                        expandedTaskId === 'ecg-assessment' ? '' : 'ecg-assessment',
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100"
+                  >
+                    ECG Assessment
+                  </button>
+                )}
+
+                {additionalTasks.map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() =>
+                      setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100"
+                  >
+                    {task.title}
+                  </button>
+                ))}
+              </div>
+
+              {expandedTaskId === 'ecg-assessment' && providerScope === 'ALS' && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                  {renderTaskContent('ecg-assessment', 'ECG Assessment')}
+                </div>
+              )}
+
+              {additionalTasks.map((task) =>
+                expandedTaskId === task.id ? (
+                  <div
+                    key={`${task.id}-more-content`}
+                    className="mt-4 rounded-xl border border-slate-200 bg-white p-4"
+                  >
+                    {renderTaskContent(task.id, task.title)}
+                  </div>
+                ) : null,
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
