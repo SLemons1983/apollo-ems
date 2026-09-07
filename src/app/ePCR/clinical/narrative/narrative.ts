@@ -201,7 +201,7 @@ function assessmentSynthesis(source: Source) {
   if (first && /diaphoretic/i.test(first.skinMoisture)) findings.push('diaphoresis');
   if (clean(source.assessment.clinical.ecg.twelveLeadInterpretation)) findings.push(`a twelve-lead interpretation documented as ${source.assessment.clinical.ecg.twelveLeadInterpretation}`);
   const impression = clean(source.complaint.primaryImpression?.description);
-  return sentence(findings.length ? `${list(findings)}. Primary impression was documented as ${impression || 'not specified'}${clean(source.complaint.secondaryImpression?.description) ? `, with a secondary impression of ${source.complaint.secondaryImpression?.description}` : ''}` : impression || 'No clinical impression documented');
+  return sentence(findings.length ? `${list(findings)}. Clinical differential was documented as ${impression || 'not specified'}` : impression || 'No clinical differential documented');
 }
 
 export function getNarrativeReviewIssues(source: Source): NarrativeReviewIssue[] {

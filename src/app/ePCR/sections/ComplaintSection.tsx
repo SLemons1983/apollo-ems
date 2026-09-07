@@ -5,7 +5,6 @@ import PCRCard from '../components/PCRCard';
 import ClinicalCategoryPicker from '../clinical/components/ClinicalCategoryPicker';
 import ClinicalCombobox from '../clinical/components/ClinicalCombobox';
 import ClinicalSymptomPicker from '../clinical/components/ClinicalSymptomPicker';
-import type { ClinicalOption } from '../clinical/engine';
 import type { CodedSelection, ComplaintForm } from '../types';
 import { commonDrugOptions } from '../reference/drugs';
 
@@ -61,12 +60,40 @@ const commonChiefComplaints = [
   'Vaginal Bleeding', 'Vertigo', 'Vomiting', 'Weakness', 'Wound Check', 'Other',
 ];
 
-const noneClinicalOption: ClinicalOption = {
-  code: 'NONE',
-  category: 'All',
-  sourceLabel: 'None',
-  suggestedLabel: 'None',
-  note: 'No secondary differential or associated symptom documented.',
+const chiefComplaintImpressionRecommendations: Record<string, string[]> = {
+  'Abdominal Pain': ['Abdominal', 'Digestive', 'Pain'],
+  'Allergic Reaction': ['Respiratory', 'Illness', 'Other'],
+  'Altered Mental Status': ['Level of Consciousness', 'Neurological', 'Endocrine/Urinary', 'Alcohol/Drug Exposure'],
+  'Behavioral Emergency': ['Emotional State/Behavior', 'Alcohol/Drug Exposure'],
+  'Burn': ['Injury', 'Pain'],
+  'Cardiac Arrest': ['Cardiovascular', 'Level of Consciousness'],
+  'Chest Pain': ['Cardiovascular', 'Respiratory', 'Pain'],
+  'Diabetic Emergency': ['Endocrine/Urinary', 'Level of Consciousness'],
+  'Difficulty Breathing': ['Respiratory', 'Cardiovascular'],
+  'Drug Overdose': ['Alcohol/Drug Exposure', 'Level of Consciousness', 'Respiratory'],
+  'Fall': ['Injury', 'Pain', 'Neurological'],
+  'Head Injury': ['Injury', 'Neurological', 'Level of Consciousness'],
+  'Hypertension': ['Cardiovascular'],
+  'Hypotension': ['Cardiovascular', 'Illness'],
+  'Ingestion / Poisoning': ['Alcohol/Drug Exposure', 'Illness'],
+  'Labor / Childbirth': ['Reproductive System'],
+  'Loss of Consciousness': ['Level of Consciousness', 'Neurological', 'Cardiovascular'],
+  'Motor Vehicle Collision': ['Injury', 'Pain'],
+  'Nausea': ['Digestive', 'Abdominal', 'Illness'],
+  'Palpitations': ['Cardiovascular'],
+  'Psychiatric Complaint': ['Emotional State/Behavior'],
+  'Respiratory Distress': ['Respiratory', 'Cardiovascular'],
+  'Seizure': ['Neurological', 'Level of Consciousness'],
+  'Shortness of Breath': ['Respiratory', 'Cardiovascular'],
+  'Stroke Symptoms': ['Neurological', 'Level of Consciousness'],
+  'Suicidal Ideation': ['Emotional State/Behavior'],
+  'Syncope': ['Level of Consciousness', 'Cardiovascular', 'Neurological'],
+  'Traumatic Injury': ['Injury', 'Pain'],
+  'Unconscious / Unresponsive': ['Level of Consciousness', 'Neurological', 'Cardiovascular'],
+  'Urinary Problem': ['Endocrine/Urinary'],
+  'Vaginal Bleeding': ['Reproductive System', 'Injury'],
+  'Vomiting': ['Digestive', 'Abdominal', 'Illness'],
+  'Weakness': ['Malaise', 'Neurological', 'Illness'],
 };
 
 type ComplaintSectionProps = {
@@ -123,7 +150,6 @@ export default function ComplaintSection({
     complaintForm.chiefComplaint,
     complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
-    complaintForm.secondaryImpression,
     complaintForm.primarySymptom,
     complaintForm.symptomsBeganDateTime,
     complaintForm.lastSeenNormalDateTime,
@@ -199,15 +225,16 @@ export default function ComplaintSection({
           </label>
 
           <ClinicalCategoryPicker
-            label="Clinical Category"
+            label="Clinical Impression"
             listType="impression"
             value={complaintForm.clinicalCategory}
+            recommendedValues={
+              chiefComplaintImpressionRecommendations[complaintForm.chiefComplaint] ?? []
+            }
             onChange={(value) => {
               updateComplaintForm('clinicalCategory', value);
               updateComplaintForm('primaryImpression', null);
               updateComplaintForm('secondaryImpression', null);
-              updateComplaintForm('primarySymptom', null);
-              updateComplaintForm('otherAssociatedSymptoms', []);
             }}
           />
 
@@ -216,48 +243,9 @@ export default function ComplaintSection({
             listType="impression"
             category={complaintForm.clinicalCategory}
             value={complaintForm.primaryImpression}
-            excludedValues={
-              complaintForm.secondaryImpression
-                ? [complaintForm.secondaryImpression]
-                : []
+            onChange={(value) =>
+              updateComplaintForm('primaryImpression', value)
             }
-            onChange={(value) => {
-              updateComplaintForm('primaryImpression', value);
-
-              if (
-                codedSelectionsMatch(
-                  value,
-                  complaintForm.secondaryImpression,
-                )
-              ) {
-                updateComplaintForm('secondaryImpression', null);
-              }
-            }}
-          />
-
-          <ClinicalCombobox
-            label="Secondary Differential"
-            listType="impression"
-            category={complaintForm.clinicalCategory}
-            value={complaintForm.secondaryImpression}
-            additionalOptions={[noneClinicalOption]}
-            excludedValues={
-              complaintForm.primaryImpression
-                ? [complaintForm.primaryImpression]
-                : []
-            }
-            onChange={(value) => {
-              updateComplaintForm('secondaryImpression', value);
-
-              if (
-                codedSelectionsMatch(
-                  value,
-                  complaintForm.primaryImpression,
-                )
-              ) {
-                updateComplaintForm('primaryImpression', null);
-              }
-            }}
           />
 
           <ClinicalSymptomPicker
