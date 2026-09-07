@@ -22,6 +22,7 @@ type ApolloBodyMapProps = {
   mode?: ApolloBodyMapMode;
   regionStatuses?: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
   clinicalOverlays?: ApolloClinicalOverlay[];
+  suggestedRegions?: ApolloBodyRegionKey[];
 };
 
 export default function ApolloBodyMap({
@@ -32,6 +33,7 @@ export default function ApolloBodyMap({
   mode = 'assessment',
   regionStatuses = {},
   clinicalOverlays = [],
+  suggestedRegions = [],
 }: ApolloBodyMapProps) {
   const [hoveredRegion, setHoveredRegion] =
     useState<ApolloBodyRegionKey | null>(null);
@@ -72,6 +74,7 @@ export default function ApolloBodyMap({
               patientSex={patientSex}
               selectedRegions={selectedRegions}
               regionStatuses={combinedRegionStatuses}
+              suggestedRegions={suggestedRegions}
               activeRegion={hoveredRegion || focusedRegion || null}
               onRegionClick={onRegionClick}
               onFocusRegion={setHoveredRegion}
@@ -82,6 +85,7 @@ export default function ApolloBodyMap({
       </div>
 
       <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+        <span><span className="text-violet-600">◆</span> Complaint / symptom</span>
         <span><span className="text-blue-600">●</span> Selected</span>
         <span><span className="text-amber-500">●</span> In Progress</span>
         <span><span className="text-emerald-600">●</span> Unremarkable</span>

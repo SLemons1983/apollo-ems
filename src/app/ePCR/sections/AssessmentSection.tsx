@@ -149,6 +149,37 @@ const integratedBodyMapTaskIds = new Set([
   'respiratory-assessment',
 ]);
 
+
+const complaintBodyRegionRules: {
+  terms: string[];
+  regions: ApolloBodyRegionKey[];
+}[] = [
+  { terms: ['chest pain', 'chest discomfort', 'chest injury', 'rib pain'], regions: ['chest'] },
+  { terms: ['abdominal pain', 'abd pain', 'stomach pain', 'abdominal injury'], regions: ['abdomen'] },
+  { terms: ['pelvic pain', 'pelvis pain', 'groin pain', 'hip pain'], regions: ['pelvis'] },
+  { terms: ['headache', 'head pain', 'head injury', 'head trauma'], regions: ['head'] },
+  { terms: ['facial pain', 'face pain', 'facial injury', 'face injury'], regions: ['face'] },
+  { terms: ['neck pain', 'neck injury'], regions: ['neck'] },
+  { terms: ['back pain', 'back injury', 'back trauma'], regions: ['back'] },
+  { terms: ['right arm pain', 'right arm injury', 'right shoulder pain', 'right elbow pain', 'right wrist pain', 'right hand pain'], regions: ['rightArm'] },
+  { terms: ['left arm pain', 'left arm injury', 'left shoulder pain', 'left elbow pain', 'left wrist pain', 'left hand pain'], regions: ['leftArm'] },
+  { terms: ['right leg pain', 'right leg injury', 'right knee pain', 'right ankle pain', 'right foot pain'], regions: ['rightLeg'] },
+  { terms: ['left leg pain', 'left leg injury', 'left knee pain', 'left ankle pain', 'left foot pain'], regions: ['leftLeg'] },
+];
+
+function getComplaintBodyRegions(summary: string): ApolloBodyRegionKey[] {
+  const normalized = summary.trim().toLowerCase();
+  if (!normalized) return [];
+
+  return Array.from(
+    new Set(
+      complaintBodyRegionRules.flatMap((rule) =>
+        rule.terms.some((term) => normalized.includes(term)) ? rule.regions : [],
+      ),
+    ),
+  );
+}
+
 type AssessmentSectionProps = {
   assessmentForm: AssessmentForm;
   onAssessmentFormChange: Dispatch<SetStateAction<AssessmentForm>>;
@@ -907,6 +938,10 @@ export default function AssessmentSection({
   });
 
   const normalizedComplaintSummary = complaintSummary.toLowerCase();
+  const complaintSuggestedBodyRegions = useMemo(
+    () => getComplaintBodyRegions(complaintSummary),
+    [complaintSummary],
+  );
   const chestPainDocumented =
     painAssessment.painPresent === 'Yes' &&
     (normalizedComplaintSummary.includes('chest pain') ||
@@ -1695,6 +1730,7 @@ export default function AssessmentSection({
             focusedRegion={selectedAssessmentRegion}
             regionStatuses={assessmentBodyRegionStatuses}
             clinicalOverlays={assessmentClinicalOverlays}
+            suggestedRegions={complaintSuggestedBodyRegions}
             onRegionClick={handleAssessmentBodyRegionClick}
           />
   

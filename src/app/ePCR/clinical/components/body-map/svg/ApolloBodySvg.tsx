@@ -14,6 +14,7 @@ type ApolloBodySvgProps = {
   patientSex?: string;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   regionStatuses: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
+  suggestedRegions?: ApolloBodyRegionKey[];
   activeRegion: ApolloBodyRegionKey | null;
   onRegionClick: (region: ApolloBodyRegionKey) => void;
   onFocusRegion: (region: ApolloBodyRegionKey) => void;
@@ -85,6 +86,7 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
             Boolean(status?.note) ||
             Boolean(status?.overlays?.length);
           const active = props.activeRegion === region.id;
+          const suggested = props.suggestedRegions?.includes(region.id) ?? false;
           const assessmentState = status?.assessmentState;
 
           const fill =
@@ -98,7 +100,9 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
                     ? 'rgba(59, 130, 246, 0.28)'
                     : hasClinicalData
                       ? 'rgba(245, 158, 11, 0.22)'
-                      : 'rgba(255, 255, 255, 0.001)';
+                      : suggested
+                        ? 'rgba(124, 58, 237, 0.16)'
+                        : 'rgba(255, 255, 255, 0.001)';
 
           const stroke =
             active
@@ -111,7 +115,9 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
                     ? '#d97706'
                     : selected
                       ? '#2563eb'
-                      : 'transparent';
+                      : suggested
+                        ? '#7c3aed'
+                        : 'transparent';
 
           return (
             <path
@@ -120,7 +126,10 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
               fill={fill}
               stroke={stroke}
               strokeWidth={
-                active || assessmentState || selected ? 4 : 0
+                active || assessmentState || selected ? 4 : suggested ? 3 : 0
+              }
+              strokeDasharray={
+                suggested && !active && !assessmentState && !selected ? '10 7' : undefined
               }
               onClick={() => props.onRegionClick(region.id)}
               onMouseEnter={() => props.onFocusRegion(region.id)}

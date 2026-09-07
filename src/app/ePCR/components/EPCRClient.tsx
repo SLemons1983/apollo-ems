@@ -1174,6 +1174,9 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                           complaintForm.primaryImpression?.description,
                           complaintForm.secondaryImpression?.description,
                           complaintForm.primarySymptom?.description,
+                          ...complaintForm.otherAssociatedSymptoms.map(
+                            (item) => item.description,
+                          ),
                         ].filter(Boolean).join(' ')}
                         suspectedStroke={
                           complaintForm.suspectedStrokeCva === "Yes"
