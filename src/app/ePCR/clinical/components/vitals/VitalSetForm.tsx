@@ -192,21 +192,6 @@ export default function VitalSetForm({
     setGcsDetailsOpen(false);
   };
 
-  const markNormalSupportingFindings = () => {
-    onChange('pulseQuality', 'Normal');
-    onChange('respiratoryQuality', 'Normal');
-    onChange('skinColor', 'Appropriate for ethnicity');
-    onChange('skinTemperature', 'Warm');
-    onChange('skinMoisture', 'Dry');
-  };
-
-  const supportingComplete = Boolean(
-    value.pulseQuality &&
-    value.respiratoryQuality &&
-    value.skinColor &&
-    value.skinTemperature &&
-    value.skinMoisture
-  );
 
   return (
     <div className="space-y-5">
@@ -440,47 +425,6 @@ export default function VitalSetForm({
         </div>
 
         <div className="sm:col-span-2 lg:col-span-3">
-          <div className="rounded-xl border border-slate-300 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-black uppercase tracking-wide text-slate-600">
-                  Supporting Findings
-                </div>
-                <div className="mt-1 text-xs font-semibold text-slate-500">
-                  Required qualitative findings can be documented in one tap when normal.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={markNormalSupportingFindings}
-                className={`rounded-lg border px-4 py-2 text-sm font-black transition ${
-                  supportingComplete &&
-                  value.pulseQuality === 'Normal' &&
-                  value.respiratoryQuality === 'Normal' &&
-                  value.skinColor === 'Appropriate for ethnicity' &&
-                  value.skinTemperature === 'Warm' &&
-                  value.skinMoisture === 'Dry'
-                    ? 'border-emerald-700 bg-emerald-700 text-white'
-                    : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
-                }`}
-              >
-                {supportingComplete &&
-                value.pulseQuality === 'Normal' &&
-                value.respiratoryQuality === 'Normal' &&
-                value.skinColor === 'Appropriate for ethnicity' &&
-                value.skinTemperature === 'Warm' &&
-                value.skinMoisture === 'Dry'
-                  ? '✓ Normal Supporting Findings'
-                  : 'Normal Supporting Findings'}
-              </button>
-            </div>
-            {supportingComplete && (
-              <div className="mt-3 text-xs font-bold text-slate-600">
-                Pulse {value.pulseQuality} • Respirations {value.respiratoryQuality} • Skin {value.skinColor}, {value.skinTemperature}, {value.skinMoisture}
-              </div>
-            )}
-          </div>
-
           <button
             type="button"
             onClick={() => setAdditionalOpen((current) => !current)}
