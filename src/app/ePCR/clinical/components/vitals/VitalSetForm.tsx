@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import type {
   ProviderScope,
   VitalSetDraft,
@@ -138,6 +140,8 @@ export default function VitalSetForm({
   onSave,
   onCancel,
 }: VitalSetFormProps) {
+  const [additionalOpen, setAdditionalOpen] = useState(false);
+  const [gcsDetailsOpen, setGcsDetailsOpen] = useState(false);
   const complete = isVitalSetComplete(value, providerScope);
   const requiredValues = getVitalRequiredValues(value, providerScope);
   const completedRequired = requiredValues.filter(
@@ -179,6 +183,30 @@ export default function VitalSetForm({
     onChange(field, score);
     onChange('gcs', total);
   };
+
+  const markGcs15 = () => {
+    onChange('gcsEyes', '4');
+    onChange('gcsVerbal', '5');
+    onChange('gcsMotor', '6');
+    onChange('gcs', '15');
+    setGcsDetailsOpen(false);
+  };
+
+  const markNormalSupportingFindings = () => {
+    onChange('pulseQuality', 'Normal');
+    onChange('respiratoryQuality', 'Normal');
+    onChange('skinColor', 'Appropriate for ethnicity');
+    onChange('skinTemperature', 'Warm');
+    onChange('skinMoisture', 'Dry');
+  };
+
+  const supportingComplete = Boolean(
+    value.pulseQuality &&
+    value.respiratoryQuality &&
+    value.skinColor &&
+    value.skinTemperature &&
+    value.skinMoisture
+  );
 
   return (
     <div className="space-y-5">
@@ -236,29 +264,33 @@ export default function VitalSetForm({
 
         {value.unableToAssess !== 'Yes' && <>
 
-        <Field label="Entry Source">
-          <select
-            value={value.source}
-            onChange={(event) => onChange('source', event.target.value)}
-            className={inputClass}
-          >
-            <option>Manual</option>
-            <option>Device Imported</option>
-          </select>
-        </Field>
-
-        <Field label="BP Method" required>
-          <select
-            value={value.bloodPressureMethod}
-            onChange={(event) =>
-              onChange('bloodPressureMethod', event.target.value)
-            }
-            className={inputClass}
-          >
-            <option>Auscultated</option>
-            <option>Palpated</option>
-          </select>
-        </Field>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Blood Pressure</span>
+            <button
+              type="button"
+              onClick={() => onChange('bloodPressureMethod', 'Auscultated')}
+              className={`rounded-full border px-3 py-1 text-xs font-black ${
+                value.bloodPressureMethod === 'Auscultated'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-300 bg-white text-slate-600'
+              }`}
+            >
+              Auscultated
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange('bloodPressureMethod', 'Palpated')}
+              className={`rounded-full border px-3 py-1 text-xs font-black ${
+                value.bloodPressureMethod === 'Palpated'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-300 bg-white text-slate-600'
+              }`}
+            >
+              Palpated
+            </button>
+          </div>
+        </div>
 
         <Field label="Systolic BP" required error={getVitalFieldError(value, 'systolic')}>
           <input
@@ -292,7 +324,7 @@ export default function VitalSetForm({
           />
         </Field>
 
-        <Field label="Heart / Pulse Rate" required error={getVitalFieldError(value, 'heartRate')}>
+        <Field label="Pulse" required error={getVitalFieldError(value, 'heartRate')}>
           <input
             type="number"
             inputMode="numeric"
@@ -304,19 +336,7 @@ export default function VitalSetForm({
           />
         </Field>
 
-        <Field label="Pulse Quality" required>
-          <select
-            value={value.pulseQuality}
-            title={findingTitle('pulseQuality')}
-            onChange={(event) => onChange('pulseQuality', event.target.value)}
-            className={selectClass('pulseQuality')}
-          >
-            <option value="">Select</option>
-            {pulseQualities.map((option) => <option key={option}>{option}</option>)}
-          </select>
-        </Field>
-
-        <Field label="Respiratory Rate" required error={getVitalFieldError(value, 'respiratoryRate')}>
+        <Field label="Respirations" required error={getVitalFieldError(value, 'respiratoryRate')}>
           <input
             type="number"
             inputMode="numeric"
@@ -328,20 +348,6 @@ export default function VitalSetForm({
             }
             className={numericClass('respiratoryRate')}
           />
-        </Field>
-
-        <Field label="Respiratory Quality" required>
-          <select
-            value={value.respiratoryQuality}
-            title={findingTitle('respiratoryQuality')}
-            onChange={(event) =>
-              onChange('respiratoryQuality', event.target.value)
-            }
-            className={selectClass('respiratoryQuality')}
-          >
-            <option value="">Select</option>
-            {respiratoryQualities.map((option) => <option key={option}>{option}</option>)}
-          </select>
         </Field>
 
         <Field label="SpO₂ %" required error={getVitalFieldError(value, 'spo2')}>
@@ -356,6 +362,181 @@ export default function VitalSetForm({
           />
         </Field>
 
+        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black uppercase tracking-wide text-slate-600">
+                Glasgow Coma Scale <span className="text-red-600">*</span>
+              </div>
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                Use the normal shortcut or document the individual responses.
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-center">
+              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">GCS</div>
+              <div className="text-2xl font-black text-slate-900">{value.gcs || '—'}</div>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={markGcs15}
+              className={`rounded-lg border px-4 py-3 text-sm font-black transition ${
+                value.gcs === '15' && value.gcsEyes === '4' && value.gcsVerbal === '5' && value.gcsMotor === '6'
+                  ? 'border-emerald-700 bg-emerald-700 text-white'
+                  : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
+              }`}
+            >
+              {value.gcs === '15' && value.gcsEyes === '4' && value.gcsVerbal === '5' && value.gcsMotor === '6'
+                ? '✓ GCS 15 — Normal'
+                : 'GCS 15 — Normal'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setGcsDetailsOpen((current) => !current)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-100"
+            >
+              {gcsDetailsOpen ? 'Hide GCS Details' : 'Document GCS Details'}
+            </button>
+          </div>
+
+          {gcsDetailsOpen && (
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              {gcsGroups.map((group) => (
+                <div key={group.field}>
+                  <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-600">
+                    {group.label}
+                  </div>
+                  <div className="space-y-2">
+                    {group.options.map((option) => {
+                      const selected = value[group.field] === option.score;
+                      return (
+                        <button
+                          key={`${group.field}-${option.score}`}
+                          type="button"
+                          onClick={() => updateGcs(group.field, option.score)}
+                          className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${
+                            selected
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="text-lg font-black">{option.score}</span>
+                          <span>{option.description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {getVitalFieldError(value, 'gcs') && (
+            <div className="mt-2 text-xs font-bold text-red-700">
+              {getVitalFieldError(value, 'gcs')}
+            </div>
+          )}
+        </div>
+
+        <div className="sm:col-span-2 lg:col-span-3">
+          <div className="rounded-xl border border-slate-300 bg-white p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-wide text-slate-600">
+                  Supporting Findings
+                </div>
+                <div className="mt-1 text-xs font-semibold text-slate-500">
+                  Required qualitative findings can be documented in one tap when normal.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={markNormalSupportingFindings}
+                className={`rounded-lg border px-4 py-2 text-sm font-black transition ${
+                  supportingComplete &&
+                  value.pulseQuality === 'Normal' &&
+                  value.respiratoryQuality === 'Normal' &&
+                  value.skinColor === 'Appropriate for ethnicity' &&
+                  value.skinTemperature === 'Warm' &&
+                  value.skinMoisture === 'Dry'
+                    ? 'border-emerald-700 bg-emerald-700 text-white'
+                    : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
+                }`}
+              >
+                {supportingComplete &&
+                value.pulseQuality === 'Normal' &&
+                value.respiratoryQuality === 'Normal' &&
+                value.skinColor === 'Appropriate for ethnicity' &&
+                value.skinTemperature === 'Warm' &&
+                value.skinMoisture === 'Dry'
+                  ? '✓ Normal Supporting Findings'
+                  : 'Normal Supporting Findings'}
+              </button>
+            </div>
+            {supportingComplete && (
+              <div className="mt-3 text-xs font-bold text-slate-600">
+                Pulse {value.pulseQuality} • Respirations {value.respiratoryQuality} • Skin {value.skinColor}, {value.skinTemperature}, {value.skinMoisture}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setAdditionalOpen((current) => !current)}
+            className="mt-3 w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-100"
+          >
+            {additionalOpen ? '− Hide Additional Vital Signs' : '+ Additional Vital Signs'}
+          </button>
+
+          {additionalOpen && (
+            <div className={`mt-3 grid gap-3 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+        <Field label="Entry Source">
+          <select
+            value={value.source}
+            onChange={(event) => onChange('source', event.target.value)}
+            className={inputClass}
+          >
+            <option>Manual</option>
+            <option>Device Imported</option>
+          </select>
+        </Field>
+        <Field label="BP Method" required>
+          <select
+            value={value.bloodPressureMethod}
+            onChange={(event) =>
+              onChange('bloodPressureMethod', event.target.value)
+            }
+            className={inputClass}
+          >
+            <option>Auscultated</option>
+            <option>Palpated</option>
+          </select>
+        </Field>
+        <Field label="Pulse Quality" required>
+          <select
+            value={value.pulseQuality}
+            title={findingTitle('pulseQuality')}
+            onChange={(event) => onChange('pulseQuality', event.target.value)}
+            className={selectClass('pulseQuality')}
+          >
+            <option value="">Select</option>
+            {pulseQualities.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Respiratory Quality" required>
+          <select
+            value={value.respiratoryQuality}
+            title={findingTitle('respiratoryQuality')}
+            onChange={(event) =>
+              onChange('respiratoryQuality', event.target.value)
+            }
+            className={selectClass('respiratoryQuality')}
+          >
+            <option value="">Select</option>
+            {respiratoryQualities.map((option) => <option key={option}>{option}</option>)}
+          </select>
+        </Field>
         <Field label="SpCO % (Optional)" error={getVitalFieldError(value, 'spco')}>
           <input
             type="number"
@@ -367,7 +548,6 @@ export default function VitalSetForm({
             className={numericClass('spco')}
           />
         </Field>
-
         <Field label="ETCO₂ mmHg (Optional)" error={getVitalFieldError(value, 'etco2')}>
           <input
             type="number"
@@ -379,59 +559,6 @@ export default function VitalSetForm({
             className={numericClass('etco2')}
           />
         </Field>
-
-        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-wide text-slate-600">
-                Glasgow Coma Scale <span className="text-red-600">*</span>
-              </div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">
-                Select one response in each category.
-              </div>
-            </div>
-            <div className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-center">
-              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500">Calculated GCS</div>
-              <div className="text-2xl font-black text-slate-900">{value.gcs || '—'}</div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            {gcsGroups.map((group) => (
-              <div key={group.field}>
-                <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-600">
-                  {group.label}
-                </div>
-                <div className="space-y-2">
-                  {group.options.map((option) => {
-                    const selected = value[group.field] === option.score;
-                    return (
-                      <button
-                        key={`${group.field}-${option.score}`}
-                        type="button"
-                        onClick={() => updateGcs(group.field, option.score)}
-                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition ${
-                          selected
-                            ? 'border-slate-900 bg-slate-900 text-white'
-                            : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100'
-                        }`}
-                      >
-                        <span className="text-lg font-black">{option.score}</span>
-                        <span>{option.description}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-          {getVitalFieldError(value, 'gcs') && (
-            <div className="mt-2 text-xs font-bold text-red-700">
-              {getVitalFieldError(value, 'gcs')}
-            </div>
-          )}
-        </div>
-
         <Field label="Temperature °F (Optional)" error={getVitalFieldError(value, 'temperature')}>
           <input
             type="number"
@@ -537,6 +664,9 @@ export default function VitalSetForm({
             className={inputClass}
           />
         </Field>
+            </div>
+          )}
+        </div>
         </>}
       </div>
 
