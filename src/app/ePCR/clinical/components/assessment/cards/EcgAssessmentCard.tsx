@@ -85,9 +85,9 @@ export default function EcgAssessmentCard({
   return (
     <div className="space-y-4">
       <div>
-        <div className="text-sm font-black text-slate-950">What was performed?</div>
-        <p className="mt-1 text-xs font-semibold text-slate-500">
-          Choose the ECG evaluation used for this patient. Apollo will show only the fields you need.
+        <div className="text-sm font-black text-slate-950">ECG performed</div>
+        <p className="mt-0.5 text-xs font-semibold text-slate-500">
+          Select the study obtained.
         </p>
 
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -200,8 +200,8 @@ export default function EcgAssessmentCard({
       )}
 
       {!value.notIndicated && !performed && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm font-semibold text-slate-500">
-          Select 4-Lead, 12-Lead, or Both to document cardiac ECG findings.
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold text-slate-500">
+          Select an ECG option above.
         </div>
       )}
     </div>

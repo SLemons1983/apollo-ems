@@ -268,6 +268,13 @@ export default function AssessmentSection({
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const [moreAssessmentsOpen, setMoreAssessmentsOpen] = useState(false);
+  function assessmentProgressLabel(taskId: string) {
+    const progress = getTaskProgress(taskId);
+    if (progress.completed >= progress.total && progress.total > 0) return '✓ Complete';
+    if (progress.completed > 0) return 'In Progress';
+    return 'Not Started';
+  }
+
   const cardiacAssessmentSuggested = useMemo(() => {
     const normalizedComplaint = complaintSummary.toLowerCase();
 
@@ -2156,8 +2163,8 @@ export default function AssessmentSection({
       </PCRCard>
 
 
-      <div className="space-y-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="space-y-2.5">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <button
             type="button"
             onClick={() =>
@@ -2169,13 +2176,19 @@ export default function AssessmentSection({
           >
             <div>
               <div className="text-base font-black text-slate-950">Primary Assessment</div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">
-                Airway • Breathing • Circulation • Disability • Exposure
-              </div>
+              <div className="mt-0.5 text-xs font-semibold text-slate-500">ABCDE primary survey</div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-black text-slate-500">
-                {getTaskProgress('primary-assessment').completed}/{getTaskProgress('primary-assessment').total}
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                  assessmentProgressLabel('primary-assessment') === '✓ Complete'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : assessmentProgressLabel('primary-assessment') === 'In Progress'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {assessmentProgressLabel('primary-assessment')}
               </span>
               <span className="text-xl font-black text-slate-500">
                 {expandedTaskId === 'primary-assessment' ? '−' : '+'}
@@ -2192,15 +2205,15 @@ export default function AssessmentSection({
 
         {(suggestedTasks.length > 0 ||
           (cardiacAssessmentSuggested)) && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
-              Suggested for this patient
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3">
+            <div className="text-sm font-black text-emerald-950">
+              Suggested Assessments
             </div>
-            <p className="mt-1 text-xs font-semibold text-emerald-900/70">
-              Based on what you already documented. Use only what is clinically appropriate.
+            <p className="mt-0.5 text-xs font-semibold text-emerald-800/80">
+              Based on documented findings
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {cardiacAssessmentSuggested && (
                 <button
                   type="button"
@@ -2209,9 +2222,9 @@ export default function AssessmentSection({
                       expandedTaskId === 'ecg-assessment' ? '' : 'ecg-assessment',
                     )
                   }
-                  className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
+                  className="rounded-full border border-emerald-300 bg-white px-3.5 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
                 >
-                  ECG Assessment
+                  Cardiac
                 </button>
               )}
 
@@ -2222,7 +2235,7 @@ export default function AssessmentSection({
                   onClick={() =>
                     setExpandedTaskId(expandedTaskId === task.id ? '' : task.id)
                   }
-                  className="rounded-full border border-emerald-300 bg-white px-4 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
+                  className="rounded-full border border-emerald-300 bg-white px-3.5 py-2 text-sm font-black text-emerald-950 shadow-sm hover:bg-emerald-100"
                 >
                   {task.title.replace(' Assessment', '').replace(' / ', ' • ')}
                 </button>
@@ -2250,7 +2263,7 @@ export default function AssessmentSection({
           </div>
         )}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <button
             type="button"
             onClick={() =>
@@ -2262,13 +2275,19 @@ export default function AssessmentSection({
           >
             <div>
               <div className="text-base font-black text-slate-950">History / SAMPLE</div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">
-                Relevant history when you need it
-              </div>
+              <div className="mt-0.5 text-xs font-semibold text-slate-500">Signs/symptoms • Allergies • Medications • History • Events</div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-black text-slate-500">
-                {getTaskProgress('history-taking').completed}/{getTaskProgress('history-taking').total}
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                  assessmentProgressLabel('history-taking') === '✓ Complete'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : assessmentProgressLabel('history-taking') === 'In Progress'
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {assessmentProgressLabel('history-taking')}
               </span>
               <span className="text-xl font-black text-slate-500">
                 {expandedTaskId === 'history-taking' ? '−' : '+'}
@@ -2283,7 +2302,7 @@ export default function AssessmentSection({
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
           <button
             type="button"
             onClick={() => {
@@ -2293,10 +2312,8 @@ export default function AssessmentSection({
             className="flex w-full items-center justify-between gap-4 text-left"
           >
             <div>
-              <div className="text-base font-black text-slate-900">+ More Assessments</div>
-              <div className="mt-1 text-xs font-semibold text-slate-500">
-                Open the full assessment library only when you need it.
-              </div>
+              <div className="text-sm font-black text-slate-800">More Assessments</div>
+              <div className="mt-0.5 text-xs font-semibold text-slate-500">Full assessment library</div>
             </div>
             <span className="text-xl font-black text-slate-500">
               {moreAssessmentsOpen ? '−' : '+'}
@@ -2316,8 +2333,8 @@ export default function AssessmentSection({
                     }
                     className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100"
                   >
-                    ECG Assessment
-                  </button>
+                  Cardiac
+                </button>
                 )}
 
                 {additionalTasks.map((task) => (
