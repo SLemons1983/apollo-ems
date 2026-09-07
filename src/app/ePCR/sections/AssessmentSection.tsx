@@ -594,6 +594,7 @@ export default function AssessmentSection({
       return {
         completed:
           ecgAssessment.notIndicated ||
+          ecgAssessment.ecgPerformed ||
           ecgAssessment.fourLeadInterpretation ||
           ecgAssessment.twelveLeadInterpretation
             ? 1
@@ -1404,7 +1405,7 @@ export default function AssessmentSection({
     if (providerScope === 'ALS') {
       const ecgProgress = getTaskProgress('ecg-assessment');
       taskProgress.push({
-        title: 'ECG Assessment',
+        title: 'Cardiac Assessment',
         completedFields: ecgProgress.completed,
         totalFields: ecgProgress.total,
       });
@@ -2218,7 +2219,7 @@ export default function AssessmentSection({
               providerScope === 'ALS' &&
               clinicalCategory === 'Cardiovascular' && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-white p-4">
-                  {renderTaskContent('ecg-assessment', 'ECG Assessment')}
+                  {renderTaskContent('ecg-assessment', 'Cardiac Assessment')}
                 </div>
               )}
 
@@ -2321,7 +2322,7 @@ export default function AssessmentSection({
 
               {expandedTaskId === 'ecg-assessment' && providerScope === 'ALS' && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-                  {renderTaskContent('ecg-assessment', 'ECG Assessment')}
+                  {renderTaskContent('ecg-assessment', 'Cardiac Assessment')}
                 </div>
               )}
 

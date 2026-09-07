@@ -2,6 +2,7 @@
 
 type EcgAssessmentForm = {
   notIndicated: boolean;
+  ecgPerformed: '' | '4-lead' | '12-lead' | 'both';
   fourLeadInterpretation: string;
   twelveLeadInterpretation: string;
   abnormalFindings: string;
@@ -57,110 +58,152 @@ export default function EcgAssessmentCard({
   value,
   onChange,
 }: EcgAssessmentCardProps) {
+  const performed =
+    value.ecgPerformed ||
+    (value.fourLeadInterpretation && value.twelveLeadInterpretation
+      ? 'both'
+      : value.fourLeadInterpretation
+        ? '4-lead'
+        : value.twelveLeadInterpretation
+          ? '12-lead'
+          : '');
+
+  const showFourLead = performed === '4-lead' || performed === 'both';
+  const showTwelveLead = performed === '12-lead' || performed === 'both';
   const hasDocumentedInterpretation = Boolean(
     value.fourLeadInterpretation || value.twelveLeadInterpretation,
   );
 
+  function selectPerformed(next: EcgAssessmentForm['ecgPerformed']) {
+    onChange('notIndicated', false);
+    onChange('ecgPerformed', next);
+
+    if (next === '4-lead') onChange('twelveLeadInterpretation', '');
+    if (next === '12-lead') onChange('fourLeadInterpretation', '');
+  }
+
   return (
     <div className="space-y-4">
-      <div
-        className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${
-          value.notIndicated
-            ? 'border-emerald-300 bg-emerald-50'
-            : 'border-slate-200 bg-slate-50'
-        }`}
-      >
-        <div>
-          <div className="text-sm font-black uppercase tracking-wide text-slate-800">
-            ECG Assessment Applicability
-          </div>
-          <p className="mt-1 text-xs font-semibold text-slate-600">
-            Use this when neither cardiac monitoring nor a 12-lead ECG is
-            clinically indicated.
-          </p>
-        </div>
+      <div>
+        <div className="text-sm font-black text-slate-950">What was performed?</div>
+        <p className="mt-1 text-xs font-semibold text-slate-500">
+          Choose the ECG evaluation used for this patient. Apollo will show only the fields you need.
+        </p>
 
-        <button
-          type="button"
-          onClick={() => onChange('notIndicated', !value.notIndicated)}
-          disabled={hasDocumentedInterpretation}
-          className={`rounded-lg border px-4 py-2 text-xs font-black uppercase tracking-wide transition ${
-            value.notIndicated
-              ? 'border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700'
-              : hasDocumentedInterpretation
-                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
-                : 'border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-50'
-          }`}
-        >
-          {value.notIndicated
-            ? '✓ ECG Assessment Not Indicated'
-            : 'ECG Assessment Not Indicated'}
-        </button>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[
+            ['4-lead', '4-Lead'],
+            ['12-lead', '12-Lead'],
+            ['both', 'Both'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => selectPerformed(key as EcgAssessmentForm['ecgPerformed'])}
+              className={`rounded-xl border px-3 py-3 text-sm font-black transition ${
+                performed === key && !value.notIndicated
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => {
+              onChange('notIndicated', true);
+              onChange('ecgPerformed', '');
+              onChange('fourLeadInterpretation', '');
+              onChange('twelveLeadInterpretation', '');
+            }}
+            disabled={hasDocumentedInterpretation && !value.notIndicated}
+            className={`rounded-xl border px-3 py-3 text-sm font-black transition ${
+              value.notIndicated
+                ? 'border-emerald-600 bg-emerald-600 text-white'
+                : hasDocumentedInterpretation
+                  ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            Not Indicated
+          </button>
+        </div>
       </div>
 
       {value.notIndicated && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-          ECG assessment documented as not indicated. Select the button again
-          to document an ECG.
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-900">
+          Cardiac ECG assessment documented as not indicated.
         </div>
       )}
 
-      <fieldset disabled={value.notIndicated} className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-slate-700">
-            4-Lead Interpretation
-          </span>
-          <select
-            value={value.fourLeadInterpretation}
-            onChange={(event) =>
-              onChange('fourLeadInterpretation', event.target.value)
-            }
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
-          >
-            <option value="">Select rhythm</option>
-            {fourLeadRhythms.map((rhythm) => (
-              <option key={rhythm} value={rhythm}>
-                {rhythm}
-              </option>
-            ))}
-          </select>
-        </label>
+      {!value.notIndicated && performed && (
+        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          {showFourLead && (
+            <label className="block">
+              <span className="mb-1 block text-sm font-black text-slate-800">
+                4-Lead Rhythm
+              </span>
+              <select
+                value={value.fourLeadInterpretation}
+                onChange={(event) =>
+                  onChange('fourLeadInterpretation', event.target.value)
+                }
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-slate-900 shadow-sm"
+              >
+                <option value="">Select rhythm</option>
+                {fourLeadRhythms.map((rhythm) => (
+                  <option key={rhythm} value={rhythm}>
+                    {rhythm}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-        <label className="block">
-          <span className="mb-1 block text-sm font-semibold text-slate-700">
-            12-Lead Interpretation
-          </span>
-          <select
-            value={value.twelveLeadInterpretation}
-            onChange={(event) =>
-              onChange('twelveLeadInterpretation', event.target.value)
-            }
-            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 shadow-sm"
-          >
-            <option value="">Select interpretation</option>
-            {twelveLeadInterpretations.map((interpretation) => (
-              <option key={interpretation} value={interpretation}>
-                {interpretation}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+          {showTwelveLead && (
+            <label className="block">
+              <span className="mb-1 block text-sm font-black text-slate-800">
+                12-Lead Interpretation
+              </span>
+              <select
+                value={value.twelveLeadInterpretation}
+                onChange={(event) =>
+                  onChange('twelveLeadInterpretation', event.target.value)
+                }
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-slate-900 shadow-sm"
+              >
+                <option value="">Select interpretation</option>
+                {twelveLeadInterpretations.map((interpretation) => (
+                  <option key={interpretation} value={interpretation}>
+                    {interpretation}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
-      <label className="block">
-        <span className="mb-1 block text-sm font-semibold text-slate-700">
-          Other Abnormal Findings
-        </span>
-        <textarea
-          value={value.abnormalFindings}
-          onChange={(event) => onChange('abnormalFindings', event.target.value)}
-          rows={4}
-          placeholder="Document ectopy, interval changes, axis deviation, morphology, artifact, serial changes, or other findings."
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm"
-        />
-      </label>
-      </fieldset>
+          <label className="block">
+            <span className="mb-1 block text-sm font-black text-slate-800">
+              Additional ECG Findings
+            </span>
+            <textarea
+              value={value.abnormalFindings}
+              onChange={(event) => onChange('abnormalFindings', event.target.value)}
+              rows={3}
+              placeholder="Optional: ectopy, interval changes, serial changes, artifact, or other pertinent findings."
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-3 text-slate-900 shadow-sm"
+            />
+          </label>
+        </div>
+      )}
+
+      {!value.notIndicated && !performed && (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm font-semibold text-slate-500">
+          Select 4-Lead, 12-Lead, or Both to document cardiac ECG findings.
+        </div>
+      )}
     </div>
   );
 }

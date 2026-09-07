@@ -459,6 +459,7 @@ export function createDefaultAssessmentForm(): AssessmentForm {
       },
       ecg: {
         notIndicated: false,
+        ecgPerformed: '',
         fourLeadInterpretation: '',
         twelveLeadInterpretation: '',
         abnormalFindings: '',
