@@ -268,6 +268,20 @@ export default function AssessmentSection({
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const [moreAssessmentsOpen, setMoreAssessmentsOpen] = useState(false);
+  const cardiacAssessmentSuggested = useMemo(() => {
+    const normalizedComplaint = complaintSummary.toLowerCase();
+
+    return (
+      providerScope === 'ALS' &&
+      (
+        clinicalCategory === 'Cardiovascular' ||
+        /\b(chest pain|chest discomfort|chest pressure|chest tightness|cardiac pain|palpitations?)\b/.test(
+          normalizedComplaint,
+        )
+      )
+    );
+  }, [clinicalCategory, complaintSummary, providerScope]);
+
   const [physicalAssessmentExpanded, setPhysicalAssessmentExpanded] =
     useState(true);
   const [expandedRegionalAssessmentId, setExpandedRegionalAssessmentId] =
@@ -2177,7 +2191,7 @@ export default function AssessmentSection({
         </div>
 
         {(suggestedTasks.length > 0 ||
-          (providerScope === 'ALS' && clinicalCategory === 'Cardiovascular')) && (
+          (cardiacAssessmentSuggested)) && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <div className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800">
               Suggested for this patient
@@ -2187,7 +2201,7 @@ export default function AssessmentSection({
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {providerScope === 'ALS' && clinicalCategory === 'Cardiovascular' && (
+              {cardiacAssessmentSuggested && (
                 <button
                   type="button"
                   onClick={() =>
