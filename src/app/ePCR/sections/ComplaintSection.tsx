@@ -4,6 +4,7 @@ import { useState } from 'react';
 import PCRCard from '../components/PCRCard';
 import ClinicalCategoryPicker from '../clinical/components/ClinicalCategoryPicker';
 import ClinicalCombobox from '../clinical/components/ClinicalCombobox';
+import ClinicalSymptomPicker from '../clinical/components/ClinicalSymptomPicker';
 import type { ClinicalOption } from '../clinical/engine';
 import type { CodedSelection, ComplaintForm } from '../types';
 import { commonDrugOptions } from '../reference/drugs';
@@ -113,8 +114,6 @@ export default function ComplaintSection({
   updateComplaintForm,
 }: ComplaintSectionProps) {
   const [expandedCard, setExpandedCard] = useState('');
-  const [associatedSymptomDraft, setAssociatedSymptomDraft] =
-    useState<CodedSelection | null>(null);
 
   function toggleCard(cardTitle: string) {
     setExpandedCard((current) => (current === cardTitle ? '' : cardTitle));
@@ -209,7 +208,6 @@ export default function ComplaintSection({
               updateComplaintForm('secondaryImpression', null);
               updateComplaintForm('primarySymptom', null);
               updateComplaintForm('otherAssociatedSymptoms', []);
-              setAssociatedSymptomDraft(null);
             }}
           />
 
@@ -262,108 +260,22 @@ export default function ComplaintSection({
             }}
           />
 
-          <ClinicalCombobox
-            label="Primary Symptom"
-            listType="symptom"
+          <ClinicalSymptomPicker
             category={complaintForm.clinicalCategory}
-            value={complaintForm.primarySymptom}
-            excludedValues={complaintForm.otherAssociatedSymptoms}
-            onChange={(value) => {
+            primary={complaintForm.primarySymptom}
+            associated={complaintForm.otherAssociatedSymptoms}
+            onPrimaryChange={(value) => {
               updateComplaintForm('primarySymptom', value);
-
-              if (value) {
-                updateComplaintForm(
-                  'otherAssociatedSymptoms',
-                  complaintForm.otherAssociatedSymptoms.filter(
-                    (symptom) => !codedSelectionsMatch(symptom, value),
-                  ),
-                );
-
-                if (codedSelectionsMatch(associatedSymptomDraft, value)) {
-                  setAssociatedSymptomDraft(null);
-                }
+              if (!value && complaintForm.otherAssociatedSymptoms.length > 0) {
+                const [nextPrimary, ...remaining] = complaintForm.otherAssociatedSymptoms;
+                updateComplaintForm('primarySymptom', nextPrimary);
+                updateComplaintForm('otherAssociatedSymptoms', remaining);
               }
             }}
+            onAssociatedChange={(value) =>
+              updateComplaintForm('otherAssociatedSymptoms', value)
+            }
           />
-
-          <div className="md:col-span-2">
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <ClinicalCombobox
-                label="Associated Symptom"
-                listType="symptom"
-                category={complaintForm.clinicalCategory}
-                value={associatedSymptomDraft}
-                additionalOptions={[noneClinicalOption]}
-                excludedValues={[
-                  ...(complaintForm.primarySymptom
-                    ? [complaintForm.primarySymptom]
-                    : []),
-                  ...complaintForm.otherAssociatedSymptoms,
-                ]}
-                onChange={setAssociatedSymptomDraft}
-              />
-
-              <button
-                type="button"
-                disabled={!associatedSymptomDraft}
-                onClick={() => {
-                  if (!associatedSymptomDraft) return;
-
-                  const selectedNone = associatedSymptomDraft.code === 'NONE';
-                  const alreadySelected =
-                    complaintForm.otherAssociatedSymptoms.some((symptom) =>
-                      codedSelectionsMatch(
-                        symptom,
-                        associatedSymptomDraft,
-                      ),
-                    );
-
-                  if (!alreadySelected) {
-                    updateComplaintForm(
-                      'otherAssociatedSymptoms',
-                      selectedNone
-                        ? [associatedSymptomDraft]
-                        : [
-                            ...complaintForm.otherAssociatedSymptoms.filter(
-                              (symptom) => symptom.code !== 'NONE',
-                            ),
-                            associatedSymptomDraft,
-                          ],
-                    );
-                  }
-
-                  setAssociatedSymptomDraft(null);
-                }}
-                className="rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
-              >
-                Add Associated Symptom
-              </button>
-            </div>
-
-            {complaintForm.otherAssociatedSymptoms.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {complaintForm.otherAssociatedSymptoms.map((symptom) => (
-                  <button
-                    key={symptom.code}
-                    type="button"
-                    onClick={() =>
-                      updateComplaintForm(
-                        'otherAssociatedSymptoms',
-                        complaintForm.otherAssociatedSymptoms.filter(
-                          (item) => !codedSelectionsMatch(item, symptom),
-                        ),
-                      )
-                    }
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50"
-                    title={`Remove ${symptom.description}`}
-                  >
-                    {symptom.description}
-                    <span className="ml-2 text-slate-400">×</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           <label className="block">
             <span className="mb-1 block text-sm font-semibold text-slate-700">
