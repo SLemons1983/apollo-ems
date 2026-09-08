@@ -11,7 +11,6 @@ import {
 import PCRProgress from "./PCRProgress";
 import PCRSection from "./PCRSection";
 import PatientHandoffRail from "./PatientHandoffRail";
-import QuickToolsPanel from "./QuickToolsPanel";
 import ReportReviewActions from "@/components/epcr/ReportReviewActions";
 import AciSuggestionFooter from "../clinical/components/intelligence/AciSuggestionFooter";
 import AssessmentSection from "../sections/AssessmentSection";
@@ -168,26 +167,19 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
   const chartRef = useRef<Record<string, unknown>>({});
   const lastSavedRef = useRef('');
   const [patientSummaryOpen, setPatientSummaryOpen] = useState(false);
-  const [quickToolsOpen, setQuickToolsOpen] = useState(false);
   const [clinicalIntelligenceOpen, setClinicalIntelligenceOpen] =
     useState(false);
   const [mobileDrawer, setMobileDrawer] = useState<
-    "patient-summary" | "quick-tools" | null
+    "patient-summary" | "review-decision" | null
   >(null);
 
   useEffect(() => {
     const savedPatientSummary = window.localStorage.getItem(
       "apollo-epcr-patient-summary-open",
     );
-    const savedQuickTools = window.localStorage.getItem(
-      "apollo-epcr-quick-tools-open",
-    );
     const restorePreferences = window.setTimeout(() => {
       if (savedPatientSummary !== null) {
         setPatientSummaryOpen(savedPatientSummary === "true");
-      }
-      if (savedQuickTools !== null) {
-        setQuickToolsOpen(savedQuickTools === "true");
       }
     }, 0);
     return () => window.clearTimeout(restorePreferences);
@@ -199,13 +191,6 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
       String(patientSummaryOpen),
     );
   }, [patientSummaryOpen]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      "apollo-epcr-quick-tools-open",
-      String(quickToolsOpen),
-    );
-  }, [quickToolsOpen]);
 
   const [callForm, setCallForm] = useState<CallForm>(() =>
     ({ ...createDefaultCallForm(), ...((initialReport?.chart.call as Partial<CallForm>) ?? {}) }),
@@ -1049,13 +1034,15 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
           >
             ☰ Patient Summary
           </button>
-          <button
-            type="button"
-            onClick={() => setMobileDrawer("quick-tools")}
-            className="rounded-lg border border-blue-950/30 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-200"
-          >
-            {reviewMode ? 'Review Decision ☰' : 'Quick Tools ☰'}
-          </button>
+          {reviewMode && (
+            <button
+              type="button"
+              onClick={() => setMobileDrawer("review-decision")}
+              className="rounded-lg border border-blue-950/30 bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-200"
+            >
+              Review Decision ☰
+            </button>
+          )}
         </div>
 
         <div
@@ -1067,11 +1054,13 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
           <div
             className="hidden items-start gap-4 xl:grid"
             style={{
-              gridTemplateColumns: `${
-                patientSummaryOpen ? "minmax(280px, 320px)" : "52px"
-              } minmax(0, 1fr) ${
-                reviewMode || quickToolsOpen ? "minmax(280px, 320px)" : "52px"
-              }`,
+              gridTemplateColumns: reviewMode
+                ? `${
+                    patientSummaryOpen ? "minmax(280px, 320px)" : "52px"
+                  } minmax(0, 1fr) minmax(280px, 320px)`
+                : `${
+                    patientSummaryOpen ? "minmax(280px, 320px)" : "52px"
+                  } minmax(0, 1fr)`,
             }}
           >
             <aside className="sticky top-4 min-w-0">
@@ -1227,56 +1216,18 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
               })}
             </div>
 
-            <aside className="sticky top-4 min-w-0">
-              {reviewMode ? (
-                reviewStatus === 'SUBMITTED' ? <ReportReviewActions reportId={initialReport?.id ?? ''} /> : <div className="rounded-2xl border border-slate-200 bg-slate-100 p-5 shadow-lg"><h2 className="text-xl font-black text-slate-950">Review complete</h2><p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p></div>
-              ) : quickToolsOpen ? (
-                <div className="overflow-hidden rounded-2xl border border-blue-950/30 bg-slate-100 shadow-lg">
-                  <div className="flex items-center justify-between bg-[linear-gradient(135deg,#031735_0%,#0a438d_55%,#168fd0_100%)] px-4 py-3 text-white">
-                    <button
-                      type="button"
-                      onClick={() => setQuickToolsOpen(false)}
-                      className="rounded-lg border border-white/20 px-2.5 py-1.5 font-bold hover:bg-white/10"
-                      aria-label="Collapse quick tools"
-                    >
-                      ▶
-                    </button>
-                    <div className="text-right">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
-                        Clinical Utilities
-                      </p>
-                      <h2 className="font-bold">Quick Tools</h2>
-                    </div>
+            {reviewMode && (
+              <aside className="sticky top-4 min-w-0">
+                {reviewStatus === 'SUBMITTED' ? (
+                  <ReportReviewActions reportId={initialReport?.id ?? ''} />
+                ) : (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-100 p-5 shadow-lg">
+                    <h2 className="text-xl font-black text-slate-950">Review complete</h2>
+                    <p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p>
                   </div>
-                  <div className="bg-slate-100 p-4">
-                    <QuickToolsPanel
-                      assessmentForm={assessmentForm}
-                      onAssessmentFormChange={setAssessmentForm}
-                      vitalsForm={vitalsForm}
-                      onVitalsFormChange={setVitalsForm}
-                      treatmentsForm={treatmentsForm}
-                      onTreatmentsFormChange={setTreatmentsForm}
-                      providerScope={documentingProviderScope}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setQuickToolsOpen(true)}
-                  className="flex min-h-[240px] w-full flex-col items-center justify-center gap-3 rounded-2xl border border-blue-950/30 bg-slate-100 px-2 py-4 text-blue-950 shadow-md hover:bg-slate-200"
-                  aria-label="Expand quick tools"
-                >
-                  <span className="font-black">◀</span>
-                  <span
-                    className="text-xs font-bold uppercase tracking-[0.16em]"
-                    style={{ writingMode: "vertical-rl" }}
-                  >
-                    Quick Tools
-                  </span>
-                </button>
-              )}
-            </aside>
+                )}
+              </aside>
+            )}
           </div>
 
           <div className="min-w-0 space-y-4 xl:hidden">
@@ -1428,12 +1379,12 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                     {mobileDrawer === "patient-summary"
                       ? "Live Clinical Summary"
-                      : "Clinical Utilities"}
+                      : "PCR Review"}
                   </p>
                   <h2 className="text-lg font-bold">
                     {mobileDrawer === "patient-summary"
                       ? "Patient Handoff"
-                      : reviewMode ? "Review Decision" : "Quick Tools"}
+                      : "Review Decision"}
                   </h2>
                 </div>
                 <button
@@ -1453,18 +1404,13 @@ export default function EPCRClient({ initialReport = null, reviewMode = false, r
                     complaintForm={complaintForm}
                     vitalsForm={vitalsForm}
                   />
-                ) : reviewMode ? (
-                  reviewStatus === 'SUBMITTED' ? <ReportReviewActions reportId={initialReport?.id ?? ''} /> : <div className="rounded-xl bg-white p-4"><h2 className="font-black">Review complete</h2><p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p></div>
+                ) : reviewStatus === 'SUBMITTED' ? (
+                  <ReportReviewActions reportId={initialReport?.id ?? ''} />
                 ) : (
-                  <QuickToolsPanel
-                    assessmentForm={assessmentForm}
-                    onAssessmentFormChange={setAssessmentForm}
-                    vitalsForm={vitalsForm}
-                    onVitalsFormChange={setVitalsForm}
-                    treatmentsForm={treatmentsForm}
-                    onTreatmentsFormChange={setTreatmentsForm}
-                    providerScope={documentingProviderScope}
-                  />
+                  <div className="rounded-xl bg-white p-4">
+                    <h2 className="font-black">Review complete</h2>
+                    <p className="mt-2 text-sm text-slate-600">This report is {reviewStatus.toLowerCase()}.</p>
+                  </div>
                 )}
               </div>
             </aside>

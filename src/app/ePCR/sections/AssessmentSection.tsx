@@ -77,6 +77,11 @@ import TraumaAssessmentCard, {
 import PoisoningAssessmentCard, { type PoisoningAssessmentForm } from '../clinical/components/assessment/cards/PoisoningAssessmentCard';
 import SeizureAssessmentCard, { type SeizureAssessmentForm } from '../clinical/components/assessment/cards/SeizureAssessmentCard';
 import ApgarAssessmentCard, { type ApgarAssessmentForm } from '../clinical/components/assessment/cards/ApgarAssessmentCard';
+import ReassessmentCard, {
+  createEmptyReassessmentForm,
+  type ReassessmentForm,
+  type ReassessmentRecord,
+} from '../clinical/components/assessment/cards/ReassessmentCard';
 import { calculateGcsScore } from '../clinical/engine/scores/gcs';
 import type { PatientForm } from '../types';
 import type {
@@ -167,6 +172,18 @@ const complaintBodyRegionRules: {
   { terms: ['right leg pain', 'right leg injury', 'right knee pain', 'right ankle pain', 'right foot pain'], regions: ['rightLeg'] },
   { terms: ['left leg pain', 'left leg injury', 'left knee pain', 'left ankle pain', 'left foot pain'], regions: ['leftLeg'] },
 ];
+
+function toLocalReassessmentDateTimeValue(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function formatReassessmentTime(value: string) {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : parsed.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+}
 
 function getComplaintBodyRegions(summary: string): ApolloBodyRegionKey[] {
   const normalized = summary.trim().toLowerCase();
@@ -269,6 +286,67 @@ export default function AssessmentSection({
   );
   const [expandedTaskId, setExpandedTaskId] = useState('');
   const [moreAssessmentsOpen, setMoreAssessmentsOpen] = useState(false);
+  const reassessmentDraft = assessmentForm.clinical.reassessment;
+  const reassessments = assessmentForm.clinical.reassessments;
+
+  function setReassessmentDraft(
+    nextValue: ReassessmentForm | ((current: ReassessmentForm) => ReassessmentForm),
+  ) {
+    onAssessmentFormChange((current) => {
+      const currentDraft = current.clinical.reassessment;
+      const resolved = typeof nextValue === 'function' ? nextValue(currentDraft) : nextValue;
+      return {
+        ...current,
+        clinical: { ...current.clinical, reassessment: resolved },
+      };
+    });
+  }
+
+  function openNewReassessment() {
+    setReassessmentDraft(createEmptyReassessmentForm(toLocalReassessmentDateTimeValue()));
+    setExpandedTaskId('reassessment');
+  }
+
+  function updateReassessmentDraft(field: keyof ReassessmentForm, value: string) {
+    setReassessmentDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function cancelReassessment() {
+    setReassessmentDraft(createEmptyReassessmentForm());
+    setExpandedTaskId('');
+  }
+
+  function saveReassessment() {
+    const createdAt = new Date().toISOString();
+    const record: ReassessmentRecord = {
+      ...reassessmentDraft,
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `reassessment-${Date.now()}`,
+      createdAt,
+    };
+    onAssessmentFormChange((current) => ({
+      ...current,
+      clinical: {
+        ...current.clinical,
+        reassessment: createEmptyReassessmentForm(),
+        reassessments: [...current.clinical.reassessments, record],
+      },
+    }));
+    setExpandedTaskId('');
+  }
+
+  const reassessmentRequiredValues = [
+    reassessmentDraft.assessedAt,
+    reassessmentDraft.reason,
+    reassessmentDraft.patientCondition,
+    reassessmentDraft.mentalStatus,
+    reassessmentDraft.airwayBreathing,
+    reassessmentDraft.circulation,
+    reassessmentDraft.interventionsResponse,
+    reassessmentDraft.transportPriority,
+  ];
+  const reassessmentSaveDisabled = reassessmentRequiredValues.some((value) => !value);
   function assessmentProgressLabel(taskId: string) {
     const progress = getTaskProgress(taskId);
     if (progress.completed >= progress.total && progress.total > 0) return '✓ Complete';
@@ -2370,6 +2448,18 @@ export default function AssessmentSection({
                 </button>
                 )}
 
+                <button
+                  type="button"
+                  onClick={() =>
+                    expandedTaskId === 'reassessment'
+                      ? setExpandedTaskId('')
+                      : openNewReassessment()
+                  }
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100"
+                >
+                  Reassessment{reassessments.length > 0 ? ` (${reassessments.length})` : ''}
+                </button>
+
                 {additionalTasks.map((task) => (
                   <button
                     key={task.id}
@@ -2383,6 +2473,55 @@ export default function AssessmentSection({
                   </button>
                 ))}
               </div>
+
+              {expandedTaskId === 'reassessment' && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                  <ReassessmentCard
+                    value={reassessmentDraft}
+                    onChange={updateReassessmentDraft}
+                    onSave={saveReassessment}
+                    onCancel={cancelReassessment}
+                    saveDisabled={reassessmentSaveDisabled}
+                  />
+                  {reassessmentSaveDisabled && (
+                    <p className="mt-3 text-xs font-semibold text-amber-700">
+                      Complete the date/time, reason, condition, mental status,
+                      airway/breathing, circulation, response, and priority to save.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {reassessments.length > 0 && expandedTaskId !== 'reassessment' && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-xs font-black uppercase tracking-wide text-slate-500">
+                    Saved Reassessments
+                  </div>
+                  {[...reassessments].reverse().map((entry, index) => (
+                    <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-black text-slate-900">
+                            {entry.reason || 'Reassessment'}
+                          </div>
+                          <div className="mt-1 text-xs font-semibold text-slate-500">
+                            {formatReassessmentTime(entry.assessedAt)}
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-black uppercase text-slate-600">
+                          #{reassessments.length - index}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-slate-700">
+                        {entry.patientCondition} · {entry.interventionsResponse}
+                      </div>
+                      {entry.notes && (
+                        <p className="mt-2 text-sm leading-5 text-slate-600">{entry.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {expandedTaskId === 'ecg-assessment' && providerScope === 'ALS' && (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
