@@ -62,6 +62,7 @@ async function buildCertificates(ce:CeClass, people:Attendance[]) {
   const logo=await pdf.embedJpg(await imageBytes('/ce-assets/ssc-logo-current.jpg'));
   const instructor=ceInstructor(ce.instructor_key);
   const signature=await pdf.embedPng(await imageBytes(instructor.signature));
+  const programDirectorSignature=await pdf.embedPng(await imageBytes('/ce-assets/russ-richardson-signature.png'));
   const W=792,H=612,navy=rgb(.035,.105,.255),gold=rgb(.86,.64,.12),gray=rgb(.32,.36,.42);
   const center=(page:any,text:string,size:number,font:any,y:number,color=navy)=>page.drawText(text,{x:(W-font.widthOfTextAtSize(text,size))/2,y,size,font,color});
   const fit=(text:string,font:any,max:number,start:number,min=8)=>{let z=start;while(z>min&&font.widthOfTextAtSize(text,z)>max)z-=.5;return z;};
@@ -93,12 +94,14 @@ async function buildCertificates(ce:CeClass, people:Attendance[]) {
     page.drawLine({start:{x:254,y:170},end:{x:538,y:170},thickness:1,color:gold});
     center(page,`California EMS CE Provider # ${PROVIDER_NUMBER}`,11.5,sansBold,149);
     center(page,'Approved California EMS Continuing Education Provider',8.5,sans,132,gray);
+    page.drawImage(programDirectorSignature,{x:76,y:61,width:205,height:61});
+    page.drawLine({start:{x:76,y:61},end:{x:304,y:61},thickness:.9,color:gold});
+    page.drawText('Russ Richardson',{x:87,y:45,size:8.5,font:sansBold,color:navy});
+    page.drawText('Program Director',{x:87,y:32,size:8,font:italic,color:gray});
     page.drawImage(signature,{x:488,y:61,width:205,height:61});
     page.drawLine({start:{x:478,y:61},end:{x:706,y:61},thickness:.9,color:gold});
     page.drawText(instructor.name,{x:488,y:45,size:8.5,font:sansBold,color:navy});
     page.drawText(instructor.title,{x:488,y:32,size:8,font:italic,color:gray});
-    page.drawText('Instructor / Program Director',{x:87,y:56,size:8,font:sansBold,color:navy});
-    page.drawText('Sequoia Safety Council',{x:87,y:43,size:8,font:sans,color:gray});
     center(page,'This document must be maintained for no less than four (4) years.',6.8,sans,27,gray);
   }
   return pdf.save();

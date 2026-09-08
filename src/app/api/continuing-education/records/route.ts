@@ -61,7 +61,14 @@ export async function POST(request: NextRequest) {
     const classDate = typeof body.classDate === 'string' ? body.classDate.trim() : '';
     const topic = typeof body.topic === 'string' ? body.topic.trim() : '';
     const ceHours = Number(body.ceHours);
-    const instructorKey = body.instructorKey === 'heather' ? 'heather' : body.instructorKey === 'jose' ? 'jose' : '';
+    const instructorKey =
+      body.instructorKey === 'russ'
+        ? 'russ'
+        : body.instructorKey === 'heather'
+          ? 'heather'
+          : body.instructorKey === 'jose'
+            ? 'jose'
+            : '';
     const employeeIds = Array.isArray(body.employeeIds) ? [...new Set(body.employeeIds.filter((id: unknown): id is string => typeof id === 'string' && id.trim().length > 0))] : [];
     if (!/^\d{4}-\d{2}-\d{2}$/.test(classDate) || !topic || topic.length > 200 || !Number.isFinite(ceHours) || ceHours <= 0 || ceHours > 100 || !instructorKey || employeeIds.length === 0 || employeeIds.length > 500) {
       return NextResponse.json({ error: 'Invalid CE class information.' }, { status: 400 });
