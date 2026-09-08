@@ -54,6 +54,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { db } = await requireSupervisorApi(request);
+    const classId = request.nextUrl.searchParams.get('classId')?.trim() ?? '';
+    if (!classId) {
+      return NextResponse.json({ error: 'CE class ID is required.' }, { status: 400 });
+    }
+
+    const { data: ceClass, error: lookupError } = await db
+      .from('ce_classes')
+      .select('id,topic')
+      .eq('id', classId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!ceClass) {
+      return NextResponse.json({ error: 'CE class was not found.' }, { status: 404 });
+    }
+
+    const { error: deleteError } = await db.from('ce_classes').delete().eq('id', classId);
+    if (deleteError) throw deleteError;
+
+    return NextResponse.json({ ok: true, id: classId });
+  } catch (error) {
+    const response = authError(error);
+    if (response) return response;
+    console.error('CE class delete error:', error);
+    return NextResponse.json({ error: 'Unable to delete CE class.' }, { status: 500 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { db } = await requireSupervisorApi(request);
