@@ -367,6 +367,54 @@ export function markAssessmentRegionUnremarkable(
   };
 }
 
+export function completeUndocumentedAssessmentBodyAsUnremarkable(
+  current: AssessmentForm,
+): AssessmentForm {
+  const nextSubregionFindings = Object.fromEntries(
+    (Object.keys(apolloBodyRegionDetails) as ApolloBodyRegionKey[]).map((region) => [
+      region,
+      Object.fromEntries(
+        apolloBodyRegionDetails[region].map((subregion) => {
+          const currentFinding = current.bodyMap.subregionFindings[region][subregion.id];
+          const status = getBodySubRegionAssessmentStatus(currentFinding);
+
+          return [
+            subregion.id,
+            status === 'not-assessed'
+              ? createUnremarkableBodySubRegionFinding()
+              : currentFinding,
+          ];
+        }),
+      ),
+    ]),
+  ) as AssessmentBodySubRegionFindings;
+
+  const selectedRegions = Object.fromEntries(
+    (Object.keys(apolloBodyRegionDetails) as ApolloBodyRegionKey[]).map((region) => [
+      region,
+      true,
+    ]),
+  ) as ApolloBodyRegionSelection;
+
+  const unremarkableRegions = Object.fromEntries(
+    (Object.keys(apolloBodyRegionDetails) as ApolloBodyRegionKey[]).map((region) => [
+      region,
+      getBodyRegionAssessmentStatusFromSubregions(nextSubregionFindings[region]) ===
+        'unremarkable',
+    ]),
+  ) as ApolloBodyRegionSelection;
+
+  return {
+    ...current,
+    bodyMap: {
+      ...current.bodyMap,
+      selectedRegions,
+      unremarkableRegions,
+      subregionFindings: nextSubregionFindings,
+    },
+  };
+}
+
 export function markEntireAssessmentBodyUnremarkable(
   current: AssessmentForm,
 ): AssessmentForm {

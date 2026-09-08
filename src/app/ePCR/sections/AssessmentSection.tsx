@@ -16,6 +16,7 @@ import type {
   ApolloBodyRegionStatus,
 } from '../clinical/components/body-map/bodyMapTypes';
 import {
+  completeUndocumentedAssessmentBodyAsUnremarkable,
   createEmptyAssessmentCmsTp,
   getBodyRegionAssessmentStatusFromSubregions,
   getBodySubRegionAssessmentStatus,
@@ -949,12 +950,46 @@ export default function AssessmentSection({
 
   const physicalAssessmentComplete = (
     Object.keys(apolloBodyRegionDetails) as ApolloBodyRegionKey[]
-  ).every((region) => {
-    const status = getBodyRegionAssessmentStatusFromSubregions(
-      assessmentForm.bodyMap.subregionFindings[region],
+  ).every((region) =>
+    Object.values(assessmentForm.bodyMap.subregionFindings[region]).every(
+      (finding) => {
+        const status = getBodySubRegionAssessmentStatus(finding);
+        return (
+          status === 'unremarkable' ||
+          status === 'abnormal' ||
+          status === 'complete'
+        );
+      },
+    ),
+  );
+
+  function handlePhysicalAssessmentToggle() {
+    if (!physicalAssessmentExpanded) {
+      setPhysicalAssessmentExpanded(true);
+      return;
+    }
+
+    if (physicalAssessmentComplete) {
+      setPhysicalAssessmentExpanded(false);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Complete Physical Assessment? Any body-map areas you have not documented will be recorded as unremarkable. Existing findings will not be changed. Select OK to complete the assessment or Cancel to keep assessing.',
     );
-    return status === 'unremarkable' || status === 'abnormal' || status === 'complete';
-  });
+
+    if (!confirmed) {
+      return;
+    }
+
+    onAssessmentFormChange((current) =>
+      completeUndocumentedAssessmentBodyAsUnremarkable(current),
+    );
+    setPhysicalAssessmentExpanded(false);
+    setSelectedAssessmentRegion('');
+    setExpandedBodySubregionId('');
+    setExpandedRegionalAssessmentId('');
+  }
 
   const normalizedComplaintSummary = complaintSummary.toLowerCase();
   const complaintSuggestedBodyRegions = useMemo(
@@ -1694,19 +1729,17 @@ export default function AssessmentSection({
         completedFields={physicalAssessmentComplete ? 1 : 0}
         totalFields={1}
         expanded={physicalAssessmentExpanded}
-        onToggle={() =>
-          setPhysicalAssessmentExpanded((current) => !current)
-        }
+        onToggle={handlePhysicalAssessmentToggle}
       >
         <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
           <div className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
             3 AM Workflow
           </div>
           <p className="mt-1 text-sm font-bold text-blue-950">
-            Start with the patient. Tap where you found a problem. If the physical exam is normal, complete it in one tap.
+            Start with the patient. Document what you find. When you finish, Apollo can mark untouched areas unremarkable for you.
           </p>
           <p className="mt-1 text-xs font-semibold text-blue-800">
-            Apollo only records findings you confirm. Focused assessments remain available below when you need them.
+            Closing the Body Map asks you to confirm the exam. Existing findings are preserved, and only untouched areas are documented as unremarkable.
           </p>
         </div>
 
