@@ -6,16 +6,21 @@ import { supabase } from '@/lib/supabase';
 
 type Certifications = Record<string, string>;
 type Employee = { id:string; first_name:string|null; last_name:string|null; role:string|null; status:string|null; certifications:Certifications|null };
-type InstructorKey = 'jose'|'heather';
+type InstructorKey = 'jose'|'heather'|'russ';
 type CeClass = { id:string; class_date:string; topic:string; ce_hours:number; course_type:'INSTRUCTOR_BASED'|'NON_INSTRUCTOR_BASED'; instructor_key:InstructorKey; created_at:string };
 type Attendance = { id:string; class_id:string; employee_id:string; employee_name:string; credential_type:string; license_number:string };
 
 const PROVIDER_NUMBER = '61-0026';
 const CE_INSTRUCTORS = {
-  jose: { name:'Jose A. Hernandez Rosas, EMT-P', title:'Operations Supervisor/Program Director', signature:'/ce-assets/jose-signature.png' },
-  heather: { name:'Heather Washburn', title:'Operations Supervisor', signature:'/ce-assets/heather-signature.png' },
+  jose: { name:'Jose A. Hernandez Rosas, EMT-P', title:'Operations Supervisor', signature:'/ce-assets/jose-signature.png' },
+  heather: { name:'Heather Washburn', title:'Operations Supervisor, EMT-P', signature:'/ce-assets/heather-signature.png' },
+  russ: { name:'Russ Richardson', title:'Program Director', signature:'/ce-assets/russ-richardson-signature.png' },
 } as const;
-function ceInstructor(key:InstructorKey|undefined) { return CE_INSTRUCTORS[key === 'heather' ? 'heather' : 'jose']; }
+function ceInstructor(key:InstructorKey|undefined) {
+  if (key === 'heather') return CE_INSTRUCTORS.heather;
+  if (key === 'russ') return CE_INSTRUCTORS.russ;
+  return CE_INSTRUCTORS.jose;
+}
 
 function employeeName(e: Employee) { return `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() || 'Unnamed Employee'; }
 function credential(e: Employee) {
@@ -199,8 +204,9 @@ export default function ContinuingEducationPage(){
     <div className="mt-4 grid gap-4 md:grid-cols-2">
       <label className="text-sm font-semibold text-slate-700">Issuing Instructor
         <select value={instructorKey} onChange={e=>setInstructorKey(e.target.value as InstructorKey)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
-          <option value="jose">Jose A. Hernandez Rosas, EMT-P — Operations Supervisor/Program Director</option>
-          <option value="heather">Heather Washburn — Operations Supervisor</option>
+          <option value="jose">Jose A. Hernandez Rosas, EMT-P — Operations Supervisor</option>
+          <option value="heather">Heather Washburn — Operations Supervisor, EMT-P</option>
+          <option value="russ">Russ Richardson — Program Director</option>
         </select>
       </label>
       <div className="space-y-2 self-end pb-1">
