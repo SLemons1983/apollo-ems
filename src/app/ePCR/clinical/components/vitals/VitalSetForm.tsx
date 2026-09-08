@@ -194,8 +194,8 @@ export default function VitalSetForm({
 
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className={compact ? "space-y-4" : "space-y-5"}>
+      <div className={`flex gap-3 ${compact ? 'flex-col items-stretch' : 'flex-wrap items-center justify-between'}`}>
         <div>
           <h3 className="font-black text-slate-900">New Vital-Sign Set</h3>
           <p className="text-xs font-semibold text-slate-500">
@@ -203,7 +203,7 @@ export default function VitalSetForm({
           </p>
         </div>
         <span
-          className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${compact ? 'self-start' : ''} ${
             complete
               ? 'bg-emerald-100 text-emerald-800'
               : 'bg-amber-100 text-amber-800'
@@ -215,7 +215,7 @@ export default function VitalSetForm({
 
       <div className={`grid gap-3 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
         <Field label="Date / Time" required>
-          <div className="flex gap-2">
+          <div className={compact ? "grid grid-cols-1 gap-2" : "flex gap-2"}>
             <input
               type="datetime-local"
               value={value.recordedAt}
@@ -225,14 +225,14 @@ export default function VitalSetForm({
             <button
               type="button"
               onClick={() => onChange('recordedAt', toLocalDateTimeValue())}
-              className="shrink-0 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-black text-white hover:bg-indigo-600"
+              className={`rounded-lg bg-indigo-700 px-3 py-2 text-xs font-black text-white hover:bg-indigo-600 ${compact ? 'w-full' : 'shrink-0'}`}
             >
               Now
             </button>
           </div>
         </Field>
 
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 sm:col-span-2 lg:col-span-3">
+        <div className={`rounded-xl border border-amber-300 bg-amber-50 ${compact ? 'p-3' : 'p-4'} sm:col-span-2 lg:col-span-3`}>
           <button
             type="button"
             aria-pressed={value.unableToAssess === 'Yes'}
@@ -250,12 +250,12 @@ export default function VitalSetForm({
         {value.unableToAssess !== 'Yes' && <>
 
         <div className="sm:col-span-2 lg:col-span-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Blood Pressure</span>
+          <div className={`flex gap-2 ${compact ? 'grid grid-cols-2' : 'flex-wrap items-center'}`}>
+            <span className={`text-xs font-black uppercase tracking-wide text-slate-600 ${compact ? 'col-span-2' : ''}`}>Blood Pressure</span>
             <button
               type="button"
               onClick={() => onChange('bloodPressureMethod', 'Auscultated')}
-              className={`rounded-full border px-3 py-1 text-xs font-black ${
+              className={`border px-3 py-2 text-xs font-black ${compact ? 'rounded-lg' : 'rounded-full'} ${
                 value.bloodPressureMethod === 'Auscultated'
                   ? 'border-slate-900 bg-slate-900 text-white'
                   : 'border-slate-300 bg-white text-slate-600'
@@ -266,7 +266,7 @@ export default function VitalSetForm({
             <button
               type="button"
               onClick={() => onChange('bloodPressureMethod', 'Palpated')}
-              className={`rounded-full border px-3 py-1 text-xs font-black ${
+              className={`border px-3 py-2 text-xs font-black ${compact ? 'rounded-lg' : 'rounded-full'} ${
                 value.bloodPressureMethod === 'Palpated'
                   ? 'border-slate-900 bg-slate-900 text-white'
                   : 'border-slate-300 bg-white text-slate-600'
@@ -407,8 +407,8 @@ export default function VitalSetForm({
           </select>
         </Field>
 
-        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 sm:col-span-2 lg:col-span-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className={`rounded-xl border border-slate-300 bg-slate-50 ${compact ? 'p-3' : 'p-4'} sm:col-span-2 lg:col-span-3`}>
+          <div className={`flex gap-3 ${compact ? 'items-center justify-between' : 'flex-wrap items-center justify-between'}`}>
             <div>
               <div className="text-xs font-black uppercase tracking-wide text-slate-600">
                 Glasgow Coma Scale <span className="text-red-600">*</span>
@@ -423,7 +423,7 @@ export default function VitalSetForm({
             </div>
           </div>
 
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className={`mt-3 grid gap-2 ${compact ? 'grid-cols-1' : 'sm:grid-cols-2'}`}>
             <button
               type="button"
               onClick={markGcs15}
@@ -447,7 +447,7 @@ export default function VitalSetForm({
           </div>
 
           {gcsDetailsOpen && (
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <div className={`mt-4 grid gap-4 ${compact ? 'grid-cols-1' : 'lg:grid-cols-3'}`}>
               {gcsGroups.map((group) => (
                 <div key={group.field}>
                   <div className="mb-2 text-xs font-black uppercase tracking-wide text-slate-600">
@@ -610,11 +610,11 @@ export default function VitalSetForm({
         </p>
       )}
 
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className={`flex gap-2 ${compact ? 'grid grid-cols-1' : 'flex-wrap justify-end'}`}>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+          className={`rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 ${compact ? 'w-full' : ''}`}
         >
           Cancel
         </button>
@@ -622,7 +622,7 @@ export default function VitalSetForm({
           type="button"
           onClick={onSave}
           disabled={!complete}
-          className="rounded-lg bg-indigo-700 px-4 py-2 text-sm font-black text-white hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className={`rounded-lg bg-indigo-700 px-4 py-2 text-sm font-black text-white hover:bg-indigo-600 disabled:cursor-not-allowed disabled:bg-slate-300 ${compact ? 'w-full py-3' : ''}`}
         >
           Save Vital Set
         </button>
