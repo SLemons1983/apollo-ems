@@ -279,7 +279,6 @@ export function getComplaintRequiredFields(complaintForm: ComplaintForm) {
     complaintForm.chiefComplaint,
     complaintForm.clinicalCategory,
     complaintForm.primaryImpression,
-    complaintForm.secondaryImpression,
     complaintForm.primarySymptom,
     complaintForm.symptomsBeganDateTime,
     complaintForm.lastSeenNormalDateTime,
