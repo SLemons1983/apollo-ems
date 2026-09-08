@@ -120,41 +120,63 @@ export default function PrimaryAssessmentCard({
         </p>
       </div>
 
-      {primarySurveyGroups.map((group) => (
-        <div
-          key={group.field}
-          className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
-        >
-          <div className="mb-3">
-            <h4 className="text-sm font-black uppercase tracking-wide text-slate-700">
-              {group.label}
-            </h4>
-            <p className="mt-1 text-sm text-slate-500">{group.prompt}</p>
-          </div>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {primarySurveyGroups.map((group, index) => (
+          <div
+            key={group.field}
+            className={`p-3 sm:p-4 ${
+              index > 0 ? 'border-t border-slate-200' : ''
+            }`}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h4 className="text-sm font-black text-slate-800">
+                {group.label}
+              </h4>
+              {value[group.field] ? (
+                <span className="shrink-0 text-xs font-bold text-emerald-700">
+                  ✓ Documented
+                </span>
+              ) : (
+                <span className="shrink-0 text-xs font-bold text-amber-700">
+                  Needed
+                </span>
+              )}
+            </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            {group.options.map((option) => {
-              const selected = value[group.field] === option;
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              {group.options.map((option) => {
+                const selected = value[group.field] === option;
 
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onChange(group.field, option)}
-                  className={`min-h-12 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                    selected
-                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                      : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50'
-                  }`}
-                >
-                  {selected ? `✓ ${option}` : option}
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => onChange(group.field, option)}
+                    className={`min-h-11 rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                      selected
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                        : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {selected ? `✓ ${option}` : option}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        ))}
+      </div>
+
+      {completedCount === primarySurveyGroups.length ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-800">
+          ✓ Primary Assessment Complete
         </div>
-      ))}
+      ) : (
+        <div className="text-sm font-semibold text-slate-500">
+          {primarySurveyGroups.length - completedCount} primary survey item{primarySurveyGroups.length - completedCount === 1 ? '' : 's'} remaining
+        </div>
+      )}
     </div>
   );
 }
