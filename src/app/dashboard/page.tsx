@@ -2952,7 +2952,8 @@ export default function DashboardPage() {
   async function saveAdditionalCompensation(nextItems: AdditionalCompensation[]) {
     setAdditionalCompensation(nextItems);
 
-    const payload = nextItems.map((item) => ({
+    const employeeItems = nextItems.filter((item) => item.employeeId === currentEmployeeId);
+    const payload = employeeItems.map((item) => ({
       id: item.id,
       employee_id: item.employeeId,
       date_key: item.dateKey,
@@ -3011,7 +3012,10 @@ export default function DashboardPage() {
   async function saveMissedMealBreaks(nextBreaks: MissedMealBreak[]) {
     setMissedMealBreaks(nextBreaks);
 
-    const payload = nextBreaks.map((mealBreak) => ({
+    const employeeBreaks = nextBreaks.filter(
+      (mealBreak) => mealBreak.employeeId === currentEmployeeId,
+    );
+    const payload = employeeBreaks.map((mealBreak) => ({
       id: mealBreak.id,
       employee_id: mealBreak.employeeId,
       date_key: mealBreak.dateKey,
@@ -3985,7 +3989,10 @@ export default function DashboardPage() {
   async function saveTimecardCorrections(nextCorrections: TimecardCorrectionRequest[]) {
     setTimecardCorrections(nextCorrections);
 
-    const payload = nextCorrections.map((correction) => ({
+    const employeeCorrections = nextCorrections.filter(
+      (correction) => correction.employeeId === currentEmployeeId,
+    );
+    const payload = employeeCorrections.map((correction) => ({
       id: correction.id,
       employee_id: correction.employeeId,
       pay_period_key: correction.payPeriodKey,
@@ -4093,6 +4100,14 @@ export default function DashboardPage() {
   }
 
   async function submitTimecardForReview() {
+    if (!currentEmployee || !currentEmployeeId) {
+      setShowTimecardSubmitConfirmation(false);
+      setTimecardStatus(
+        'Action Required: Apollo could not link your login to an employee profile. Please contact a supervisor before submitting payroll.',
+      );
+      return;
+    }
+
     if (submittedTimecard && !returnedTimecard) {
       setShowTimecardSubmitConfirmation(false);
       setTimecardStatus('This timecard has already been submitted for supervisor review.');
