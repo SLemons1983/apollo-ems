@@ -391,6 +391,7 @@ type TimecardPayType =
   | 'CALL_IN'
   | 'SICK_TIME'
   | 'VACATION'
+  | 'VACATION_24'
   | 'LEAVE'
   | 'JURY_DUTY';
 
@@ -3153,6 +3154,7 @@ export default function DashboardPage() {
       value === 'CALL_IN' ||
       value === 'SICK_TIME' ||
       value === 'VACATION' ||
+      value === 'VACATION_24' ||
       value === 'LEAVE' ||
       value === 'JURY_DUTY'
     ) {
@@ -3336,7 +3338,7 @@ export default function DashboardPage() {
     }
 
     if (shiftType === 'VACATION') {
-      return 'VACATION';
+      return Math.abs(hours - 24) < 0.01 ? 'VACATION_24' : 'VACATION';
     }
 
     if (shiftType === 'LEAVE') {
@@ -3872,7 +3874,9 @@ export default function DashboardPage() {
           weeklyOtTrackedHours[weekIndex] += nonDoubleTimeHours;
           nextWeek = addToWeekBreakdown(targetWeek, { regularHours, overtimeHours, doubleTimeHours });
         } else {
-          // 24-Hour Shift rows use weekly OT after 40 hours.
+          // 24-Hour Shift and full 24-hour vacation rows use weekly OT after 40 hours.
+          // SSC handbook practice treats a full scheduled 24-hour vacation shift
+          // the same as the employee's normal 24-hour shift for Reg/OT calculation.
           const hoursBeforeThisShift = weeklyOtTrackedHours[weekIndex];
           const regularRemainingThisWeek = Math.max(0, 40 - hoursBeforeThisShift);
           const regularHours = Math.min(hours, regularRemainingThisWeek);
@@ -6634,7 +6638,8 @@ export default function DashboardPage() {
                                       <option value="TWENTY_FOUR_HOUR">24-Hour Shift</option>
                                       <option value="CALL_IN">Call In</option>
                                       <option value="SICK_TIME">Sick Time</option>
-                                      <option value="VACATION">Vacation</option>
+                                      <option value="VACATION">Vacation - Non 24-Shift</option>
+                                      <option value="VACATION_24">Vacation - 24-Hour Shift</option>
                                       <option value="LEAVE">Leave</option>
                                       <option value="JURY_DUTY">Jury Duty</option>
                                     </select>
@@ -6887,7 +6892,7 @@ export default function DashboardPage() {
                   <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
                     <div className="font-bold text-slate-900">Pay Calculation Rules</div>
                     <div className="mt-1">
-                      Shift Type controls the calculation rule. Non 24-Shift respects the weekly 40-hour regular cap, with over 12 hours on that row paid as double time. 24-Hour Shift uses weekly OT after 40 worked hours per week. Sick Time, Vacation, and Jury Duty are regular-only and do not accrue OT/DT. Leave documents a scheduled absence but contributes zero paid or worked hours. Missed meal declarations add one regular-rate penalty hour after supervisor approval.
+                      Shift Type controls the calculation rule. Non 24-Shift respects the weekly 40-hour regular cap, with over 12 hours on that row paid as double time. 24-Hour Shift uses weekly OT after 40 worked hours per week. Sick Time, non-24-hour Vacation, and Jury Duty are regular-only and do not accrue OT/DT. Full scheduled 24-hour Vacation follows the same weekly Reg/OT calculation as a normal 24-hour shift. Leave documents a scheduled absence but contributes zero paid or worked hours. Missed meal declarations add one regular-rate penalty hour after supervisor approval.
                     </div>
                   </div>
 
