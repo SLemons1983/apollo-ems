@@ -15,16 +15,41 @@ export function usernameBase(firstName: string, lastName: string) {
   return `${initial}${surname}`.slice(0, 28);
 }
 
+export function normalizeEpcrRole(value: unknown): EpcrRole | null {
+  const normalized = String(value ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s/-]+/g, '_')
+    .replace(/_+/g, '_');
+
+  const aliases: Record<string, EpcrRole> = {
+    PRIMARY_ADMIN: 'PRIMARY_ADMIN',
+    PRIMARYADMIN: 'PRIMARY_ADMIN',
+    ADMIN: 'ADMIN',
+    ADMINISTRATOR: 'ADMIN',
+    INSTRUCTOR: 'ADMIN',
+    ADMIN_INSTRUCTOR: 'ADMIN',
+    REVIEWER: 'REVIEWER',
+    QA_REVIEWER: 'REVIEWER',
+    CLINICIAN: 'CLINICIAN',
+    STUDENT: 'CLINICIAN',
+    CLINICIAN_STUDENT: 'CLINICIAN',
+    USER: 'CLINICIAN',
+  };
+
+  return aliases[normalized] ?? null;
+}
+
 export function validateInvite(value: unknown) {
   if (!value || typeof value !== 'object') return { error: 'Invitation details are required.' };
   const input = value as Record<string, unknown>;
   const first_name = String(input.first_name ?? '').trim().slice(0, 80);
   const last_name = String(input.last_name ?? '').trim().slice(0, 80);
   const email = String(input.email ?? '').trim().toLowerCase().slice(0, 200);
-  const role = input.role as EpcrRole;
+  const role = normalizeEpcrRole(input.role);
   if (!first_name || !last_name) return { error: 'First and last name are required.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'A valid email is required.' };
-  if (!EPCR_ROLES.includes(role)) return { error: 'Select a valid ePCR role.' };
+  if (!role) return { error: 'Select a valid ePCR role.' };
   const base = usernameBase(first_name, last_name);
   if (base.length < 2) return { error: 'Unable to generate a username from that name.' };
   return { data: { first_name, last_name, email, role, base } };
