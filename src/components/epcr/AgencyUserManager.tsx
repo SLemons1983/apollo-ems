@@ -13,8 +13,6 @@ type CsvPreviewRow = CsvInputRow & {
   imported?: boolean;
 };
 
-const CSV_TEMPLATE = `first_name,last_name,email,role\nJohn,Smith,john.smith@example.com,CLINICIAN\nSarah,Jones,sarah.jones@example.com,REVIEWER\n`;
-
 function parseCsv(text: string) {
   const rows: string[][] = [];
   let row: string[] = [];
@@ -51,9 +49,8 @@ function normalizeHeader(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
-function csvRowsFromText(text: string): { users?: CsvInputRow[]; error?: string } {
-  const parsed = parseCsv(text.replace(/^\uFEFF/, ''));
-  if (parsed.length < 2) return { error: 'The CSV must include a header row and at least one user.' };
+function rowsToUsers(parsed: string[][]): { users?: CsvInputRow[]; error?: string } {
+  if (parsed.length < 2) return { error: 'The import file must include a header row and at least one user.' };
   const headers = parsed[0].map(normalizeHeader);
   const aliases: Record<string, string[]> = {
     first_name: ['first_name', 'firstname', 'first'],
@@ -65,13 +62,128 @@ function csvRowsFromText(text: string): { users?: CsvInputRow[]; error?: string 
   const missing = Object.entries(positions).filter(([, position]) => position < 0).map(([key]) => key);
   if (missing.length) return { error: `Missing required column${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}.` };
 
-  const users = parsed.slice(1).map((values) => ({
-    first_name: values[positions.first_name] ?? '',
-    last_name: values[positions.last_name] ?? '',
-    email: values[positions.email] ?? '',
-    role: values[positions.role] ?? '',
-  }));
+  const users = parsed.slice(1)
+    .filter((values) => values.some((value) => String(value ?? '').trim()))
+    .map((values) => ({
+      first_name: values[positions.first_name] ?? '',
+      last_name: values[positions.last_name] ?? '',
+      email: values[positions.email] ?? '',
+      role: values[positions.role] ?? '',
+    }));
+  if (!users.length) return { error: 'Add at least one user to the import file.' };
   return { users };
+}
+
+function csvRowsFromText(text: string) {
+  return rowsToUsers(parseCsv(text.replace(/^\uFEFF/, '')));
+}
+
+type ZipEntry = { name: string; method: number; compressedSize: number; localOffset: number };
+
+function findZipEnd(view: DataView) {
+  const signature = 0x06054b50;
+  const start = Math.max(0, view.byteLength - 65557);
+  for (let offset = view.byteLength - 22; offset >= start; offset -= 1) {
+    if (view.getUint32(offset, true) === signature) return offset;
+  }
+  return -1;
+}
+
+function zipEntries(buffer: ArrayBuffer) {
+  const view = new DataView(buffer);
+  const decoder = new TextDecoder();
+  const end = findZipEnd(view);
+  if (end < 0) throw new Error('The Excel file is not a valid .xlsx workbook.');
+  const entryCount = view.getUint16(end + 10, true);
+  let offset = view.getUint32(end + 16, true);
+  const entries = new Map<string, ZipEntry>();
+
+  for (let index = 0; index < entryCount; index += 1) {
+    if (view.getUint32(offset, true) !== 0x02014b50) throw new Error('The Excel workbook directory is invalid.');
+    const method = view.getUint16(offset + 10, true);
+    const compressedSize = view.getUint32(offset + 20, true);
+    const fileNameLength = view.getUint16(offset + 28, true);
+    const extraLength = view.getUint16(offset + 30, true);
+    const commentLength = view.getUint16(offset + 32, true);
+    const localOffset = view.getUint32(offset + 42, true);
+    const nameBytes = new Uint8Array(buffer, offset + 46, fileNameLength);
+    const name = decoder.decode(nameBytes);
+    entries.set(name, { name, method, compressedSize, localOffset });
+    offset += 46 + fileNameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+async function zipEntryText(buffer: ArrayBuffer, entry: ZipEntry) {
+  const view = new DataView(buffer);
+  const local = entry.localOffset;
+  if (view.getUint32(local, true) !== 0x04034b50) throw new Error(`Workbook entry ${entry.name} is invalid.`);
+  const fileNameLength = view.getUint16(local + 26, true);
+  const extraLength = view.getUint16(local + 28, true);
+  const start = local + 30 + fileNameLength + extraLength;
+  const compressed = new Uint8Array(buffer.slice(start, start + entry.compressedSize));
+
+  if (entry.method === 0) return new TextDecoder().decode(compressed);
+  if (entry.method !== 8 || typeof DecompressionStream === 'undefined') {
+    throw new Error('This browser cannot read compressed Excel workbooks. Use a current Chrome, Edge, or Safari browser, or upload CSV instead.');
+  }
+
+  const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Response(stream).text();
+}
+
+function cellColumn(reference: string) {
+  const letters = reference.match(/^[A-Z]+/i)?.[0]?.toUpperCase() ?? '';
+  let column = 0;
+  for (const letter of letters) column = column * 26 + letter.charCodeAt(0) - 64;
+  return column - 1;
+}
+
+async function xlsxRowsFromFile(file: File): Promise<{ users?: CsvInputRow[]; error?: string }> {
+  if (file.size > 2 * 1024 * 1024) return { error: 'Excel imports must be 2 MB or smaller.' };
+  const buffer = await file.arrayBuffer();
+  const entries = zipEntries(buffer);
+  const workbookEntry = entries.get('xl/workbook.xml');
+  const relationshipsEntry = entries.get('xl/_rels/workbook.xml.rels');
+  if (!workbookEntry || !relationshipsEntry) return { error: 'The Excel workbook is missing required worksheet information.' };
+
+  const parser = new DOMParser();
+  const workbookXml = parser.parseFromString(await zipEntryText(buffer, workbookEntry), 'application/xml');
+  const relationshipXml = parser.parseFromString(await zipEntryText(buffer, relationshipsEntry), 'application/xml');
+  const sheets = Array.from(workbookXml.getElementsByTagName('sheet'));
+  const usersSheet = sheets.find((sheet) => sheet.getAttribute('name')?.trim().toLowerCase() === 'users') ?? sheets[0];
+  if (!usersSheet) return { error: 'The Excel workbook does not contain a worksheet.' };
+  const relationshipId = usersSheet.getAttribute('r:id') ?? usersSheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+  const relationship = Array.from(relationshipXml.getElementsByTagName('Relationship')).find((item) => item.getAttribute('Id') === relationshipId);
+  const target = relationship?.getAttribute('Target') ?? '';
+  const worksheetPath = target.startsWith('/') ? target.slice(1) : `xl/${target.replace(/^\.\//, '')}`;
+  const worksheetEntry = entries.get(worksheetPath);
+  if (!worksheetEntry) return { error: 'The Users worksheet could not be read.' };
+
+  let sharedStrings: string[] = [];
+  const sharedEntry = entries.get('xl/sharedStrings.xml');
+  if (sharedEntry) {
+    const sharedXml = parser.parseFromString(await zipEntryText(buffer, sharedEntry), 'application/xml');
+    sharedStrings = Array.from(sharedXml.getElementsByTagName('si')).map((item) =>
+      Array.from(item.getElementsByTagName('t')).map((text) => text.textContent ?? '').join(''),
+    );
+  }
+
+  const worksheetXml = parser.parseFromString(await zipEntryText(buffer, worksheetEntry), 'application/xml');
+  const parsedRows = Array.from(worksheetXml.getElementsByTagName('row')).map((row) => {
+    const values: string[] = [];
+    for (const cell of Array.from(row.getElementsByTagName('c'))) {
+      const column = cellColumn(cell.getAttribute('r') ?? '');
+      if (column < 0) continue;
+      const type = cell.getAttribute('t');
+      const value = cell.getElementsByTagName('v')[0]?.textContent ?? '';
+      const inlineText = Array.from(cell.getElementsByTagName('t')).map((item) => item.textContent ?? '').join('');
+      values[column] = type === 's' ? (sharedStrings[Number(value)] ?? '') : type === 'inlineStr' ? inlineText : value;
+    }
+    return values;
+  }).filter((values) => values.some((value) => String(value ?? '').trim()));
+
+  return rowsToUsers(parsedRows);
 }
 
 export default function AgencyUserManager() {
@@ -123,7 +235,7 @@ export default function AgencyUserManager() {
 
   async function validateCsv(users: CsvInputRow[]) {
     setCsvWorking(true);
-    setCsvMessage('Validating CSV...');
+    setCsvMessage('Validating import...');
     setCsvPreview([]);
     const response = await fetch('/api/epcr/users', {
       method: 'POST',
@@ -132,7 +244,7 @@ export default function AgencyUserManager() {
     });
     const result = await response.json();
     if (!response.ok) {
-      setCsvMessage(result.error ?? 'Unable to validate the CSV.');
+      setCsvMessage(result.error ?? 'Unable to validate the import file.');
       setCsvWorking(false);
       return;
     }
@@ -144,42 +256,33 @@ export default function AgencyUserManager() {
     setCsvWorking(false);
   }
 
-  async function handleCsvFile(event: ChangeEvent<HTMLInputElement>) {
+  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
     setCsvFileName(file.name);
-    setCsvMessage('Reading CSV...');
+    setCsvMessage('Reading import file...');
     setCsvPreview([]);
     try {
-      const parsed = csvRowsFromText(await file.text());
+      const isExcel = file.name.toLowerCase().endsWith('.xlsx');
+      const parsed = isExcel ? await xlsxRowsFromFile(file) : csvRowsFromText(await file.text());
       if (!parsed.users) {
         setCsvUsers([]);
-        setCsvMessage(parsed.error ?? 'Unable to read the CSV.');
+        setCsvMessage(parsed.error ?? 'Unable to read the import file.');
         return;
       }
       if (parsed.users.length > 100) {
         setCsvUsers([]);
-        setCsvMessage('Import up to 100 users at a time. Split larger rosters into multiple CSV files.');
+        setCsvMessage('Import up to 100 users at a time. Split larger rosters into multiple files.');
         return;
       }
       setCsvUsers(parsed.users);
       await validateCsv(parsed.users);
-    } catch {
+    } catch (error) {
       setCsvUsers([]);
-      setCsvMessage('Unable to read that CSV file.');
+      setCsvMessage(error instanceof Error ? error.message : 'Unable to read that import file.');
+    } finally {
+      event.target.value = '';
     }
-  }
-
-  function downloadTemplate() {
-    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'apollo-epcr-user-import-template.csv';
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
   }
 
   async function importCsvUsers() {
@@ -227,7 +330,7 @@ export default function AgencyUserManager() {
       <a href="/epcr-dashboard" className="font-black text-blue-700 transition hover:text-blue-900">&larr; Agency Admin</a>
       <p className="mt-6 text-xs font-black uppercase tracking-[0.2em] text-blue-700">Agency administration</p>
       <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-950">Manage users</h1>
-      <p className="mt-2 text-slate-600">Invite one person at a time or import an agency roster from CSV. Access to other agencies is never shown here.</p>
+      <p className="mt-2 text-slate-600">Invite one person at a time or import an agency roster from Excel or CSV. Access to other agencies is never shown here.</p>
     </header>
 
     <div className="mt-6 grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
@@ -251,19 +354,19 @@ export default function AgencyUserManager() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">Bulk onboarding</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">Import users from CSV</h2>
-            <p className="mt-2 max-w-2xl text-sm text-slate-600">Upload up to 100 users at once. Apollo validates every row before any invitation is sent.</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Import users from Excel</h2>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">Use the formatted ApolloEMS Excel template with role dropdowns, or upload an existing CSV roster. Apollo validates every row before any invitation is sent.</p>
           </div>
-          <button type="button" onClick={downloadTemplate} className="rounded-xl border border-blue-700 bg-white px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-50">Download CSV template</button>
+          <a href="/templates/apollo-epcr-user-import-template.xlsx" download className="rounded-xl border border-blue-700 bg-white px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-50">Download Excel template</a>
         </div>
 
         <div className="mt-5 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-5">
           <label className="block cursor-pointer">
-            <span className="block text-sm font-black text-slate-950">Choose CSV roster</span>
-            <span className="mt-1 block text-sm text-slate-600">Required columns: first_name, last_name, email, role</span>
-            <input type="file" accept=".csv,text/csv" onChange={(event) => void handleCsvFile(event)} className="mt-4 block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-700 file:px-4 file:py-2.5 file:font-black file:text-white hover:file:bg-blue-800"/>
+            <span className="block text-sm font-black text-slate-950">Choose Excel or CSV roster</span>
+            <span className="mt-1 block text-sm text-slate-600">Recommended: use the ApolloEMS .xlsx template. Required columns: first_name, last_name, email, role</span>
+            <input type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" onChange={(event) => void handleImportFile(event)} className="mt-4 block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-700 file:px-4 file:py-2.5 file:font-black file:text-white hover:file:bg-blue-800"/>
           </label>
-          <p className="mt-3 text-xs leading-5 text-slate-500">Role values may be CLINICIAN, REVIEWER, ADMIN, or PRIMARY_ADMIN. Friendly values such as Student, Instructor, and User are also accepted. Only a Primary Admin can import another Primary Admin.</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">The Excel template includes a Role dropdown with Clinician / Student, Reviewer, Admin / Instructor, and Primary Admin. Existing CSV files may also use CLINICIAN, REVIEWER, ADMIN, or PRIMARY_ADMIN. Only a Primary Admin can import another Primary Admin.</p>
         </div>
 
         {(csvFileName || csvMessage) && <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">

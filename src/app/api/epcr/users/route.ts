@@ -109,7 +109,7 @@ async function validateBulkRows(access: Access, rows: unknown[]): Promise<BulkRo
       return { row, ...data, valid: false, error: 'Only a Primary Admin can invite another Primary Admin.' };
     }
     if (duplicateEmails.has(data.email)) {
-      return { row, ...data, valid: false, error: 'This email appears more than once in the CSV.' };
+      return { row, ...data, valid: false, error: 'This email appears more than once in the import file.' };
     }
     const existingStatus = existingByEmail.get(data.email);
     if (existingStatus) {
@@ -180,7 +180,7 @@ export async function POST(request: NextRequest) {
 
   if (action === 'VALIDATE_BULK' || action === 'IMPORT_BULK') {
     const rows = Array.isArray(input.users) ? input.users : [];
-    if (!rows.length) return NextResponse.json({ error: 'Add at least one user to the CSV.' }, { status: 400 });
+    if (!rows.length) return NextResponse.json({ error: 'Add at least one user to the import file.' }, { status: 400 });
     if (rows.length > MAX_BULK_USERS) return NextResponse.json({ error: `Import up to ${MAX_BULK_USERS} users at a time.` }, { status: 400 });
 
     try {
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
         skipped: results.filter((row) => !row.imported).length,
       });
     } catch (error) {
-      return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to process the CSV import.' }, { status: 400 });
+      return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to process the user import.' }, { status: 400 });
     }
   }
 
