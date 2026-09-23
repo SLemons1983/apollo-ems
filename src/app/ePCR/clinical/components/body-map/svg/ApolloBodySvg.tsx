@@ -1,6 +1,8 @@
 'use client';
 
 import ApolloBodyFigure from '../ApolloBodyFigure';
+import type { ApolloBodyAgeGroup } from '../bodyMapPatientProfile';
+import { getApolloBodyIllustrationProfile } from '../bodyMapIllustrationProfile';
 import type {
   ApolloBodyRegionKey,
   ApolloBodyRegionStatus,
@@ -12,6 +14,7 @@ import { bodySvgBack, bodySvgBackLayout } from './bodySvgBack';
 type ApolloBodySvgProps = {
   view: ApolloBodyView;
   patientSex?: string;
+  patientAgeGroup?: ApolloBodyAgeGroup;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   regionStatuses: Partial<Record<ApolloBodyRegionKey, ApolloBodyRegionStatus>>;
   suggestedRegions?: ApolloBodyRegionKey[];
@@ -35,6 +38,11 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
   const imageHref = isFemale
     ? '/epcr/body-map/apollo-body-female.png'
     : '/epcr/body-map/apollo-body-male.png';
+  const illustrationProfile = getApolloBodyIllustrationProfile(
+    props.patientAgeGroup,
+    illustrationSex,
+    props.view,
+  );
 
   if (regions.length === 0) {
     return <ApolloBodyFigure {...props} />;
@@ -54,15 +62,17 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
           </filter>
         </defs>
 
-        <image
-          href={imageHref}
-          x="0"
-          y="0"
-          width={layout.canvasWidth}
-          height={layout.canvasHeight}
-          aria-hidden="true"
-          pointerEvents="none"
-        />
+        <g transform={illustrationProfile.transform}>
+          <image
+            href={imageHref}
+            x="0"
+            y="0"
+            width={layout.canvasWidth}
+            height={layout.canvasHeight}
+            aria-hidden="true"
+            pointerEvents="none"
+          />
+        </g>
 
         <defs>
           {regions.map((region, index) =>
@@ -77,7 +87,7 @@ export default function ApolloBodySvg(props: ApolloBodySvgProps) {
           )}
         </defs>
 
-        <g>
+        <g transform={illustrationProfile.transform}>
         {regions.map((region, index) => {
           const selected = props.selectedRegions[region.id];
           const status = props.regionStatuses[region.id];

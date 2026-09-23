@@ -92,6 +92,7 @@ export default function ApolloBodyMap({
             <ApolloBodySvg
               view={view}
               patientSex={patientSex}
+              patientAgeGroup={patientProfile?.ageGroup}
               selectedRegions={selectedRegions}
               regionStatuses={combinedRegionStatuses}
               suggestedRegions={suggestedRegions}
