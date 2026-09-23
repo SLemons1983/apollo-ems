@@ -1127,7 +1127,7 @@ export default function PatientSection({
               <option value=""></option>
               {dispositionOptions.map((disposition) => (
                 <option key={disposition} value={disposition}>
-                  {disposition}
+                  {dispositionOptionLabels[disposition] ?? disposition}
                 </option>
               ))}
             </select>
