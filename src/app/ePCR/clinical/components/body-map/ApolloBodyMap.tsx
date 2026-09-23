@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import ApolloBodySvg from './svg/ApolloBodySvg';
+import { getApolloBodyPatientProfile } from './bodyMapPatientProfile';
 import { apolloBodyMapModeConfig } from './bodyMapModeConfig';
 import {
   buildBodyRegionStatusesFromClinicalOverlays,
@@ -16,6 +17,7 @@ import type {
 
 type ApolloBodyMapProps = {
   patientSex?: string;
+  patientDateOfBirth?: string;
   selectedRegions: Record<ApolloBodyRegionKey, boolean>;
   focusedRegion?: ApolloBodyRegionKey | '';
   onRegionClick: (region: ApolloBodyRegionKey) => void;
@@ -27,6 +29,7 @@ type ApolloBodyMapProps = {
 
 export default function ApolloBodyMap({
   patientSex = '',
+  patientDateOfBirth = '',
   selectedRegions,
   focusedRegion = '',
   onRegionClick,
@@ -39,6 +42,10 @@ export default function ApolloBodyMap({
     useState<ApolloBodyRegionKey | null>(null);
 
   const modeConfig = apolloBodyMapModeConfig[mode];
+  const patientProfile = useMemo(
+    () => getApolloBodyPatientProfile(patientDateOfBirth),
+    [patientDateOfBirth],
+  );
   const combinedRegionStatuses = mergeBodyRegionStatuses(
     regionStatuses,
     buildBodyRegionStatusesFromClinicalOverlays(clinicalOverlays),
@@ -59,6 +66,19 @@ export default function ApolloBodyMap({
             Tap the patient where you found a problem or need to document the exam.
           </p>
         </div>
+        {patientProfile && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-right">
+            <div className="text-[10px] font-black uppercase tracking-wide text-blue-600">
+              Patient Body Profile
+            </div>
+            <div className="mt-0.5 text-sm font-black text-slate-900">
+              {patientProfile.ageGroupLabel}
+            </div>
+            <div className="text-[11px] font-semibold text-slate-500">
+              {patientProfile.ageDescription}
+            </div>
+          </div>
+        )}
       </div>
       </div>
 

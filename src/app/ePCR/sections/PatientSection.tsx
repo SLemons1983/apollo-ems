@@ -166,6 +166,10 @@ const dispositionOptions = [
   'Canceled by Other Agency at Scene',
 ];
 
+const dispositionOptionLabels: Record<string, string> = {
+  RMCT: 'RMCT / AMA',
+};
+
 const transportedToOptions = [
   'AMC Bakersfield',
   'AMC Hanford',
@@ -351,7 +355,7 @@ function OutcomeSelect({
         <option value=""></option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {dispositionOptionLabels[option] ?? option}
           </option>
         ))}
       </select>
