@@ -1856,6 +1856,7 @@ export default function AssessmentSection({
           <ApolloBodyMap
             mode="assessment"
             patientSex={patientForm.gender}
+            patientDateOfBirth={patientForm.dateOfBirth}
             selectedRegions={selectedAssessmentRegions}
             focusedRegion={selectedAssessmentRegion}
             regionStatuses={assessmentBodyRegionStatuses}
