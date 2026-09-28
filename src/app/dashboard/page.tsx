@@ -1322,7 +1322,7 @@ export default function DashboardPage() {
 
   const [compensationDateKey, setCompensationDateKey] = useState('');
   const [compensationType, setCompensationType] =
-    useState<'LDT_STIPEND' | 'MEAL_PAY'>('LDT_STIPEND');
+    useState<'' | 'LDT_STIPEND' | 'MEAL_PAY'>('');
   const [timecardStatus, setTimecardStatus] = useState('');
   const [showTimecardSubmitConfirmation, setShowTimecardSubmitConfirmation] = useState(false);
   const [isSubmittingTimecard, setIsSubmittingTimecard] = useState(false);
@@ -2609,6 +2609,49 @@ export default function DashboardPage() {
 
 
 
+  useEffect(() => {
+    if (!currentEmployeeId) return;
+
+    let cancelled = false;
+
+    async function refreshEmployeeSubmittedTimecards() {
+      const { data, error } = await supabase
+        .from('submitted_timecards')
+        .select('*')
+        .eq('employee_id', currentEmployeeId)
+        .order('submitted_at', { ascending: false });
+
+      if (cancelled || error) {
+        if (error) console.error('Failed to refresh submitted timecards:', error);
+        return;
+      }
+
+      setSubmittedTimecards(
+        (data ?? []).map((row: any) => ({
+          id: row.id, employeeId: row.employee_id, employeeName: row.employee_name,
+          payPeriodKey: row.pay_period_key, payPeriodStart: row.pay_period_start,
+          payPeriodEnd: row.pay_period_end, submittedAt: row.submitted_at,
+          totalHours: row.total_hours ?? 0, payBreakdown: row.pay_breakdown ?? {
+            regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0,
+            holidayPremiumHours: 0, missedMealPenaltyHours: 0,
+            week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
+            week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
+          },
+          punches: row.punches ?? [], missedMealBreaks: row.missed_meal_breaks ?? [],
+          corrections: row.corrections ?? [],
+          additionalCompensation: Array.isArray(row.additional_compensation) ? row.additional_compensation : [],
+          submissionAcknowledgement: row.submission_acknowledgement && typeof row.submission_acknowledgement === 'object' ? row.submission_acknowledgement : null,
+          note: row.note ?? '', status: row.status,
+        })),
+      );
+    }
+
+    void refreshEmployeeSubmittedTimecards();
+    const interval = window.setInterval(() => void refreshEmployeeSubmittedTimecards(), 5000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [currentEmployeeId]);
+
+
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
@@ -2974,6 +3017,11 @@ export default function DashboardPage() {
   }
 
   function addAdditionalCompensation() {
+    if (!compensationType) {
+      setTimecardStatus('Select a compensation type before adding compensation.');
+      return;
+    }
+
     if (!compensationDateKey) {
       setTimecardStatus('Select a date before adding compensation.');
       return;
@@ -3122,6 +3170,16 @@ export default function DashboardPage() {
     (item) => item.employeeId === currentEmployeeId && item.payPeriodKey === selectedPayPeriod.key,
   );
 
+  const payPeriodAdditionalCompensation = additionalCompensation.filter((item) => {
+    const startKey = toDateKey(selectedPayPeriod.start);
+    const endKey = toDateKey(selectedPayPeriod.end);
+    return (
+      item.employeeId === currentEmployeeId &&
+      item.dateKey >= startKey &&
+      item.dateKey <= endKey
+    );
+  });
+
   const selectedPayPeriodStartKey = getIsoDateInputValue(selectedPayPeriod.start);
   const selectedPayPeriodEndKey = getIsoDateInputValue(selectedPayPeriod.end);
 
@@ -3133,19 +3191,25 @@ export default function DashboardPage() {
     );
   }
 
-  const submittedTimecard = submittedTimecards.find(
-    (item) =>
-      item.employeeId === currentEmployeeId &&
-      timecardMatchesSelectedPayPeriod(item) &&
-      item.status !== 'RETURNED',
-  ) ?? null;
+  // Treat the newest submission for this employee/pay period as the authoritative state.
+  // Older records are intentionally retained for the audit trail and must never lock the
+  // employee out after a newer record has been returned for correction.
+  const selectedPayPeriodTimecards = submittedTimecards
+    .filter(
+      (item) =>
+        item.employeeId === currentEmployeeId &&
+        timecardMatchesSelectedPayPeriod(item),
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+    );
 
-  const returnedTimecard = submittedTimecards.find(
-    (item) =>
-      item.employeeId === currentEmployeeId &&
-      timecardMatchesSelectedPayPeriod(item) &&
-      item.status === 'RETURNED',
-  ) ?? null;
+  const latestTimecard = selectedPayPeriodTimecards[0] ?? null;
+  const submittedTimecard =
+    latestTimecard && latestTimecard.status !== 'RETURNED' ? latestTimecard : null;
+  const returnedTimecard =
+    latestTimecard?.status === 'RETURNED' ? latestTimecard : null;
 
   function normalizeReturnedPayType(value: string | undefined): TimecardPayType {
     if (
@@ -4089,9 +4153,11 @@ export default function DashboardPage() {
       updated_at: new Date().toISOString(),
     };
 
+    // Employee submissions are immutable audit records. Always INSERT a new row;
+    // supervisor review actions may update that specific row later.
     const { error } = await supabase
       .from('submitted_timecards')
-      .upsert(payload, { onConflict: 'id' });
+      .insert(payload);
 
     if (error) {
       throw error;
@@ -4129,7 +4195,7 @@ export default function DashboardPage() {
     const isResubmission = Boolean(returnedTimecard);
 
     const timecard: SubmittedTimecard = {
-      id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${Date.now()}`,
+      id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${crypto.randomUUID()}`,
       employeeId: currentEmployeeId,
       employeeName: currentEmployee?.name ?? 'Employee profile not linked',
       payPeriodKey: selectedPayPeriod.key,
@@ -4175,16 +4241,8 @@ export default function DashboardPage() {
       status: 'PENDING_SUPERVISOR_REVIEW',
     };
 
-    const returnedForThisPeriod = submittedTimecards.find(
-      (item) =>
-        item.employeeId === currentEmployeeId &&
-        timecardMatchesSelectedPayPeriod(item) &&
-        item.status === 'RETURNED',
-    );
-
-    if (returnedForThisPeriod) {
-      timecard.id = returnedForThisPeriod.id;
-    }
+    // IMPORTANT: never reuse the returned timecard ID here. A resubmission must
+    // be a new database row so the original returned card remains as an audit record.
 
     try {
       await saveSubmittedTimecard(timecard);
@@ -6850,6 +6908,7 @@ export default function DashboardPage() {
                       </select>
 
                       <select value={compensationType} onChange={(event) => setCompensationType(event.target.value as AdditionalCompensation['compensationType'])} className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500">
+                        <option value="">Select compensation type</option>
                         <option value="LDT_STIPEND">LDT Stipend ($75)</option>
                         <option value="MEAL_PAY">Meal Pay ($25)</option>
                       </select>
@@ -6860,10 +6919,10 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      {additionalCompensation.length === 0 ? (
+                      {payPeriodAdditionalCompensation.length === 0 ? (
                         <div className="text-xs text-slate-500">No additional compensation added for this pay period.</div>
                       ) : (
-                        additionalCompensation.map((item) => (
+                        payPeriodAdditionalCompensation.map((item) => (
                           <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm">
                             <div>
                               <div className="font-semibold text-slate-900">{item.dateKey}</div>

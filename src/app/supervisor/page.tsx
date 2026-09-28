@@ -1486,13 +1486,36 @@ export default function SupervisorPage() {
 
   const pendingTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
-      .filter((timecard) => timecard.status === 'PENDING_SUPERVISOR_REVIEW')
+      .filter(
+        (timecard) =>
+          timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
+          timecard.submissionAcknowledgement?.submissionAction !== 'RESUBMITTED',
+      )
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [selectedPayPeriodTimecards]);
+
+  const resubmittedTimecards = useMemo(() => {
+    return selectedPayPeriodTimecards
+      .filter(
+        (timecard) =>
+          timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
+          timecard.submissionAcknowledgement?.submissionAction === 'RESUBMITTED',
+      )
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
   const pendingResubmissionTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
-      .filter((timecard) => timecard.status === 'RETURNED')
+      .filter((timecard) => {
+        if (timecard.status !== 'RETURNED') return false;
+        return !selectedPayPeriodTimecards.some(
+          (candidate) =>
+            candidate.employeeId === timecard.employeeId &&
+            candidate.id !== timecard.id &&
+            new Date(candidate.submittedAt).getTime() > new Date(timecard.submittedAt).getTime() &&
+            candidate.submissionAcknowledgement?.submissionAction === 'RESUBMITTED',
+        );
+      })
       .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
@@ -3883,7 +3906,7 @@ export default function SupervisorPage() {
       return;
     }
 
-    if (pendingTimecards.length > 0) {
+    if (pendingTimecards.length > 0 || resubmittedTimecards.length > 0) {
       window.alert('Payroll cannot be submitted. Timecards are still pending review.');
       return;
     }
@@ -7536,8 +7559,8 @@ export default function SupervisorPage() {
           {renderTile(
             'timecard-review',
             'Timecard Review',
-            pendingTimecards.length + pendingResubmissionTimecards.length > 0
-              ? `${pendingTimecards.length} pending review; ${pendingResubmissionTimecards.length} pending employee resubmission.`
+            pendingTimecards.length + resubmittedTimecards.length + pendingResubmissionTimecards.length > 0
+              ? `${pendingTimecards.length} pending review; ${resubmittedTimecards.length} resubmitted; ${pendingResubmissionTimecards.length} pending employee resubmission.`
               : 'Review, approve, or return submitted employee timecards.',
             <div className="space-y-5">
               <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
@@ -7583,6 +7606,7 @@ export default function SupervisorPage() {
                 className={`rounded-xl border p-4 ${
                   employeesNotSubmitted.length === 0 &&
                   pendingTimecards.length === 0 &&
+                  resubmittedTimecards.length === 0 &&
                   pendingResubmissionTimecards.length === 0
                     ? 'border-emerald-300 bg-emerald-50'
                     : 'border-amber-300 bg-amber-50'
@@ -7590,6 +7614,7 @@ export default function SupervisorPage() {
               >
                 {employeesNotSubmitted.length === 0 &&
                 pendingTimecards.length === 0 &&
+                resubmittedTimecards.length === 0 &&
                 pendingResubmissionTimecards.length === 0 ? (
                   <>
                     <div className="text-lg font-bold text-emerald-800">
@@ -7623,7 +7648,7 @@ export default function SupervisorPage() {
                     </div>
 
                     <div className="text-sm text-amber-700">
-                      Pending Reviews: {pendingTimecards.length}
+                      Pending Reviews: {pendingTimecards.length + resubmittedTimecards.length}
                     </div>
 
                     <div className="text-sm text-amber-700">
@@ -7922,6 +7947,42 @@ export default function SupervisorPage() {
               </div>
 
               <div>
+                <div className="mb-2 flex w-full items-center justify-between rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                  <span className="text-sm font-semibold text-violet-900">
+                    Resubmitted Timecards ({resubmittedTimecards.length})
+                  </span>
+                </div>
+
+                {resubmittedTimecards.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-600">
+                    No corrected timecards have been resubmitted for review.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {resubmittedTimecards.map((timecard) => (
+                        <button
+                          key={timecard.id}
+                          type="button"
+                          onClick={() => setSelectedTimecardId(selectedTimecardId === timecard.id ? null : timecard.id)}
+                          className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                            selectedTimecardId === timecard.id
+                              ? 'border-violet-400 bg-violet-100 text-violet-900'
+                              : 'border-violet-200 bg-white text-slate-800 hover:bg-violet-50'
+                          }`}
+                        >
+                          {timecard.employeeName}
+                        </button>
+                      ))}
+                    </div>
+                    {resubmittedTimecards.map((timecard) =>
+                      selectedTimecardId === timecard.id ? renderSubmittedTimecard(timecard) : null
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <button
                   type="button"
                   onClick={() =>
@@ -8036,7 +8097,7 @@ export default function SupervisorPage() {
                 )}
               </div>
             </div>,
-            pendingTimecards.length + pendingResubmissionTimecards.length > 0,
+            pendingTimecards.length + resubmittedTimecards.length + pendingResubmissionTimecards.length > 0,
           )}
 
           {renderTile(
