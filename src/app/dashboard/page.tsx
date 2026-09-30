@@ -481,6 +481,9 @@ type SubmittedTimecard = {
   corrections: TimecardCorrectionRequest[];
   additionalCompensation: AdditionalCompensation[];
   submissionAcknowledgement: TimecardSubmissionAcknowledgement | null;
+  signatureText?: string;
+  signatureAt?: string;
+  signatureUserAgent?: string;
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
 };
@@ -1325,6 +1328,7 @@ export default function DashboardPage() {
     useState<'' | 'LDT_STIPEND' | 'MEAL_PAY'>('');
   const [timecardStatus, setTimecardStatus] = useState('');
   const [showTimecardSubmitConfirmation, setShowTimecardSubmitConfirmation] = useState(false);
+  const [timecardSignature, setTimecardSignature] = useState('');
   const [isSubmittingTimecard, setIsSubmittingTimecard] = useState(false);
   const [timecardWarningDialog, setTimecardWarningDialog] =
     useState<TimecardWarningDialog | null>(null);
@@ -1425,7 +1429,21 @@ export default function DashboardPage() {
   const [mobileNumberSaving, setMobileNumberSaving] = useState(false);
 
   const payPeriodOptions = useMemo(() => buildPayPeriodOptions(new Date(), 28), []);
-  const currentPayPeriod = useMemo(() => getCurrentPayPeriodOption(payPeriodOptions, new Date()), [payPeriodOptions]);
+  const currentPayPeriod = useMemo(
+    () => getCurrentPayPeriodOption(payPeriodOptions, new Date()),
+    [payPeriodOptions],
+  );
+
+  // Future pay periods are intentionally hidden from the employee timecard.
+  // Historical periods remain available for review; the current period is the
+  // employee's center of attention.
+  const employeePayPeriodOptions = useMemo(
+    () =>
+      payPeriodOptions.filter(
+        (option) => option.start.getTime() <= currentPayPeriod.end.getTime(),
+      ),
+    [currentPayPeriod.end, payPeriodOptions],
+  );
 
   const currentEmployee = useMemo(() => {
     const normalizedAuthEmail = authEmail.trim().toLowerCase();
@@ -2562,6 +2580,9 @@ export default function DashboardPage() {
                   typeof row.submission_acknowledgement === 'object'
                     ? row.submission_acknowledgement
                     : null,
+                signatureText: row.signature_text ?? '',
+                signatureAt: row.signature_at ?? '',
+                signatureUserAgent: row.signature_user_agent ?? '',
                 note: row.note ?? '',
                 status: row.status,
               })),
@@ -2641,6 +2662,9 @@ export default function DashboardPage() {
           corrections: row.corrections ?? [],
           additionalCompensation: Array.isArray(row.additional_compensation) ? row.additional_compensation : [],
           submissionAcknowledgement: row.submission_acknowledgement && typeof row.submission_acknowledgement === 'object' ? row.submission_acknowledgement : null,
+          signatureText: row.signature_text ?? '',
+          signatureAt: row.signature_at ?? '',
+          signatureUserAgent: row.signature_user_agent ?? '',
           note: row.note ?? '', status: row.status,
         })),
       );
@@ -2957,7 +2981,12 @@ export default function DashboardPage() {
     return `${currentEmployeeId}-${selectedPayPeriod.key}`;
   }
 
-  async function saveTimecardNote(value: string) {
+  async function saveTimecardNote(value: string) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const noteKey = getTimecardNoteKey();
     const updated = {
       ...timecardNotes,
@@ -3016,7 +3045,12 @@ export default function DashboardPage() {
     }
   }
 
-  function addAdditionalCompensation() {
+  function addAdditionalCompensation() {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     if (!compensationType) {
       setTimecardStatus('Select a compensation type before adding compensation.');
       return;
@@ -3041,7 +3075,12 @@ export default function DashboardPage() {
     setTimecardStatus('Additional compensation added.');
   }
 
-  async function removeAdditionalCompensation(id: string) {
+  async function removeAdditionalCompensation(id: string) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     setAdditionalCompensation(additionalCompensation.filter((item) => item.id !== id));
 
     const { error } = await supabase
@@ -3082,7 +3121,12 @@ export default function DashboardPage() {
     }
   }
 
-  function addMissedMealBreak() {
+  function addMissedMealBreak() {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     if (!missedMealDateKey || !missedMealReason.trim()) {
       setTimecardStatus('Select a date and enter a reason before submitting a missed meal break.');
       return;
@@ -3102,7 +3146,12 @@ export default function DashboardPage() {
     setTimecardStatus('Missed meal break declaration added to this timecard.');
   }
 
-  async function removeMissedMealBreak(id: string) {
+  async function removeMissedMealBreak(id: string) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     setMissedMealBreaks(missedMealBreaks.filter((item) => item.id !== id));
 
     const { error } = await supabase
@@ -3210,6 +3259,13 @@ export default function DashboardPage() {
     latestTimecard && latestTimecard.status !== 'RETURNED' ? latestTimecard : null;
   const returnedTimecard =
     latestTimecard?.status === 'RETURNED' ? latestTimecard : null;
+
+  // Historical periods are review-only. A submitted current-period card is also
+  // locked until it is returned for correction. A returned current-period card
+  // becomes editable again.
+  const isCurrentPayPeriod = selectedPayPeriod.key === currentPayPeriod.key;
+  const isTimecardEditable =
+    isCurrentPayPeriod && (!submittedTimecard || Boolean(returnedTimecard));
 
   function normalizeReturnedPayType(value: string | undefined): TimecardPayType {
     if (
@@ -3518,7 +3574,12 @@ export default function DashboardPage() {
     };
   }
 
-  function updateEditableRow(date: Date, partial: Partial<EditableTimecardRow>) {
+  function updateEditableRow(date: Date, partial: Partial<EditableTimecardRow>) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const current = getEditableRowForDate(date);
@@ -3632,6 +3693,11 @@ export default function DashboardPage() {
     field: 'clockInTime' | 'clockOutTime',
     value: string,
   ) {
+    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
     const normalizedValue = normalizeManualTimeInput(value);
     const nextRow: EditableTimecardRow = {
       ...row,
@@ -3693,7 +3759,12 @@ export default function DashboardPage() {
     });
   }
 
-  function updateEditableRowById(date: Date, rowId: string, partial: Partial<EditableTimecardRow>) {
+  function updateEditableRowById(date: Date, rowId: string, partial: Partial<EditableTimecardRow>) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const dateKey = toDateKey(date);
     const current =
       rowId === getEditableRowKey(dateKey)
@@ -3741,7 +3812,12 @@ export default function DashboardPage() {
       });
   }
 
-  function addEditableSegmentRow(date: Date) {
+  function addEditableSegmentRow(date: Date) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const dateKey = toDateKey(date);
     const rowKey = getEditableRowKey(dateKey);
     const rows = getEditableRowsForDate(date);
@@ -3764,7 +3840,12 @@ export default function DashboardPage() {
     updateEditableRowById(date, segmentKey, segmentRow);
   }
 
-  async function clearEditableRowById(date: Date, rowId: string) {
+  async function clearEditableRowById(date: Date, rowId: string) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const dateKey = toDateKey(date);
     const baseRowKey = getEditableRowKey(dateKey);
 
@@ -3818,7 +3899,12 @@ export default function DashboardPage() {
     setEditableTimecardRows(updatedRows);
   }
 
-  function clearEditableRow(date: Date) {
+  function clearEditableRow(date: Date) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     const confirmed = window.confirm('Clear this entire shift line? This will remove the shift, shift type, clock-in, clock-out, and calculated hours for this row.');
     if (!confirmed) {
       return;
@@ -4083,7 +4169,12 @@ export default function DashboardPage() {
     }
   }
 
-  function addTimecardCorrection() {
+  function addTimecardCorrection() {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     if (!correctionDateKey || !correctionShiftLabel || !correctionRequestedDate || !correctionRequestedTime || !correctionReason.trim()) {
       setTimecardStatus('Complete all correction fields before adding a correction request.');
       return;
@@ -4112,7 +4203,12 @@ export default function DashboardPage() {
     setTimecardStatus('Timecard correction request added.');
   }
 
-  async function removeTimecardCorrection(id: string) {
+  async function removeTimecardCorrection(id: string) {    if (!isTimecardEditable) {
+      setTimecardStatus('This timecard is read-only. Only the current pay period can be edited.');
+      return;
+    }
+
+
     setTimecardCorrections(timecardCorrections.filter((item) => item.id !== id));
 
     const { error } = await supabase
@@ -4145,6 +4241,9 @@ export default function DashboardPage() {
       corrections: timecard.corrections ?? [],
       additional_compensation: timecard.additionalCompensation ?? [],
       submission_acknowledgement: timecard.submissionAcknowledgement ?? null,
+      signature_text: timecard.signatureText ?? null,
+      signature_at: timecard.signatureAt ?? null,
+      signature_user_agent: timecard.signatureUserAgent ?? null,
       note: timecard.note ?? '',
       status: timecard.status,
       supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
@@ -4193,6 +4292,18 @@ export default function DashboardPage() {
 
     const acknowledgementAcceptedAt = new Date().toISOString();
     const isResubmission = Boolean(returnedTimecard);
+    const signature = timecardSignature.trim();
+
+    if (
+      !signature ||
+      signature.toLowerCase() !== (currentEmployee?.name ?? '').trim().toLowerCase()
+    ) {
+      setTimecardStatus(
+        'Enter your full legal name exactly as shown in Apollo to apply your electronic signature.',
+      );
+      setIsSubmittingTimecard(false);
+      return;
+    }
 
     const timecard: SubmittedTimecard = {
       id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${crypto.randomUUID()}`,
@@ -4227,6 +4338,10 @@ export default function DashboardPage() {
 
           return a.createdAt.localeCompare(b.createdAt);
         }),
+      signatureText: signature,
+      signatureAt: acknowledgementAcceptedAt,
+      signatureUserAgent:
+        typeof navigator !== 'undefined' ? navigator.userAgent : '',
       submissionAcknowledgement: {
         employeeId: currentEmployeeId,
         employeeName: currentEmployee?.name ?? 'Employee profile not linked',
@@ -4248,6 +4363,7 @@ export default function DashboardPage() {
       await saveSubmittedTimecard(timecard);
 
       setShowTimecardSubmitConfirmation(false);
+      setTimecardSignature('');
       setTimecardStatus('Timecard submitted for supervisor review.');
     } catch (error) {
       console.error('Failed to submit timecard:', error);
@@ -6425,7 +6541,7 @@ export default function DashboardPage() {
                     onChange={(event) => setSelectedPayPeriodKey(event.target.value)}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
                   >
-                    {payPeriodOptions.map((option) => (
+                    {employeePayPeriodOptions.map((option) => (
                       <option key={option.key} value={option.key}>
                         {`Pay Period ${option.number} (${formatShortDate(option.start)} - ${formatShortDate(option.end)})`}
                       </option>
@@ -6445,9 +6561,32 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {!isCurrentPayPeriod && (
+                <div className="mb-4 rounded-2xl border border-slate-300 bg-slate-100 p-4">
+                  <div className="text-sm font-bold uppercase tracking-wide text-slate-700">
+                    Historical Pay Period — Read Only
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">
+                    This pay period is closed for employee editing. You can review the recorded timecard, but changes must not be made to a previous pay period.
+                  </div>
+                </div>
+              )}
+
+              {isCurrentPayPeriod && returnedTimecard && (
+                <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
+                  <div className="text-sm font-bold uppercase tracking-wide text-amber-800">
+                    Action Required — Timecard Returned
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-amber-950">
+                    Your supervisor returned this timecard for correction. Review the requested changes, make your corrections, and resubmit the timecard.
+                  </div>
+                </div>
+              )}
+
+              <fieldset disabled={!isTimecardEditable} className="contents">
               <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
                 <div className="text-sm font-semibold uppercase tracking-wide text-blue-800">
-                  Manual Time Entry
+                  {isTimecardEditable ? 'Manual Time Entry' : 'Timecard Review'}
                 </div>
                 <div className="mt-1 text-sm leading-6 text-blue-950">
                   Enter or correct your clock-in and clock-out dates and times in the timecard below. Review all entries and totals before submitting the pay period for supervisor approval.
@@ -7009,6 +7148,21 @@ export default function DashboardPage() {
                           Submit this timecard for supervisor review?
                         </p>
 
+                        <label className="mt-4 block text-sm font-semibold text-slate-800">
+                          Electronic Signature
+                          <span className="mt-1 block text-xs font-normal text-slate-500">
+                            Type your full name exactly as shown in Apollo. This records your acknowledgement and the submission date/time.
+                          </span>
+                          <input
+                            type="text"
+                            value={timecardSignature}
+                            onChange={(event) => setTimecardSignature(event.target.value)}
+                            placeholder={currentEmployee?.name ?? 'Full legal name'}
+                            autoComplete="name"
+                            className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                          />
+                        </label>
+
                         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                           <button
                             type="button"
@@ -7021,7 +7175,11 @@ export default function DashboardPage() {
 
                           <button
                             type="button"
-                            disabled={isSubmittingTimecard}
+                            disabled={
+                              isSubmittingTimecard ||
+                              timecardSignature.trim().toLowerCase() !==
+                                (currentEmployee?.name ?? '').trim().toLowerCase()
+                            }
                             onClick={() => void submitTimecardForReview()}
                             className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                           >
@@ -7034,6 +7192,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              </fieldset>
             </div>,
             false,
           )}
