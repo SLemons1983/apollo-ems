@@ -3378,6 +3378,53 @@ export default function DashboardPage() {
       .replace(/-segment-\d+$/, '');
   }
 
+  function getHistoricalSubmittedRowsForDate(date: Date): EditableTimecardRow[] {
+    if (!submittedTimecard) {
+      return [];
+    }
+
+    const dateKey = toDateKey(date);
+    const punchesForDate = submittedTimecard.punches.filter(
+      (punch) => punch.shiftDateKey === dateKey,
+    );
+
+    if (punchesForDate.length === 0) {
+      return [];
+    }
+
+    const groups = new Map<string, TimePunch[]>();
+
+    punchesForDate.forEach((punch, index) => {
+      const groupKey = punch.id
+        .replace(/^editable-clock-in-/, '')
+        .replace(/^editable-clock-out-/, '');
+
+      const safeKey = groupKey || `${punch.shiftLabel}-${punch.payType ?? 'DAILY_OT_DT'}-${index}`;
+      groups.set(safeKey, [...(groups.get(safeKey) ?? []), punch]);
+    });
+
+    return [...groups.entries()]
+      .map(([id, group]) => {
+        const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+        const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+
+        return {
+          id: `historical-${id}`,
+          shiftLabel: clockIn?.shiftLabel ?? clockOut?.shiftLabel ?? '',
+          payType: normalizeReturnedPayType(clockIn?.payType ?? clockOut?.payType),
+          clockInDate: clockIn ? getDateInputFromTimestamp(clockIn.timestamp) : '',
+          clockInTime: clockIn ? getTimeInputFromTimestamp(clockIn.timestamp) : '',
+          clockOutDate: clockOut ? getDateInputFromTimestamp(clockOut.timestamp) : '',
+          clockOutTime: clockOut ? getTimeInputFromTimestamp(clockOut.timestamp) : '',
+        };
+      })
+      .sort((a, b) =>
+        `${a.clockInDate}T${a.clockInTime}`.localeCompare(
+          `${b.clockInDate}T${b.clockInTime}`,
+        ),
+      );
+  }
+
   function getEditableRowsForDate(date: Date): EditableTimecardRow[] {
     const dateKey = toDateKey(date);
     const baseRow = getEditableRowForDate(date);
@@ -6747,7 +6794,9 @@ export default function DashboardPage() {
                         <tbody>
                           {week.dates.flatMap((date, index) => {
                             const dateKey = toDateKey(date);
-                            const rows = getEditableRowsForDate(date);
+                            const rows = isTimecardEditable
+                              ? getEditableRowsForDate(date)
+                              : getHistoricalSubmittedRowsForDate(date);
 
                             return rows.map((row, rowIndex) => {
                               const rowId = row.id ?? getEditableRowKey(dateKey);
