@@ -4035,6 +4035,12 @@ export default function DashboardPage() {
     };
   }
 
+  function getRowsForTimecardCalculation(date: Date): EditableTimecardRow[] {
+    return isTimecardEditable
+      ? getEditableRowsForDate(date)
+      : getHistoricalSubmittedRowsForDate(date);
+  }
+
   function calculateTimecardPayBreakdown(): PayBreakdown {
     let week1 = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 };
     let week2 = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 };
@@ -4045,7 +4051,7 @@ export default function DashboardPage() {
     dates.forEach((date, index) => {
       const weekIndex = index < 7 ? 0 : 1;
 
-      getEditableRowsForDate(date).forEach((row) => {
+      getRowsForTimecardCalculation(date).forEach((row) => {
         const hours = getEditableRowHours(row);
 
         if (!hours || !row.shiftLabel) {
@@ -4117,7 +4123,10 @@ export default function DashboardPage() {
   function getTimecardTotalHours(): number {
     return dates.reduce(
       (total, date) =>
-        total + getEditableRowsForDate(date).reduce((dateTotal, row) => dateTotal + getEditableRowHours(row), 0),
+        total + getRowsForTimecardCalculation(date).reduce(
+          (dateTotal, row) => dateTotal + getEditableRowHours(row),
+          0,
+        ),
       0,
     );
   }
