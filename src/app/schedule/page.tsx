@@ -759,7 +759,11 @@ function normalizeLegacyEmployeeSlot(
   };
 }
 
-function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment {
+function normalizeShift(
+  raw: unknown,
+  category: ShiftCategory,
+  allowMultipleSupervisorEmployees = false,
+): ShiftAssignment {
   if (!raw || typeof raw !== 'object') {
     return createEmptyShift(false);
   }
@@ -791,7 +795,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
         );
 
   const employee2 =
-    category === 'SUPERVISOR'
+    category === 'SUPERVISOR' && !allowMultipleSupervisorEmployees
       ? createEmptyEmployeeSlot()
       : maybeShift.employee2 && typeof maybeShift.employee2 === 'object'
         ? normalizeEmployeeSlot(maybeShift.employee2)
@@ -803,7 +807,7 @@ function normalizeShift(raw: unknown, category: ShiftCategory): ShiftAssignment 
           );
 
   const employee3 =
-    category === 'SUPERVISOR'
+    category === 'SUPERVISOR' && !allowMultipleSupervisorEmployees
       ? createEmptyEmployeeSlot()
       : maybeShift.employee3 && typeof maybeShift.employee3 === 'object'
         ? normalizeEmployeeSlot(maybeShift.employee3)
@@ -914,7 +918,7 @@ function normalizeDaySchedule(raw: unknown): DaySchedule {
         OC: normalizeShift(standard.OC, 'UNIT'),
         GM: normalizeShift(standard.GM, 'SUPERVISOR'),
         ADMIN_SUP: normalizeShift(standard.ADMIN_SUP, 'SUPERVISOR'),
-        FIELD_SUP: normalizeShift(standard.FIELD_SUP, 'SUPERVISOR'),
+        FIELD_SUP: normalizeShift(standard.FIELD_SUP, 'SUPERVISOR', true),
       },
       extras: extras.map((extra) => normalizeExtraShift(extra)),
     };
@@ -928,7 +932,7 @@ function normalizeDaySchedule(raw: unknown): DaySchedule {
       OC: normalizeShift(maybeDay.OC, 'UNIT'),
       GM: normalizeShift(maybeDay.GM, 'SUPERVISOR'),
       ADMIN_SUP: normalizeShift(maybeDay.ADMIN_SUP, 'SUPERVISOR'),
-      FIELD_SUP: normalizeShift(maybeDay.FIELD_SUP, 'SUPERVISOR'),
+      FIELD_SUP: normalizeShift(maybeDay.FIELD_SUP, 'SUPERVISOR', true),
     },
     extras: [],
   };
@@ -1784,103 +1788,111 @@ export default function SchedulePage() {
       }
 
       try {
-        try {
-          const { data: openShiftData, error: openShiftError } = await supabase
-            .from('open_shift_requests')
-            .select('*')
-            .order('requested_at', { ascending: false });
+        void Promise.allSettled([
+          (async () => {
+            try {
+              const { data: openShiftData, error: openShiftError } = await supabase
+                .from('open_shift_requests')
+                .select('*')
+                .order('requested_at', { ascending: false });
 
-          if (openShiftError) {
-            console.error('Failed to load open shift requests:', openShiftError);
-          } else if (isActive) {
-            setOpenShiftRequests(
-              (openShiftData ?? []).map((row: any) => ({
-                id: row.id,
-                employeeId: row.employee_id,
-                employeeName: row.employee_name,
-                dateKey: row.date_key,
-                shiftKey: row.shift_key,
-                shiftLabel: row.shift_label,
-                payPeriodKey: row.pay_period_key,
-                requestedAt: row.requested_at,
-                status: row.status,
-                employeeNote: row.employee_note ?? undefined,
-                supervisorNote: row.supervisor_note ?? undefined,
-              })),
-            );
-          }
-        } catch (openShiftError) {
-          console.error('Failed to load open shift requests:', openShiftError);
-        }
+              if (openShiftError) {
+                console.error('Failed to load open shift requests:', openShiftError);
+              } else if (isActive) {
+                setOpenShiftRequests(
+                  (openShiftData ?? []).map((row: any) => ({
+                    id: row.id,
+                    employeeId: row.employee_id,
+                    employeeName: row.employee_name,
+                    dateKey: row.date_key,
+                    shiftKey: row.shift_key,
+                    shiftLabel: row.shift_label,
+                    payPeriodKey: row.pay_period_key,
+                    requestedAt: row.requested_at,
+                    status: row.status,
+                    employeeNote: row.employee_note ?? undefined,
+                    supervisorNote: row.supervisor_note ?? undefined,
+                  })),
+                );
+              }
+            } catch (error) {
+              console.error('Failed to load open shift requests:', error);
+            }
+          })(),
 
-        try {
-          const { data: vacationData, error: vacationError } = await supabase
-            .from('vacation_requests')
-            .select('*')
-            .order('requested_at', { ascending: false });
+          (async () => {
+            try {
+              const { data: vacationData, error: vacationError } = await supabase
+                .from('vacation_requests')
+                .select('*')
+                .order('requested_at', { ascending: false });
 
-          if (vacationError) {
-            console.error('Failed to load vacation requests:', vacationError);
-          } else if (isActive) {
-            setVacationRequests(
-              (vacationData ?? []).map((row: any) => ({
-                id: row.id,
-                employeeId: row.employee_id,
-                employeeName: row.employee_name,
-                dateKey: row.date_key,
-                shiftLabel: row.shift_label,
-                startTime: row.start_time,
-                endTime: row.end_time,
-                reason: row.reason ?? '',
-                status: row.status,
-                supervisorNote: row.supervisor_note ?? undefined,
-                requestedAt: row.requested_at,
-              })),
-            );
-          }
-        } catch (vacationError) {
-          console.error('Failed to load vacation requests:', vacationError);
-        }
+              if (vacationError) {
+                console.error('Failed to load vacation requests:', vacationError);
+              } else if (isActive) {
+                setVacationRequests(
+                  (vacationData ?? []).map((row: any) => ({
+                    id: row.id,
+                    employeeId: row.employee_id,
+                    employeeName: row.employee_name,
+                    dateKey: row.date_key,
+                    shiftLabel: row.shift_label,
+                    startTime: row.start_time,
+                    endTime: row.end_time,
+                    reason: row.reason ?? '',
+                    status: row.status,
+                    supervisorNote: row.supervisor_note ?? undefined,
+                    requestedAt: row.requested_at,
+                  })),
+                );
+              }
+            } catch (error) {
+              console.error('Failed to load vacation requests:', error);
+            }
+          })(),
 
-        try {
-          const { data: shiftTradeData, error: shiftTradeError } = await supabase
-            .from('shift_trade_requests')
-            .select('*')
-            .order('requested_at', { ascending: false });
+          (async () => {
+            try {
+              const { data: shiftTradeData, error: shiftTradeError } = await supabase
+                .from('shift_trade_requests')
+                .select('*')
+                .order('requested_at', { ascending: false });
 
-          if (shiftTradeError) {
-            console.error('Failed to load shift trade requests:', shiftTradeError);
-          } else if (isActive) {
-            setShiftTradeRequests(
-              (shiftTradeData ?? []).map((row: any) => ({
-                id: row.id,
-                requestingEmployeeId: row.requesting_employee_id,
-                requestingEmployeeName: row.requesting_employee_name,
-                requestingDateKey: row.requesting_date_key,
-                requestingShiftKey: row.requesting_shift_key,
-                requestingShiftLabel: row.requesting_shift_label,
-                requestingStartTime: row.requesting_start_time ?? undefined,
-                requestingEndTime: row.requesting_end_time ?? undefined,
-                targetEmployeeId: row.target_employee_id ?? undefined,
-                targetEmployeeName: row.target_employee_name ?? undefined,
-                targetDateKey: row.target_date_key,
-                targetShiftKey: row.target_shift_key,
-                targetShiftLabel: row.target_shift_label,
-                targetStartTime: row.target_start_time ?? undefined,
-                targetEndTime: row.target_end_time ?? undefined,
-                targetIsOpenShift: Boolean(row.target_is_open_shift),
-                payPeriodKey: row.pay_period_key,
-                requestedAt: row.requested_at,
-                status: row.status,
-                employeeNote: row.employee_note ?? undefined,
-                recipientNote: row.recipient_note ?? undefined,
-                supervisorNote: row.supervisor_note ?? undefined,
-              })),
-            );
-          }
-        } catch (shiftTradeError) {
-          console.error('Failed to load shift trade requests:', shiftTradeError);
-        }
+              if (shiftTradeError) {
+                console.error('Failed to load shift trade requests:', shiftTradeError);
+              } else if (isActive) {
+                setShiftTradeRequests(
+                  (shiftTradeData ?? []).map((row: any) => ({
+                    id: row.id,
+                    requestingEmployeeId: row.requesting_employee_id,
+                    requestingEmployeeName: row.requesting_employee_name,
+                    requestingDateKey: row.requesting_date_key,
+                    requestingShiftKey: row.requesting_shift_key,
+                    requestingShiftLabel: row.requesting_shift_label,
+                    requestingStartTime: row.requesting_start_time ?? undefined,
+                    requestingEndTime: row.requesting_end_time ?? undefined,
+                    targetEmployeeId: row.target_employee_id ?? undefined,
+                    targetEmployeeName: row.target_employee_name ?? undefined,
+                    targetDateKey: row.target_date_key,
+                    targetShiftKey: row.target_shift_key,
+                    targetShiftLabel: row.target_shift_label,
+                    targetStartTime: row.target_start_time ?? undefined,
+                    targetEndTime: row.target_end_time ?? undefined,
+                    targetIsOpenShift: Boolean(row.target_is_open_shift),
+                    payPeriodKey: row.pay_period_key,
+                    requestedAt: row.requested_at,
+                    status: row.status,
+                    employeeNote: row.employee_note ?? undefined,
+                    recipientNote: row.recipient_note ?? undefined,
+                    supervisorNote: row.supervisor_note ?? undefined,
+                  })),
+                );
+              }
+            } catch (error) {
+              console.error('Failed to load shift trade requests:', error);
+            }
+          })(),
+        ]);
 
         loadEmployeesFromSupabase()
           .then((loadedEmployees) => {
@@ -1901,29 +1913,48 @@ export default function SchedulePage() {
         }
 
         const assignments: any[] = [];
-        let assignmentPageStart = 0;
         const assignmentPageSize = 1000;
+        const assignmentBatchSize = 5;
 
-        while (true) {
+        const fetchAssignmentPage = async (pageStart: number) => {
           const { data: assignmentPage, error: assignmentError } = await supabase
             .from('schedule_assignments')
             .select('*')
             .order('date_key', { ascending: true })
             .order('shift_key', { ascending: true })
             .order('slot_number', { ascending: true })
-            .range(assignmentPageStart, assignmentPageStart + assignmentPageSize - 1);
+            .range(pageStart, pageStart + assignmentPageSize - 1);
 
           if (assignmentError) {
             throw assignmentError;
           }
 
-          assignments.push(...(assignmentPage ?? []));
+          return assignmentPage ?? [];
+        };
 
-          if (!assignmentPage || assignmentPage.length < assignmentPageSize) {
+        let assignmentPageStart = 0;
+        let firstPage = await fetchAssignmentPage(assignmentPageStart);
+        assignments.push(...firstPage);
+
+        while (firstPage.length === assignmentPageSize) {
+          const batchStarts = Array.from(
+            { length: assignmentBatchSize },
+            (_, index) => assignmentPageStart + assignmentPageSize * (index + 1),
+          );
+
+          const batchPages = await Promise.all(batchStarts.map(fetchAssignmentPage));
+          batchPages.forEach((page) => assignments.push(...page));
+
+          const shortPageIndex = batchPages.findIndex(
+            (page) => page.length < assignmentPageSize,
+          );
+
+          if (shortPageIndex >= 0) {
             break;
           }
 
-          assignmentPageStart += assignmentPageSize;
+          assignmentPageStart += assignmentPageSize * assignmentBatchSize;
+          firstPage = batchPages[batchPages.length - 1];
         }
 
         const rebuilt: ScheduleData = {};
@@ -2214,7 +2245,7 @@ export default function SchedulePage() {
           });
 
           slots.forEach(([slotKey, slot], index) => {
-            if (SUPERVISOR_SHIFTS.has(shiftName) && slotKey !== 'employee1') {
+            if ((shiftName === 'ADMIN_SUP' || shiftName === 'GM') && slotKey !== 'employee1') {
               return;
             }
 
@@ -3657,7 +3688,7 @@ export default function SchedulePage() {
     setScheduleDataSafely((current) => {
       const next = cloneScheduleData(normalizeLoadedData(current));
       const shift = next[dateKey]?.standard[shiftName];
-      if (!shift || SUPERVISOR_SHIFTS.has(shiftName)) {
+      if (!shift || shiftName === 'ADMIN_SUP' || shiftName === 'GM') {
         return current;
       }
 
