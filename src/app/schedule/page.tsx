@@ -1771,7 +1771,18 @@ export default function SchedulePage() {
   useEffect(() => {
     let isActive = true;
 
-    const loadData = async () => {
+    const loadData = async (options?: { allowWhenDirty?: boolean }) => {
+      const allowWhenDirty = Boolean(options?.allowWhenDirty);
+
+      if (!allowWhenDirty && (dirtyDatesRef.current.size > 0 || isSavingScheduleRef.current)) {
+        setSaveStatus(
+          isSavingScheduleRef.current
+            ? 'A schedule save is in progress. Apollo will not replace the editor with an external refresh.'
+            : 'The published schedule changed elsewhere. Save or discard your current changes before refreshing.',
+        );
+        return;
+      }
+
       try {
         try {
           const { data: openShiftData, error: openShiftError } = await supabase
@@ -2036,6 +2047,18 @@ export default function SchedulePage() {
 
         if (isActive) {
           const normalizedRebuilt = normalizeLoadedData(rebuilt);
+
+          // A refresh request can finish after the user has started editing.
+          // Never replace newer in-memory work with a stale external snapshot.
+          if (!allowWhenDirty && (dirtyDatesRef.current.size > 0 || isSavingScheduleRef.current)) {
+            setSaveStatus(
+              isSavingScheduleRef.current
+                ? 'A schedule save is in progress. Apollo kept your current edits instead of applying the external refresh.'
+                : 'The published schedule changed elsewhere. Save or discard your current changes before refreshing.',
+            );
+            return;
+          }
+
           persistedScheduleRef.current = cloneScheduleData(normalizedRebuilt);
           setScheduleDataSafely(normalizedRebuilt);
         }
