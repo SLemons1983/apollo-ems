@@ -998,6 +998,31 @@ function buildEmployeeName(profile: StoredEmployeeProfile): string {
   return `${first} ${last}`.trim() || profile.id || 'Unnamed Employee';
 }
 
+function normalizeTimecardSignature(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function getTimecardSignatureNames(employeeName: string): string[] {
+  const normalized = normalizeTimecardSignature(employeeName);
+  if (!normalized) {
+    return [];
+  }
+
+  const names = new Set<string>([normalized]);
+  const commaIndex = normalized.indexOf(',');
+
+  if (commaIndex > 0) {
+    const last = normalized.slice(0, commaIndex).trim();
+    const first = normalized.slice(commaIndex + 1).trim();
+
+    if (first && last) {
+      names.add(`${first} ${last}`);
+    }
+  }
+
+  return [...names];
+}
+
 function buildSupabaseEmployeeName(employee: SupabaseEmployeeRow): string {
   const first = (employee.first_name ?? '').trim();
   const last = (employee.last_name ?? '').trim();
@@ -4357,14 +4382,13 @@ export default function DashboardPage() {
     const isResubmission = Boolean(returnedTimecard);
     const signature = timecardSignature.trim();
 
+    const validSignatureNames = getTimecardSignatureNames(currentEmployee?.name ?? '');
+
     if (
       !signature ||
-      signature.toLowerCase() !== (currentEmployee?.name ?? '').trim().toLowerCase()
+      !validSignatureNames.includes(normalizeTimecardSignature(signature))
     ) {
-      setTimecardStatus(
-        'Enter your full legal name exactly as shown in Apollo to apply your electronic signature.',
-      );
-      setIsSubmittingTimecard(false);
+      setTimecardStatus('Enter your full name to sign the timecard.');
       return;
     }
 
@@ -7216,13 +7240,17 @@ export default function DashboardPage() {
                         <label className="mt-4 block text-sm font-semibold text-slate-800">
                           Electronic Signature
                           <span className="mt-1 block text-xs font-normal text-slate-500">
-                            Type your full name exactly as shown in Apollo. This records your acknowledgement and the submission date/time.
+                            Type your full name. This records your acknowledgement and the submission date/time.
                           </span>
                           <input
                             type="text"
                             value={timecardSignature}
                             onChange={(event) => setTimecardSignature(event.target.value)}
-                            placeholder={currentEmployee?.name ?? 'Full legal name'}
+                            placeholder={
+                              getTimecardSignatureNames(currentEmployee?.name ?? '')[1] ??
+                              currentEmployee?.name ??
+                              'Full legal name'
+                            }
                             autoComplete="name"
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                           />
@@ -7242,8 +7270,9 @@ export default function DashboardPage() {
                             type="button"
                             disabled={
                               isSubmittingTimecard ||
-                              timecardSignature.trim().toLowerCase() !==
-                                (currentEmployee?.name ?? '').trim().toLowerCase()
+                              !getTimecardSignatureNames(currentEmployee?.name ?? '').includes(
+                                normalizeTimecardSignature(timecardSignature),
+                              )
                             }
                             onClick={() => void submitTimecardForReview()}
                             className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
