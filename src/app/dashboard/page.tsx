@@ -3260,12 +3260,19 @@ export default function DashboardPage() {
   const returnedTimecard =
     latestTimecard?.status === 'RETURNED' ? latestTimecard : null;
 
-  // Historical periods are review-only. A submitted current-period card is also
-  // locked until it is returned for correction. A returned current-period card
-  // becomes editable again.
+  // Employees may edit the current pay period and the immediately preceding
+  // pay period. This gives the previous period a full pay-period buffer for
+  // submission/corrections before it becomes historical.
+  //
+  // Submitted cards remain locked until returned for correction, preserving
+  // the existing submitted-timecard/versioning workflow.
   const isCurrentPayPeriod = selectedPayPeriod.key === currentPayPeriod.key;
+  const previousPayPeriodStart = addDays(currentPayPeriod.start, -14);
+  const isTimecardEditablePeriod =
+    isCurrentPayPeriod ||
+    toDateKey(selectedPayPeriod.start) === toDateKey(previousPayPeriodStart);
   const isTimecardEditable =
-    isCurrentPayPeriod && (!submittedTimecard || Boolean(returnedTimecard));
+    isTimecardEditablePeriod && (!submittedTimecard || Boolean(returnedTimecard));
 
   function normalizeReturnedPayType(value: string | undefined): TimecardPayType {
     if (
@@ -6617,7 +6624,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {!isCurrentPayPeriod && (
+              {!isTimecardEditablePeriod && (
                 <div className="mb-4 rounded-2xl border border-slate-300 bg-slate-100 p-4">
                   <div className="text-sm font-bold uppercase tracking-wide text-slate-700">
                     Historical Pay Period — Read Only
