@@ -131,6 +131,8 @@ type EmployeeRole = 'Paramedic' | 'EMT' | 'Supervisor';
 type EmployeeOption = {
   id: string;
   name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   phone: string;
   role: EmployeeRole;
@@ -1002,21 +1004,33 @@ function normalizeTimecardSignature(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-function getTimecardSignatureNames(employeeName: string): string[] {
-  const normalized = normalizeTimecardSignature(employeeName);
-  if (!normalized) {
+function getTimecardSignatureNames(employee: EmployeeOption | null): string[] {
+  if (!employee) {
     return [];
   }
 
-  const names = new Set<string>([normalized]);
-  const commaIndex = normalized.indexOf(',');
+  const names = new Set<string>();
+  const first = employee.firstName.trim();
+  const last = employee.lastName.trim();
 
-  if (commaIndex > 0) {
-    const last = normalized.slice(0, commaIndex).trim();
-    const first = normalized.slice(commaIndex + 1).trim();
+  if (first && last) {
+    names.add(normalizeTimecardSignature(`${first} ${last}`));
+    names.add(normalizeTimecardSignature(`${last}, ${first}`));
+  }
 
-    if (first && last) {
-      names.add(`${first} ${last}`);
+  // Preserve compatibility with the existing display name if canonical fields
+  // are unavailable for any reason.
+  if (employee.name.trim()) {
+    const normalizedDisplayName = normalizeTimecardSignature(employee.name);
+    names.add(normalizedDisplayName);
+
+    const commaIndex = normalizedDisplayName.indexOf(',');
+    if (commaIndex > 0) {
+      const displayLast = normalizedDisplayName.slice(0, commaIndex).trim();
+      const displayFirst = normalizedDisplayName.slice(commaIndex + 1).trim();
+      if (displayFirst && displayLast) {
+        names.add(`${displayFirst} ${displayLast}`);
+      }
     }
   }
 
@@ -1034,6 +1048,8 @@ function mapSupabaseEmployee(employee: SupabaseEmployeeRow): EmployeeOption {
   return {
     id: employee.id,
     name: buildSupabaseEmployeeName(employee),
+    firstName: (employee.first_name ?? '').trim(),
+    lastName: (employee.last_name ?? '').trim(),
     email: (employee.email ?? '').trim().toLowerCase(),
     phone: employee.phone ?? '',
     role: normalizeEmployeeRole(employee.role ?? undefined),
@@ -1306,6 +1322,8 @@ function loadEmployeesFromProfiles(): EmployeeOption[] {
       .map((profile) => ({
         id: profile.id,
         name: buildEmployeeName(profile),
+        firstName: (profile.firstName ?? '').trim(),
+        lastName: (profile.lastName ?? '').trim(),
         email: (profile.email ?? '').trim().toLowerCase(),
         phone: profile.phone ?? '',
         role: normalizeEmployeeRole(profile.role),
@@ -4382,7 +4400,7 @@ export default function DashboardPage() {
     const isResubmission = Boolean(returnedTimecard);
     const signature = timecardSignature.trim();
 
-    const validSignatureNames = getTimecardSignatureNames(currentEmployee?.name ?? '');
+    const validSignatureNames = getTimecardSignatureNames(currentEmployee);
 
     if (
       !signature ||
@@ -7247,9 +7265,9 @@ export default function DashboardPage() {
                             value={timecardSignature}
                             onChange={(event) => setTimecardSignature(event.target.value)}
                             placeholder={
-                              getTimecardSignatureNames(currentEmployee?.name ?? '')[1] ??
-                              currentEmployee?.name ??
-                              'Full legal name'
+                              currentEmployee?.firstName && currentEmployee?.lastName
+                                ? `${currentEmployee.firstName} ${currentEmployee.lastName}`
+                                : currentEmployee?.name ?? 'Full legal name'
                             }
                             autoComplete="name"
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
@@ -7270,7 +7288,7 @@ export default function DashboardPage() {
                             type="button"
                             disabled={
                               isSubmittingTimecard ||
-                              !getTimecardSignatureNames(currentEmployee?.name ?? '').includes(
+                              !getTimecardSignatureNames(currentEmployee).includes(
                                 normalizeTimecardSignature(timecardSignature),
                               )
                             }
