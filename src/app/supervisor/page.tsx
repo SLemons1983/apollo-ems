@@ -191,6 +191,18 @@ type TimecardSubmissionAcknowledgement = {
 
 type SubmittedTimecard = {
   id: string;
+  versionNumber: number;
+  parentTimecardId?: string;
+  versionReason?: string;
+  createdByRole?: string;
+  createdByEmployeeId?: string;
+  supervisorEditAt?: string;
+  supervisorEditBy?: string;
+  supervisorEditComment?: string;
+  employeeReviewRequired: boolean;
+  employeeReviewedAt?: string;
+  employeeReviewedBy?: string;
+  employeeReviewAcknowledgement?: Record<string, unknown> | null;
   employeeId: string;
   employeeName: string;
   payPeriodKey: string;
@@ -1207,6 +1219,22 @@ export default function SupervisorPage() {
             setSubmittedTimecards(
               (submittedData ?? []).map((row: any) => ({
                 id: row.id,
+                versionNumber: Number(row.version_number ?? 1),
+                parentTimecardId: row.parent_timecard_id ?? undefined,
+                versionReason: row.version_reason ?? undefined,
+                createdByRole: row.created_by_role ?? undefined,
+                createdByEmployeeId: row.created_by_employee_id ?? undefined,
+                supervisorEditAt: row.supervisor_edit_at ?? undefined,
+                supervisorEditBy: row.supervisor_edit_by ?? undefined,
+                supervisorEditComment: row.supervisor_edit_comment ?? undefined,
+                employeeReviewRequired: Boolean(row.employee_review_required),
+                employeeReviewedAt: row.employee_reviewed_at ?? undefined,
+                employeeReviewedBy: row.employee_reviewed_by ?? undefined,
+                employeeReviewAcknowledgement:
+                  row.employee_review_acknowledgement &&
+                  typeof row.employee_review_acknowledgement === 'object'
+                    ? row.employee_review_acknowledgement
+                    : null,
                 employeeId: row.employee_id,
                 employeeName: row.employee_name,
                 payPeriodKey: row.pay_period_key,
@@ -1469,38 +1497,37 @@ export default function SupervisorPage() {
   }, [announcements]);
 
   const selectedPayPeriodTimecards = useMemo(() => {
-    const selectedStartKey = makeDateInputValue(selectedPayPeriod.start);
-    const selectedEndKey = makeDateInputValue(selectedPayPeriod.end);
-
-    return submittedTimecards.filter((timecard) => {
-      const timecardStartKey = makeDateInputValue(new Date(timecard.payPeriodStart));
-      const timecardEndKey = makeDateInputValue(new Date(timecard.payPeriodEnd));
-
-      return (
-        timecard.payPeriodKey === selectedPayPeriod.key &&
-        timecardStartKey === selectedStartKey &&
-        timecardEndKey === selectedEndKey
-      );
-    });
-  }, [selectedPayPeriod.end, selectedPayPeriod.key, selectedPayPeriod.start, submittedTimecards]);
+    // The pay-period key identifies the payroll period. Serialized midnight
+    // timestamps depend on the submitting device's timezone and must not
+    // exclude a saved submission from its supervisor review queue.
+    return submittedTimecards.filter(
+      (timecard) => timecard.payPeriodKey === selectedPayPeriod.key,
+    );
+  }, [selectedPayPeriod.key, submittedTimecards]);
 
   const pendingTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
-      .filter(
-        (timecard) =>
+      .filter((timecard) => {
+        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
+        return (
+          latest?.id === timecard.id &&
           timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
-          timecard.submissionAcknowledgement?.submissionAction !== 'RESUBMITTED',
-      )
+          timecard.submissionAcknowledgement?.submissionAction !== 'RESUBMITTED'
+        );
+      })
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
   const resubmittedTimecards = useMemo(() => {
     return selectedPayPeriodTimecards
-      .filter(
-        (timecard) =>
+      .filter((timecard) => {
+        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
+        return (
+          latest?.id === timecard.id &&
           timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
-          timecard.submissionAcknowledgement?.submissionAction === 'RESUBMITTED',
-      )
+          timecard.submissionAcknowledgement?.submissionAction === 'RESUBMITTED'
+        );
+      })
       .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
 
@@ -1508,13 +1535,8 @@ export default function SupervisorPage() {
     return selectedPayPeriodTimecards
       .filter((timecard) => {
         if (timecard.status !== 'RETURNED') return false;
-        return !selectedPayPeriodTimecards.some(
-          (candidate) =>
-            candidate.employeeId === timecard.employeeId &&
-            candidate.id !== timecard.id &&
-            new Date(candidate.submittedAt).getTime() > new Date(timecard.submittedAt).getTime() &&
-            candidate.submissionAcknowledgement?.submissionAction === 'RESUBMITTED',
-        );
+        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
+        return latest?.id === timecard.id;
       })
       .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
   }, [selectedPayPeriodTimecards]);
@@ -1737,6 +1759,22 @@ export default function SupervisorPage() {
     setSubmittedTimecards(
       rows.map((row: any) => ({
         id: row.id,
+        versionNumber: Number(row.version_number ?? 1),
+        parentTimecardId: row.parent_timecard_id ?? undefined,
+        versionReason: row.version_reason ?? undefined,
+        createdByRole: row.created_by_role ?? undefined,
+        createdByEmployeeId: row.created_by_employee_id ?? undefined,
+        supervisorEditAt: row.supervisor_edit_at ?? undefined,
+        supervisorEditBy: row.supervisor_edit_by ?? undefined,
+        supervisorEditComment: row.supervisor_edit_comment ?? undefined,
+        employeeReviewRequired: Boolean(row.employee_review_required),
+        employeeReviewedAt: row.employee_reviewed_at ?? undefined,
+        employeeReviewedBy: row.employee_reviewed_by ?? undefined,
+        employeeReviewAcknowledgement:
+          row.employee_review_acknowledgement &&
+          typeof row.employee_review_acknowledgement === 'object'
+            ? row.employee_review_acknowledgement
+            : null,
         employeeId: row.employee_id,
         employeeName: row.employee_name,
         payPeriodKey: row.pay_period_key,
@@ -1779,6 +1817,18 @@ export default function SupervisorPage() {
   async function saveSubmittedTimecard(timecard: SubmittedTimecard) {
     const payload = {
       id: timecard.id,
+      version_number: timecard.versionNumber ?? 1,
+      parent_timecard_id: timecard.parentTimecardId ?? null,
+      version_reason: timecard.versionReason ?? null,
+      created_by_role: timecard.createdByRole ?? 'EMPLOYEE',
+      created_by_employee_id: timecard.createdByEmployeeId ?? timecard.employeeId,
+      supervisor_edit_at: timecard.supervisorEditAt ?? null,
+      supervisor_edit_by: timecard.supervisorEditBy ?? null,
+      supervisor_edit_comment: timecard.supervisorEditComment ?? null,
+      employee_review_required: Boolean(timecard.employeeReviewRequired),
+      employee_reviewed_at: timecard.employeeReviewedAt ?? null,
+      employee_reviewed_by: timecard.employeeReviewedBy ?? null,
+      employee_review_acknowledgement: timecard.employeeReviewAcknowledgement ?? null,
       employee_id: timecard.employeeId,
       employee_name: timecard.employeeName,
       pay_period_key: timecard.payPeriodKey,
@@ -3094,6 +3144,23 @@ export default function SupervisorPage() {
     });
   }
 
+  function getNextTimecardVersionNumber(timecard: SubmittedTimecard): number {
+    return Math.max(1, Number(timecard.versionNumber ?? 1) + 1);
+  }
+
+  function getLatestTimecardVersionForEmployee(
+    timecards: SubmittedTimecard[],
+    employeeId: string,
+  ): SubmittedTimecard | null {
+    return timecards
+      .filter((item) => item.employeeId === employeeId)
+      .sort((a, b) => {
+        const versionDifference = (b.versionNumber ?? 1) - (a.versionNumber ?? 1);
+        if (versionDifference !== 0) return versionDifference;
+        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+      })[0] ?? null;
+  }
+
   async function saveSupervisorTimecardEdit(timecard: SubmittedTimecard) {
     if (payrollLocked) {
       window.alert(
@@ -3254,8 +3321,24 @@ export default function SupervisorPage() {
       `${correctionType} by ${correctedBy} on ${new Date(correctedAt).toLocaleString('en-US')}.\n` +
       `Reason: ${reason}\n` +
       `Changes: ${changeDescriptions.join(' | ')}`;
+    const nextVersionNumber = getNextTimecardVersionNumber(timecard);
     const correctedTimecard: SubmittedTimecard = {
       ...timecard,
+      id: crypto.randomUUID(),
+      versionNumber: nextVersionNumber,
+      parentTimecardId: timecard.id,
+      versionReason: affectsCompensation
+        ? 'SUPERVISOR_COMPENSATION_CORRECTION'
+        : 'SUPERVISOR_ADMINISTRATIVE_CORRECTION',
+      createdByRole: 'SUPERVISOR',
+      createdByEmployeeId: currentEmployee?.id ?? CURRENT_SUPERVISOR_EMPLOYEE_ID,
+      supervisorEditAt: correctedAt,
+      supervisorEditBy: currentEmployee?.name ?? 'Supervisor',
+      supervisorEditComment: supervisorComment,
+      employeeReviewRequired: affectsCompensation,
+      employeeReviewedAt: undefined,
+      employeeReviewedBy: undefined,
+      employeeReviewAcknowledgement: null,
       totalHours: nextTotalHours,
       payBreakdown: nextPayBreakdown,
       punches: correctedPunches,
@@ -3264,6 +3347,7 @@ export default function SupervisorPage() {
       supervisorComment,
       reviewedAt: undefined,
       reviewedBy: undefined,
+      submittedAt: correctedAt,
     };
     const auditEntry: AuditLogEntry = {
       id: `audit-timecard-edit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3290,17 +3374,24 @@ export default function SupervisorPage() {
       });
 
       if (auditError) {
-        try {
-          await saveSubmittedTimecard(timecard);
-        } catch (rollbackError) {
-          console.error('Failed to roll back timecard after audit error:', rollbackError);
+        const { error: cleanupError } = await supabase
+          .from('submitted_timecards')
+          .delete()
+          .eq('id', correctedTimecard.id);
+
+        if (cleanupError) {
+          console.error('Failed to remove unsafely-audited correction version:', cleanupError);
         }
 
         throw new Error(
-          `The correction audit could not be saved, so Apollo restored the original timecard. ${auditError.message}`,
+          `The correction audit could not be saved, so Apollo did not publish the new correction version. ${auditError.message}`,
         );
       }
 
+      setSubmittedTimecards((current) => [
+        correctedTimecard,
+        ...current,
+      ]);
       setAuditLog((current) => [auditEntry, ...current].slice(0, 250));
 
       cancelSupervisorTimecardEdit();
@@ -4284,6 +4375,15 @@ export default function SupervisorPage() {
             <div className="mt-1 text-sm text-slate-600">
               Pay Period: {formatShortDate(new Date(timecard.payPeriodStart))} to {formatShortDate(new Date(timecard.payPeriodEnd))}
             </div>
+            <div className="mt-1 text-sm text-slate-600">
+              Version: {timecard.versionNumber ?? 1}
+              {timecard.parentTimecardId ? ' • Supervisor correction version' : ' • Original submission'}
+            </div>
+            {timecard.versionReason && (
+              <div className="mt-1 text-xs font-semibold text-slate-500">
+                {timecard.versionReason.replaceAll('_', ' ')}
+              </div>
+            )}
             <div className="mt-1 text-sm text-slate-600">
               Submitted: {new Date(timecard.submittedAt).toLocaleString('en-US', {
                 month: 'numeric',

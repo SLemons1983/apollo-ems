@@ -3272,15 +3272,9 @@ export default function DashboardPage() {
     );
   });
 
-  const selectedPayPeriodStartKey = getIsoDateInputValue(selectedPayPeriod.start);
-  const selectedPayPeriodEndKey = getIsoDateInputValue(selectedPayPeriod.end);
-
   function timecardMatchesSelectedPayPeriod(item: SubmittedTimecard): boolean {
-    return (
-      item.payPeriodKey === selectedPayPeriod.key &&
-      getIsoDateInputValue(new Date(item.payPeriodStart)) === selectedPayPeriodStartKey &&
-      getIsoDateInputValue(new Date(item.payPeriodEnd)) === selectedPayPeriodEndKey
-    );
+    // Use the same period identity as the supervisor review queue.
+    return item.payPeriodKey === selectedPayPeriod.key;
   }
 
   // Treat the newest submission for this employee/pay period as the authoritative state.
