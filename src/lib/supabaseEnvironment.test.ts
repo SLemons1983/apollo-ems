@@ -85,8 +85,21 @@ describe('resolveSupabasePublicConfig', () => {
     expect(config).toMatchObject({ deploymentEnvironment: 'preview', projectRef: 'eejahcuftznsabulssew', usedProductionDefaults: false });
   });
 
-  it('a partial configuration is rejected even in production', () => {
-    expect(() => resolveSupabasePublicConfig({ VERCEL_ENV: 'production', NEXT_PUBLIC_SUPABASE_URL: PRODUCTION_SUPABASE_URL })).toThrow(/not configured/);
+  it('production fills any missing variable with the production value', () => {
+    const urlOnly = resolveSupabasePublicConfig({ VERCEL_ENV: 'production', NEXT_PUBLIC_SUPABASE_URL: `${PRODUCTION_SUPABASE_URL}/` });
+    expect(urlOnly.publishableKey).toMatch(/^sb_publishable_Pprc/);
+    const keyOnly = resolveSupabasePublicConfig({ VERCEL_ENV: 'production', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_explicit' });
+    expect(keyOnly).toMatchObject({ url: PRODUCTION_SUPABASE_URL, publishableKey: 'sb_publishable_explicit' });
+  });
+
+  it('production ignores a leftover legacy anon key variable', () => {
+    const config = resolveSupabasePublicConfig({ VERCEL_ENV: 'production', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJ-legacy' });
+    expect(config).toMatchObject({ url: PRODUCTION_SUPABASE_URL, publishableKey: expect.stringMatching(/^sb_publishable_Pprc/) });
+  });
+
+  it('a partial configuration is rejected outside production', () => {
+    expect(() => resolveSupabasePublicConfig({ VERCEL_ENV: 'preview', NEXT_PUBLIC_SUPABASE_URL: STAGING_URL })).toThrow(/not configured/);
+    expect(() => resolveSupabasePublicConfig({ VERCEL_ENV: 'preview', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: STAGING_KEY })).toThrow(/not configured/);
   });
 
   it('accepts the legacy anon key variable name', () => {

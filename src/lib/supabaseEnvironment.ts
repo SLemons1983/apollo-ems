@@ -3,9 +3,11 @@
 //
 // Rules (enforced when the app is built, so a misconfigured deployment fails
 // to build instead of silently reaching the wrong database):
-//   * production   -> must use the production project. If no Supabase
-//                     variables are set, the production values below are used,
-//                     which keeps today's production behaviour unchanged.
+//   * production   -> must use the production project. Any Supabase variable
+//                     that is not set falls back to the production value below
+//                     (as the app did before), so existing Production
+//                     environment variables never break the build. The legacy
+//                     NEXT_PUBLIC_SUPABASE_ANON_KEY is ignored in production.
 //   * preview, development, local -> must set NEXT_PUBLIC_SUPABASE_URL and
 //                     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and may NEVER point
 //                     at the production project.
@@ -48,12 +50,17 @@ export type SupabasePublicConfig = {
 
 export function resolveSupabasePublicConfig(env: Env): SupabasePublicConfig {
   const deploymentEnvironment = getDeploymentEnvironment(env);
+  const isProduction = deploymentEnvironment === 'production';
   let url = env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? '';
-  let publishableKey = (env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
+  let publishableKey =
+    (isProduction ? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY : env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim() ?? '';
   let usedProductionDefaults = false;
 
-  if (!url && !publishableKey && deploymentEnvironment === 'production') {
+  if (isProduction && !url) {
     url = PRODUCTION_SUPABASE_URL;
+    usedProductionDefaults = true;
+  }
+  if (isProduction && !publishableKey) {
     publishableKey = PRODUCTION_SUPABASE_PUBLISHABLE_KEY;
     usedProductionDefaults = true;
   }

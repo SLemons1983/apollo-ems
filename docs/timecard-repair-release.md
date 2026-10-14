@@ -1,73 +1,102 @@
-# Timecard resubmission repair: release guide
+# Timecard resubmission repair: production release plan
 
-Branch `claude/bold-hawking-idxk8h`. Nothing here has been deployed.
+Branch `claude/bold-hawking-idxk8h`, based on `main` at `96bfd8d` (current
+production). Nothing here has been deployed or applied to production.
 
-## What changed
+## What changes
 
 | Area | Change |
 |---|---|
-| Current-version rule | `src/lib/timecardWorkflow.ts` is the single rule for which timecard record is current (lineage, then time, version, id), used by the employee dashboard, supervisor queues, payroll status, the approved packet, default period selection and analytics. |
-| Resubmission | Employee submissions record version, parent and reason; resubmissions are always visible to supervisors. Stuck legacy resubmissions reappear without data changes. |
-| Approved packet | Exactly one current approved record per employee; superseded approvals are listed separately and excluded. |
-| Corrections | Saved rows load for whichever period is selected; a returned card is restored once, in the database (`restore_returned_timecard_rows`), never over newer corrections; the table is read-only until the restore check finishes. |
-| Signature | Matches the signed-in employee's own first/last name, ignoring case, accents, spacing and punctuation; clear messages; IDs/placeholders never accepted. |
-| Submission state | Every failure path resets "Submitting…". |
-| Finalized payroll | Employees cannot submit into a finalized period and are told a supervisor can reopen payroll; supervisor locks now apply to every period. Returned cards stay editable outside the two-period window. |
-| Environments | Supabase settings come from one module; non-production builds cannot use the production project; email/SMS/CAD are blocked outside production. |
-| Removed | Temporary `/api/supervisor/timecard-diagnostic` (hard-coded employee names). |
+| Current-version rule | `src/lib/timecardWorkflow.ts` is the single rule for which timecard record is current. The employee dashboard, supervisor queues, payroll status, the approved packet, default period selection and analytics all use it. |
+| Resubmission | Employee submissions now also write `version_number`, `parent_timecard_id`, `version_reason`, `created_by_role` and `created_by_employee_id`. Resubmissions always appear under **Resubmitted**. Previously hidden resubmissions reappear without any data change. |
+| Approved packet | Exactly one current approved record per employee and period. Superseded approvals are listed separately and excluded from totals. |
+| Corrections | Saved rows load for whichever period is selected. A returned card is copied into the editable table once (`restore_returned_timecard_rows`) and never over newer corrections. |
+| Signature | Matches the signed-in employee's own first and last name, ignoring case, accents, spacing and punctuation. Messages are clear. "Submitting…" can no longer get stuck. |
+| Finalized payroll | Employees cannot submit into a finalized period and are told how to get it reopened. Supervisor payroll locks now apply to every period. |
+| Self-approval | A supervisor cannot approve their own timecard. The old check compared against a constant and never matched. |
+| Supabase settings | All code reads one validated setting (`src/lib/supabaseConfig.ts`) instead of 26 hard-coded copies. Production resolves to the same project and key as today. |
+| Removed | Temporary `/api/supervisor/timecard-diagnostic`, which hard-coded two employees' names. |
 
-## Database change (production)
+Runtime dependencies are identical to `main`. Only dev/test packages were added.
 
-One additive migration: `supabase/migrations/202610140001_restore_returned_timecard_rows.sql`.
-It creates a single function (`SECURITY INVOKER`, execute granted to
-`authenticated` only). No tables, columns, policies or rows change. It is
-written to work whatever the production types of `editable_timecard_rows.date_key`
-(text/date) and `updated_at` (text/timestamptz) are.
+## Step 0: read-only production check (before anything else)
 
-The app works without it (it falls back to the previous restore), so the
-migration may be applied before or after the app release. Applying it first
-is recommended.
+Paste `supabase/production/readiness-readonly.sql` into the **production**
+SQL Editor and run it. It is a single `SELECT`: it changes nothing and returns
+no employee data. **Every row marked FAIL blocks the release.** Share the
+output; redact any email addresses that appear in policy text.
 
-## Required configuration before release
+The release depends on these results:
 
-1. **Confirm columns** (read-only, Supabase Table Editor, production):
-   `submitted_timecards` has `version_number`, `parent_timecard_id`,
-   `version_reason`, `created_by_role`, `created_by_employee_id`
-   (migration `202609300001`). If any is missing, do not release.
-2. **Confirm `editable_timecard_rows`** has a primary key or unique constraint on `id`
-   (the app's upserts already rely on it).
-3. **Vercel → Settings → Environment Variables → "Automatically expose System
-   Environment Variables"**: must be on, so production builds see
-   `VERCEL_ENV=production`. Otherwise set `APOLLO_DEPLOYMENT_ENVIRONMENT=production`
-   for the Production environment only. If neither is present, the production
-   build fails safely (the live site is unaffected).
-4. **Keep** "Only build production" and the `vercel.json` branch restriction
-   until staging and Preview are verified.
+- The five version columns exist with an employee INSERT allowed (FAIL means employee submissions would error).
+- `editable_timecard_rows(id)` has a primary key or unique constraint.
+- `editable_timecard_rows` has no extra required columns, and its `updated_at` values are ISO timestamps.
+- Section 5 policies let an employee insert their own `submitted_timecards` row and read `payroll_submissions`. Today's `main` already needs this.
 
-## Release procedure
+Also check one setting in Vercel, without changing it: Settings → Environment
+Variables → **"Automatically expose System Environment Variables"** should be on.
+The build reads `VERCEL_ENV=production` from it. If it is off, the production
+build fails safely and the live site stays on `96bfd8d`. Then either turn it on
+or add `APOLLO_DEPLOYMENT_ENVIRONMENT=production` (Production only).
+Existing `NEXT_PUBLIC_SUPABASE_*` variables need no changes. In production,
+any one that is missing falls back to the current production value.
 
-1. Choose a window between pay periods; tell supervisors that previously
-   hidden resubmissions will appear in the Resubmitted queue.
-2. Apply the migration to production (Supabase SQL editor, paste the file,
-   run). Verify: `select proname from pg_proc where proname = 'restore_returned_timecard_rows';`
-3. Merge the branch into `main` (pull request, review). Vercel builds production.
-4. Check the deployment build log for success, then sign in at apolloems.org
-   as an employee and a supervisor and verify the dashboard, the supervisor
-   queues and the payroll status table load.
-5. Watch the first returned/resubmitted timecards through to approval.
+## Release sequence
+
+Choose a time when supervisors are not mid-approval, and tell them that
+earlier hidden resubmissions may now appear under Resubmitted.
+
+1. **Migration (production SQL Editor):** paste
+   `supabase/migrations/202610140001_restore_returned_timecard_rows.sql` and run it.
+   It creates one function and changes no tables, policies or rows.
+2. **Verify the function:**
+   ```sql
+   select p.oid::regprocedure, not p.prosecdef as invoker,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_can_run,
+          has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can_run
+     from pg_proc p where p.proname = 'restore_returned_timecard_rows';
+   ```
+   Expected: one row, `invoker = true`, `authenticated_can_run = true`, `anon_can_run = false`.
+3. **Open a pull request** from the branch to `main`, review it and merge it.
+   Vercel builds production from `main`. The branch entry in `vercel.json`
+   has no effect on `main`.
+4. **Watch the build** in Vercel and confirm it succeeds and is promoted.
+5. **Smoke test (real accounts, no test data written):** as an employee, open
+   the Dashboard → Timecard and confirm the current period and saved entries
+   load. As a supervisor, open Supervisor → Timecards and confirm the queues
+   and payroll status load. Open the approved packet for the last finalized
+   period. Its totals should match what payroll already received. They should
+   differ only where Step 0 reported employee+period groups with more than one
+   APPROVED row, which were previously counted twice.
+6. **First real cycle:** follow the next returned → corrected → resubmitted →
+   approved timecard to completion.
+
+The app also works if step 1 has not been applied yet: it falls back to the
+previous restore method. Applying the migration first is recommended.
 
 ## Rollback
 
-- **App**: in Vercel, promote the previous production deployment (commit
-  `96bfd8d`), or revert the merge commit on `main`. No data migration needs
-  undoing: records written by the new code (version/parent fields, restore
-  marker rows hidden via `deleted: true`) are read correctly by the old code.
-- **Database function**: harmless to leave in place. To remove:
-  `drop function public.restore_returned_timecard_rows(text, text, text, timestamptz, text, jsonb);`
-- No production data is modified by this release.
+- **App:** in Vercel → Deployments, promote the previous production deployment
+  (`96bfd8d`) with Instant Rollback, then revert the merge commit on `main`.
+  Old code reads records written by the new code correctly: the version fields
+  are ones it already reads, and restore marker rows are `deleted: true`,
+  which it already hides. Rolling back also brings back the original defects
+  (hidden resubmissions, corrections overwritten on reload).
+- **Database function:** it is safe to leave in place. To remove it:
+  ```sql
+  drop function if exists public.restore_returned_timecard_rows(text, text, text, timestamptz, text, jsonb);
+  ```
+- **Data:** the release changes no existing rows. New code only adds rows
+  through normal use (submissions, editable rows, restore markers), which is
+  the same as today.
 
-## Tests
+## Verification run on this branch
 
-`npm test` (111 unit/workflow tests), `npm run test:db` (61 real-PostgreSQL
-tests, local only), `npm run typecheck`, `npm run build`. Lint has pre-existing
-failures on `main`; this branch reduces them and adds none.
+| Check | Result |
+|---|---|
+| `npm run typecheck` | pass |
+| `npm test` (workflow, lifecycle/payroll invariants, restore, pay periods, environment, integration guards) | 121 pass |
+| `npm run test:db` on PostgreSQL 16.15 and 17.10 (local) | 80 pass each |
+| `VERCEL_ENV=production npm run build`, with no Supabase variables set | pass; production URL inlined into 44 server bundles; no staging reference in the output |
+| `npx eslint src` | 122 errors / 109 warnings, all pre-existing (`main`: 123 / 110) |
+| `readiness-readonly.sql` on PostgreSQL 16 and 17 rehearsal schemas | all PASS; a deliberately broken schema produces the expected FAILs, without errors |
