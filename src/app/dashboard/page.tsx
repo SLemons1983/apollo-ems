@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   addDays,
@@ -8,6 +8,20 @@ import {
   getCurrentPayPeriodOption,
   type PayPeriodOption,
 } from '@/lib/payPeriods';
+import {
+  assignRestoredRowKeys,
+  checkTimecardSignature,
+  evaluateEmployeeSubmission,
+  getEditableRowPrefix,
+  getEmployeeSubmissionVersionFields,
+  getEmployeeTimecardState,
+  getExpectedSignatureName,
+  getRestoreMarkerRowId,
+  getReturnedTimecardsForEmployee,
+  isTimecardPeriodEditable,
+  savedRowsChangedAfterReturn,
+  shouldRestoreReturnedTimecard,
+} from '@/lib/timecardWorkflow';
 
 type ShiftName = 'R1' | 'R2' | 'P' | 'OC' | 'GM' | 'ADMIN_SUP' | 'FIELD_SUP';
 type ShiftCategory = 'UNIT' | 'SUPERVISOR';
@@ -466,6 +480,13 @@ type TimecardSubmissionAcknowledgement = {
   acceptedAt: string;
   submissionAction: 'SUBMITTED' | 'RESUBMITTED';
   certificationText: string;
+  // How the typed signature was verified against the authenticated employee's
+  // profile (absent on records submitted before verification was recorded).
+  signatureVerification?: {
+    method: string;
+    matchedProfileName: string;
+    employeeId: string;
+  };
 };
 
 type SubmittedTimecard = {
@@ -488,7 +509,104 @@ type SubmittedTimecard = {
   signatureUserAgent?: string;
   note: string;
   status: 'PENDING_SUPERVISOR_REVIEW' | 'APPROVED' | 'RETURNED';
+  versionNumber?: number | null;
+  parentTimecardId?: string | null;
+  versionReason?: string | null;
+  createdByRole?: string | null;
+  createdByEmployeeId?: string | null;
+  supervisorComment?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
 };
+
+type SubmittedTimecardDbRow = {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  pay_period_key: string;
+  pay_period_start: string;
+  pay_period_end: string;
+  submitted_at: string;
+  total_hours: number | null;
+  pay_breakdown: PayBreakdown | null;
+  punches: TimePunch[] | null;
+  missed_meal_breaks: MissedMealBreak[] | null;
+  corrections: TimecardCorrectionRequest[] | null;
+  additional_compensation: unknown;
+  submission_acknowledgement: unknown;
+  signature_text: string | null;
+  signature_at: string | null;
+  signature_user_agent: string | null;
+  note: string | null;
+  status: SubmittedTimecard['status'];
+  version_number: number | null;
+  parent_timecard_id: string | null;
+  version_reason: string | null;
+  created_by_role: string | null;
+  created_by_employee_id: string | null;
+  supervisor_comment: string | null;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+};
+
+type EditableTimecardDbRow = {
+  id: string;
+  updated_at?: string | null;
+  row_data?:
+    | (Partial<EditableTimecardRow> & {
+        deleted?: boolean;
+        restoreMarker?: boolean;
+        restoredFromTimecardId?: string;
+      })
+    | null;
+};
+
+// Maps a submitted_timecards row. Lineage columns are kept as-is (null when the
+// row predates versioning) so the shared workflow rules can order records.
+function mapSubmittedTimecardRow(row: SubmittedTimecardDbRow): SubmittedTimecard {
+  return {
+    id: row.id,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    payPeriodKey: row.pay_period_key,
+    payPeriodStart: row.pay_period_start,
+    payPeriodEnd: row.pay_period_end,
+    submittedAt: row.submitted_at,
+    totalHours: row.total_hours ?? 0,
+    payBreakdown: row.pay_breakdown ?? {
+      regularHours: row.total_hours ?? 0,
+      overtimeHours: 0,
+      doubleTimeHours: 0,
+      holidayPremiumHours: 0,
+      missedMealPenaltyHours: 0,
+      week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
+      week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
+    },
+    punches: row.punches ?? [],
+    missedMealBreaks: row.missed_meal_breaks ?? [],
+    corrections: row.corrections ?? [],
+    additionalCompensation: Array.isArray(row.additional_compensation)
+      ? (row.additional_compensation as AdditionalCompensation[])
+      : [],
+    submissionAcknowledgement:
+      row.submission_acknowledgement && typeof row.submission_acknowledgement === 'object'
+        ? (row.submission_acknowledgement as TimecardSubmissionAcknowledgement)
+        : null,
+    signatureText: row.signature_text ?? '',
+    signatureAt: row.signature_at ?? '',
+    signatureUserAgent: row.signature_user_agent ?? '',
+    note: row.note ?? '',
+    status: row.status,
+    versionNumber: row.version_number ?? null,
+    parentTimecardId: row.parent_timecard_id ?? null,
+    versionReason: row.version_reason ?? null,
+    createdByRole: row.created_by_role ?? null,
+    createdByEmployeeId: row.created_by_employee_id ?? null,
+    supervisorComment: row.supervisor_comment ?? null,
+    reviewedAt: row.reviewed_at ?? null,
+    reviewedBy: row.reviewed_by ?? null,
+  };
+}
 
 type EditableTimecardRow = {
   id?: string;
@@ -1000,43 +1118,6 @@ function buildEmployeeName(profile: StoredEmployeeProfile): string {
   return `${first} ${last}`.trim() || profile.id || 'Unnamed Employee';
 }
 
-function normalizeTimecardSignature(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function getTimecardSignatureNames(employee: EmployeeOption | null): string[] {
-  if (!employee) {
-    return [];
-  }
-
-  const names = new Set<string>();
-  const first = employee.firstName.trim();
-  const last = employee.lastName.trim();
-
-  if (first && last) {
-    names.add(normalizeTimecardSignature(`${first} ${last}`));
-    names.add(normalizeTimecardSignature(`${last}, ${first}`));
-  }
-
-  // Preserve compatibility with the existing display name if canonical fields
-  // are unavailable for any reason.
-  if (employee.name.trim()) {
-    const normalizedDisplayName = normalizeTimecardSignature(employee.name);
-    names.add(normalizedDisplayName);
-
-    const commaIndex = normalizedDisplayName.indexOf(',');
-    if (commaIndex > 0) {
-      const displayLast = normalizedDisplayName.slice(0, commaIndex).trim();
-      const displayFirst = normalizedDisplayName.slice(commaIndex + 1).trim();
-      if (displayFirst && displayLast) {
-        names.add(`${displayFirst} ${displayLast}`);
-      }
-    }
-  }
-
-  return [...names];
-}
-
 function buildSupabaseEmployeeName(employee: SupabaseEmployeeRow): string {
   const first = (employee.first_name ?? '').trim();
   const last = (employee.last_name ?? '').trim();
@@ -1356,7 +1437,19 @@ export default function DashboardPage() {
   const [additionalCompensation, setAdditionalCompensation] = useState<AdditionalCompensation[]>([]);
   const [submittedTimecards, setSubmittedTimecards] = useState<SubmittedTimecard[]>([]);
   const [editableTimecardRows, setEditableTimecardRows] = useState<Record<string, EditableTimecardRow>>({});
+  // Returned timecards already copied into editable rows. Seeded from permanent
+  // marker rows so a restore never repeats after a reload.
   const [restoredReturnedTimecardIds, setRestoredReturnedTimecardIds] = useState<string[]>([]);
+  // Pay periods whose saved editable rows have finished loading.
+  const [loadedEditableRowPeriodKeys, setLoadedEditableRowPeriodKeys] = useState<string[]>([]);
+  // Employee/pay-period pairs already loaded (or loading) during this visit.
+  // Each period is read once, as before, so returning to a period never
+  // replaces edits that are still being saved with an older database copy.
+  const requestedEditableRowPeriodsRef = useRef(new Set<string>());
+  // Most recent saved-row update time per pay period.
+  const [latestEditableRowUpdateByPeriod, setLatestEditableRowUpdateByPeriod] = useState<Record<string, string>>({});
+  // Pay periods with a payroll submission record (finalized payroll).
+  const [finalizedPayrollPeriodKeys, setFinalizedPayrollPeriodKeys] = useState<string[]>([]);
   const [missedMealDateKey, setMissedMealDateKey] = useState('');
   const [missedMealReason, setMissedMealReason] = useState('');
   const [correctionDateKey, setCorrectionDateKey] = useState('');
@@ -2585,83 +2678,8 @@ export default function DashboardPage() {
           }
         });
 
-      supabase
-        .from('submitted_timecards')
-        .select('*')
-        .order('submitted_at', { ascending: false })
-        .then(({ data: submittedData, error: submittedError }) => {
-          if (submittedError) {
-            console.error('Failed to load submitted timecards:', submittedError);
-          } else {
-            setSubmittedTimecards(
-              (submittedData ?? []).map((row: any) => ({
-                id: row.id,
-                employeeId: row.employee_id,
-                employeeName: row.employee_name,
-                payPeriodKey: row.pay_period_key,
-                payPeriodStart: row.pay_period_start,
-                payPeriodEnd: row.pay_period_end,
-                submittedAt: row.submitted_at,
-                totalHours: row.total_hours ?? 0,
-                payBreakdown: row.pay_breakdown ?? {
-                  regularHours: row.total_hours ?? 0,
-                  overtimeHours: 0,
-                  doubleTimeHours: 0,
-                  holidayPremiumHours: 0,
-                  missedMealPenaltyHours: 0,
-                  week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
-                  week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
-                },
-                punches: row.punches ?? [],
-                missedMealBreaks: row.missed_meal_breaks ?? [],
-                corrections: row.corrections ?? [],
-                additionalCompensation: Array.isArray(row.additional_compensation)
-                  ? row.additional_compensation
-                  : [],
-                submissionAcknowledgement:
-                  row.submission_acknowledgement &&
-                  typeof row.submission_acknowledgement === 'object'
-                    ? row.submission_acknowledgement
-                    : null,
-                signatureText: row.signature_text ?? '',
-                signatureAt: row.signature_at ?? '',
-                signatureUserAgent: row.signature_user_agent ?? '',
-                note: row.note ?? '',
-                status: row.status,
-              })),
-            );
-          }
-        });
-
-      supabase
-        .from('editable_timecard_rows')
-        .select('*')
-        .eq('employee_id', currentEmployeeId)
-        .eq('pay_period_key', currentPayPeriod.key)
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Failed to load editable timecard rows:', error);
-          } else {
-            setEditableTimecardRows(
-              Object.fromEntries(
-                (data ?? [])
-                  .filter((row: any) => !row.row_data?.deleted)
-                  .map((row: any) => [
-                    row.id,
-                    {
-                      id: row.id,
-                      shiftLabel: row.row_data?.shiftLabel ?? '',
-                      payType: row.row_data?.payType ?? 'DAILY_OT_DT',
-                      clockInDate: row.row_data?.clockInDate ?? '',
-                      clockInTime: row.row_data?.clockInTime ?? '',
-                      clockOutDate: row.row_data?.clockOutDate ?? '',
-                      clockOutTime: row.row_data?.clockOutTime ?? '',
-                    },
-                  ]),
-              ),
-            );
-          }
-        });
+      // Submitted timecards and editable timecard rows are loaded by dedicated,
+      // employee- and pay-period-scoped effects below.
 
       setSelectedPayPeriodKey(currentPayPeriod.key);
     } catch (error) {
@@ -2690,27 +2708,7 @@ export default function DashboardPage() {
         return;
       }
 
-      setSubmittedTimecards(
-        (data ?? []).map((row: any) => ({
-          id: row.id, employeeId: row.employee_id, employeeName: row.employee_name,
-          payPeriodKey: row.pay_period_key, payPeriodStart: row.pay_period_start,
-          payPeriodEnd: row.pay_period_end, submittedAt: row.submitted_at,
-          totalHours: row.total_hours ?? 0, payBreakdown: row.pay_breakdown ?? {
-            regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0,
-            holidayPremiumHours: 0, missedMealPenaltyHours: 0,
-            week1: { regularHours: row.total_hours ?? 0, overtimeHours: 0, doubleTimeHours: 0 },
-            week2: { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0 },
-          },
-          punches: row.punches ?? [], missedMealBreaks: row.missed_meal_breaks ?? [],
-          corrections: row.corrections ?? [],
-          additionalCompensation: Array.isArray(row.additional_compensation) ? row.additional_compensation : [],
-          submissionAcknowledgement: row.submission_acknowledgement && typeof row.submission_acknowledgement === 'object' ? row.submission_acknowledgement : null,
-          signatureText: row.signature_text ?? '',
-          signatureAt: row.signature_at ?? '',
-          signatureUserAgent: row.signature_user_agent ?? '',
-          note: row.note ?? '', status: row.status,
-        })),
-      );
+      setSubmittedTimecards((data ?? []).map(mapSubmittedTimecardRow));
     }
 
     void refreshEmployeeSubmittedTimecards();
@@ -2775,6 +2773,130 @@ export default function DashboardPage() {
   const selectedPayPeriod = useMemo(() => {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
   }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
+
+  // Saved editable rows are loaded for whichever pay period is selected (not
+  // only the current one), so corrections to a previous or returned period
+  // survive navigation and page reloads.
+  useEffect(() => {
+    if (!currentEmployeeId) return;
+
+    const payPeriodKey = selectedPayPeriod.key;
+    const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
+    const requestKey = `${currentEmployeeId}|${payPeriodKey}`;
+    const requestedPeriods = requestedEditableRowPeriodsRef.current;
+
+    if (requestedPeriods.has(requestKey)) return;
+    requestedPeriods.add(requestKey);
+
+    let cancelled = false;
+    let completed = false;
+
+    supabase
+      .from('editable_timecard_rows')
+      .select('*')
+      .eq('employee_id', currentEmployeeId)
+      .eq('pay_period_key', payPeriodKey)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+
+        if (error) {
+          // The period stays "not loaded", so a returned card is never
+          // restored over rows whose saved state is unknown. Selecting the
+          // period again retries the load.
+          console.error('Failed to load editable timecard rows:', error);
+          requestedPeriods.delete(requestKey);
+          return;
+        }
+
+        const savedRows: EditableTimecardDbRow[] = data ?? [];
+        const restoredTimecardIds = savedRows
+          .filter((row) => row.row_data?.restoreMarker === true)
+          .map((row) => row.row_data?.restoredFromTimecardId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+        setEditableTimecardRows((current) => ({
+          ...Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))),
+          ...Object.fromEntries(
+            savedRows
+              .filter((row) => !row.row_data?.deleted)
+              .map((row) => [
+                row.id,
+                {
+                  id: row.id,
+                  shiftLabel: row.row_data?.shiftLabel ?? '',
+                  payType: row.row_data?.payType ?? 'DAILY_OT_DT',
+                  clockInDate: row.row_data?.clockInDate ?? '',
+                  clockInTime: row.row_data?.clockInTime ?? '',
+                  clockOutDate: row.row_data?.clockOutDate ?? '',
+                  clockOutTime: row.row_data?.clockOutTime ?? '',
+                },
+              ]),
+          ),
+        }));
+
+        if (restoredTimecardIds.length > 0) {
+          setRestoredReturnedTimecardIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
+        }
+
+        const latestUpdatedAt = savedRows
+          .filter((row) => !row.row_data?.restoreMarker && typeof row.updated_at === 'string')
+          .map((row) => row.updated_at as string)
+          .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+
+        setLatestEditableRowUpdateByPeriod((current) => {
+          const next = { ...current };
+          if (latestUpdatedAt) next[payPeriodKey] = latestUpdatedAt;
+          else delete next[payPeriodKey];
+          return next;
+        });
+
+        setLoadedEditableRowPeriodKeys((current) =>
+          current.includes(payPeriodKey) ? current : [...current, payPeriodKey],
+        );
+        completed = true;
+      });
+
+    return () => {
+      // A load interrupted before it finished (e.g. the employee switched
+      // periods) is retried the next time the period is selected.
+      if (!completed) requestedPeriods.delete(requestKey);
+      cancelled = true;
+    };
+  }, [currentEmployeeId, selectedPayPeriod.key]);
+
+  // Finalized payroll periods (a payroll_submissions record exists). If the
+  // list cannot be read, no period is treated as finalized, which preserves the
+  // previous behaviour instead of blocking every employee.
+  useEffect(() => {
+    if (!currentEmployeeId) return;
+
+    let cancelled = false;
+
+    async function refreshFinalizedPayrollPeriods() {
+      const { data, error } = await supabase.from('payroll_submissions').select('pay_period_key');
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('Failed to load finalized payroll periods:', error);
+        return;
+      }
+
+      setFinalizedPayrollPeriodKeys(
+        (data ?? [])
+          .map((row: { pay_period_key: string | null }) => row.pay_period_key)
+          .filter((key): key is string => Boolean(key)),
+      );
+    }
+
+    void refreshFinalizedPayrollPeriods();
+    const interval = window.setInterval(() => void refreshFinalizedPayrollPeriods(), 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [currentEmployeeId]);
 
   const dates = useMemo(() => {
     return Array.from({ length: 14 }, (_, index) => addDays(selectedPayPeriod.start, index));
@@ -3277,39 +3399,46 @@ export default function DashboardPage() {
     return item.payPeriodKey === selectedPayPeriod.key;
   }
 
-  // Treat the newest submission for this employee/pay period as the authoritative state.
-  // Older records are intentionally retained for the audit trail and must never lock the
-  // employee out after a newer record has been returned for correction.
-  const selectedPayPeriodTimecards = submittedTimecards
-    .filter(
-      (item) =>
-        item.employeeId === currentEmployeeId &&
-        timecardMatchesSelectedPayPeriod(item),
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-    );
+  // All records for this employee and pay period. Every submission and
+  // resubmission is retained for the audit trail; the shared workflow rules
+  // (also used by the supervisor screens) decide which one is current.
+  const selectedPayPeriodTimecards = submittedTimecards.filter(
+    (item) =>
+      item.employeeId === currentEmployeeId &&
+      timecardMatchesSelectedPayPeriod(item),
+  );
 
-  const latestTimecard = selectedPayPeriodTimecards[0] ?? null;
-  const submittedTimecard =
-    latestTimecard && latestTimecard.status !== 'RETURNED' ? latestTimecard : null;
-  const returnedTimecard =
-    latestTimecard?.status === 'RETURNED' ? latestTimecard : null;
+  const {
+    current: latestTimecard,
+    lockedRecord: submittedTimecard,
+    returnedRecord: returnedTimecard,
+  } = getEmployeeTimecardState(selectedPayPeriodTimecards, currentEmployeeId, selectedPayPeriod.key);
+
+  // Returned timecards in any pay period, so a card returned for an earlier
+  // period is never missed while the current period is displayed.
+  const returnedTimecardsNeedingAction = currentEmployeeId
+    ? getReturnedTimecardsForEmployee(submittedTimecards, currentEmployeeId)
+    : [];
 
   // Employees may edit the current pay period and the immediately preceding
   // pay period. This gives the previous period a full pay-period buffer for
-  // submission/corrections before it becomes historical.
-  //
-  // Submitted cards remain locked until returned for correction, preserving
-  // the existing submitted-timecard/versioning workflow.
+  // submission/corrections before it becomes historical. A card a supervisor
+  // returned for correction stays editable even outside that window, and a
+  // finalized payroll period is locked until a supervisor reopens payroll.
   const isCurrentPayPeriod = selectedPayPeriod.key === currentPayPeriod.key;
   const previousPayPeriodStart = addDays(currentPayPeriod.start, -14);
-  const isTimecardEditablePeriod =
+  const isWithinEmployeeEditWindow =
     isCurrentPayPeriod ||
     toDateKey(selectedPayPeriod.start) === toDateKey(previousPayPeriodStart);
-  const isTimecardEditable =
-    isTimecardEditablePeriod && (!submittedTimecard || Boolean(returnedTimecard));
+  const isSelectedPayrollFinalized = finalizedPayrollPeriodKeys.includes(selectedPayPeriod.key);
+  const isTimecardEditable = isTimecardPeriodEditable({
+    isWithinEmployeeEditWindow,
+    isPayrollFinalized: isSelectedPayrollFinalized,
+    current: latestTimecard,
+  });
+  const isTimecardEditablePeriod =
+    !isSelectedPayrollFinalized && (isWithinEmployeeEditWindow || Boolean(returnedTimecard));
+  const timecardSignatureCheck = checkTimecardSignature(timecardSignature, currentEmployee);
 
   function normalizeReturnedPayType(value: string | undefined): TimecardPayType {
     if (
@@ -3338,7 +3467,7 @@ export default function DashboardPage() {
     return `${date.getHours()}`.padStart(2, '0') + ':' + `${date.getMinutes()}`.padStart(2, '0');
   }
 
-  async function restoreEditableRowsFromReturnedTimecard(timecard: SubmittedTimecard) {
+  function buildRestoredRowsFromReturnedTimecard(timecard: SubmittedTimecard): Record<string, EditableTimecardRow> {
     const grouped = new Map<string, TimePunch[]>();
 
     timecard.punches.forEach((punch) => {
@@ -3349,20 +3478,32 @@ export default function DashboardPage() {
       grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), punch]);
     });
 
+    const groups = [...grouped.entries()]
+      .map(([groupKey, group]) => {
+        const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
+        const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
+        return {
+          groupKey,
+          clockIn,
+          clockOut,
+          dateKey: clockIn?.shiftDateKey ?? clockOut?.shiftDateKey ?? '',
+        };
+      })
+      .filter((group) => group.dateKey);
+
+    // Every restored row gets a key the timecard table displays (the date's
+    // base row or a segment row), so no returned shift is hidden or dropped
+    // from the resubmission.
+    const rowKeys = assignRestoredRowKeys(
+      groups,
+      getEditableRowPrefix(currentEmployeeId, timecard.payPeriodKey),
+    );
+
     const restoredRows: Record<string, EditableTimecardRow> = {};
 
-    grouped.forEach((group, groupKey) => {
-      const clockIn = group.find((punch) => punch.type === 'CLOCK_IN') ?? null;
-      const clockOut = [...group].reverse().find((punch) => punch.type === 'CLOCK_OUT') ?? null;
-      const dateKey = clockIn?.shiftDateKey ?? clockOut?.shiftDateKey ?? '';
-
-      if (!dateKey) {
-        return;
-      }
-
-      const rowId = groupKey.startsWith(`${currentEmployeeId}-${selectedPayPeriod.key}-`)
-        ? groupKey
-        : `${getEditableRowKey(dateKey)}-returned-${Object.keys(restoredRows).length}`;
+    groups.forEach(({ groupKey, clockIn, clockOut }) => {
+      const rowId = rowKeys.get(groupKey);
+      if (!rowId) return;
 
       restoredRows[rowId] = {
         id: rowId,
@@ -3375,23 +3516,56 @@ export default function DashboardPage() {
       };
     });
 
-    if (Object.keys(restoredRows).length === 0) {
-      return;
+    return restoredRows;
+  }
+
+  // Copies a returned timecard into the editable table exactly once. A
+  // permanent marker row records the restore, so later visits never overwrite
+  // the employee's saved corrections with the returned values again.
+  async function restoreEditableRowsFromReturnedTimecard(
+    timecard: SubmittedTimecard,
+    options: { copyRows: boolean },
+  ) {
+    const payPeriodKey = timecard.payPeriodKey;
+    const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
+    const restoredRows = options.copyRows ? buildRestoredRowsFromReturnedTimecard(timecard) : {};
+    const now = new Date().toISOString();
+
+    if (Object.keys(restoredRows).length > 0) {
+      setEditableTimecardRows((current) => ({
+        ...current,
+        ...restoredRows,
+      }));
     }
 
-    setEditableTimecardRows((current) => ({
-      ...current,
-      ...restoredRows,
-    }));
+    const firstDateKey =
+      Object.keys(restoredRows).map((id) => id.slice(prefix.length).replace(/-segment-\d+$/, ''))[0] ??
+      toDateKey(new Date(timecard.payPeriodStart));
 
-    const rows = Object.entries(restoredRows).map(([id, row]) => ({
-      id,
-      employee_id: currentEmployeeId,
-      pay_period_key: selectedPayPeriod.key,
-      date_key: getEditableRowDateKey(id),
-      row_data: row,
-      updated_at: new Date().toISOString(),
-    }));
+    const rows = [
+      ...Object.entries(restoredRows).map(([id, row]) => ({
+        id,
+        employee_id: currentEmployeeId,
+        pay_period_key: payPeriodKey,
+        date_key: id.slice(prefix.length).replace(/-segment-\d+$/, ''),
+        row_data: row,
+        updated_at: now,
+      })),
+      {
+        id: getRestoreMarkerRowId(currentEmployeeId, payPeriodKey, timecard.id),
+        employee_id: currentEmployeeId,
+        pay_period_key: payPeriodKey,
+        date_key: firstDateKey,
+        row_data: {
+          deleted: true,
+          restoreMarker: true,
+          restoredFromTimecardId: timecard.id,
+          restoredAt: now,
+          rowsCopied: Object.keys(restoredRows).length,
+        },
+        updated_at: now,
+      },
+    ];
 
     const { error } = await supabase
       .from('editable_timecard_rows')
@@ -3399,27 +3573,40 @@ export default function DashboardPage() {
 
     if (error) {
       console.error('Failed to restore returned timecard rows:', error);
-      window.alert(`Returned timecard restore failed: ${error.message}`);
+      setTimecardStatus(
+        `Action Required: Apollo could not prepare your returned timecard for correction. Reload the page and try again. ${error.message}`,
+      );
     }
   }
 
   useEffect(() => {
-    if (!returnedTimecard || restoredReturnedTimecardIds.includes(returnedTimecard.id)) {
+    const restoredIds = new Set(restoredReturnedTimecardIds);
+
+    if (
+      !returnedTimecard ||
+      !shouldRestoreReturnedTimecard({
+        returnedTimecardId: returnedTimecard.id,
+        isPeriodEditable: isTimecardEditable,
+        periodRowsLoaded: loadedEditableRowPeriodKeys.includes(returnedTimecard.payPeriodKey),
+        restoredTimecardIds: restoredIds,
+      })
+    ) {
       return;
     }
 
+    // Rows saved after the return already reflect it (an earlier restore or
+    // the employee's own corrections): record the marker, keep the rows.
+    const copyRows = !savedRowsChangedAfterReturn(
+      latestEditableRowUpdateByPeriod[returnedTimecard.payPeriodKey],
+      returnedTimecard.reviewedAt,
+    );
+
     setRestoredReturnedTimecardIds((current) => [...current, returnedTimecard.id]);
-    void restoreEditableRowsFromReturnedTimecard(returnedTimecard);
-  }, [returnedTimecard?.id, restoredReturnedTimecardIds]);
+    void restoreEditableRowsFromReturnedTimecard(returnedTimecard, { copyRows });
+  }, [returnedTimecard?.id, restoredReturnedTimecardIds, loadedEditableRowPeriodKeys, isTimecardEditable]);
 
   function getEditableRowKey(dateKey: string): string {
     return `${currentEmployeeId}-${selectedPayPeriod.key}-${dateKey}`;
-  }
-
-  function getEditableRowDateKey(rowKey: string): string {
-    return rowKey
-      .replace(`${currentEmployeeId}-${selectedPayPeriod.key}-`, '')
-      .replace(/-segment-\d+$/, '');
   }
 
   function getHistoricalSubmittedRowsForDate(date: Date): EditableTimecardRow[] {
@@ -4346,9 +4533,14 @@ export default function DashboardPage() {
       signature_user_agent: timecard.signatureUserAgent ?? null,
       note: timecard.note ?? '',
       status: timecard.status,
-      supervisor_comment: 'supervisorComment' in timecard ? (timecard.supervisorComment ?? null) : null,
-      reviewed_at: 'reviewedAt' in timecard ? (timecard.reviewedAt ?? null) : null,
-      reviewed_by: 'reviewedBy' in timecard ? (timecard.reviewedBy ?? null) : null,
+      version_number: timecard.versionNumber ?? null,
+      parent_timecard_id: timecard.parentTimecardId ?? null,
+      version_reason: timecard.versionReason ?? null,
+      created_by_role: timecard.createdByRole ?? 'EMPLOYEE',
+      created_by_employee_id: timecard.createdByEmployeeId ?? timecard.employeeId,
+      supervisor_comment: timecard.supervisorComment ?? null,
+      reviewed_at: timecard.reviewedAt ?? null,
+      reviewed_by: timecard.reviewedBy ?? null,
       updated_at: new Date().toISOString(),
     };
 
@@ -4369,96 +4561,111 @@ export default function DashboardPage() {
   }
 
   async function submitTimecardForReview() {
-    if (!currentEmployee || !currentEmployeeId) {
-      setShowTimecardSubmitConfirmation(false);
-      setTimecardStatus(
-        'Action Required: Apollo could not link your login to an employee profile. Please contact a supervisor before submitting payroll.',
-      );
+    // All checks run before the submitting flag is set, and the flag is
+    // cleared in `finally`, so no failure path can leave the form stuck on
+    // "Submitting...".
+    const eligibility = evaluateEmployeeSubmission({
+      hasEmployeeProfile: Boolean(currentEmployee && currentEmployeeId),
+      isSubmitting: isSubmittingTimecard,
+      isWithinEmployeeEditWindow,
+      isPayrollFinalized: isSelectedPayrollFinalized,
+      current: latestTimecard,
+    });
+
+    if (!eligibility.allowed) {
+      if (eligibility.reason !== 'SUBMISSION_IN_PROGRESS') {
+        setShowTimecardSubmitConfirmation(false);
+        setTimecardStatus(eligibility.message);
+      }
       return;
     }
 
-    if (submittedTimecard && !returnedTimecard) {
-      setShowTimecardSubmitConfirmation(false);
-      setTimecardStatus('This timecard has already been submitted for supervisor review.');
+    if (!currentEmployee) {
       return;
     }
 
-    if (isSubmittingTimecard) {
+    // The signature is checked against the authenticated employee's own
+    // profile; currentEmployee is resolved from the login email.
+    const signatureCheck = checkTimecardSignature(timecardSignature, currentEmployee);
+
+    if (!signatureCheck.valid) {
+      setTimecardStatus(signatureCheck.message);
       return;
     }
 
     setIsSubmittingTimecard(true);
     setTimecardStatus('');
 
-    const acknowledgementAcceptedAt = new Date().toISOString();
-    const isResubmission = Boolean(returnedTimecard);
-    const signature = timecardSignature.trim();
+    try {
+      const acknowledgementAcceptedAt = new Date().toISOString();
+      const signature = timecardSignature.trim();
+      const versionFields = getEmployeeSubmissionVersionFields(selectedPayPeriodTimecards, currentEmployeeId);
 
-    const validSignatureNames = getTimecardSignatureNames(currentEmployee);
-
-    if (
-      !signature ||
-      !validSignatureNames.includes(normalizeTimecardSignature(signature))
-    ) {
-      setTimecardStatus('Enter your full name to sign the timecard.');
-      return;
-    }
-
-    const timecard: SubmittedTimecard = {
-      id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${crypto.randomUUID()}`,
-      employeeId: currentEmployeeId,
-      employeeName: currentEmployee?.name ?? 'Employee profile not linked',
-      payPeriodKey: selectedPayPeriod.key,
-      payPeriodStart: selectedPayPeriod.start.toISOString(),
-      payPeriodEnd: selectedPayPeriod.end.toISOString(),
-      submittedAt: new Date().toISOString(),
-      totalHours: getTimecardTotalHours(),
-      payBreakdown: calculateTimecardPayBreakdown(),
-      punches: getEditableTimecardPunches(),
-      missedMealBreaks: payPeriodMissedMealBreaks,
-      corrections: payPeriodCorrections,
-      additionalCompensation: additionalCompensation
-        .filter((item) => {
-          const payPeriodStartKey = toDateKey(selectedPayPeriod.start);
-          const payPeriodEndKey = toDateKey(selectedPayPeriod.end);
-
-          return (
-            item.employeeId === currentEmployeeId &&
-            item.dateKey >= payPeriodStartKey &&
-            item.dateKey <= payPeriodEndKey
-          );
-        })
-        .sort((a, b) => {
-          const dateCompare = a.dateKey.localeCompare(b.dateKey);
-
-          if (dateCompare !== 0) {
-            return dateCompare;
-          }
-
-          return a.createdAt.localeCompare(b.createdAt);
-        }),
-      signatureText: signature,
-      signatureAt: acknowledgementAcceptedAt,
-      signatureUserAgent:
-        typeof navigator !== 'undefined' ? navigator.userAgent : '',
-      submissionAcknowledgement: {
+      const timecard: SubmittedTimecard = {
+        id: `timecard-${currentEmployeeId}-${selectedPayPeriod.key}-${crypto.randomUUID()}`,
         employeeId: currentEmployeeId,
         employeeName: currentEmployee?.name ?? 'Employee profile not linked',
-        acceptedAt: acknowledgementAcceptedAt,
-        submissionAction: isResubmission ? 'RESUBMITTED' : 'SUBMITTED',
-        certificationText:
-          payPeriodMissedMealBreaks.length > 0
-            ? `I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I reported ${payPeriodMissedMealBreaks.length} missed meal break${payPeriodMissedMealBreaks.length === 1 ? '' : 's'} and acknowledge that the declarations and reasons entered for those missed meal breaks are accurate. I am requesting the applicable meal-period compensation. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.`
-            : 'I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I acknowledge that I received adequate time for my meal breaks and that no additional meal-break compensation is needed for this pay period. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.',
-      },
-      note: timecardNotes[getTimecardNoteKey()] ?? '',
-      status: 'PENDING_SUPERVISOR_REVIEW',
-    };
+        payPeriodKey: selectedPayPeriod.key,
+        payPeriodStart: selectedPayPeriod.start.toISOString(),
+        payPeriodEnd: selectedPayPeriod.end.toISOString(),
+        submittedAt: new Date().toISOString(),
+        totalHours: getTimecardTotalHours(),
+        payBreakdown: calculateTimecardPayBreakdown(),
+        punches: getEditableTimecardPunches(),
+        missedMealBreaks: payPeriodMissedMealBreaks,
+        corrections: payPeriodCorrections,
+        additionalCompensation: additionalCompensation
+          .filter((item) => {
+            const payPeriodStartKey = toDateKey(selectedPayPeriod.start);
+            const payPeriodEndKey = toDateKey(selectedPayPeriod.end);
 
-    // IMPORTANT: never reuse the returned timecard ID here. A resubmission must
-    // be a new database row so the original returned card remains as an audit record.
+            return (
+              item.employeeId === currentEmployeeId &&
+              item.dateKey >= payPeriodStartKey &&
+              item.dateKey <= payPeriodEndKey
+            );
+          })
+          .sort((a, b) => {
+            const dateCompare = a.dateKey.localeCompare(b.dateKey);
 
-    try {
+            if (dateCompare !== 0) {
+              return dateCompare;
+            }
+
+            return a.createdAt.localeCompare(b.createdAt);
+          }),
+        signatureText: signature,
+        signatureAt: acknowledgementAcceptedAt,
+        signatureUserAgent:
+          typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        submissionAcknowledgement: {
+          employeeId: currentEmployeeId,
+          employeeName: currentEmployee?.name ?? 'Employee profile not linked',
+          acceptedAt: acknowledgementAcceptedAt,
+          submissionAction: versionFields.submissionAction,
+          signatureVerification: {
+            method: signatureCheck.method,
+            matchedProfileName: signatureCheck.matchedProfileName,
+            employeeId: currentEmployeeId,
+          },
+          certificationText:
+            payPeriodMissedMealBreaks.length > 0
+              ? `I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I reported ${payPeriodMissedMealBreaks.length} missed meal break${payPeriodMissedMealBreaks.length === 1 ? '' : 's'} and acknowledge that the declarations and reasons entered for those missed meal breaks are accurate. I am requesting the applicable meal-period compensation. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.`
+              : 'I certify that the hours reported on this timecard, including any edits entered directly into the table, accurately reflect the hours I have worked during this pay period. I acknowledge that I received adequate time for my meal breaks and that no additional meal-break compensation is needed for this pay period. I understand that falsification of this record may result in disciplinary action, up to and including termination of employment.',
+        },
+        note: timecardNotes[getTimecardNoteKey()] ?? '',
+        status: 'PENDING_SUPERVISOR_REVIEW',
+        // Lineage: a resubmission records the returned card it replaces, so the
+        // employee and supervisor screens agree on which record is current.
+        versionNumber: versionFields.versionNumber,
+        parentTimecardId: versionFields.parentTimecardId,
+        versionReason: versionFields.versionReason,
+        createdByRole: versionFields.createdByRole,
+        createdByEmployeeId: versionFields.createdByEmployeeId,
+      };
+
+      // IMPORTANT: never reuse the returned timecard ID here. A resubmission must
+      // be a new database row so the original returned card remains as an audit record.
       await saveSubmittedTimecard(timecard);
 
       setShowTimecardSubmitConfirmation(false);
@@ -6663,15 +6870,17 @@ export default function DashboardPage() {
               {!isTimecardEditablePeriod && (
                 <div className="mb-4 rounded-2xl border border-slate-300 bg-slate-100 p-4">
                   <div className="text-sm font-bold uppercase tracking-wide text-slate-700">
-                    Historical Pay Period — Read Only
+                    {isSelectedPayrollFinalized ? 'Payroll Finalized — Read Only' : 'Historical Pay Period — Read Only'}
                   </div>
                   <div className="mt-1 text-sm leading-6 text-slate-600">
-                    This pay period is closed for employee editing. You can review the recorded timecard, but changes must not be made to a previous pay period.
+                    {isSelectedPayrollFinalized
+                      ? 'Payroll for this pay period has been finalized. If a correction is needed, contact a supervisor: they can reopen payroll for this period so the timecard can be corrected and resubmitted.'
+                      : 'This pay period is closed for employee editing. You can review the recorded timecard, but changes must not be made to a previous pay period.'}
                   </div>
                 </div>
               )}
 
-              {isCurrentPayPeriod && returnedTimecard && (
+              {returnedTimecard && (
                 <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
                   <div className="text-sm font-bold uppercase tracking-wide text-amber-800">
                     Action Required — Timecard Returned
@@ -6679,8 +6888,39 @@ export default function DashboardPage() {
                   <div className="mt-1 text-sm leading-6 text-amber-950">
                     Your supervisor returned this timecard for correction. Review the requested changes, make your corrections, and resubmit the timecard.
                   </div>
+                  {returnedTimecard.supervisorComment && (
+                    <div className="mt-2 whitespace-pre-wrap rounded-xl bg-white/70 p-3 text-sm text-amber-950">
+                      <span className="font-semibold">Supervisor message:</span> {returnedTimecard.supervisorComment}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {returnedTimecardsNeedingAction
+                .filter((timecard) => timecard.payPeriodKey !== selectedPayPeriod.key)
+                .map((timecard) => (
+                  <div
+                    key={timecard.id}
+                    className="mb-4 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <div className="text-sm font-bold uppercase tracking-wide text-amber-800">
+                        Action Required — Returned Timecard in Another Pay Period
+                      </div>
+                      <div className="mt-1 text-sm leading-6 text-amber-950">
+                        Your timecard for {formatShortDate(new Date(timecard.payPeriodStart))} to{' '}
+                        {formatShortDate(new Date(timecard.payPeriodEnd))} was returned for correction.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPayPeriodKey(timecard.payPeriodKey)}
+                      className="rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-800"
+                    >
+                      Open Returned Timecard
+                    </button>
+                  </div>
+                ))}
 
               <fieldset disabled={!isTimecardEditable} className="contents">
               <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
@@ -7258,15 +7498,35 @@ export default function DashboardPage() {
                             type="text"
                             value={timecardSignature}
                             onChange={(event) => setTimecardSignature(event.target.value)}
-                            placeholder={
-                              currentEmployee?.firstName && currentEmployee?.lastName
-                                ? `${currentEmployee.firstName} ${currentEmployee.lastName}`
-                                : currentEmployee?.name ?? 'Full legal name'
-                            }
+                            placeholder={getExpectedSignatureName(currentEmployee) || 'Full legal name'}
                             autoComplete="name"
+                            aria-invalid={!timecardSignatureCheck.valid && timecardSignature.trim().length > 0}
+                            aria-describedby="timecard-signature-help"
                             className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
                           />
                         </label>
+
+                        <p
+                          id="timecard-signature-help"
+                          role="status"
+                          className={`mt-2 text-xs leading-5 ${
+                            timecardSignatureCheck.valid
+                              ? 'text-emerald-700'
+                              : timecardSignatureCheck.reason === 'EMPTY'
+                                ? 'text-slate-600'
+                                : 'font-semibold text-red-700'
+                          }`}
+                        >
+                          {timecardSignatureCheck.valid
+                            ? `Signature matches your Apollo profile (${timecardSignatureCheck.matchedProfileName}).`
+                            : timecardSignatureCheck.message}
+                        </p>
+
+                        {timecardStatus && showTimecardSubmitConfirmation && (
+                          <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-800">
+                            {timecardStatus}
+                          </p>
+                        )}
 
                         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                           <button
@@ -7280,12 +7540,7 @@ export default function DashboardPage() {
 
                           <button
                             type="button"
-                            disabled={
-                              isSubmittingTimecard ||
-                              !getTimecardSignatureNames(currentEmployee).includes(
-                                normalizeTimecardSignature(timecardSignature),
-                              )
-                            }
+                            disabled={isSubmittingTimecard || !timecardSignatureCheck.valid}
                             onClick={() => void submitTimecardForReview()}
                             className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                           >
