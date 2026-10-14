@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import {
   addDays,
@@ -686,6 +687,179 @@ function isCompanyHoliday(date: Date): boolean {
   );
 }
 
+function mapSubmittedTimecardRow(row: any): SubmittedTimecard {
+  return {
+    id: row.id,
+    versionNumber: Number(row.version_number ?? 1),
+    parentTimecardId: row.parent_timecard_id ?? undefined,
+    versionReason: row.version_reason ?? undefined,
+    createdByRole: row.created_by_role ?? undefined,
+    createdByEmployeeId: row.created_by_employee_id ?? undefined,
+    supervisorEditAt: row.supervisor_edit_at ?? undefined,
+    supervisorEditBy: row.supervisor_edit_by ?? undefined,
+    supervisorEditComment: row.supervisor_edit_comment ?? undefined,
+    employeeReviewRequired: Boolean(row.employee_review_required),
+    employeeReviewedAt: row.employee_reviewed_at ?? undefined,
+    employeeReviewedBy: row.employee_reviewed_by ?? undefined,
+    employeeReviewAcknowledgement:
+      row.employee_review_acknowledgement &&
+      typeof row.employee_review_acknowledgement === 'object'
+        ? row.employee_review_acknowledgement
+        : null,
+    employeeId: row.employee_id,
+    employeeName: row.employee_name,
+    payPeriodKey: row.pay_period_key,
+    payPeriodStart: row.pay_period_start,
+    payPeriodEnd: row.pay_period_end,
+    submittedAt: row.submitted_at,
+    totalHours: Number(row.total_hours ?? 0),
+    payBreakdown: row.pay_breakdown ?? undefined,
+    punches: Array.isArray(row.punches) ? row.punches : [],
+    missedMealBreaks: Array.isArray(row.missed_meal_breaks)
+      ? row.missed_meal_breaks
+      : [],
+    corrections: Array.isArray(row.corrections) ? row.corrections : [],
+    additionalCompensation: Array.isArray(row.additional_compensation)
+      ? row.additional_compensation
+      : [],
+    submissionAcknowledgement:
+      row.submission_acknowledgement &&
+      typeof row.submission_acknowledgement === 'object'
+        ? row.submission_acknowledgement
+        : null,
+    note: row.note ?? '',
+    status: row.status,
+    supervisorComment: row.supervisor_comment ?? undefined,
+    reviewedAt: row.reviewed_at ?? undefined,
+    reviewedBy: row.reviewed_by ?? undefined,
+  };
+}
+
+function mapApolloMessageRow(row: any): ApolloMessage {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    senderId: row.sender_id,
+    senderName: row.sender_name,
+    senderRole: row.sender_role,
+    recipients: row.recipients ?? [],
+    audienceLabel: row.audience_label,
+    title: row.title,
+    body: row.body,
+    createdAt: row.created_at,
+    relatedType: row.related_type ?? undefined,
+    relatedId: row.related_id ?? undefined,
+    priority: row.priority ?? 'NORMAL',
+  };
+}
+
+function apolloMessageToRow(message: ApolloMessage) {
+  return {
+    id: message.id,
+    conversation_id: message.conversationId,
+    sender_id: message.senderId,
+    sender_name: message.senderName,
+    sender_role: message.senderRole,
+    recipients: message.recipients ?? [],
+    audience_label: message.audienceLabel,
+    title: message.title,
+    body: message.body,
+    created_at: message.createdAt,
+    related_type: message.relatedType ?? null,
+    related_id: message.relatedId ?? null,
+    priority: message.priority ?? 'NORMAL',
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// Records in `next` that are new or differ from their copy in `previous`.
+// Saving only these keeps one supervisor's stale copy of untouched rows from
+// overwriting changes other people made since this page loaded.
+function getChangedRecords<T extends { id: string }>(previous: T[], next: T[]): T[] {
+  const previousById = new Map(previous.map((record) => [record.id, JSON.stringify(record)]));
+  return next.filter((record) => previousById.get(record.id) !== JSON.stringify(record));
+}
+
+// Replaces the records covered by a refresh with freshly fetched copies. It
+// returns `current` itself when nothing changed so React skips the re-render,
+// and reuses unchanged record objects so memoized views stay stable.
+function mergeRefreshedRecords<T extends { id: string }>(
+  current: T[],
+  fetched: T[],
+  isCoveredByRefresh: (record: T) => boolean,
+): T[] {
+  const currentById = new Map(current.map((record) => [record.id, record]));
+  const fetchedIds = new Set(fetched.map((record) => record.id));
+  let changed = false;
+
+  const refreshed = fetched.map((record) => {
+    const existing = currentById.get(record.id);
+    if (existing && JSON.stringify(existing) === JSON.stringify(record)) {
+      return existing;
+    }
+    changed = true;
+    return record;
+  });
+
+  const untouched = current.filter((record) => {
+    if (fetchedIds.has(record.id)) return false;
+    if (isCoveredByRefresh(record)) {
+      changed = true;
+      return false;
+    }
+    return true;
+  });
+
+  return changed ? [...untouched, ...refreshed] : current;
+}
+
+// Blank or non-numeric geofence input is ignored rather than saved as 0/NaN.
+function parseGeofenceNumber(value: string): number | null {
+  const parsed = Number(value);
+  return value.trim() !== '' && Number.isFinite(parsed) ? parsed : null;
+}
+
+// Text input that keeps its own draft and saves on blur or Enter, so a save
+// (and an audit entry) happens once per edit instead of once per keystroke.
+function DraftInput({
+  value,
+  onCommit,
+  type = 'text',
+  ...inputProps
+}: Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'> & {
+  value: string | number;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [lastValue, setLastValue] = useState(value);
+
+  if (value !== lastValue) {
+    setLastValue(value);
+    setDraft(String(value));
+  }
+
+  function commit() {
+    if (draft !== String(value)) {
+      onCommit(draft);
+    }
+  }
+
+  return (
+    <input
+      {...inputProps}
+      type={type}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export default function SupervisorPage() {
   const [activeTile, setActiveTile] = useState<string | null>(null);
 
@@ -811,9 +985,9 @@ export default function SupervisorPage() {
 
   const inventoryToday = new Date(new Date().toDateString());
 
-  const totalInventoryValue = inventoryItems.reduce(
-    (total, item) => total + (item.qtyOnHand * item.unitCost),
-    0,
+  const totalInventoryValue = useMemo(
+    () => inventoryItems.reduce((total, item) => total + (item.qtyOnHand * item.unitCost), 0),
+    [inventoryItems],
   );
 
   function getInventoryItemLabel(itemId: string) {
@@ -850,7 +1024,7 @@ export default function SupervisorPage() {
   const [incidentReportSupervisorFilter, setIncidentReportSupervisorFilter] = useState('ALL');
   const [incidentReportSaveStatus, setIncidentReportSaveStatus] = useState('');
   const [showClosedIncidentReports, setShowClosedIncidentReports] = useState(false);
-  const [supervisorShiftReportDate, setSupervisorShiftReportDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [supervisorShiftReportDate, setSupervisorShiftReportDate] = useState(() => makeDateInputValue(new Date()));
   const [supervisorShiftReportAbsences, setSupervisorShiftReportAbsences] = useState('No');
   const [supervisorShiftReportTardies, setSupervisorShiftReportTardies] = useState('No');
   const [supervisorShiftReportVehicleIssues, setSupervisorShiftReportVehicleIssues] = useState('No');
@@ -1223,62 +1397,7 @@ export default function SupervisorPage() {
           }
         });
 
-      supabase
-        .from('submitted_timecards')
-        .select('*')
-        .order('submitted_at', { ascending: false })
-        .then(({ data: submittedData, error: submittedError }) => {
-          if (submittedError) {
-            console.error('Failed to load submitted timecards:', submittedError);
-          } else {
-            setSubmittedTimecards(
-              (submittedData ?? []).map((row: any) => ({
-                id: row.id,
-                versionNumber: Number(row.version_number ?? 1),
-                parentTimecardId: row.parent_timecard_id ?? undefined,
-                versionReason: row.version_reason ?? undefined,
-                createdByRole: row.created_by_role ?? undefined,
-                createdByEmployeeId: row.created_by_employee_id ?? undefined,
-                supervisorEditAt: row.supervisor_edit_at ?? undefined,
-                supervisorEditBy: row.supervisor_edit_by ?? undefined,
-                supervisorEditComment: row.supervisor_edit_comment ?? undefined,
-                employeeReviewRequired: Boolean(row.employee_review_required),
-                employeeReviewedAt: row.employee_reviewed_at ?? undefined,
-                employeeReviewedBy: row.employee_reviewed_by ?? undefined,
-                employeeReviewAcknowledgement:
-                  row.employee_review_acknowledgement &&
-                  typeof row.employee_review_acknowledgement === 'object'
-                    ? row.employee_review_acknowledgement
-                    : null,
-                employeeId: row.employee_id,
-                employeeName: row.employee_name,
-                payPeriodKey: row.pay_period_key,
-                payPeriodStart: row.pay_period_start,
-                payPeriodEnd: row.pay_period_end,
-                submittedAt: row.submitted_at,
-                totalHours: row.total_hours ?? 0,
-                payBreakdown: row.pay_breakdown ?? undefined,
-                punches: row.punches ?? [],
-                missedMealBreaks: row.missed_meal_breaks ?? [],
-                corrections: row.corrections ?? [],
-                additionalCompensation: Array.isArray(row.additional_compensation)
-                  ? row.additional_compensation
-                  : [],
-                submissionAcknowledgement:
-                  row.submission_acknowledgement &&
-                  typeof row.submission_acknowledgement === 'object'
-                    ? row.submission_acknowledgement
-                    : null,
-                note: row.note ?? '',
-                status: row.status,
-                supervisorComment: row.supervisor_comment ?? undefined,
-                reviewedAt: row.reviewed_at ?? undefined,
-                reviewedBy: row.reviewed_by ?? undefined,
-              })),
-            );
-            setSubmittedTimecardsLoaded(true);
-          }
-        });
+      void refreshSubmittedTimecards();
 
       void (async () => {
         const assignments: any[] = [];
@@ -1344,33 +1463,7 @@ export default function SupervisorPage() {
           }
         });
 
-      supabase
-        .from('apollo_messages')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .then(({ data: messageData, error: messageError }) => {
-          if (messageError) {
-            console.error('Failed to load Apollo messages:', messageError);
-          } else {
-            setApolloMessages(
-              (messageData ?? []).map((row: any) => ({
-                id: row.id,
-                conversationId: row.conversation_id,
-                senderId: row.sender_id,
-                senderName: row.sender_name,
-                senderRole: row.sender_role,
-                recipients: row.recipients ?? [],
-                audienceLabel: row.audience_label,
-                title: row.title,
-                body: row.body,
-                createdAt: row.created_at,
-                relatedType: row.related_type ?? undefined,
-                relatedId: row.related_id ?? undefined,
-                priority: row.priority ?? 'NORMAL',
-              })),
-            );
-          }
-        });
+      void refreshApolloMessages();
 
       supabase
         .from('employee_sms_preferences')
@@ -1622,37 +1715,44 @@ export default function SupervisorPage() {
 
 
 
+  // Polls overlap when a request outlasts the interval; these flags skip a
+  // refresh while the previous one is still in flight.
+  const apolloMessagesRefreshInFlight = useRef(false);
+  const submittedTimecardsRefreshInFlight = useRef(false);
+
   async function refreshApolloMessages() {
-    const { data, error } = await supabase
-      .from('apollo_messages')
-      .select('*')
-      .order('created_at', { ascending: false });
+    if (apolloMessagesRefreshInFlight.current) return;
+    apolloMessagesRefreshInFlight.current = true;
 
-    if (error) {
-      console.error('Supervisor Apollo message refresh failed:', error);
-      return;
+    try {
+      const { data, error } = await supabase
+        .from('apollo_messages')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supervisor Apollo message refresh failed:', error);
+        return;
+      }
+
+      const fetched = (data ?? []).map(mapApolloMessageRow);
+      setApolloMessages((current) => {
+        const merged = mergeRefreshedRecords(current, fetched, () => true);
+        if (merged === current) return current;
+
+        // Keep the newest-first order the query returned.
+        const mergedById = new Map(merged.map((message) => [message.id, message]));
+        return fetched.map((message) => mergedById.get(message.id) ?? message);
+      });
+    } finally {
+      apolloMessagesRefreshInFlight.current = false;
     }
-
-    setApolloMessages(
-      (data ?? []).map((row: any) => ({
-        id: row.id,
-        conversationId: row.conversation_id,
-        senderId: row.sender_id,
-        senderName: row.sender_name,
-        senderRole: row.sender_role,
-        recipients: row.recipients ?? [],
-        audienceLabel: row.audience_label,
-        title: row.title,
-        body: row.body,
-        createdAt: row.created_at,
-        relatedType: row.related_type ?? undefined,
-        relatedId: row.related_id ?? undefined,
-        priority: row.priority ?? 'NORMAL',
-      })),
-    );
   }
 
   useEffect(() => {
+    // apollo_messages is not in the supabase_realtime publication yet, so this
+    // channel stays quiet and the poll below keeps the inbox current. If
+    // realtime is enabled later, each change triggers one de-duplicated refresh.
     const channel = supabase
       .channel('supervisor-apollo-messages')
       .on(
@@ -1662,34 +1762,8 @@ export default function SupervisorPage() {
           schema: 'public',
           table: 'apollo_messages',
         },
-        async () => {
-          const { data, error } = await supabase
-            .from('apollo_messages')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-          if (error) {
-            console.error('Realtime supervisor Apollo message refresh failed:', error);
-            return;
-          }
-
-          setApolloMessages(
-            (data ?? []).map((row: any) => ({
-              id: row.id,
-              conversationId: row.conversation_id,
-              senderId: row.sender_id,
-              senderName: row.sender_name,
-              senderRole: row.sender_role,
-              recipients: row.recipients ?? [],
-              audienceLabel: row.audience_label,
-              title: row.title,
-              body: row.body,
-              createdAt: row.created_at,
-              relatedType: row.related_type ?? undefined,
-              relatedId: row.related_id ?? undefined,
-              priority: row.priority ?? 'NORMAL',
-            })),
-          );
+        () => {
+          void refreshApolloMessages();
         },
       )
       .subscribe();
@@ -1699,97 +1773,119 @@ export default function SupervisorPage() {
     };
   }, []);
 
-
   useEffect(() => {
     const interval = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       void refreshApolloMessages();
     }, 10000);
 
-    return () => window.clearInterval(interval);
-  }, []);
-
-  async function refreshSubmittedTimecards() {
-    const rows: any[] = [];
-    const pageSize = 1000;
-    let pageStart = 0;
-
-    while (true) {
-      const { data, error } = await supabase
-        .from('submitted_timecards')
-        .select('*')
-        .order('submitted_at', { ascending: false })
-        .range(pageStart, pageStart + pageSize - 1);
-
-      if (error) {
-        console.error('Failed to refresh submitted timecards:', error);
-        return;
-      }
-
-      rows.push(...(data ?? []));
-
-      if (!data || data.length < pageSize) {
-        break;
-      }
-
-      pageStart += pageSize;
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') void refreshApolloMessages();
     }
 
-    setSubmittedTimecards(
-      rows.map((row: any) => ({
-        id: row.id,
-        versionNumber: Number(row.version_number ?? 1),
-        parentTimecardId: row.parent_timecard_id ?? undefined,
-        versionReason: row.version_reason ?? undefined,
-        createdByRole: row.created_by_role ?? undefined,
-        createdByEmployeeId: row.created_by_employee_id ?? undefined,
-        supervisorEditAt: row.supervisor_edit_at ?? undefined,
-        supervisorEditBy: row.supervisor_edit_by ?? undefined,
-        supervisorEditComment: row.supervisor_edit_comment ?? undefined,
-        employeeReviewRequired: Boolean(row.employee_review_required),
-        employeeReviewedAt: row.employee_reviewed_at ?? undefined,
-        employeeReviewedBy: row.employee_reviewed_by ?? undefined,
-        employeeReviewAcknowledgement:
-          row.employee_review_acknowledgement &&
-          typeof row.employee_review_acknowledgement === 'object'
-            ? row.employee_review_acknowledgement
-            : null,
-        employeeId: row.employee_id,
-        employeeName: row.employee_name,
-        payPeriodKey: row.pay_period_key,
-        payPeriodStart: row.pay_period_start,
-        payPeriodEnd: row.pay_period_end,
-        submittedAt: row.submitted_at,
-        totalHours: Number(row.total_hours ?? 0),
-        payBreakdown: row.pay_breakdown ?? undefined,
-        punches: Array.isArray(row.punches) ? row.punches : [],
-        missedMealBreaks: Array.isArray(row.missed_meal_breaks)
-          ? row.missed_meal_breaks
-          : [],
-        corrections: Array.isArray(row.corrections) ? row.corrections : [],
-        additionalCompensation: Array.isArray(row.additional_compensation)
-          ? row.additional_compensation
-          : [],
-        submissionAcknowledgement:
-          row.submission_acknowledgement &&
-          typeof row.submission_acknowledgement === 'object'
-            ? row.submission_acknowledgement
-            : null,
-        note: row.note ?? '',
-        status: row.status,
-        supervisorComment: row.supervisor_comment ?? undefined,
-        reviewedAt: row.reviewed_at ?? undefined,
-        reviewedBy: row.reviewed_by ?? undefined,
-      })),
-    );
-    setSubmittedTimecardsLoaded(true);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Without payPeriodKeys, every timecard is reloaded. With them, only those
+  // pay periods are fetched and merged in; everything else is left as is.
+  async function refreshSubmittedTimecards(payPeriodKeys?: string[]) {
+    if (submittedTimecardsRefreshInFlight.current) return;
+    submittedTimecardsRefreshInFlight.current = true;
+
+    try {
+      const rows: any[] = [];
+      const pageSize = 1000;
+      let pageStart = 0;
+
+      while (true) {
+        let query = supabase.from('submitted_timecards').select('*');
+
+        if (payPeriodKeys) {
+          query = query.in('pay_period_key', payPeriodKeys);
+        }
+
+        const { data, error } = await query
+          .order('submitted_at', { ascending: false })
+          .range(pageStart, pageStart + pageSize - 1);
+
+        if (error) {
+          console.error('Failed to refresh submitted timecards:', error);
+          return;
+        }
+
+        rows.push(...(data ?? []));
+
+        if (!data || data.length < pageSize) {
+          break;
+        }
+
+        pageStart += pageSize;
+      }
+
+      const fetched = rows.map(mapSubmittedTimecardRow);
+      const refreshedKeys = payPeriodKeys ? new Set(payPeriodKeys) : null;
+
+      setSubmittedTimecards((current) => {
+        const merged = mergeRefreshedRecords(
+          current,
+          fetched,
+          (timecard) => !refreshedKeys || refreshedKeys.has(timecard.payPeriodKey),
+        );
+
+        if (merged === current) return current;
+
+        // Same newest-first order the full query returns.
+        return [...merged].sort(
+          (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+        );
+      });
+      setSubmittedTimecardsLoaded(true);
+    } finally {
+      submittedTimecardsRefreshInFlight.current = false;
+    }
   }
 
+  // The 5-second poll only fetches the pay periods on screen (selected and
+  // current). A full reload runs every 2 minutes and when the tab regains
+  // focus, so edits to any other period still show up. Polling pauses while
+  // the tab is hidden.
+  const activeTimecardPayPeriodKeys = useRef<string[]>([]);
+
   useEffect(() => {
+    activeTimecardPayPeriodKeys.current = Array.from(
+      new Set([selectedPayPeriod.key, currentPayPeriod.key]),
+    );
+  }, [currentPayPeriod.key, selectedPayPeriod.key]);
+
+  useEffect(() => {
+    let tick = 0;
+
     const interval = window.setInterval(() => {
-      void refreshSubmittedTimecards();
+      if (document.visibilityState === 'hidden') return;
+
+      tick += 1;
+      if (tick % 24 === 0 || activeTimecardPayPeriodKeys.current.length === 0) {
+        void refreshSubmittedTimecards();
+      } else {
+        void refreshSubmittedTimecards(activeTimecardPayPeriodKeys.current);
+      }
     }, 5000);
 
-    return () => window.clearInterval(interval);
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') void refreshSubmittedTimecards();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   async function saveSubmittedTimecard(timecard: SubmittedTimecard) {
@@ -1883,28 +1979,16 @@ export default function SupervisorPage() {
   }
 
   function saveApolloMessages(nextMessages: ApolloMessage[]) {
+    const changedMessages = getChangedRecords(apolloMessages, nextMessages);
     setApolloMessages(nextMessages);
 
-    const rows = nextMessages.map((message) => ({
-      id: message.id,
-      conversation_id: message.conversationId,
-      sender_id: message.senderId,
-      sender_name: message.senderName,
-      sender_role: message.senderRole,
-      recipients: message.recipients ?? [],
-      audience_label: message.audienceLabel,
-      title: message.title,
-      body: message.body,
-      created_at: message.createdAt,
-      related_type: message.relatedType ?? null,
-      related_id: message.relatedId ?? null,
-      priority: message.priority ?? 'NORMAL',
-      updated_at: new Date().toISOString(),
-    }));
+    if (changedMessages.length === 0) {
+      return;
+    }
 
     supabase
       .from('apollo_messages')
-      .upsert(rows, { onConflict: 'id' })
+      .upsert(changedMessages.map(apolloMessageToRow), { onConflict: 'id' })
       .then(({ error }) => {
         if (error) {
           console.error('Failed to save Apollo messages:', error);
@@ -2642,7 +2726,9 @@ export default function SupervisorPage() {
   }
 
   const builderDateKeys = Object.keys(builderSchedule).sort();
-  const builderWarnings = getBuilderWarnings();
+  // Only the schedule draft and employee names feed the warnings.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const builderWarnings = useMemo(() => getBuilderWarnings(), [builderSchedule, employees]);
 
   const incidentReportCategories = useMemo(() => {
     return Array.from(new Set(
@@ -2717,9 +2803,14 @@ export default function SupervisorPage() {
   }, [openShiftRequests]);
 
   function saveOpenShiftRequests(nextRequests: OpenShiftRequest[]) {
+    const changedRequests = getChangedRecords(openShiftRequests, nextRequests);
     setOpenShiftRequests(nextRequests);
 
-    const rows = nextRequests.map((request) => ({
+    if (changedRequests.length === 0) {
+      return;
+    }
+
+    const rows = changedRequests.map((request) => ({
       id: request.id,
       employee_id: request.employeeId,
       employee_name: request.employeeName,
@@ -3364,7 +3455,7 @@ export default function SupervisorPage() {
         correctedTimecard,
         ...current,
       ]);
-      setAuditLog((current) => [auditEntry, ...current].slice(0, 250));
+      setAuditLog((current) => [auditEntry, ...current]);
 
       cancelSupervisorTimecardEdit();
       setSelectedTimecardId(null);
@@ -3489,6 +3580,18 @@ export default function SupervisorPage() {
     return (value ?? '').trim().toLowerCase();
   }
 
+  // 8,000+ schedule rows; index them once instead of scanning per timecard.
+  const scheduleAssignmentsByEmployeeId = useMemo(() => {
+    const byEmployeeId = new Map<string, any[]>();
+    scheduleAssignments.forEach((row) => {
+      if (!row.employee_id) return;
+      const list = byEmployeeId.get(row.employee_id) ?? [];
+      list.push(row);
+      byEmployeeId.set(row.employee_id, list);
+    });
+    return byEmployeeId;
+  }, [scheduleAssignments]);
+
   function getScheduleMatchStatus(timecard: SubmittedTimecard): 'MATCH' | 'REVIEW' {
     if (
       hasManualEditFlag(timecard) ||
@@ -3502,9 +3605,8 @@ export default function SupervisorPage() {
     const startKey = makeDateInputValue(new Date(timecard.payPeriodStart));
     const endKey = makeDateInputValue(new Date(timecard.payPeriodEnd));
 
-    const scheduledRows = scheduleAssignments.filter(
+    const scheduledRows = (scheduleAssignmentsByEmployeeId.get(timecard.employeeId) ?? []).filter(
       (row) =>
-        row.employee_id === timecard.employeeId &&
         row.date_key >= startKey &&
         row.date_key <= endKey &&
         !row.is_open_slot,
@@ -4064,6 +4166,9 @@ export default function SupervisorPage() {
     }
   }
 
+  const [printPacketTimecards, setPrintPacketTimecards] = useState<SubmittedTimecard[] | null>(null);
+  const printPacketContainerRef = useRef<HTMLDivElement>(null);
+
   function printTimecardPacket(
     packetCards: SubmittedTimecard[],
     packetTitle: string,
@@ -4074,9 +4179,14 @@ export default function SupervisorPage() {
       return;
     }
 
+    // Render the packet's cards off-screen just long enough to copy their
+    // markup, instead of keeping every card rendered at all times.
+    flushSync(() => setPrintPacketTimecards(packetCards));
+    const printContainer = printPacketContainerRef.current;
+
     const html = packetCards
       .map((timecard) => {
-        const element = document.getElementById(`printable-${timecard.id}`);
+        const element = printContainer?.querySelector(`[id="printable-${CSS.escape(timecard.id)}"]`);
         if (!element) return '';
 
         return `
@@ -4086,6 +4196,8 @@ export default function SupervisorPage() {
         `;
       })
       .join('');
+
+    setPrintPacketTimecards(null);
 
     const printWindow = window.open('', '_blank');
 
@@ -5079,7 +5191,7 @@ export default function SupervisorPage() {
 
   async function addAuditEntry(action: string, details: string) {
     const entry: AuditLogEntry = {
-      id: `audit-${Date.now()}`,
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: new Date().toISOString(),
       actor: 'Supervisor',
       action,
@@ -5099,19 +5211,22 @@ export default function SupervisorPage() {
       return;
     }
 
-    setAuditLog((current) => [entry, ...current].slice(0, 250));
+    setAuditLog((current) => [entry, ...current]);
   }
 
   async function saveSystemConfig(nextConfig: SystemConfig, action = 'SYSTEM_CONFIG_UPDATED', details = 'System configuration updated') {
+    const logoChanged = nextConfig.logoDataUrl !== systemConfig.logoDataUrl;
     setSystemConfig(nextConfig);
 
+    // The logo is a large data URL; only send it when it actually changed.
+    // Columns left out of the upsert keep their stored values.
     const { error } = await supabase
       .from('system_config')
       .upsert(
         {
           id: 'default',
           company_name: nextConfig.companyName,
-          logo_data_url: nextConfig.logoDataUrl,
+          ...(logoChanged ? { logo_data_url: nextConfig.logoDataUrl } : {}),
           important_links: nextConfig.importantLinks,
           geofences: nextConfig.geofences,
           updated_at: new Date().toISOString(),
@@ -5239,9 +5354,14 @@ export default function SupervisorPage() {
   }
 
   function saveAnnouncements(nextAnnouncements: CompanyAnnouncement[]) {
+    const changedAnnouncements = getChangedRecords(announcements, nextAnnouncements);
     setAnnouncements(nextAnnouncements);
 
-    const rows = nextAnnouncements.map((announcement) => ({
+    if (changedAnnouncements.length === 0) {
+      return;
+    }
+
+    const rows = changedAnnouncements.map((announcement) => ({
       id: announcement.id,
       title: announcement.title,
       message: announcement.message,
@@ -6260,20 +6380,35 @@ export default function SupervisorPage() {
     );
   }
 
-  function getFleetInspectionsForVehicle(vehicle: FleetVehicle) {
-    const unitNumber = vehicle.unitNumber.trim().toLowerCase();
-    const vehicleName = vehicle.vehicleName.trim().toLowerCase();
+  // Vehicle rows ask for their inspections several times per render; cache the
+  // result per vehicle until the inspection list changes.
+  const getFleetInspectionsForVehicle = useMemo(() => {
+    const cache = new Map<string, FleetInspection[]>();
 
-    return fleetInspections.filter((inspection) => {
-      const inspectionVehicle = inspection.vehicle.trim().toLowerCase();
+    return (vehicle: FleetVehicle) => {
+      const unitNumber = vehicle.unitNumber.trim().toLowerCase();
+      const vehicleName = vehicle.vehicleName.trim().toLowerCase();
+      const cacheKey = `${unitNumber}\u0000${vehicleName}`;
+      const cached = cache.get(cacheKey);
 
-      return (
-        inspectionVehicle === unitNumber ||
-        inspectionVehicle === vehicleName ||
-        (!!unitNumber && inspectionVehicle.includes(unitNumber))
-      );
-    });
-  }
+      if (cached) {
+        return cached;
+      }
+
+      const inspections = fleetInspections.filter((inspection) => {
+        const inspectionVehicle = inspection.vehicle.trim().toLowerCase();
+
+        return (
+          inspectionVehicle === unitNumber ||
+          inspectionVehicle === vehicleName ||
+          (!!unitNumber && inspectionVehicle.includes(unitNumber))
+        );
+      });
+
+      cache.set(cacheKey, inspections);
+      return inspections;
+    };
+  }, [fleetInspections]);
 
   function getLatestFleetInspectionForVehicle(vehicle: FleetVehicle) {
     return getFleetInspectionsForVehicle(vehicle)[0] ?? null;
@@ -6728,7 +6863,8 @@ export default function SupervisorPage() {
     id: string,
     titleText: string,
     description: string,
-    children: React.ReactNode,
+    // Built only while the tile is open, so closed tiles cost nothing to render.
+    renderChildren: () => React.ReactNode,
     hasAlert = false,
   ) {
     const isOpen = activeTile === id;
@@ -6758,13 +6894,18 @@ export default function SupervisorPage() {
           </div>
         </button>
 
-        {isOpen && <div className="border-t border-slate-200 p-5">{children}</div>}
+        {isOpen && <div className="border-t border-slate-200 p-5">{renderChildren()}</div>}
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
+      {printPacketTimecards && (
+        <div ref={printPacketContainerRef} className="hidden">
+          {printPacketTimecards.map((timecard) => renderSubmittedTimecard(timecard))}
+        </div>
+      )}
       <div className="mx-auto max-w-[1500px]">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -6797,7 +6938,7 @@ export default function SupervisorPage() {
             pendingOpenShiftRequests.length > 0
               ? `${pendingOpenShiftRequests.length} open shift request${pendingOpenShiftRequests.length === 1 ? '' : 's'} pending.`
               : 'Open the supervisor schedule board and review open shift requests.',
-            <div className="space-y-5">
+            () => (<div className="space-y-5">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <a
                   href="/schedule"
@@ -7054,7 +7195,7 @@ export default function SupervisorPage() {
                 )}
               </div>
 
-            </div>,
+            </div>),
             pendingOpenShiftRequests.length > 0,
           )}
 
@@ -7062,7 +7203,7 @@ export default function SupervisorPage() {
             'company-announcements',
             'Company Announcements',
             'Create time-limited announcements that display on the employee dashboard.',
-            <div className="space-y-5">
+            () => (<div className="space-y-5">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
                   <div>
@@ -7182,7 +7323,7 @@ export default function SupervisorPage() {
                   </div>
                 )}
               </div>
-            </div>,
+            </div>),
           )}
 
           {renderTile(
@@ -7193,7 +7334,7 @@ export default function SupervisorPage() {
               : `${smsEligibleEmployees.length} employee${
                   smsEligibleEmployees.length === 1 ? '' : 's'
                 } currently eligible for supervisor SMS messages.`,
-            <div className="space-y-5">
+            () => (<div className="space-y-5">
               <div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-sm font-bold text-slate-900">
@@ -7411,7 +7552,7 @@ export default function SupervisorPage() {
                   )}
                 </div>
               </details>
-            </div>,
+            </div>),
           )}
 
           {renderTile(
@@ -7420,7 +7561,7 @@ export default function SupervisorPage() {
             openIncidentReports.length > 0
               ? `${openIncidentReports.length} open incident report${openIncidentReports.length === 1 ? '' : 's'}.`
               : 'No open incident reports.',
-            <div className="space-y-3">
+            () => (<div className="space-y-3">
               <div className="flex justify-end">
                 <button
                   type="button"
@@ -7591,7 +7732,7 @@ export default function SupervisorPage() {
                   )}
                 </div>
               )}
-            </div>,
+            </div>),
             openIncidentReports.length > 0,
           )}
 
@@ -7599,21 +7740,21 @@ export default function SupervisorPage() {
             'continuing-education',
             'Continuing Education (CE)',
             'Create CE classes, record attendance, and generate California EMS CE certificates.',
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            () => (<div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <a
                 href="/supervisor/continuing-education"
                 className="inline-flex rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-800"
               >
                 Open Continuing Education
               </a>
-            </div>,
+            </div>),
           )}
 
           {renderTile(
             'analytics-reports',
             'Analytics & Reports',
             'Review workforce hours, attendance, staffing, payroll exceptions, and certification compliance.',
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            () => (<div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm font-semibold text-slate-900">
                 Turn Apollo data into operational insight
               </div>
@@ -7629,7 +7770,7 @@ export default function SupervisorPage() {
               >
                 Open Analytics & Reports
               </a>
-            </div>,
+            </div>),
           )}
 
           {renderTile(
@@ -7638,7 +7779,7 @@ export default function SupervisorPage() {
             pendingTimecards.length + resubmittedTimecards.length + pendingResubmissionTimecards.length > 0
               ? `${pendingTimecards.length} pending review; ${resubmittedTimecards.length} resubmitted; ${pendingResubmissionTimecards.length} pending employee resubmission.`
               : 'Review, approve, or return submitted employee timecards.',
-            <div className="space-y-5">
+            () => (<div className="space-y-5">
               <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="text-sm font-semibold text-slate-900">Selected Pay Period</div>
@@ -7805,12 +7946,6 @@ export default function SupervisorPage() {
                       ? 'Finalizing Payroll...'
                       : 'Finalize & Lock Payroll'}
                 </button>
-              </div>
-
-              <div className="hidden">
-                {[...approvedTimecards, ...pendingResubmissionTimecards].map(
-                  (timecard) => renderSubmittedTimecard(timecard),
-                )}
               </div>
 
               <div>
@@ -8193,7 +8328,7 @@ export default function SupervisorPage() {
                   </>
                 )}
               </div>
-            </div>,
+            </div>),
             pendingTimecards.length + resubmittedTimecards.length + pendingResubmissionTimecards.length > 0,
           )}
 
@@ -8201,7 +8336,7 @@ export default function SupervisorPage() {
             'supervisor-shift-report',
             'Daily Supervisor Shift Report',
             'Submit a daily operational report for supervisor review and recordkeeping.',
-            <form className="space-y-4" onSubmit={handleSupervisorShiftReportSubmit}>
+            () => (<form className="space-y-4" onSubmit={handleSupervisorShiftReportSubmit}>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-xs font-semibold text-slate-600">
                   Supervisor Completing Report
@@ -8271,7 +8406,7 @@ export default function SupervisorPage() {
               >
                 {isSubmittingSupervisorShiftReport ? 'Submitting...' : 'Submit Supervisor Shift Report'}
               </button>
-            </form>,
+            </form>),
           )}
 
           {renderTile(
@@ -8280,7 +8415,7 @@ export default function SupervisorPage() {
             employeeCertificationAlertCount > 0
               ? `${employeeCertificationAlertCount} employee${employeeCertificationAlertCount === 1 ? '' : 's'} with expired or soon-expiring certifications.`
               : 'Manage employees, seniority, certifications, and employment status.',
-            <div className={`rounded-xl border p-4 ${
+            () => (<div className={`rounded-xl border p-4 ${
               employeeCertificationAlertCount > 0
                 ? 'border-red-300 bg-red-50'
                 : 'border-slate-200 bg-slate-50'
@@ -8299,7 +8434,7 @@ export default function SupervisorPage() {
               >
                 Open Employee Profiles
               </a>
-            </div>,
+            </div>),
             employeeCertificationAlertCount > 0,
           )}
 
@@ -8307,7 +8442,7 @@ export default function SupervisorPage() {
             'fleet-services',
             'Fleet Services',
             'Track vehicle status, mileage, service readiness, and maintenance records.',
-            <div className="space-y-4">
+            () => (<div className="space-y-4">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -9402,14 +9537,14 @@ export default function SupervisorPage() {
                   </div>
                 </div>
               )}
-            </div>,
+            </div>),
           )}
 
           {renderTile(
             'inventory-tracking',
             'Inventory Tracking',
             'Manage supply rooms, inventory levels, PAR counts, transfers, and ordering status.',
-            <div className="space-y-4">
+            () => (<div className="space-y-4">
               {!showInventoryRoomDetail && (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -10716,7 +10851,7 @@ export default function SupervisorPage() {
                   </div>
                 )}
               </div>
-            </div>,
+            </div>),
           )}
 
           {selectedEditInventoryItem && (
@@ -11009,7 +11144,7 @@ export default function SupervisorPage() {
             'system-configuration',
             'System Configuration',
             'Configure company branding, permissions reference, important links, geofences, and review the activity log.',
-            <div className="space-y-6">
+            () => (<div className="space-y-6">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="text-sm font-bold text-slate-900">Roles & Permissions Reference</div>
                 <div className="mt-1 text-xs text-slate-600">
@@ -11043,10 +11178,10 @@ export default function SupervisorPage() {
                 <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_240px]">
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Company Name</label>
-                    <input
+                    <DraftInput
                       type="text"
                       value={systemConfig.companyName}
-                      onChange={(event) => updateCompanyName(event.target.value)}
+                      onCommit={updateCompanyName}
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                     />
 
@@ -11109,16 +11244,16 @@ export default function SupervisorPage() {
                 <div className="mt-4 space-y-3">
                   {systemConfig.importantLinks.map((link) => (
                     <div key={link.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 lg:grid-cols-[1fr_1.5fr_auto]">
-                      <input
+                      <DraftInput
                         type="text"
                         value={link.label}
-                        onChange={(event) => updateImportantLink(link.id, { label: event.target.value })}
+                        onCommit={(value) => updateImportantLink(link.id, { label: value })}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                       />
-                      <input
+                      <DraftInput
                         type="url"
                         value={link.url}
-                        onChange={(event) => updateImportantLink(link.id, { url: event.target.value })}
+                        onCommit={(value) => updateImportantLink(link.id, { url: value })}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
                       />
                       <button type="button" onClick={() => removeImportantLink(link.id)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
@@ -11154,11 +11289,11 @@ export default function SupervisorPage() {
 
                   {systemConfig.geofences.map((geofence) => (
                     <div key={geofence.id} className="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]">
-                      <input type="text" value={geofence.shiftLabel} onChange={(event) => updateGeofence(geofence.id, { shiftLabel: event.target.value })} placeholder="Shift" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
-                      <input type="text" value={geofence.locationLabel} onChange={(event) => updateGeofence(geofence.id, { locationLabel: event.target.value })} placeholder="Location" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
-                      <input type="number" value={geofence.latitude} onChange={(event) => updateGeofence(geofence.id, { latitude: Number(event.target.value) })} placeholder="Latitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
-                      <input type="number" value={geofence.longitude} onChange={(event) => updateGeofence(geofence.id, { longitude: Number(event.target.value) })} placeholder="Longitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
-                      <input type="number" value={geofence.radiusFeet} onChange={(event) => updateGeofence(geofence.id, { radiusFeet: Number(event.target.value) })} placeholder="Radius ft" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <DraftInput type="text" value={geofence.shiftLabel} onCommit={(value) => updateGeofence(geofence.id, { shiftLabel: value })} placeholder="Shift" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <DraftInput type="text" value={geofence.locationLabel} onCommit={(value) => updateGeofence(geofence.id, { locationLabel: value })} placeholder="Location" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <DraftInput type="number" value={geofence.latitude} onCommit={(value) => { const parsed = parseGeofenceNumber(value); if (parsed !== null) updateGeofence(geofence.id, { latitude: parsed }); }} placeholder="Latitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <DraftInput type="number" value={geofence.longitude} onCommit={(value) => { const parsed = parseGeofenceNumber(value); if (parsed !== null) updateGeofence(geofence.id, { longitude: parsed }); }} placeholder="Longitude" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
+                      <DraftInput type="number" value={geofence.radiusFeet} onCommit={(value) => { const parsed = parseGeofenceNumber(value); if (parsed !== null) updateGeofence(geofence.id, { radiusFeet: parsed }); }} placeholder="Radius ft" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500" />
                       <button type="button" onClick={() => removeGeofence(geofence.id)} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100">
                         Delete
                       </button>
@@ -11299,7 +11434,7 @@ export default function SupervisorPage() {
                   )}
                 </div>
               </div>
-            </div>,
+            </div>),
           )}
 
         </div>
