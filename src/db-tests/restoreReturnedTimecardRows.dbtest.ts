@@ -15,7 +15,10 @@ import {
 // Real-PostgreSQL tests for public.restore_returned_timecard_rows, using
 // synthetic data in throwaway local databases. The production column types of
 // editable_timecard_rows are not in the repository, so every test runs against
-// each plausible combination (date_key text|date, updated_at text|timestamptz).
+// each plausible combination (date_key text|date, updated_at and reviewed_at
+// text|timestamptz). Row-level security is deliberately permissive (any
+// signed-in user may write any row), as reported for production, so the
+// function's own identity and ownership checks are what these tests prove.
 
 const adminUrl = getLocalAdminUrl();
 const describeDb = adminUrl ? describe : describe.skip;
@@ -24,6 +27,16 @@ const EMP = 'emp-synthetic-001';
 const OTHER = 'emp-synthetic-002';
 const EMP_EMAIL = 'employee.one@example.test';
 const OTHER_EMAIL = 'employee.two@example.test';
+const SHARED_EMAIL = 'shared.inbox@example.test'; // on two employee profiles
+const STRANGER_EMAIL = 'not.an.employee@example.test';
+const AUTH_IDS: Record<string, string> = {
+  [EMP_EMAIL]: '00000000-0000-4000-8000-000000000001',
+  [OTHER_EMAIL]: '00000000-0000-4000-8000-000000000002',
+  [SHARED_EMAIL]: '00000000-0000-4000-8000-000000000003',
+  [STRANGER_EMAIL]: '00000000-0000-4000-8000-000000000004',
+};
+/** JWT claims as Supabase issues them: the database identifies the user by sub. */
+const signedIn = (email: string) => ({ email, sub: AUTH_IDS[email] });
 const PERIOD = '2026-pp-20';
 const PREFIX = `${EMP}-${PERIOD}-`;
 const ROW_A = `${PREFIX}2026-10-06`;
@@ -58,14 +71,15 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     return c;
   };
 
-  const callRestore = (c: Client, rows: unknown = returnedRows, employeeId = EMP) =>
+  type Call = { rows?: unknown; employeeId?: string; timecardId?: string; reviewedAt?: string | null; period?: string };
+  const callRestore = (c: Client, { rows = returnedRows, employeeId = EMP, timecardId = RETURNED_ID, reviewedAt = REVIEWED_AT, period = PERIOD }: Call = {}) =>
     c.query<{ result: string }>(
       `SELECT public.restore_returned_timecard_rows($1, $2, $3, $4, $5, $6) AS result`,
-      [employeeId, PERIOD, RETURNED_ID, REVIEWED_AT, '2026-10-06', JSON.stringify(rows)],
+      [employeeId, period, timecardId, reviewedAt, '2026-10-06', JSON.stringify(rows)],
     );
 
-  const restoreAs = async (c: Client, email = EMP_EMAIL, rows: unknown = returnedRows, employeeId = EMP) =>
-    (await asUser(c, { email }, () => callRestore(c, rows, employeeId))).rows[0].result;
+  const restoreAs = async (c: Client, email = EMP_EMAIL, call: Call = {}) =>
+    (await asUser(c, signedIn(email), () => callRestore(c, call))).rows[0].result;
 
   const rowsNow = async () =>
     (
@@ -94,6 +108,13 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     // Synthetic reconstruction: the production definition is not in the repo.
     await admin.query(`
       CREATE TABLE public.employees (id text PRIMARY KEY, email text NOT NULL, role text, status text);
+      CREATE TABLE public.submitted_timecards (
+        id text PRIMARY KEY,
+        employee_id text NOT NULL,
+        pay_period_key text NOT NULL,
+        status text NOT NULL,
+        reviewed_at ${updatedType}
+      );
       CREATE TABLE public.editable_timecard_rows (
         id text PRIMARY KEY,
         employee_id text NOT NULL,
@@ -103,15 +124,30 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
         updated_at ${updatedType}
       );
       ALTER TABLE public.editable_timecard_rows ENABLE ROW LEVEL SECURITY;
-      CREATE POLICY employee_own_rows ON public.editable_timecard_rows FOR ALL TO authenticated
-        USING (employee_id IN (SELECT id FROM public.employees WHERE lower(email) = lower(auth.jwt()->>'email')))
-        WITH CHECK (employee_id IN (SELECT id FROM public.employees WHERE lower(email) = lower(auth.jwt()->>'email')));
+      CREATE POLICY any_signed_in_user ON public.editable_timecard_rows FOR ALL TO authenticated
+        USING (true) WITH CHECK (true);
+      ALTER TABLE public.submitted_timecards ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY any_signed_in_user ON public.submitted_timecards FOR ALL TO authenticated
+        USING (true) WITH CHECK (true);
       GRANT SELECT ON public.employees TO authenticated;
-      GRANT SELECT, INSERT, UPDATE ON public.editable_timecard_rows TO authenticated;
+      GRANT SELECT, INSERT, UPDATE ON public.editable_timecard_rows, public.submitted_timecards TO authenticated;
       INSERT INTO public.employees VALUES
-        ('${EMP}', '${EMP_EMAIL}', 'EMT', 'Active'),
-        ('${OTHER}', '${OTHER_EMAIL}', 'EMT', 'Active');
+        ('${EMP}', '  Employee.One@Example.TEST ', 'EMT', 'Active'),
+        ('${OTHER}', '${OTHER_EMAIL}', 'EMT', 'Active'),
+        ('emp-synthetic-003', '${SHARED_EMAIL}', 'EMT', 'Active'),
+        ('emp-synthetic-004', '${SHARED_EMAIL}', 'EMT', 'Active');
+      INSERT INTO public.submitted_timecards VALUES
+        ('${RETURNED_ID}', '${EMP}', '${PERIOD}', 'RETURNED', '${REVIEWED_AT}'),
+        ('tc-other-employee-returned', '${OTHER}', '${PERIOD}', 'RETURNED', '${REVIEWED_AT}'),
+        ('tc-own-pending', '${EMP}', '${PERIOD}', 'PENDING_SUPERVISOR_REVIEW', '${REVIEWED_AT}'),
+        ('tc-own-approved', '${EMP}', '${PERIOD}', 'APPROVED', '${REVIEWED_AT}'),
+        ('tc-own-other-period', '${EMP}', '2026-pp-19', 'RETURNED', '${REVIEWED_AT}'),
+        ('tc-own-returned-no-time', '${EMP}', '${PERIOD}', 'RETURNED', NULL),
+        ('tc-shared-inbox-returned', 'emp-synthetic-003', '${PERIOD}', 'RETURNED', '${REVIEWED_AT}');
     `);
+    for (const [email, id] of Object.entries(AUTH_IDS)) {
+      await admin.query('INSERT INTO auth.users (id, email) VALUES ($1, $2)', [id, email]);
+    }
     await admin.query(readMigration('202610140001_restore_returned_timecard_rows.sql'));
   });
 
@@ -164,7 +200,7 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     const deviceA = await client();
     const deviceB = await client();
 
-    await beginAsUser(deviceA, { email: EMP_EMAIL });
+    await beginAsUser(deviceA, signedIn(EMP_EMAIL));
     expect((await callRestore(deviceA)).rows[0].result).toBe('RESTORED');
 
     const deviceBCall = restoreAs(deviceB);
@@ -180,7 +216,7 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     const restorer = await client();
 
     // The employee saves a correction on one device; not yet committed.
-    await beginAsUser(editor, { email: EMP_EMAIL });
+    await beginAsUser(editor, signedIn(EMP_EMAIL));
     await editor.query(
       `UPDATE public.editable_timecard_rows SET row_data = row_data || '{"clockOutTime":"19:45"}', updated_at = $2 WHERE id = $1`,
       [ROW_A, AFTER_RETURN],
@@ -203,7 +239,7 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     const deviceA = await client();
     const deviceB = await client();
     expect(await restoreAs(deviceA)).toBe('RESTORED');
-    await asUser(deviceA, { email: EMP_EMAIL }, () =>
+    await asUser(deviceA, signedIn(EMP_EMAIL), () =>
       deviceA.query(
         `UPDATE public.editable_timecard_rows SET row_data = row_data || '{"clockOutTime":"19:45"}', updated_at = $2 WHERE id = $1`,
         [ROW_A, new Date().toISOString()],
@@ -229,7 +265,7 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     const c = await client();
     // Duplicate ids make the copy statement fail after validation passed.
     const duplicate = [returnedRows[0], { ...returnedRows[0], row_data: { clockOutTime: '20:00' } }];
-    await expect(restoreAs(c, EMP_EMAIL, duplicate)).rejects.toThrow();
+    await expect(restoreAs(c, EMP_EMAIL, { rows: duplicate })).rejects.toThrow();
     const rows = await rowsNow();
     expect(rows.some((r) => r.id === MARKER)).toBe(false);
     expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('18:00');
@@ -247,23 +283,99 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
       { not: 'an array' },
     ];
     for (const rows of cases) {
-      await expect(restoreAs(c, EMP_EMAIL, rows)).rejects.toMatchObject({ code: '22023' });
+      await expect(restoreAs(c, EMP_EMAIL, { rows })).rejects.toMatchObject({ code: '22023' });
     }
     expect((await rowsNow()).some((r) => r.id === MARKER)).toBe(false);
   });
 
-  it('respects row-level security: another employee cannot restore or alter these rows', async () => {
+  /** Every rejected call must leave the table exactly as it was. */
+  const expectRejectedWithoutChanges = async (attempt: () => Promise<unknown>, code: string) => {
+    const before = await rowsNow();
+    await expect(attempt()).rejects.toMatchObject({ code });
+    expect(await rowsNow()).toEqual(before);
+  };
+
+  it('identifies the caller in the database, ignoring email case and spacing', async () => {
     await resetAsSubmitted();
-    const intruder = await client();
-    await expect(restoreAs(intruder, OTHER_EMAIL)).rejects.toThrow(/row-level security/);
-    const rows = await rowsNow();
-    expect(rows.some((r) => r.id === MARKER)).toBe(false);
-    expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('18:00');
+    expect(await restoreAs(await client(), EMP_EMAIL)).toBe('RESTORED');
+  });
+
+  it('rejects unauthorized callers: no signed-in user, no employee profile, or an ambiguous profile', async () => {
+    await resetAsSubmitted();
+    const c = await client();
+    // Signed-in role but no user id (sub) in the token.
+    await expectRejectedWithoutChanges(() => asUser(c, { email: EMP_EMAIL }, () => callRestore(c)), '42501');
+    // A real sign-in whose email belongs to no employee.
+    await expectRejectedWithoutChanges(() => restoreAs(c, STRANGER_EMAIL), '42501');
+    // An email shared by two employee profiles is never guessed between.
+    await expectRejectedWithoutChanges(
+      () => restoreAs(c, SHARED_EMAIL, { employeeId: 'emp-synthetic-003', rows: [], timecardId: 'tc-shared-inbox-returned' }),
+      '42501',
+    );
+    // A token whose email claim is forged: identity comes from auth.users, not the claim.
+    await expectRejectedWithoutChanges(
+      () => asUser(c, { email: EMP_EMAIL, sub: AUTH_IDS[OTHER_EMAIL] }, () => callRestore(c)),
+      '42501',
+    );
+  });
+
+  it('rejects a mismatched employee id, in either direction, even though row-level security would allow it', async () => {
+    await resetAsSubmitted();
+    const c = await client();
+    // Another employee names this employee and their returned card.
+    await expectRejectedWithoutChanges(() => restoreAs(c, OTHER_EMAIL), '42501');
+    // This employee names another employee, with rows shaped for that employee.
+    const otherRows = [{ ...returnedRows[0], id: `${OTHER}-${PERIOD}-2026-10-06` }];
+    await expectRejectedWithoutChanges(
+      () => restoreAs(c, EMP_EMAIL, { employeeId: OTHER, rows: otherRows, timecardId: 'tc-other-employee-returned' }),
+      '42501',
+    );
+  });
+
+  it('rejects forged returned-timecard references', async () => {
+    await resetAsSubmitted();
+    const c = await client();
+    for (const timecardId of ['tc-other-employee-returned', 'tc-own-pending', 'tc-own-approved', 'tc-does-not-exist']) {
+      await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { timecardId }), '42501');
+    }
+    // Own returned card, but claimed for a different pay period.
+    await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { timecardId: 'tc-own-other-period' }), '42501');
+    await expectRejectedWithoutChanges(
+      () => restoreAs(c, EMP_EMAIL, { period: '2026-pp-19', rows: [], timecardId: RETURNED_ID }),
+      '42501',
+    );
+  });
+
+  it('rejects missing, invalid or altered return times, so corrections stay protected', async () => {
+    await resetAsSubmitted();
+    // The employee corrected a row after the return.
+    await admin.query(
+      `UPDATE public.editable_timecard_rows SET row_data = row_data || '{"clockOutTime":"19:45"}', updated_at = $2 WHERE id = $1`,
+      [ROW_A, AFTER_RETURN],
+    );
+    const c = await client();
+    await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { reviewedAt: null }), '22023');
+    // A later time would have let the restore overwrite the correction.
+    await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { reviewedAt: '2030-01-01T00:00:00.000Z' }), '22023');
+    await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { reviewedAt: SUBMITTED_AT }), '22023');
+    // The stored card itself has no return time.
+    await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { timecardId: 'tc-own-returned-no-time' }), '22023');
+    if (updatedType === 'text') {
+      await admin.query(
+        `INSERT INTO public.submitted_timecards VALUES ('tc-own-returned-bad-time', $1, $2, 'RETURNED', 'not a time')
+           ON CONFLICT (id) DO NOTHING`,
+        [EMP, PERIOD],
+      );
+      await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { timecardId: 'tc-own-returned-bad-time' }), '22023');
+    }
+    // With the genuine return time the correction is still kept.
+    expect(await restoreAs(c)).toBe('MARKER_ONLY');
+    expect((await rowsNow()).find((r) => r.id === ROW_A)?.clock_out).toBe('19:45');
   });
 
   it('a returned card with no shifts records only the marker', async () => {
     await resetAsSubmitted();
-    expect(await restoreAs(await client(), EMP_EMAIL, [])).toBe('RESTORED');
+    expect(await restoreAs(await client(), EMP_EMAIL, { rows: [] })).toBe('RESTORED');
     const rows = await rowsNow();
     expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('18:00');
     expect(rows.filter((r) => r.marker)).toHaveLength(1);

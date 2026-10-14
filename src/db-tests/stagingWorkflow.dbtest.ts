@@ -28,6 +28,14 @@ const SUPERVISOR = 'morgan.reyes@example.test';
 const AVERY = 'avery.chen@example.test';
 const RILEY = 'riley.okafor@example.test';
 const REMOVED = 'former.employee@example.test';
+// Supabase identifies the signed-in user by the token's sub (auth.users.id).
+const AUTH_IDS: Record<string, string> = {
+  [SUPERVISOR]: '00000000-0000-4000-8000-0000000000a1',
+  [AVERY]: '00000000-0000-4000-8000-0000000000a2',
+  [RILEY]: '00000000-0000-4000-8000-0000000000a3',
+  [REMOVED]: '00000000-0000-4000-8000-0000000000a4',
+};
+const signedIn = (email: string) => ({ email, sub: AUTH_IDS[email] });
 
 type Row = {
   id: string;
@@ -67,7 +75,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
   };
   const timecardsAs = async (email: string, period?: string) => {
     const c = await client();
-    return asUser(c, { email }, async () =>
+    return asUser(c, signedIn(email), async () =>
       (
         await c.query<Row>(
           `SELECT * FROM public.submitted_timecards ${period ? 'WHERE pay_period_key = $1' : ''} ORDER BY id`,
@@ -87,6 +95,9 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
     }
     await admin.query(read('supabase/staging/002_staging_access_rules.sql'));
     await admin.query(read('supabase/staging/003_synthetic_seed.sql'));
+    for (const [email, id] of Object.entries(AUTH_IDS)) {
+      await admin.query('INSERT INTO auth.users (id, email) VALUES ($1, $2)', [id, email]);
+    }
   });
 
   afterEach(async () => {
@@ -126,7 +137,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
     it('an employee cannot submit for someone else or submit an already-approved card', async () => {
       const c = await client();
       const insert = (employeeId: string, status: string) =>
-        asUser(c, { email: AVERY }, () =>
+        asUser(c, signedIn(AVERY), () =>
           c.query(
             `INSERT INTO public.submitted_timecards (id, employee_id, pay_period_key, pay_period_start, pay_period_end, submitted_at, status)
              VALUES ($1, $2, '2026-pp-22', 'x', 'y', now(), $3)`,
@@ -139,12 +150,12 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
 
     it('an employee cannot approve their own timecard; a supervisor can', async () => {
       const employee = await client();
-      const result = await asUser(employee, { email: AVERY }, () =>
+      const result = await asUser(employee, signedIn(AVERY), () =>
         employee.query(`UPDATE public.submitted_timecards SET status = 'APPROVED' WHERE id = 'stg-pp21-avery-v1'`),
       );
       expect(result.rowCount).toBe(0);
       const supervisor = await client();
-      const approved = await asUser(supervisor, { email: SUPERVISOR }, () =>
+      const approved = await asUser(supervisor, signedIn(SUPERVISOR), () =>
         supervisor.query(`UPDATE public.submitted_timecards SET status = 'APPROVED' WHERE id = 'stg-pp22-taylor-v1'`),
       );
       expect(approved.rowCount).toBe(1);
@@ -152,24 +163,24 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
 
     it('employees read the payroll lock but cannot finalize payroll', async () => {
       const c = await client();
-      const keys = await asUser(c, { email: AVERY }, () => c.query(`SELECT pay_period_key FROM public.payroll_submissions`));
+      const keys = await asUser(c, signedIn(AVERY), () => c.query(`SELECT pay_period_key FROM public.payroll_submissions`));
       expect(keys.rows.map((r) => r.pay_period_key)).toEqual(['2026-pp-20']);
       await expect(
-        asUser(c, { email: AVERY }, () => c.query(`INSERT INTO public.payroll_submissions (pay_period_key) VALUES ('2026-pp-21')`)),
+        asUser(c, signedIn(AVERY), () => c.query(`INSERT INTO public.payroll_submissions (pay_period_key) VALUES ('2026-pp-21')`)),
       ).rejects.toThrow(/row-level security/);
     });
 
     it("an employee cannot read or restore another employee's editable rows", async () => {
       const c = await client();
-      const rows = await asUser(c, { email: AVERY }, () =>
+      const rows = await asUser(c, signedIn(AVERY), () =>
         c.query(`SELECT id FROM public.editable_timecard_rows WHERE employee_id = 'emp-stg-emt-2'`),
       );
       expect(rows.rowCount).toBe(0);
       await expect(
-        asUser(c, { email: AVERY }, () =>
+        asUser(c, signedIn(AVERY), () =>
           c.query(`SELECT public.restore_returned_timecard_rows('emp-stg-emt-2', '2026-pp-21', 'stg-pp21-riley-v1', now(), '2026-10-02', '[]')`),
         ),
-      ).rejects.toThrow(/row-level security/);
+      ).rejects.toMatchObject({ code: '42501' });
     });
   });
 
@@ -198,7 +209,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
       const state = getEmployeeTimecardState(own, 'emp-stg-emt-2', period);
       expect(state.returnedRecord?.id).toBe('stg-pp21-riley-v1');
 
-      const restored = await asUser(riley, { email: RILEY }, () =>
+      const restored = await asUser(riley, signedIn(RILEY), () =>
         riley.query<{ r: string }>(`SELECT public.restore_returned_timecard_rows($1, $2, $3, $4, $5, $6) AS r`, [
           'emp-stg-emt-2', period, 'stg-pp21-riley-v1', state.returnedRecord!.reviewedAt, '2026-10-02',
           JSON.stringify(buildRestoreRpcRows({ [`${prefix}2026-10-02`]: { shiftLabel: 'R1', clockOutTime: '19:00' } }, prefix)),
@@ -206,7 +217,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
       );
       expect(restored.rows[0].r).toBe('RESTORED');
 
-      await asUser(riley, { email: RILEY }, () =>
+      await asUser(riley, signedIn(RILEY), () =>
         riley.query(
           `UPDATE public.editable_timecard_rows SET row_data = row_data || '{"clockOutTime":"21:00"}', updated_at = now() WHERE id = $1`,
           [`${prefix}2026-10-02`],
@@ -225,7 +236,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
         evaluateEmployeeSubmission({ hasEmployeeProfile: true, isSubmitting: false, isWithinEmployeeEditWindow: true, isPayrollFinalized: false, current: state.current }),
       ).toEqual({ allowed: true, isResubmission: true });
       const fields = getEmployeeSubmissionVersionFields(own, 'emp-stg-emt-2');
-      await asUser(riley, { email: RILEY }, () =>
+      await asUser(riley, signedIn(RILEY), () =>
         riley.query(
           `INSERT INTO public.submitted_timecards (id, employee_id, employee_name, pay_period_key, pay_period_start, pay_period_end,
              submitted_at, total_hours, submission_acknowledgement, status, version_number, parent_timecard_id, version_reason,
@@ -241,7 +252,7 @@ describeDb('staging schema, access rules and timecard workflow (local PostgreSQL
       expect(queues.awaitingEmployeeResubmission).toEqual([]);
 
       const supervisor = await client();
-      await asUser(supervisor, { email: SUPERVISOR }, () =>
+      await asUser(supervisor, signedIn(SUPERVISOR), () =>
         supervisor.query(`UPDATE public.submitted_timecards SET status = 'APPROVED', reviewed_at = now() WHERE id = 'stg-pp21-riley-v2'`),
       );
       queues = buildSupervisorTimecardQueues(await timecardsAs(SUPERVISOR, period));

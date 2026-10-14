@@ -41,6 +41,8 @@ counted(section, item, sql, needs_version, needs_restore) AS (VALUES
      'select count(*) as n from public.editable_timecard_rows where left(id::text, length(employee_id::text || ''-'' || pay_period_key::text || ''-'')) <> employee_id::text || ''-'' || pay_period_key::text || ''-''', false, true),
   ('7 data', 'editable_timecard_rows: existing restore marker rows',
      'select count(*) as n from public.editable_timecard_rows where id::text like ''%-restore-marker-%''', false, true),
+  ('7 data', 'submitted_timecards: RETURNED rows without reviewed_at (cannot be restored automatically; employee re-enters)',
+     'select count(*) as n from public.submitted_timecards where upper(status::text) = ''RETURNED'' and reviewed_at is null', false, false),
   ('7 data', 'payroll_submissions: finalized periods',
      'select count(*) as n from public.payroll_submissions', false, false)
 )
@@ -57,6 +59,34 @@ SELECT section, item, detail, status FROM (
   SELECT '1 server', 'role "authenticated" exists and may use schema public',
          (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') AND has_schema_privilege('authenticated', 'public', 'USAGE'))::text,
          CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') AND has_schema_privilege('authenticated', 'public', 'USAGE') THEN 'PASS' ELSE 'FAIL' END
+
+  -- 1b. Sign-in to employee mapping used by the restore function:
+  --     auth.uid() -> auth.users.email -> exactly one employees row (case-insensitive)
+  UNION ALL
+  SELECT '1 identity', 'auth.uid() and auth.users exist; the migration owner (current user) may read auth.users',
+         format('auth.uid=%s auth.users=%s readable=%s', to_regprocedure('auth.uid()') IS NOT NULL,
+                to_regclass('auth.users') IS NOT NULL,
+                to_regclass('auth.users') IS NOT NULL AND has_table_privilege(current_user, 'auth.users', 'SELECT')),
+         CASE WHEN to_regprocedure('auth.uid()') IS NOT NULL AND to_regclass('auth.users') IS NOT NULL
+               AND has_table_privilege(current_user, 'auth.users', 'SELECT') THEN 'PASS' ELSE 'FAIL' END
+  UNION ALL
+  SELECT '1 identity', 'employees.id and employees.email columns (types)',
+         coalesce(string_agg(column_name || '=' || data_type, ', ' ORDER BY column_name), 'missing'),
+         CASE WHEN count(*) = 2 THEN 'PASS' ELSE 'FAIL' END
+    FROM information_schema.columns
+   WHERE table_schema = 'public' AND table_name = 'employees' AND column_name IN ('id', 'email')
+  UNION ALL
+  SELECT '1 identity', 'email addresses shared by more than one employee profile (those users cannot restore; INFO)',
+         count(*)::text, 'INFO'
+    FROM (SELECT 1 FROM public.employees WHERE coalesce(btrim(email), '') <> ''
+           GROUP BY lower(btrim(email)) HAVING count(*) > 1) d
+  UNION ALL
+  SELECT '1 identity', 'sign-in accounts whose email matches exactly one employee / total sign-in accounts',
+         format('%s / %s',
+                (SELECT count(*) FROM auth.users u
+                  WHERE (SELECT count(*) FROM public.employees e WHERE lower(btrim(e.email)) = lower(btrim(u.email))) = 1),
+                (SELECT count(*) FROM auth.users)),
+         'INFO'
 
   -- 2. Columns the release depends on
   UNION ALL

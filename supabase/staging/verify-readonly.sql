@@ -16,10 +16,10 @@ FROM (
    WHERE grantee = 'anon' AND table_schema = 'public' AND privilege_type = 'SELECT'
      AND table_name IN ('employees','submitted_timecards','editable_timecard_rows','payroll_submissions','time_punches')
   UNION ALL
-  SELECT 'restore function: SECURITY INVOKER, authenticated may run it, anon may not',
-         format('invoker=%s authenticated=%s anon=%s', NOT p.prosecdef,
+  SELECT 'restore function: SECURITY DEFINER, authenticated may run it, anon may not',
+         format('definer=%s authenticated=%s anon=%s', p.prosecdef,
                 has_function_privilege('authenticated', p.oid, 'EXECUTE'), has_function_privilege('anon', p.oid, 'EXECUTE')),
-         NOT p.prosecdef AND has_function_privilege('authenticated', p.oid, 'EXECUTE') AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')
+         p.prosecdef AND has_function_privilege('authenticated', p.oid, 'EXECUTE') AND NOT has_function_privilege('anon', p.oid, 'EXECUTE')
     FROM pg_proc p WHERE p.oid = to_regprocedure('public.restore_returned_timecard_rows(text,text,text,timestamptz,text,jsonb)')
   UNION ALL
   SELECT 'version columns on submitted_timecards', count(*)::text || ' of 5', count(*) = 5

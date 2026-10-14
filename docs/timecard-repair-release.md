@@ -10,7 +10,7 @@ production). Nothing here has been deployed or applied to production.
 | Current-version rule | `src/lib/timecardWorkflow.ts` is the single rule for which timecard record is current. The employee dashboard, supervisor queues, payroll status, the approved packet, default period selection and analytics all use it. |
 | Resubmission | Employee submissions now also write `version_number`, `parent_timecard_id`, `version_reason`, `created_by_role` and `created_by_employee_id`. Resubmissions always appear under **Resubmitted**. Previously hidden resubmissions reappear without any data change. |
 | Approved packet | Exactly one current approved record per employee and period. Superseded approvals are listed separately and excluded from totals. |
-| Corrections | Saved rows load for whichever period is selected. A returned card is copied into the editable table once (`restore_returned_timecard_rows`) and never over newer corrections. |
+| Corrections | Saved rows load for whichever period is selected. A returned card is copied into the editable table once (`restore_returned_timecard_rows`) and never over newer corrections. The database identifies the caller from `auth.uid()` and restores only that employee's own RETURNED card, using the stored return time; client-supplied ids and times are verified, never trusted. |
 | Signature | Matches the signed-in employee's own first and last name, ignoring case, accents, spacing and punctuation. Messages are clear. "Submitting…" can no longer get stuck. |
 | Finalized payroll | Employees cannot submit into a finalized period and are told how to get it reopened. Supervisor payroll locks now apply to every period. |
 | Self-approval | A supervisor cannot approve their own timecard. The old check compared against a constant and never matched. |
@@ -51,12 +51,12 @@ earlier hidden resubmissions may now appear under Resubmitted.
    It creates one function and changes no tables, policies or rows.
 2. **Verify the function:**
    ```sql
-   select p.oid::regprocedure, not p.prosecdef as invoker,
+   select p.oid::regprocedure, p.prosecdef as security_definer,
           has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_can_run,
           has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can_run
      from pg_proc p where p.proname = 'restore_returned_timecard_rows';
    ```
-   Expected: one row, `invoker = true`, `authenticated_can_run = true`, `anon_can_run = false`.
+   Expected: one row, `security_definer = true`, `authenticated_can_run = true`, `anon_can_run = false`.
 3. **Open a pull request** from the branch to `main`, review it and merge it.
    Vercel builds production from `main`. The branch entry in `vercel.json`
    has no effect on `main`.
@@ -96,7 +96,7 @@ previous restore method. Applying the migration first is recommended.
 |---|---|
 | `npm run typecheck` | pass |
 | `npm test` (workflow, lifecycle/payroll invariants, restore, pay periods, environment, integration guards) | 121 pass |
-| `npm run test:db` on PostgreSQL 16.15 and 17.10 (local) | 80 pass each |
+| `npm run test:db` on PostgreSQL 16.15 and 17.10 (local) | 96 pass each (includes the security tests) |
 | `VERCEL_ENV=production npm run build`, with no Supabase variables set | pass; production URL inlined into 44 server bundles; no staging reference in the output |
 | `npx eslint src` | 122 errors / 109 warnings, all pre-existing (`main`: 123 / 110) |
 | `readiness-readonly.sql` on PostgreSQL 16 and 17 rehearsal schemas | all PASS; a deliberately broken schema produces the expected FAILs, without errors |
