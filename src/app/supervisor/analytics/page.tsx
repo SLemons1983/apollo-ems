@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { selectCurrentTimecards, type TimecardStatus } from '@/lib/timecardWorkflow';
 
 type Employee = {
   id: string;
@@ -17,10 +18,14 @@ type Timecard = {
   id: string;
   employeeId: string;
   employeeName: string;
+  payPeriodKey: string;
+  submittedAt: string;
+  versionNumber: number | null;
+  parentTimecardId: string | null;
   start: string;
   end: string;
   total: number;
-  status: string;
+  status: TimecardStatus;
   breakdown: Record<string, any>;
   punches: Record<string, any>[];
   missedMeals: Record<string, any>[];
@@ -275,6 +280,10 @@ export default function AnalyticsPage() {
           id: row.id,
           employeeId: row.employee_id,
           employeeName: row.employee_name,
+          payPeriodKey: row.pay_period_key,
+          submittedAt: row.submitted_at,
+          versionNumber: row.version_number ?? null,
+          parentTimecardId: row.parent_timecard_id ?? null,
           start: row.pay_period_start,
           end: row.pay_period_end,
           total: number(row.total_hours),
@@ -326,7 +335,12 @@ export default function AnalyticsPage() {
   const rangeTimecards = useMemo(() => timecards.filter((card) =>
     card.start >= startDate && card.end <= endDate && allowedEmployeeIds.has(card.employeeId)
   ), [timecards, startDate, endDate, allowedEmployeeIds]);
-  const approvedTimecards = useMemo(() => rangeTimecards.filter((card) => card.status === 'APPROVED'), [rangeTimecards]);
+  // Only each employee's current record per pay period counts, so superseded
+  // versions never double-count approved hours.
+  const approvedTimecards = useMemo(
+    () => selectCurrentTimecards(rangeTimecards).filter((card) => card.status === 'APPROVED'),
+    [rangeTimecards],
+  );
 
   const employeeRows = useMemo(() => filteredEmployees.map((employee) => {
     const cards = approvedTimecards.filter((card) => card.employeeId === employee.id);
@@ -428,7 +442,9 @@ export default function AnalyticsPage() {
   }, [rangeAssignments, openRequests, tradeRequests, vacationRequests, startDate, endDate, employeeFilter]);
 
   const exceptions = useMemo(() => {
-    const cards = rangeTimecards;
+    // Current records only: superseded versions would double-count stipends,
+    // missed meals and corrections.
+    const cards = selectCurrentTimecards(rangeTimecards);
     return {
       missedMeals: cards.reduce((sum, card) => sum + card.missedMeals.length, 0),
       ldt: cards.reduce((sum, card) => sum + card.compensation.filter((item) => item.compensationType === 'LDT_STIPEND' || item.compensation_type === 'LDT_STIPEND').length, 0),

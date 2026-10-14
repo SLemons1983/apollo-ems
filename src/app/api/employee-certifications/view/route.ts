@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseUrl } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
+const SUPABASE_URL = supabaseUrl;
 const CERTIFICATION_BUCKET = 'employee-certifications';
 
 export async function POST(request: NextRequest) {

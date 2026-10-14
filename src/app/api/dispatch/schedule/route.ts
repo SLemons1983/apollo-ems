@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseUrl } from '@/lib/supabaseConfig';
 
 export async function GET() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -16,7 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient('https://xyrusrspvyuwpplhhett.supabase.co', serviceRoleKey);
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const assignments: any[] = [];
   let assignmentPageStart = 0;

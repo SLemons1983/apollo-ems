@@ -8,5 +8,11 @@
       "path": "/api/cron/certification-reminder",
       "schedule": "15 7 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "claude/bold-hawking-idxk8h": false
+    }
+  }
 }

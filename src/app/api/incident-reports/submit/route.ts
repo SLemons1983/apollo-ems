@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
+import { supabaseUrl } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
+const SUPABASE_URL = supabaseUrl;
 
 const CATEGORY_RECIPIENTS: Record<string, string[]> = {
   'Check Request': ['kira.holley@sscems.org'],

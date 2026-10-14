@@ -1,4 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { isProductionSupabaseProject } from "./supabaseConfig";
 
 const MAX_SKEW_MS = 5 * 60 * 1000;
 
@@ -60,6 +61,11 @@ export function verifySignedRequest(request: Request, rawBody: string, expectedC
 }
 
 export async function signedPost(url: string, clientId: string, secret: string, payload: unknown) {
+  // Outside production, never send unit status, location or emergency
+  // signals to CAD unless a non-production CAD is explicitly enabled.
+  if (!isProductionSupabaseProject && process.env.APOLLO_ALLOW_NONPRODUCTION_CAD !== "true") {
+    throw new Error("CAD integration is disabled outside the production environment");
+  }
   const body = JSON.stringify(payload);
   const response = await fetch(url, { method: "POST", headers: signedHeaders(clientId, secret, body), body, cache: "no-store" });
   const text = await response.text();

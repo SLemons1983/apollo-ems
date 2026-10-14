@@ -2,9 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { isPlatformOwner } from '@/lib/platformOwner';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
-const PUBLISHABLE_KEY = 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const SUPABASE_URL = supabaseUrl;
+const PUBLISHABLE_KEY = supabasePublishableKey;
 
 export async function getOwnerAdminClient() {
   const cookieStore = await cookies();

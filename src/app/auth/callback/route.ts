@@ -2,8 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
+const SUPABASE_URL = supabaseUrl;
 
 async function syncEmployeeAuthProfile(user: {
   email?: string | null;
@@ -64,8 +65,8 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = createServerClient(
-      'https://xyrusrspvyuwpplhhett.supabase.co',
-      'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
+      supabaseUrl,
+      supabasePublishableKey,
       {
         cookies: {
           getAll() {

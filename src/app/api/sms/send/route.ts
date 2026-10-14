@@ -1,12 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { isProductionSupabaseProject, supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
 const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ??
-  'https://xyrusrspvyuwpplhhett.supabase.co';
+  supabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+  supabasePublishableKey;
 
 const RECIPIENT_MODES = new Set([
   'INDIVIDUAL',
@@ -224,6 +223,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'No consented, SMS-enabled recipients were found.' },
         { status: 400 },
+      );
+    }
+
+    // Text messages reach real phones: never send them outside production.
+    if (!isProductionSupabaseProject) {
+      return NextResponse.json(
+        { error: 'SMS delivery is disabled outside the production environment.' },
+        { status: 503 },
       );
     }
 

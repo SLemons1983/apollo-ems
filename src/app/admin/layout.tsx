@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { isPlatformOwner } from '@/lib/platformOwner';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
 async function signOut() {
   'use server';
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
-    'https://xyrusrspvyuwpplhhett.supabase.co',
-    'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
+    supabaseUrl,
+    supabasePublishableKey,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
@@ -31,8 +32,8 @@ async function signOut() {
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
-    'https://xyrusrspvyuwpplhhett.supabase.co',
-    'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
+    supabaseUrl,
+    supabasePublishableKey,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),

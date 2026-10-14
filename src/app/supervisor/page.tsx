@@ -8,6 +8,13 @@ import {
   getCurrentPayPeriodOption,
   type PayPeriodOption,
 } from '@/lib/payPeriods';
+import {
+  buildSupervisorTimecardQueues,
+  getNextTimecardVersionNumber,
+  getPayrollStatusForRecord,
+  isOwnTimecard,
+  selectCurrentTimecards,
+} from '@/lib/timecardWorkflow';
 
 type ImportantLink = {
   id: string;
@@ -860,12 +867,20 @@ export default function SupervisorPage() {
   const [scheduleAssignmentsLoaded, setScheduleAssignmentsLoaded] = useState(false);
   const [employeesLoaded, setEmployeesLoaded] = useState(false);
   const [timecardReviewPeriodInitialized, setTimecardReviewPeriodInitialized] = useState(false);
-  const [payrollSubmission, setPayrollSubmission] = useState<{
-    submittedBy: string;
-    submittedAt: string;
-    payPeriodKey: string;
-    approvedCount: number;
-  } | null>(null);
+  // Finalized payroll records for every pay period, keyed by pay period. The
+  // lock must reflect whichever period is selected, not only the period that
+  // was current when the page loaded.
+  const [payrollSubmissionsByPeriod, setPayrollSubmissionsByPeriod] = useState<
+    Record<
+      string,
+      {
+        submittedBy: string;
+        submittedAt: string;
+        payPeriodKey: string;
+        approvedCount: number;
+      }
+    >
+  >({});
   const [payrollActionPending, setPayrollActionPending] = useState(false);
   const [builderStartDate, setBuilderStartDate] = useState('');
   const [builderEndDate, setBuilderEndDate] = useState('');
@@ -925,13 +940,12 @@ export default function SupervisorPage() {
         .map((row) => row.employee_id as string),
     );
 
+    // Only an employee's current record counts; a superseded approval does not.
     const approvedEmployeeIds = new Set(
-      submittedTimecards
-        .filter(
-          (timecard) =>
-            timecard.payPeriodKey === previousPayPeriod.key &&
-            timecard.status === 'APPROVED',
-        )
+      selectCurrentTimecards(
+        submittedTimecards.filter((timecard) => timecard.payPeriodKey === previousPayPeriod.key),
+      )
+        .filter((timecard) => timecard.status === 'APPROVED')
         .map((timecard) => timecard.employeeId),
     );
 
@@ -958,7 +972,8 @@ export default function SupervisorPage() {
     timecardReviewPeriodInitialized,
   ]);
 
-  const payrollLocked = payrollSubmission?.payPeriodKey === selectedPayPeriod.key;
+  const payrollSubmission = payrollSubmissionsByPeriod[selectedPayPeriod.key] ?? null;
+  const payrollLocked = Boolean(payrollSubmission);
 
   const smsEligibleEmployeeIds = useMemo(
     () => new Set(smsPreferences.map((preference) => preference.employee_id)),
@@ -1306,19 +1321,25 @@ export default function SupervisorPage() {
           if (error) {
             console.error('Failed to load payroll submissions:', error);
           } else {
-            const currentSubmission = (data ?? []).find(
-              (row: any) => row.pay_period_key === selectedPayPeriod.key,
-            );
-
-            setPayrollSubmission(
-              currentSubmission
-                ? {
-                    submittedBy: currentSubmission.submitted_by,
-                    submittedAt: currentSubmission.submitted_at,
-                    payPeriodKey: currentSubmission.pay_period_key,
-                    approvedCount: currentSubmission.approved_timecards,
-                  }
-                : null,
+            setPayrollSubmissionsByPeriod(
+              Object.fromEntries(
+                (data ?? [])
+                  .filter((row: { pay_period_key?: string | null }) => Boolean(row.pay_period_key))
+                  .map((row: {
+                    pay_period_key: string;
+                    submitted_by: string;
+                    submitted_at: string;
+                    approved_timecards: number;
+                  }) => [
+                    row.pay_period_key,
+                    {
+                      submittedBy: row.submitted_by,
+                      submittedAt: row.submitted_at,
+                      payPeriodKey: row.pay_period_key,
+                      approvedCount: row.approved_timecards,
+                    },
+                  ]),
+              ),
             );
           }
         });
@@ -1505,47 +1526,20 @@ export default function SupervisorPage() {
     );
   }, [selectedPayPeriod.key, submittedTimecards]);
 
-  const pendingTimecards = useMemo(() => {
-    return selectedPayPeriodTimecards
-      .filter((timecard) => {
-        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
-        return (
-          latest?.id === timecard.id &&
-          timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
-          timecard.submissionAcknowledgement?.submissionAction !== 'RESUBMITTED'
-        );
-      })
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-  }, [selectedPayPeriodTimecards]);
-
-  const resubmittedTimecards = useMemo(() => {
-    return selectedPayPeriodTimecards
-      .filter((timecard) => {
-        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
-        return (
-          latest?.id === timecard.id &&
-          timecard.status === 'PENDING_SUPERVISOR_REVIEW' &&
-          timecard.submissionAcknowledgement?.submissionAction === 'RESUBMITTED'
-        );
-      })
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-  }, [selectedPayPeriodTimecards]);
-
-  const pendingResubmissionTimecards = useMemo(() => {
-    return selectedPayPeriodTimecards
-      .filter((timecard) => {
-        if (timecard.status !== 'RETURNED') return false;
-        const latest = getLatestTimecardVersionForEmployee(selectedPayPeriodTimecards, timecard.employeeId);
-        return latest?.id === timecard.id;
-      })
-      .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
-  }, [selectedPayPeriodTimecards]);
-
-  const approvedTimecards = useMemo(() => {
-    return selectedPayPeriodTimecards
-      .filter((timecard) => timecard.status === 'APPROVED')
-      .sort((a, b) => new Date(b.reviewedAt ?? b.submittedAt).getTime() - new Date(a.reviewedAt ?? a.submittedAt).getTime());
-  }, [selectedPayPeriodTimecards]);
+  // One shared definition of the current record per employee (see
+  // src/lib/timecardWorkflow.ts) drives every queue, the payroll status table
+  // and the approved payroll packet, and matches the employee dashboard.
+  const timecardQueues = useMemo(
+    () => buildSupervisorTimecardQueues(selectedPayPeriodTimecards),
+    [selectedPayPeriodTimecards],
+  );
+  const pendingTimecards = timecardQueues.pendingReview;
+  const resubmittedTimecards = timecardQueues.resubmitted;
+  const pendingResubmissionTimecards = timecardQueues.awaitingEmployeeResubmission;
+  // Exactly one record per employee: the current record, and only when it is
+  // approved. Superseded or outdated approvals never enter the packet.
+  const approvedTimecards = timecardQueues.approvedForPayroll;
+  const supersededApprovals = timecardQueues.supersededApprovals;
 
   const scheduledEmployeeIds = useMemo(() => {
     const startKey = makeDateInputValue(selectedPayPeriod.start);
@@ -1565,15 +1559,7 @@ export default function SupervisorPage() {
   }, [employees, scheduledEmployeeIds, selectedPayPeriodTimecards]);
 
   const payrollStatusRows = useMemo<PayrollStatusRow[]>(() => {
-    const latestTimecardByEmployeeId = new Map<string, SubmittedTimecard>();
-
-    selectedPayPeriodTimecards.forEach((timecard) => {
-      const current = latestTimecardByEmployeeId.get(timecard.employeeId);
-
-      if (!current || new Date(timecard.submittedAt) > new Date(current.submittedAt)) {
-        latestTimecardByEmployeeId.set(timecard.employeeId, timecard);
-      }
-    });
+    const latestTimecardByEmployeeId = timecardQueues.currentByEmployeeId;
 
     const participatingEmployeeIds = new Set<string>([
       ...scheduledEmployeeIds,
@@ -1585,15 +1571,7 @@ export default function SupervisorPage() {
     return [...participatingEmployeeIds]
       .map((employeeId) => {
         const timecard = latestTimecardByEmployeeId.get(employeeId);
-        let status: PayrollStatus = 'NOT_SUBMITTED';
-
-        if (timecard?.status === 'PENDING_SUPERVISOR_REVIEW') {
-          status = 'PENDING_REVIEW';
-        } else if (timecard?.status === 'RETURNED') {
-          status = 'PENDING_RESUBMISSION';
-        } else if (timecard?.status === 'APPROVED') {
-          status = 'APPROVED';
-        }
+        const status: PayrollStatus = getPayrollStatusForRecord(timecard);
 
         return {
           employeeId,
@@ -1606,7 +1584,7 @@ export default function SupervisorPage() {
         };
       })
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [employees, scheduledEmployeeIds, selectedPayPeriodTimecards]);
+  }, [employees, scheduledEmployeeIds, timecardQueues]);
 
   function sendTimecardReminders() {
     if (employeesNotSubmitted.length === 0) {
@@ -1873,7 +1851,12 @@ export default function SupervisorPage() {
 
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
 
-    if (timecard?.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID) {
+    if (!currentEmployee?.id) {
+      window.alert('Apollo could not identify your supervisor profile, so this timecard cannot be approved. Reload the page or contact an administrator.');
+      return;
+    }
+
+    if (timecard && isOwnTimecard(timecard.employeeId, currentEmployee.id)) {
       window.alert('You cannot approve your own timecard. It must be reviewed by another supervisor or GM.');
       return;
     }
@@ -3144,23 +3127,6 @@ export default function SupervisorPage() {
     });
   }
 
-  function getNextTimecardVersionNumber(timecard: SubmittedTimecard): number {
-    return Math.max(1, Number(timecard.versionNumber ?? 1) + 1);
-  }
-
-  function getLatestTimecardVersionForEmployee(
-    timecards: SubmittedTimecard[],
-    employeeId: string,
-  ): SubmittedTimecard | null {
-    return timecards
-      .filter((item) => item.employeeId === employeeId)
-      .sort((a, b) => {
-        const versionDifference = (b.versionNumber ?? 1) - (a.versionNumber ?? 1);
-        if (versionDifference !== 0) return versionDifference;
-        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
-      })[0] ?? null;
-  }
-
   async function saveSupervisorTimecardEdit(timecard: SubmittedTimecard) {
     if (payrollLocked) {
       window.alert(
@@ -3321,7 +3287,13 @@ export default function SupervisorPage() {
       `${correctionType} by ${correctedBy} on ${new Date(correctedAt).toLocaleString('en-US')}.\n` +
       `Reason: ${reason}\n` +
       `Changes: ${changeDescriptions.join(' | ')}`;
-    const nextVersionNumber = getNextTimecardVersionNumber(timecard);
+    // Next number across every record for this employee and pay period, so a
+    // correction never reuses a version number already in the audit trail.
+    const nextVersionNumber = getNextTimecardVersionNumber(
+      submittedTimecards.filter(
+        (item) => item.employeeId === timecard.employeeId && item.payPeriodKey === timecard.payPeriodKey,
+      ),
+    );
     const correctedTimecard: SubmittedTimecard = {
       ...timecard,
       id: crypto.randomUUID(),
@@ -3968,7 +3940,11 @@ export default function SupervisorPage() {
         throw error;
       }
 
-      setPayrollSubmission(null);
+      setPayrollSubmissionsByPeriod((current) => {
+        const next = { ...current };
+        delete next[selectedPayPeriod.key];
+        return next;
+      });
 
       await addAuditEntry(
         'PAYROLL_REOPENED',
@@ -4047,7 +4023,7 @@ export default function SupervisorPage() {
         throw error;
       }
 
-      setPayrollSubmission(submission);
+      setPayrollSubmissionsByPeriod((current) => ({ ...current, [submission.payPeriodKey]: submission }));
 
       await addAuditEntry(
         'PAYROLL_SUBMITTED',
@@ -4347,7 +4323,7 @@ export default function SupervisorPage() {
     const hasMissingPunches = hasMissingPunchFlag(timecard, weeks);
     const hasMissedMeals = timecard.missedMealBreaks.length > 0;
     const hasFlags = hasManualEdits || hasSupervisorEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
-    const isOwnSupervisorTimecard = timecard.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID;
+    const isOwnSupervisorTimecard = isOwnTimecard(timecard.employeeId, currentEmployee?.id);
     const scheduleMatchStatus = getScheduleMatchStatus(timecard);
 
     return (
@@ -8149,6 +8125,27 @@ export default function SupervisorPage() {
               </div>
 
               <div>
+                {supersededApprovals.length > 0 && (
+                  <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                    <div className="font-semibold">
+                      Earlier approval replaced by a newer version ({supersededApprovals.length})
+                    </div>
+                    <div className="mt-1 text-xs leading-5">
+                      These employees have a newer timecard version that is pending review or awaiting
+                      resubmission. Their earlier approved version is kept in the audit trail but is
+                      not included in the approved payroll packet until the newer version is approved.
+                    </div>
+                    <ul className="mt-2 list-disc pl-5 text-xs">
+                      {supersededApprovals.map((item) => (
+                        <li key={item.employeeId}>
+                          {item.current.employeeName}: current version is{' '}
+                          {item.current.status === 'RETURNED' ? 'awaiting employee resubmission' : 'pending review'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowReviewedTimecards((current) => !current)}
