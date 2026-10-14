@@ -7,6 +7,13 @@
 --   * active supervisors / admins / GMs read everything and do all reviewing;
 --   * signed-out (anon) callers get nothing.
 
+-- Staging contains no real people: the repository's agency migration inserts
+-- the platform owner's contact email; replace it with a synthetic address.
+UPDATE public.apollo_agencies
+   SET primary_contact_email = 'agency-owner@example.test',
+       primary_contact_name = 'Staging Agency Owner'
+ WHERE primary_contact_email NOT LIKE '%@example.test';
+
 -- Who is signed in, resolved from the login email. SECURITY DEFINER so the
 -- lookup itself is not blocked by the employees policy; it returns only the
 -- caller's own id / role flag.

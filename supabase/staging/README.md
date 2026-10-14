@@ -17,6 +17,26 @@ this to production (`xyrusrspvyuwpplhhett`).**
 connection string, server identity shown, typed confirmation, one transaction
 per file).
 
+## One-time setup (copy and paste)
+
+Run in a terminal that has `git`, `psql` and `python3` (your Codespace has
+all three). You need two things from the **staging** project dashboard
+(Connect → Session pooler): the host name, and the staging database password
+(you will type it at a hidden prompt; it is never put in the command).
+
+```bash
+cd /workspaces/apollo-ems 2>/dev/null || { git clone https://github.com/SLemons1983/apollo-ems.git && cd apollo-ems; }
+git fetch origin claude/bold-hawking-idxk8h && git checkout claude/bold-hawking-idxk8h && git pull --ff-only
+STAGING_DATABASE_URL='postgresql://postgres.eejahcuftznsabulssew@PASTE-SESSION-POOLER-HOST:5432/postgres' \
+  scripts/apply-staging.sh
+```
+
+The script shows the server it reached and the 19 files it will apply, then
+waits for you to type `APPLY TO STAGING`. Anything else cancels with no
+change. It refuses the production project, other projects, non-Supabase
+hosts, passwords inside the URL, the transaction pooler (port 6543) and any
+database that already has tables. It ends with a verification summary.
+
 ## Verified locally
 
 `npm run test:db` builds the whole stack on a local PostgreSQL server and
