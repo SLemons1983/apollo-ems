@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
 const protectedRoutes = ['/dashboard', '/employees', '/schedule', '/supervisor', '/admin', '/ePCR', '/epcr/dashboard', '/epcr-dashboard', '/MDT'];
 const supervisorRoutes = ['/employees', '/schedule', '/supervisor'];
@@ -50,8 +51,8 @@ export async function middleware(request: NextRequest) {
   });
 
   const supabase = createServerClient(
-    'https://xyrusrspvyuwpplhhett.supabase.co',
-    'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU',
+    supabaseUrl,
+    supabasePublishableKey,
     {
       cookies: {
         getAll() {

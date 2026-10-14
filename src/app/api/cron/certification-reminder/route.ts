@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
+import { supabaseUrl } from '@/lib/supabaseConfig';
 
 export const dynamic = 'force-dynamic';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
+const SUPABASE_URL = supabaseUrl;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const REMINDER_DAYS = new Set([90, 30, 23, 16, 14, 9, 2]);

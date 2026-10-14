@@ -2,9 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
-const KEY = 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const URL = supabaseUrl;
+const KEY = supabasePublishableKey;
 
 export async function POST(request: NextRequest) {
   const access = await currentEpcrMembership();

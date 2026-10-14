@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { NextRequest } from 'next/server';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://xyrusrspvyuwpplhhett.supabase.co';
-const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const SUPABASE_URL = supabaseUrl;
+const PUBLISHABLE_KEY = supabasePublishableKey;
 
 function supervisorRole(role: string | null, jobTitle: string | null) {
   const normalizedRole = (role ?? '').trim().toLowerCase();

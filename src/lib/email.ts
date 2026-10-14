@@ -1,4 +1,6 @@
 import { Resend } from 'resend';
+import { filterNonProductionRecipients } from './nonProductionSafety';
+import { isProductionSupabaseProject } from './supabaseConfig';
 
 const FROM_EMAIL =
   process.env.APOLLO_EMAIL_FROM ||
@@ -26,7 +28,16 @@ export async function sendApolloEmail(params: {
         !SUPPRESSED_ROUTINE_RECIPIENTS.has(email.toLowerCase()),
     );
 
-  if (recipients.length === 0) {
+  // Outside production, email only allowlisted test addresses
+  // (APOLLO_NONPRODUCTION_EMAIL_ALLOWLIST), never real employees or customers.
+  const deliverableRecipients = isProductionSupabaseProject
+    ? recipients
+    : filterNonProductionRecipients(recipients, process.env.APOLLO_NONPRODUCTION_EMAIL_ALLOWLIST);
+
+  if (deliverableRecipients.length === 0) {
+    if (!isProductionSupabaseProject && recipients.length > 0) {
+      console.info(`Non-production email not sent (${recipients.length} recipient(s) not on the allowlist).`);
+    }
     return { data: null, error: null, skipped: true };
   }
 
@@ -40,7 +51,7 @@ export async function sendApolloEmail(params: {
 
   const result = await resend.emails.send({
     from: FROM_EMAIL,
-    to: recipients,
+    to: deliverableRecipients,
     subject: params.subject,
     text: params.text,
     attachments: params.attachments,

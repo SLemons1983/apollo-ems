@@ -1,9 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
-const KEY = 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const URL = supabaseUrl;
+const KEY = supabasePublishableKey;
 
 export function epcrAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

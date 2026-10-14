@@ -1,9 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://xyrusrspvyuwpplhhett.supabase.co";
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU";
+const url = supabaseUrl;
+const publishableKey = supabasePublishableKey;
 
 export async function requireMdtUser() {
   const cookieStore = await cookies();

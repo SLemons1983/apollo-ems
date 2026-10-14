@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getOwnerAdminClient } from '@/lib/adminApi';
 import { validateInvite } from '@/lib/epcrAccess';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const owner = await getOwnerAdminClient();
@@ -81,7 +82,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (action !== 'REINVITE') return NextResponse.json({ error: 'Select a valid access action.' }, { status: 400 });
   if (!['INVITED', 'REVOKED'].includes(member.status)) return NextResponse.json({ error: 'Only an unaccepted or revoked membership can receive a fresh invitation.' }, { status: 409 });
   const origin = new URL(request.url).origin;
-  const auth = createClient('https://xyrusrspvyuwpplhhett.supabase.co', 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU', { auth: { persistSession: false, autoRefreshToken: false } });
+  const auth = createClient(supabaseUrl, supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { error: resendError } = await auth.auth.resetPasswordForEmail(member.email, { redirectTo: `${origin}/epcr/setup-password` });
   if (resendError) return NextResponse.json({ error: resendError.message }, { status: 400 });
   const { data: updated, error: updateError } = await owner.db.from('epcr_memberships').update({ status: 'INVITED', last_invited_at: new Date().toISOString(), revoked_at: null, revoked_by: null }).eq('id', member.id).eq('agency_id', id).eq('status', member.status).select().maybeSingle();

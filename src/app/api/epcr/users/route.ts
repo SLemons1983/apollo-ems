@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { currentEpcrMembership, epcrAdminClient } from '@/lib/epcrServer';
 import { EPCR_ROLES, validateInvite, type EpcrRole } from '@/lib/epcrAccess';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
-const PUBLISHABLE_KEY = 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const SUPABASE_URL = supabaseUrl;
+const PUBLISHABLE_KEY = supabasePublishableKey;
 const MAX_BULK_USERS = 100;
 
 type Access = NonNullable<Awaited<ReturnType<typeof currentEpcrMembership>>>;

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { supabaseUrl } from '@/lib/supabaseConfig';
 
 export const dynamic = 'force-dynamic';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
+const SUPABASE_URL = supabaseUrl;
 const ANCHOR_DATE_UTC = Date.UTC(2026, 5, 7);
 const DAY_MS = 24 * 60 * 60 * 1000;
 

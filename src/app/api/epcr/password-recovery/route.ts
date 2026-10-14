@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseUrl, supabasePublishableKey } from '@/lib/supabaseConfig';
 
-const SUPABASE_URL = 'https://xyrusrspvyuwpplhhett.supabase.co';
-const PUBLISHABLE_KEY = 'sb_publishable_Pprc1W8EQ4tFMo_hvIX60A_t9zBIFaU';
+const SUPABASE_URL = supabaseUrl;
+const PUBLISHABLE_KEY = supabasePublishableKey;
 
 function serverClient(request: NextRequest, response: NextResponse) {
   return createServerClient(SUPABASE_URL, PUBLISHABLE_KEY, {
