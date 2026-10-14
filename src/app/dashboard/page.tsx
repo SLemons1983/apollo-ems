@@ -10,6 +10,7 @@ import {
 } from '@/lib/payPeriods';
 import {
   assignRestoredRowKeys,
+  buildRestoreRpcRows,
   checkTimecardSignature,
   evaluateEmployeeSubmission,
   getEditableRowPrefix,
@@ -19,6 +20,8 @@ import {
   getRestoreMarkerRowId,
   getReturnedTimecardsForEmployee,
   decideReturnedTimecardRestore,
+  isMissingDatabaseFunctionError,
+  isRestoreRpcResult,
   isTimecardPeriodEditable,
   shouldRestoreReturnedTimecard,
 } from '@/lib/timecardWorkflow';
@@ -606,6 +609,42 @@ function mapSubmittedTimecardRow(row: SubmittedTimecardDbRow): SubmittedTimecard
     reviewedAt: row.reviewed_at ?? null,
     reviewedBy: row.reviewed_by ?? null,
   };
+}
+
+// Replaces one pay period's editable rows (identified by key prefix) with the
+// saved database rows. Hidden rows (deleted rows and restore markers) are skipped.
+function mergeSavedEditableRows(
+  current: Record<string, EditableTimecardRow>,
+  prefix: string,
+  savedRows: EditableTimecardDbRow[],
+): Record<string, EditableTimecardRow> {
+  return {
+    ...Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))),
+    ...Object.fromEntries(
+      savedRows
+        .filter((row) => !row.row_data?.deleted)
+        .map((row) => [
+          row.id,
+          {
+            id: row.id,
+            shiftLabel: row.row_data?.shiftLabel ?? '',
+            payType: row.row_data?.payType ?? 'DAILY_OT_DT',
+            clockInDate: row.row_data?.clockInDate ?? '',
+            clockInTime: row.row_data?.clockInTime ?? '',
+            clockOutDate: row.row_data?.clockOutDate ?? '',
+            clockOutTime: row.row_data?.clockOutTime ?? '',
+          },
+        ]),
+    ),
+  };
+}
+
+/** Returned timecards that a period's saved restore-marker rows record as restored. */
+function getRestoredTimecardIdsFromRows(savedRows: EditableTimecardDbRow[]): string[] {
+  return savedRows
+    .filter((row) => row.row_data?.restoreMarker === true)
+    .map((row) => row.row_data?.restoredFromTimecardId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
 
 type EditableTimecardRow = {
@@ -1440,6 +1479,10 @@ export default function DashboardPage() {
   // Returned timecards already copied into editable rows. Seeded from permanent
   // marker rows so a restore never repeats after a reload.
   const [restoredReturnedTimecardIds, setRestoredReturnedTimecardIds] = useState<string[]>([]);
+  // Returned timecards whose restore check has finished on this device. The
+  // timecard table stays read-only until then, so nothing can be typed into
+  // rows that the restore is about to write.
+  const [completedRestoreCheckIds, setCompletedRestoreCheckIds] = useState<string[]>([]);
   // Pay periods whose saved editable rows have finished loading.
   const [loadedEditableRowPeriodKeys, setLoadedEditableRowPeriodKeys] = useState<string[]>([]);
   // Employee/pay-period pairs already loaded (or loading) during this visit.
@@ -2772,6 +2815,24 @@ export default function DashboardPage() {
     return payPeriodOptions.find((option) => option.key === selectedPayPeriodKey) ?? currentPayPeriod;
   }, [currentPayPeriod, payPeriodOptions, selectedPayPeriodKey]);
 
+  // Replaces the editable rows of one pay period with the saved database rows
+  // and records which returned timecards that period has already restored.
+  function applySavedEditableRows(payPeriodKey: string, savedRows: EditableTimecardDbRow[]) {
+    const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
+    const restoredTimecardIds = getRestoredTimecardIdsFromRows(savedRows);
+
+    setEditableTimecardRows((current) => mergeSavedEditableRows(current, prefix, savedRows));
+
+    if (restoredTimecardIds.length > 0) {
+      setRestoredReturnedTimecardIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
+      setCompletedRestoreCheckIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
+    }
+
+    setLoadedEditableRowPeriodKeys((current) =>
+      current.includes(payPeriodKey) ? current : [...current, payPeriodKey],
+    );
+  }
+
   // Saved editable rows are loaded for whichever pay period is selected (not
   // only the current one), so corrections to a previous or returned period
   // survive navigation and page reloads.
@@ -2779,7 +2840,6 @@ export default function DashboardPage() {
     if (!currentEmployeeId) return;
 
     const payPeriodKey = selectedPayPeriod.key;
-    const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
     const requestKey = `${currentEmployeeId}|${payPeriodKey}`;
     const requestedPeriods = requestedEditableRowPeriodsRef.current;
 
@@ -2803,37 +2863,21 @@ export default function DashboardPage() {
           // period again retries the load.
           console.error('Failed to load editable timecard rows:', error);
           requestedPeriods.delete(requestKey);
+          setTimecardStatus(
+            'Action Required: Apollo could not load your saved timecard entries. Reload the page before making changes.',
+          );
           return;
         }
 
         const savedRows: EditableTimecardDbRow[] = data ?? [];
-        const restoredTimecardIds = savedRows
-          .filter((row) => row.row_data?.restoreMarker === true)
-          .map((row) => row.row_data?.restoredFromTimecardId)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+        const restoredTimecardIds = getRestoredTimecardIdsFromRows(savedRows);
+        const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
 
-        setEditableTimecardRows((current) => ({
-          ...Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(prefix))),
-          ...Object.fromEntries(
-            savedRows
-              .filter((row) => !row.row_data?.deleted)
-              .map((row) => [
-                row.id,
-                {
-                  id: row.id,
-                  shiftLabel: row.row_data?.shiftLabel ?? '',
-                  payType: row.row_data?.payType ?? 'DAILY_OT_DT',
-                  clockInDate: row.row_data?.clockInDate ?? '',
-                  clockInTime: row.row_data?.clockInTime ?? '',
-                  clockOutDate: row.row_data?.clockOutDate ?? '',
-                  clockOutTime: row.row_data?.clockOutTime ?? '',
-                },
-              ]),
-          ),
-        }));
+        setEditableTimecardRows((current) => mergeSavedEditableRows(current, prefix, savedRows));
 
         if (restoredTimecardIds.length > 0) {
           setRestoredReturnedTimecardIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
+          setCompletedRestoreCheckIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
         }
 
         setLoadedEditableRowPeriodKeys((current) =>
@@ -3417,11 +3461,15 @@ export default function DashboardPage() {
     isCurrentPayPeriod ||
     toDateKey(selectedPayPeriod.start) === toDateKey(previousPayPeriodStart);
   const isSelectedPayrollFinalized = finalizedPayrollPeriodKeys.includes(selectedPayPeriod.key);
-  const isTimecardEditable = isTimecardPeriodEditable({
+  const isTimecardPeriodOpen = isTimecardPeriodEditable({
     isWithinEmployeeEditWindow,
     isPayrollFinalized: isSelectedPayrollFinalized,
     current: latestTimecard,
   });
+  const isAwaitingRestoreCheck = Boolean(
+    returnedTimecard && isTimecardPeriodOpen && !completedRestoreCheckIds.includes(returnedTimecard.id),
+  );
+  const isTimecardEditable = isTimecardPeriodOpen && !isAwaitingRestoreCheck;
   const isTimecardEditablePeriod =
     !isSelectedPayrollFinalized && (isWithinEmployeeEditWindow || Boolean(returnedTimecard));
   const timecardSignatureCheck = checkTimecardSignature(timecardSignature, currentEmployee);
@@ -3505,15 +3553,9 @@ export default function DashboardPage() {
     return restoredRows;
   }
 
-  // Copies a returned timecard into the editable table exactly once. A
-  // permanent marker row records the restore, so later visits never overwrite
-  // the employee's saved corrections with the returned values again.
-  //
-  // The decision is made from a fresh read of the database taken immediately
-  // before writing, so a restore or corrections made on another device are
-  // always respected. Only editable_timecard_rows is written; submitted
-  // timecards are never touched.
-  async function restoreEditableRowsFromReturnedTimecard(timecard: SubmittedTimecard) {
+  // Fallback used only while the database function is not installed: the
+  // previous client-side restore (fresh read, decide, one combined write).
+  async function restoreViaDirectWrites(timecard: SubmittedTimecard) {
     const payPeriodKey = timecard.payPeriodKey;
     const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
     const markerId = getRestoreMarkerRowId(currentEmployeeId, payPeriodKey, timecard.id);
@@ -3607,6 +3649,59 @@ export default function DashboardPage() {
     }
   }
 
+  async function reloadEditableRowsForPeriod(payPeriodKey: string) {
+    const { data, error } = await supabase
+      .from('editable_timecard_rows')
+      .select('*')
+      .eq('employee_id', currentEmployeeId)
+      .eq('pay_period_key', payPeriodKey);
+
+    if (error) {
+      console.error('Failed to reload editable timecard rows:', error);
+      return;
+    }
+
+    applySavedEditableRows(payPeriodKey, data ?? []);
+  }
+
+  // Copies a returned timecard into the editable table exactly once, through
+  // public.restore_returned_timecard_rows: one database transaction, serialized
+  // per employee and pay period, that never overwrites rows changed after the
+  // return. The table stays read-only on this device until the check is done.
+  async function restoreEditableRowsFromReturnedTimecard(timecard: SubmittedTimecard) {
+    const payPeriodKey = timecard.payPeriodKey;
+    const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
+    const rows = buildRestoreRpcRows(buildRestoredRowsFromReturnedTimecard(timecard), prefix);
+
+    try {
+      const { data, error } = await supabase.rpc('restore_returned_timecard_rows', {
+        p_employee_id: currentEmployeeId,
+        p_pay_period_key: payPeriodKey,
+        p_returned_timecard_id: timecard.id,
+        p_returned_reviewed_at: timecard.reviewedAt || null,
+        p_marker_date_key: rows[0]?.date_key ?? toDateKey(new Date(timecard.payPeriodStart)),
+        p_rows: rows,
+      });
+
+      if (error && isMissingDatabaseFunctionError(error)) {
+        console.warn('restore_returned_timecard_rows is not installed; using the direct-write restore.');
+        await restoreViaDirectWrites(timecard);
+      } else if (error || !isRestoreRpcResult(data)) {
+        console.error('Failed to restore returned timecard rows:', error ?? data);
+        setTimecardStatus(
+          'Action Required: Apollo could not prepare your returned timecard for correction. Reload the page and try again.',
+        );
+        return;
+      }
+
+      await reloadEditableRowsForPeriod(payPeriodKey);
+    } finally {
+      setCompletedRestoreCheckIds((current) =>
+        current.includes(timecard.id) ? current : [...current, timecard.id],
+      );
+    }
+  }
+
   useEffect(() => {
     const restoredIds = new Set(restoredReturnedTimecardIds);
 
@@ -3614,7 +3709,7 @@ export default function DashboardPage() {
       !returnedTimecard ||
       !shouldRestoreReturnedTimecard({
         returnedTimecardId: returnedTimecard.id,
-        isPeriodEditable: isTimecardEditable,
+        isPeriodEditable: isTimecardPeriodOpen,
         periodRowsLoaded: loadedEditableRowPeriodKeys.includes(returnedTimecard.payPeriodKey),
         restoredTimecardIds: restoredIds,
       })
@@ -3624,7 +3719,7 @@ export default function DashboardPage() {
 
     setRestoredReturnedTimecardIds((current) => [...current, returnedTimecard.id]);
     void restoreEditableRowsFromReturnedTimecard(returnedTimecard);
-  }, [returnedTimecard?.id, restoredReturnedTimecardIds, loadedEditableRowPeriodKeys, isTimecardEditable]);
+  }, [returnedTimecard?.id, restoredReturnedTimecardIds, loadedEditableRowPeriodKeys, isTimecardPeriodOpen]);
 
   function getEditableRowKey(dateKey: string): string {
     return `${currentEmployeeId}-${selectedPayPeriod.key}-${dateKey}`;

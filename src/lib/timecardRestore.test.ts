@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildRestoreRpcRows,
   decideReturnedTimecardRestore,
+  isMissingDatabaseFunctionError,
+  isRestoreRpcResult,
   getEditableRowPrefix,
   getRestoreMarkerRowId,
   savedRowsChangedAfterReturn,
@@ -199,5 +202,34 @@ describe('returned timecard restore never overwrites employee corrections', () =
     // If the employee's device clock was far behind the supervisor's, a real
     // correction can look older than the return.
     expect(savedRowsChangedAfterReturn('2026-10-06T15:00:00Z', '2026-10-06T16:00:00Z')).toBe(false);
+  });
+});
+
+describe('database restore function helpers', () => {
+  it('builds rows with the date taken from each visible row key', () => {
+    expect(
+      buildRestoreRpcRows(
+        { [`${PREFIX}2026-10-06`]: { shiftLabel: 'R1' }, [`${PREFIX}2026-10-07-segment-2`]: { shiftLabel: 'P' } },
+        PREFIX,
+      ),
+    ).toEqual([
+      { id: `${PREFIX}2026-10-06`, date_key: '2026-10-06', row_data: { shiftLabel: 'R1' } },
+      { id: `${PREFIX}2026-10-07-segment-2`, date_key: '2026-10-07', row_data: { shiftLabel: 'P' } },
+    ]);
+  });
+
+  it('accepts only the three documented results', () => {
+    ['RESTORED', 'MARKER_ONLY', 'ALREADY_RESTORED'].forEach((value) => expect(isRestoreRpcResult(value)).toBe(true));
+    [null, undefined, '', 'restored', 42, {}].forEach((value) => expect(isRestoreRpcResult(value)).toBe(false));
+  });
+
+  it('falls back to direct writes only when the function is not installed', () => {
+    expect(isMissingDatabaseFunctionError({ code: 'PGRST202' })).toBe(true);
+    expect(isMissingDatabaseFunctionError({ code: '42883' })).toBe(true);
+    // Permission, row-level security, validation and network errors are real failures.
+    ['42501', '22023', '23505', 'PGRST301', '', undefined].forEach((code) =>
+      expect(isMissingDatabaseFunctionError({ code })).toBe(false),
+    );
+    expect(isMissingDatabaseFunctionError(null)).toBe(false);
   });
 });

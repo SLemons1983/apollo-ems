@@ -558,6 +558,33 @@ export function savedRowsChangedAfterReturn(
   return Number.isFinite(saved) && Number.isFinite(reviewed) && saved > reviewed;
 }
 
+/** Rows in the shape public.restore_returned_timecard_rows expects. */
+export function buildRestoreRpcRows(
+  restoredRows: Record<string, object>,
+  prefix: string,
+): Array<{ id: string; date_key: string; row_data: object }> {
+  return Object.entries(restoredRows).map(([id, row]) => ({
+    id,
+    date_key: id.slice(prefix.length).replace(/-segment-\d+$/, ''),
+    row_data: row,
+  }));
+}
+
+export type RestoreRpcResult = 'RESTORED' | 'MARKER_ONLY' | 'ALREADY_RESTORED';
+
+export function isRestoreRpcResult(value: unknown): value is RestoreRpcResult {
+  return value === 'RESTORED' || value === 'MARKER_ONLY' || value === 'ALREADY_RESTORED';
+}
+
+/**
+ * True only when the database reports that the function does not exist (the
+ * migration has not been applied yet). Every other error is a real failure.
+ * PGRST202: PostgREST could not find the function; 42883: undefined_function.
+ */
+export function isMissingDatabaseFunctionError(error: { code?: string | null } | null | undefined): boolean {
+  return error?.code === 'PGRST202' || error?.code === '42883';
+}
+
 export type RestoreAction = 'NONE' | 'MARKER_ONLY' | 'COPY_ROWS_AND_MARKER';
 
 /**
