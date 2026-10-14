@@ -431,3 +431,105 @@ describe('multiple employees and periods', () => {
     });
   });
 });
+
+describe('payroll totals and historical approvals (randomized workflows)', () => {
+  // Deterministic pseudo-random generator so failures are reproducible.
+  function seededRandom(seed: number) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 2 ** 32;
+    };
+  }
+
+  it('holds every payroll invariant across 300 random workflows', () => {
+    const employees = ['emp-r1', 'emp-r2', 'emp-r3', 'emp-r4'];
+
+    for (let seed = 1; seed <= 300; seed += 1) {
+      const random = seededRandom(seed);
+      const store = new TimecardStore();
+      const createdSnapshots = new Map<string, { submittedAt: string; totalHours: number; versionNumber: number | null | undefined }>();
+      const everApproved = new Set<string>();
+
+      for (let step = 0; step < 40; step += 1) {
+        const employeeId = employees[Math.floor(random() * employees.length)];
+        const current = store.employeeView(employeeId, P).current;
+        const roll = random();
+
+        const superseded = store.records.filter(
+          (record) => record.status !== 'APPROVED' && record.id !== store.employeeView(record.employeeId, P).current?.id,
+        );
+
+        // Historical data: the old supervisor screen could approve a copy
+        // that had already been superseded, leaving duplicate approvals.
+        if (roll > 0.92 && superseded.length > 0) {
+          store.supervisorApprove(superseded[Math.floor(random() * superseded.length)].id);
+        } else if (!current || current.status === 'RETURNED') {
+          // Only actions the current screens allow in this state.
+          if (roll < 0.15 && current?.status === 'RETURNED' && random() < 0.3) {
+            // Legacy (pre-fix) resubmission without lineage.
+            store.legacyEmployeeResubmit(employeeId, P, Math.round(random() * 80));
+          } else {
+            store.employeeSubmit(employeeId, P, Math.round(random() * 80), {
+              clockOffsetMinutes: random() < 0.2 ? -Math.round(random() * 600) : 0,
+            });
+          }
+        } else if (current.status === 'PENDING_SUPERVISOR_REVIEW') {
+          if (roll < 0.4) store.supervisorApprove(current.id);
+          else if (roll < 0.7) store.supervisorReturn(current.id, 'Fix');
+          else store.supervisorEdit(current.id, Math.round(random() * 80));
+        }
+
+        store.records.forEach((record) => {
+          if (!createdSnapshots.has(record.id)) {
+            createdSnapshots.set(record.id, {
+              submittedAt: record.submittedAt,
+              totalHours: (record as { totalHours: number }).totalHours,
+              versionNumber: record.versionNumber,
+            });
+          }
+          if (record.status === 'APPROVED') everApproved.add(record.id);
+        });
+
+        const queues = store.supervisorQueues(P);
+        const packet = queues.approvedForPayroll;
+
+        // 1. At most one packet record per employee, always current and approved.
+        expect(new Set(packet.map((r) => r.employeeId)).size).toBe(packet.length);
+        packet.forEach((record) => {
+          expect(record.status).toBe('APPROVED');
+          expect(queues.currentByEmployeeId.get(record.employeeId)?.id).toBe(record.id);
+        });
+
+        // 2. Packet total equals the sum of each employee's current approved hours.
+        const expectedTotal = employees.reduce((sum, id) => {
+          const currentRecord = store.employeeView(id, P).current as { status: string; totalHours: number } | null;
+          return sum + (currentRecord?.status === 'APPROVED' ? currentRecord.totalHours : 0);
+        }, 0);
+        expect(store.approvedPacketHours(P)).toBe(expectedTotal);
+
+        // 3. Every employee is in exactly one queue, and both screens agree.
+        employees.forEach((id) => {
+          const currentRecord = expectScreensAgree(store, id, P);
+          const memberships = [queues.pendingReview, queues.resubmitted, queues.awaitingEmployeeResubmission, packet].filter(
+            (queue) => queue.some((record) => record.employeeId === id),
+          ).length;
+          expect(memberships).toBe(currentRecord ? 1 : 0);
+        });
+
+        // 4. History is never lost or rewritten; approvals are never undone.
+        expect(store.records).toHaveLength(createdSnapshots.size);
+        store.records.forEach((record) => {
+          const snapshot = createdSnapshots.get(record.id)!;
+          expect(record.submittedAt).toBe(snapshot.submittedAt);
+          expect((record as { totalHours: number }).totalHours).toBe(snapshot.totalHours);
+          expect(record.versionNumber).toBe(snapshot.versionNumber);
+        });
+        everApproved.forEach((id) => {
+          expect(store.records.find((record) => record.id === id)?.status).toBe('APPROVED');
+        });
+      }
+    }
+    // 300 workflows x 40 checked steps: allow more than the 5-second default.
+  }, 60_000);
+});

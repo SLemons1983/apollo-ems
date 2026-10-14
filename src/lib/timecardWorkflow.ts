@@ -558,6 +558,28 @@ export function savedRowsChangedAfterReturn(
   return Number.isFinite(saved) && Number.isFinite(reviewed) && saved > reviewed;
 }
 
+export type RestoreAction = 'NONE' | 'MARKER_ONLY' | 'COPY_ROWS_AND_MARKER';
+
+/**
+ * Final restore decision, made from a FRESH database read taken immediately
+ * before writing (not from rows loaded when the page opened), so another
+ * device's restore or corrections are always seen.
+ *
+ * - Marker already present: write nothing.
+ * - Saved rows changed after the return: they already hold the returned
+ *   values or the employee's corrections, so only record the marker.
+ * - Otherwise: copy the returned rows and record the marker in one write.
+ */
+export function decideReturnedTimecardRestore(input: {
+  markerExists: boolean;
+  latestSavedRowUpdatedAt: string | null | undefined;
+  returnedReviewedAt: string | null | undefined;
+}): RestoreAction {
+  if (input.markerExists) return 'NONE';
+  if (savedRowsChangedAfterReturn(input.latestSavedRowUpdatedAt, input.returnedReviewedAt)) return 'MARKER_ONLY';
+  return 'COPY_ROWS_AND_MARKER';
+}
+
 export function shouldRestoreReturnedTimecard(input: {
   returnedTimecardId: string | null;
   isPeriodEditable: boolean;

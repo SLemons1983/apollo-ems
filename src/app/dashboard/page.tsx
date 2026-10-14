@@ -18,8 +18,8 @@ import {
   getExpectedSignatureName,
   getRestoreMarkerRowId,
   getReturnedTimecardsForEmployee,
+  decideReturnedTimecardRestore,
   isTimecardPeriodEditable,
-  savedRowsChangedAfterReturn,
   shouldRestoreReturnedTimecard,
 } from '@/lib/timecardWorkflow';
 
@@ -1446,8 +1446,6 @@ export default function DashboardPage() {
   // Each period is read once, as before, so returning to a period never
   // replaces edits that are still being saved with an older database copy.
   const requestedEditableRowPeriodsRef = useRef(new Set<string>());
-  // Most recent saved-row update time per pay period.
-  const [latestEditableRowUpdateByPeriod, setLatestEditableRowUpdateByPeriod] = useState<Record<string, string>>({});
   // Pay periods with a payroll submission record (finalized payroll).
   const [finalizedPayrollPeriodKeys, setFinalizedPayrollPeriodKeys] = useState<string[]>([]);
   const [missedMealDateKey, setMissedMealDateKey] = useState('');
@@ -2838,18 +2836,6 @@ export default function DashboardPage() {
           setRestoredReturnedTimecardIds((current) => [...new Set([...current, ...restoredTimecardIds])]);
         }
 
-        const latestUpdatedAt = savedRows
-          .filter((row) => !row.row_data?.restoreMarker && typeof row.updated_at === 'string')
-          .map((row) => row.updated_at as string)
-          .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-
-        setLatestEditableRowUpdateByPeriod((current) => {
-          const next = { ...current };
-          if (latestUpdatedAt) next[payPeriodKey] = latestUpdatedAt;
-          else delete next[payPeriodKey];
-          return next;
-        });
-
         setLoadedEditableRowPeriodKeys((current) =>
           current.includes(payPeriodKey) ? current : [...current, payPeriodKey],
         );
@@ -3522,26 +3508,60 @@ export default function DashboardPage() {
   // Copies a returned timecard into the editable table exactly once. A
   // permanent marker row records the restore, so later visits never overwrite
   // the employee's saved corrections with the returned values again.
-  async function restoreEditableRowsFromReturnedTimecard(
-    timecard: SubmittedTimecard,
-    options: { copyRows: boolean },
-  ) {
+  //
+  // The decision is made from a fresh read of the database taken immediately
+  // before writing, so a restore or corrections made on another device are
+  // always respected. Only editable_timecard_rows is written; submitted
+  // timecards are never touched.
+  async function restoreEditableRowsFromReturnedTimecard(timecard: SubmittedTimecard) {
     const payPeriodKey = timecard.payPeriodKey;
     const prefix = getEditableRowPrefix(currentEmployeeId, payPeriodKey);
-    const restoredRows = options.copyRows ? buildRestoredRowsFromReturnedTimecard(timecard) : {};
-    const now = new Date().toISOString();
+    const markerId = getRestoreMarkerRowId(currentEmployeeId, payPeriodKey, timecard.id);
 
-    if (Object.keys(restoredRows).length > 0) {
-      setEditableTimecardRows((current) => ({
-        ...current,
-        ...restoredRows,
-      }));
+    const { data: freshData, error: readError } = await supabase
+      .from('editable_timecard_rows')
+      .select('id, updated_at, row_data')
+      .eq('employee_id', currentEmployeeId)
+      .eq('pay_period_key', payPeriodKey);
+
+    if (readError) {
+      // Nothing is written when the current saved state cannot be confirmed.
+      console.error('Failed to check saved timecard rows before restoring:', readError);
+      setTimecardStatus(
+        'Action Required: Apollo could not prepare your returned timecard for correction. Reload the page and try again.',
+      );
+      return;
     }
 
+    const freshRows: EditableTimecardDbRow[] = freshData ?? [];
+    const markerExists = freshRows.some(
+      (row) =>
+        row.id === markerId ||
+        (row.row_data?.restoreMarker === true && row.row_data?.restoredFromTimecardId === timecard.id),
+    );
+    const latestSavedRowUpdatedAt = freshRows
+      .filter((row) => !row.row_data?.restoreMarker && typeof row.updated_at === 'string')
+      .map((row) => row.updated_at as string)
+      .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+
+    const action = decideReturnedTimecardRestore({
+      markerExists,
+      latestSavedRowUpdatedAt,
+      returnedReviewedAt: timecard.reviewedAt,
+    });
+
+    if (action === 'NONE') {
+      return;
+    }
+
+    const restoredRows = action === 'COPY_ROWS_AND_MARKER' ? buildRestoredRowsFromReturnedTimecard(timecard) : {};
+    const now = new Date().toISOString();
     const firstDateKey =
       Object.keys(restoredRows).map((id) => id.slice(prefix.length).replace(/-segment-\d+$/, ''))[0] ??
       toDateKey(new Date(timecard.payPeriodStart));
 
+    // Rows and marker are sent in ONE request, so they are saved together or
+    // not at all.
     const rows = [
       ...Object.entries(restoredRows).map(([id, row]) => ({
         id,
@@ -3552,7 +3572,7 @@ export default function DashboardPage() {
         updated_at: now,
       })),
       {
-        id: getRestoreMarkerRowId(currentEmployeeId, payPeriodKey, timecard.id),
+        id: markerId,
         employee_id: currentEmployeeId,
         pay_period_key: payPeriodKey,
         date_key: firstDateKey,
@@ -3576,6 +3596,14 @@ export default function DashboardPage() {
       setTimecardStatus(
         `Action Required: Apollo could not prepare your returned timecard for correction. Reload the page and try again. ${error.message}`,
       );
+      return;
+    }
+
+    if (Object.keys(restoredRows).length > 0) {
+      setEditableTimecardRows((current) => ({
+        ...current,
+        ...restoredRows,
+      }));
     }
   }
 
@@ -3594,15 +3622,8 @@ export default function DashboardPage() {
       return;
     }
 
-    // Rows saved after the return already reflect it (an earlier restore or
-    // the employee's own corrections): record the marker, keep the rows.
-    const copyRows = !savedRowsChangedAfterReturn(
-      latestEditableRowUpdateByPeriod[returnedTimecard.payPeriodKey],
-      returnedTimecard.reviewedAt,
-    );
-
     setRestoredReturnedTimecardIds((current) => [...current, returnedTimecard.id]);
-    void restoreEditableRowsFromReturnedTimecard(returnedTimecard, { copyRows });
+    void restoreEditableRowsFromReturnedTimecard(returnedTimecard);
   }, [returnedTimecard?.id, restoredReturnedTimecardIds, loadedEditableRowPeriodKeys, isTimecardEditable]);
 
   function getEditableRowKey(dateKey: string): string {
