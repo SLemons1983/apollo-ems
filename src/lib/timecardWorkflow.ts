@@ -282,6 +282,15 @@ export function getEmployeeSubmissionVersionFields(
 // Supervisor queues, payroll status and approved payroll packet
 // ---------------------------------------------------------------------------
 
+/**
+ * A supervisor may not review their own timecard. Compares against the
+ * signed-in supervisor's employee record; an unknown signed-in employee is
+ * never treated as the owner (callers must block reviews in that case).
+ */
+export function isOwnTimecard(timecardEmployeeId: string, signedInEmployeeId: string | null | undefined): boolean {
+  return Boolean(signedInEmployeeId) && timecardEmployeeId === signedInEmployeeId;
+}
+
 export type PayrollTimecardStatus = 'NOT_SUBMITTED' | 'PENDING_REVIEW' | 'PENDING_RESUBMISSION' | 'APPROVED';
 
 export function getPayrollStatusForRecord(record: TimecardVersionRecord | null | undefined): PayrollTimecardStatus {

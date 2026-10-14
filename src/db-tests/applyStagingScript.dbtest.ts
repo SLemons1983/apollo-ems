@@ -9,9 +9,10 @@ import { connect, createTestDatabase, dropTestDatabase, getLocalAdminUrl, SUPABA
 const adminUrl = getLocalAdminUrl();
 const describeDb = adminUrl ? describe : describe.skip;
 const script = path.resolve(__dirname, '../../scripts/apply-staging.sh');
+const testerScript = path.resolve(__dirname, '../../scripts/add-staging-tester.sh');
 
-function run(args: string[], env: Record<string, string | undefined> = {}, input = '') {
-  const result = spawnSync('bash', [script, ...args], {
+function run(args: string[], env: Record<string, string | undefined> = {}, input = '', file = script) {
+  const result = spawnSync('bash', [file, ...args], {
     env: { NODE_ENV: 'test', PATH: process.env.PATH, HOME: process.env.HOME, ...env },
     input,
     encoding: 'utf8',
@@ -108,6 +109,42 @@ describeDb('apply-staging.sh rehearsal on local PostgreSQL', () => {
     const c = await connect(urls.fresh);
     const agencies = await c.query(`SELECT primary_contact_email FROM public.apollo_agencies`);
     expect(agencies.rows.every((r) => String(r.primary_contact_email).endsWith('@example.test'))).toBe(true);
+    await c.end();
+  });
+
+  it('links tester Google accounts to synthetic profiles with the right access', async () => {
+    const tester = (env: Record<string, string>) =>
+      run(['--local-rehearsal', urls.fresh], { STAGING_TESTER_CONFIRM: 'ADD TESTERS', ...env }, '', testerScript);
+
+    expect(tester({ STAGING_TESTER_SUPERVISOR_EMAIL: 'same@example.com', STAGING_TESTER_EMPLOYEE_EMAIL: 'SAME@example.com' }).out).toMatch(/two different Google accounts/);
+    expect(tester({ STAGING_TESTER_SUPERVISOR_EMAIL: "x'); drop table employees; --@example.com", STAGING_TESTER_EMPLOYEE_EMAIL: '' }).code).toBe(2);
+    expect(tester({ STAGING_TESTER_SUPERVISOR_EMAIL: 'riley.okafor@example.test', STAGING_TESTER_EMPLOYEE_EMAIL: '' }).out).toMatch(/already belongs to another staging profile/);
+
+    const ok = tester({ STAGING_TESTER_SUPERVISOR_EMAIL: 'Tester.Supervisor@Example.com', STAGING_TESTER_EMPLOYEE_EMAIL: 'tester.employee@example.com' });
+    expect(ok.out).toMatch(/Done/);
+    expect(ok.code).toBe(0);
+
+    const c = await connect(urls.fresh);
+    const rows = await c.query(`SELECT id, email, role, status FROM public.employees WHERE id LIKE 'emp-stg-tester-%' ORDER BY id`);
+    expect(rows.rows).toEqual([
+      { id: 'emp-stg-tester-employee', email: 'tester.employee@example.com', role: 'EMT', status: 'Active' },
+      { id: 'emp-stg-tester-supervisor', email: 'tester.supervisor@example.com', role: 'Supervisor', status: 'Active' },
+    ]);
+    const visible = async (email: string) => {
+      await c.query('BEGIN');
+      await c.query('SET LOCAL ROLE authenticated');
+      await c.query(`SELECT set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ email })]);
+      const n = Number((await c.query('SELECT count(*) FROM public.submitted_timecards')).rows[0].count);
+      await c.query('ROLLBACK');
+      return n;
+    };
+    expect(await visible('tester.supervisor@example.com')).toBe(12);
+    expect(await visible('tester.employee@example.com')).toBe(0);
+    expect(await visible('someone.else@example.com')).toBe(0);
+
+    const removed = run(['--remove', '--local-rehearsal', urls.fresh], { STAGING_TESTER_CONFIRM: 'REMOVE TESTERS' }, '', testerScript);
+    expect(removed.code).toBe(0);
+    expect(await visible('tester.supervisor@example.com')).toBe(0);
     await c.end();
   });
 

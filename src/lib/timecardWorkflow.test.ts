@@ -14,6 +14,7 @@ import {
   getPayrollStatusForRecord,
   getRestoreMarkerRowId,
   getReturnedTimecardsForEmployee,
+  isOwnTimecard,
   isTimecardPeriodEditable,
   savedRowsChangedAfterReturn,
   selectCurrentTimecard,
@@ -515,5 +516,20 @@ describe('restoring a returned timecard', () => {
     const marker = getRestoreMarkerRowId(EMP, PERIOD, 'timecard-abc');
     expect(marker.startsWith(prefix)).toBe(true);
     expect(marker).not.toMatch(new RegExp(`^${prefix}\\d{4}-\\d{2}-\\d{2}`));
+  });
+});
+
+describe('isOwnTimecard', () => {
+  it('matches only the signed-in supervisor\'s own employee record', () => {
+    expect(isOwnTimecard('emp-stg-sup-1', 'emp-stg-sup-1')).toBe(true);
+    expect(isOwnTimecard('emp-stg-emt-1', 'emp-stg-sup-1')).toBe(false);
+    // The old check compared against a fixed placeholder id and never matched.
+    expect(isOwnTimecard('emp-stg-sup-1', 'emp-001')).toBe(false);
+  });
+
+  it('never treats an unknown signed-in employee as the owner', () => {
+    expect(isOwnTimecard('emp-stg-sup-1', null)).toBe(false);
+    expect(isOwnTimecard('emp-stg-sup-1', undefined)).toBe(false);
+    expect(isOwnTimecard('', '')).toBe(false);
   });
 });

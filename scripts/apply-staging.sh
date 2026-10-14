@@ -20,54 +20,15 @@
 # the result is verified.
 set -euo pipefail
 
-STAGING_REF="eejahcuftznsabulssew"
-PRODUCTION_REF="xyrusrspvyuwpplhhett"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-fail() { echo "REFUSED: $*" >&2; exit 2; }
+source "$ROOT/scripts/lib/staging-target.sh"
 
 MODE="staging"
 if [ "${1:-}" = "--local-rehearsal" ]; then
-  MODE="rehearsal"
-  URL="${2:-}"
+  staging_target rehearsal "${2:-}"
 else
-  URL="${STAGING_DATABASE_URL:-}"
-fi
-[ -n "$URL" ] || fail "no connection string. Set STAGING_DATABASE_URL (staging project only)."
-
-lower_url="$(printf '%s' "$URL" | tr '[:upper:]' '[:lower:]')"
-case "$lower_url" in *"$PRODUCTION_REF"*) fail "the connection string refers to the PRODUCTION project ($PRODUCTION_REF)." ;; esac
-
-# Parse the URL (scheme, user, password presence, host).
-parsed="$(python3 - "$URL" <<'PY' || true
-import sys
-from urllib.parse import urlsplit
-try:
-    u = urlsplit(sys.argv[1])
-    if u.scheme not in ("postgres", "postgresql") or not u.hostname:
-        raise ValueError
-    print(u.username or "", "yes" if u.password else "no", u.hostname.lower(), u.port or 5432, sep="\t")
-except Exception:
-    print("INVALID")
-PY
-)"
-[ "$parsed" != "INVALID" ] && [ -n "$parsed" ] || fail "not a valid postgresql:// connection string."
-IFS=$'\t' read -r db_user has_password db_host db_port <<<"$parsed"
-[ "$has_password" = "no" ] || fail "do not put the password in the connection string; you will be prompted for it."
-
-if [ "$MODE" = "rehearsal" ]; then
-  case "$db_host" in 127.0.0.1|localhost|::1) ;; *) fail "--local-rehearsal only targets a PostgreSQL server on this machine." ;; esac
-else
-  if [ "$db_user" != "postgres.$STAGING_REF" ] && [ "$db_host" != "db.$STAGING_REF.supabase.co" ]; then
-    fail "the connection must be to staging project $STAGING_REF (user postgres.$STAGING_REF via the session pooler, or host db.$STAGING_REF.supabase.co)."
-  fi
-  case "$db_host" in *.supabase.com|*.supabase.co) ;; *) fail "host $db_host is not a Supabase host." ;; esac
-  [ "$db_port" != "6543" ] || fail "port 6543 is the transaction pooler; use the session pooler (port 5432)." 
-  case "$lower_url" in *sslmode=*) ;; *) URL="$URL$([[ "$URL" == *\?* ]] && echo '&' || echo '?')sslmode=require" ;; esac
-  if [ -z "${PGPASSWORD:-}" ]; then
-    read -r -s -p "Staging database password (input hidden): " PGPASSWORD; echo
-    export PGPASSWORD
-  fi
+  staging_target staging "${STAGING_DATABASE_URL:-}"
 fi
 
 export PGOPTIONS="-c statement_timeout=120000 -c lock_timeout=30000"
@@ -96,7 +57,13 @@ fi
 
 for f in "${FILES[@]}"; do
   echo "-> ${f#$ROOT/}"
-  "${PSQL[@]}" --single-transaction -f "$f"
+  if grep -qiE '^[[:space:]]*(begin|start transaction)[[:space:]]*;' "$f"; then
+    # The file manages its own transaction (begin; ... commit;). Wrapping it in
+    # another one only produces nested-transaction warnings.
+    "${PSQL[@]}" -f "$f"
+  else
+    "${PSQL[@]}" --single-transaction -f "$f"
+  fi
 done
 
 echo "Verifying..."

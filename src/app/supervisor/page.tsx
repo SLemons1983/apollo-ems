@@ -12,6 +12,7 @@ import {
   buildSupervisorTimecardQueues,
   getNextTimecardVersionNumber,
   getPayrollStatusForRecord,
+  isOwnTimecard,
   selectCurrentTimecards,
 } from '@/lib/timecardWorkflow';
 
@@ -1850,7 +1851,12 @@ export default function SupervisorPage() {
 
     const timecard = submittedTimecards.find((item) => item.id === timecardId);
 
-    if (timecard?.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID) {
+    if (!currentEmployee?.id) {
+      window.alert('Apollo could not identify your supervisor profile, so this timecard cannot be approved. Reload the page or contact an administrator.');
+      return;
+    }
+
+    if (timecard && isOwnTimecard(timecard.employeeId, currentEmployee.id)) {
       window.alert('You cannot approve your own timecard. It must be reviewed by another supervisor or GM.');
       return;
     }
@@ -4317,7 +4323,7 @@ export default function SupervisorPage() {
     const hasMissingPunches = hasMissingPunchFlag(timecard, weeks);
     const hasMissedMeals = timecard.missedMealBreaks.length > 0;
     const hasFlags = hasManualEdits || hasSupervisorEdits || hasGeofenceFlags || hasMissingPunches || hasMissedMeals;
-    const isOwnSupervisorTimecard = timecard.employeeId === CURRENT_SUPERVISOR_EMPLOYEE_ID;
+    const isOwnSupervisorTimecard = isOwnTimecard(timecard.employeeId, currentEmployee?.id);
     const scheduleMatchStatus = getScheduleMatchStatus(timecard);
 
     return (
