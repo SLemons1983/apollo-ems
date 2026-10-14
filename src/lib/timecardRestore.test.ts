@@ -66,6 +66,7 @@ function restore(
 
   const action = decideReturnedTimecardRestore({
     markerExists,
+    hasSavedRows: fresh.some((row) => !row.row_data.restoreMarker),
     latestSavedRowUpdatedAt,
     returnedReviewedAt: returned.reviewedAt,
   });
@@ -101,7 +102,7 @@ function tableAsSubmitted() {
 describe('decideReturnedTimecardRestore', () => {
   it('writes nothing once the marker exists', () => {
     expect(
-      decideReturnedTimecardRestore({ markerExists: true, latestSavedRowUpdatedAt: null, returnedReviewedAt: RETURNED.reviewedAt }),
+      decideReturnedTimecardRestore({ markerExists: true, hasSavedRows: true, latestSavedRowUpdatedAt: null, returnedReviewedAt: RETURNED.reviewedAt }),
     ).toBe('NONE');
   });
 
@@ -109,6 +110,7 @@ describe('decideReturnedTimecardRestore', () => {
     expect(
       decideReturnedTimecardRestore({
         markerExists: false,
+        hasSavedRows: true,
         latestSavedRowUpdatedAt: '2026-10-07T00:00:00Z',
         returnedReviewedAt: RETURNED.reviewedAt,
       }),
@@ -117,11 +119,39 @@ describe('decideReturnedTimecardRestore', () => {
 
   it('copies rows only when nothing changed since the return', () => {
     expect(
-      decideReturnedTimecardRestore({ markerExists: false, latestSavedRowUpdatedAt: SUBMITTED_AT, returnedReviewedAt: RETURNED.reviewedAt }),
+      decideReturnedTimecardRestore({ markerExists: false, hasSavedRows: true, latestSavedRowUpdatedAt: SUBMITTED_AT, returnedReviewedAt: RETURNED.reviewedAt }),
     ).toBe('COPY_ROWS_AND_MARKER');
     expect(
-      decideReturnedTimecardRestore({ markerExists: false, latestSavedRowUpdatedAt: undefined, returnedReviewedAt: RETURNED.reviewedAt }),
+      decideReturnedTimecardRestore({ markerExists: false, hasSavedRows: false, latestSavedRowUpdatedAt: undefined, returnedReviewedAt: RETURNED.reviewedAt }),
     ).toBe('COPY_ROWS_AND_MARKER');
+  });
+});
+
+describe('legacy returned cards (no return time recorded)', () => {
+  const legacy = (hasSavedRows: boolean, latestSavedRowUpdatedAt?: string) =>
+    decideReturnedTimecardRestore({ markerExists: false, hasSavedRows, latestSavedRowUpdatedAt, returnedReviewedAt: null });
+
+  it('keeps every saved row, whatever its time, and only records the marker', () => {
+    expect(legacy(true, SUBMITTED_AT)).toBe('MARKER_ONLY');
+    expect(legacy(true, '2020-01-01T00:00:00Z')).toBe('MARKER_ONLY');
+    expect(legacy(true, undefined)).toBe('MARKER_ONLY');
+    expect(
+      decideReturnedTimecardRestore({ markerExists: false, hasSavedRows: true, latestSavedRowUpdatedAt: SUBMITTED_AT, returnedReviewedAt: 'not a time' }),
+    ).toBe('MARKER_ONLY');
+  });
+
+  it('copies the returned shifts when the employee has no saved rows', () => {
+    expect(legacy(false)).toBe('COPY_ROWS_AND_MARKER');
+  });
+
+  it('an employee correction to a legacy returned card survives the first open after release and every reload', () => {
+    const table = tableAsSubmitted();
+    const legacyCard = { ...RETURNED, reviewedAt: null as unknown as string, clockOut: '18:00' };
+    // The employee had already corrected the row before this release.
+    table.rows.set(ROW, { id: ROW, updated_at: '2020-01-01T00:00:00Z', row_data: { clockIn: '07:00', clockOut: '19:45' } });
+    expect(restore(table, legacyCard, '2026-10-15T08:00:00Z')).toBe('MARKER_ONLY');
+    expect(restore(table, legacyCard, '2026-10-15T09:00:00Z')).toBe('NONE');
+    expect(table.rows.get(ROW)?.row_data.clockOut).toBe('19:45');
   });
 });
 

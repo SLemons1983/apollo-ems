@@ -358,7 +358,7 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     // A later time would have let the restore overwrite the correction.
     await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { reviewedAt: '2030-01-01T00:00:00.000Z' }), '22023');
     await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { reviewedAt: SUBMITTED_AT }), '22023');
-    // The stored card itself has no return time.
+    // A time sent for a legacy card that has none stored.
     await expectRejectedWithoutChanges(() => restoreAs(c, EMP_EMAIL, { timecardId: 'tc-own-returned-no-time' }), '22023');
     if (updatedType === 'text') {
       await admin.query(
@@ -371,6 +371,63 @@ describeDb.each(variants)('restore_returned_timecard_rows (date_key $dateType, u
     // With the genuine return time the correction is still kept.
     expect(await restoreAs(c)).toBe('MARKER_ONLY');
     expect((await rowsNow()).find((r) => r.id === ROW_A)?.clock_out).toBe('19:45');
+  });
+
+  describe('legacy returned card (no reviewed_at stored)', () => {
+    const LEGACY = 'tc-own-returned-no-time';
+    const legacyMarker = `${PREFIX}restore-marker-${LEGACY}`;
+    const restoreLegacy = (c: Client, email = EMP_EMAIL) => restoreAs(c, email, { timecardId: LEGACY, reviewedAt: null });
+
+    it('opens without error and keeps every saved row, including old corrections', async () => {
+      await resetAsSubmitted();
+      // Corrected long ago: with no return time this cannot be told apart from a correction.
+      await admin.query(
+        `UPDATE public.editable_timecard_rows SET row_data = row_data || '{"clockOutTime":"19:45"}', updated_at = $2 WHERE id = $1`,
+        [ROW_A, '2020-01-01T00:00:00.000Z'],
+      );
+      const c = await client();
+      expect(await restoreLegacy(c)).toBe('MARKER_ONLY');
+      expect(await restoreLegacy(c)).toBe('ALREADY_RESTORED');
+      const rows = await rowsNow();
+      expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('19:45');
+      expect(rows.find((r) => r.id === ROW_B)?.clock_out).toBe('18:30');
+      expect(rows.filter((r) => r.marker).map((r) => r.id)).toEqual([legacyMarker]);
+      const card = await admin.query(`SELECT status, reviewed_at FROM public.submitted_timecards WHERE id = $1`, [LEGACY]);
+      expect(card.rows[0]).toEqual({ status: 'RETURNED', reviewed_at: null }); // nothing invented
+    });
+
+    it('copies the returned shifts when the employee has no saved rows', async () => {
+      await admin.query('DELETE FROM public.editable_timecard_rows');
+      expect(await restoreLegacy(await client())).toBe('RESTORED');
+      const rows = await rowsNow();
+      expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('19:00');
+      expect(rows.find((r) => r.id === ROW_B)?.clock_out).toBe('19:30');
+    });
+
+    it('a row saved by another device during the copy is never overwritten', async () => {
+      await admin.query('DELETE FROM public.editable_timecard_rows');
+      const editor = await client();
+      const restorer = await client();
+      await beginAsUser(editor, signedIn(EMP_EMAIL));
+      await editor.query(
+        `INSERT INTO public.editable_timecard_rows (id, employee_id, pay_period_key, date_key, row_data, updated_at)
+         VALUES ($1, $2, $3, '2026-10-06', '{"clockOutTime":"20:15"}', NULL)`,
+        [ROW_A, EMP, PERIOD],
+      );
+      const restoreCall = restoreLegacy(restorer);
+      expect(await settledWithin(restoreCall, 400)).toBe('pending');
+      await editor.query('COMMIT');
+      expect(await restoreCall).toBe('RESTORED');
+      const rows = await rowsNow();
+      expect(rows.find((r) => r.id === ROW_A)?.clock_out).toBe('20:15'); // the employee's save wins
+      expect(rows.find((r) => r.id === ROW_B)?.clock_out).toBe('19:30');
+    });
+
+    it("cannot be used on another employee's legacy card", async () => {
+      await resetAsSubmitted();
+      const intruder = await client();
+      await expectRejectedWithoutChanges(() => restoreLegacy(intruder, OTHER_EMAIL), '42501');
+    });
   });
 
   it('a returned card with no shifts records only the marker', async () => {

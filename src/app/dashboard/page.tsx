@@ -3588,6 +3588,7 @@ export default function DashboardPage() {
 
     const action = decideReturnedTimecardRestore({
       markerExists,
+      hasSavedRows: freshRows.some((row) => !row.row_data?.restoreMarker),
       latestSavedRowUpdatedAt,
       returnedReviewedAt: timecard.reviewedAt,
     });

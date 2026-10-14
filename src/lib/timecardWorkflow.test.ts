@@ -533,3 +533,44 @@ describe('isOwnTimecard', () => {
     expect(isOwnTimecard('', '')).toBe(false);
   });
 });
+
+describe('legacy returned card (no return time, no version number)', () => {
+  // Shape of the production records returned before return times were stored.
+  const legacy = card({ id: 'tc-legacy-returned', status: 'RETURNED', reviewedAt: null, versionNumber: null });
+
+  it('can be opened, edited and resubmitted, then approved once', () => {
+    const state = getEmployeeTimecardState([legacy], EMP, PERIOD);
+    expect(state.returnedRecord?.id).toBe(legacy.id);
+    // Editable even outside the normal two-period window, unless payroll is finalized.
+    expect(isTimecardPeriodEditable({ isWithinEmployeeEditWindow: false, isPayrollFinalized: false, current: state.current })).toBe(true);
+    expect(isTimecardPeriodEditable({ isWithinEmployeeEditWindow: false, isPayrollFinalized: true, current: state.current })).toBe(false);
+    expect(
+      evaluateEmployeeSubmission({ hasEmployeeProfile: true, isSubmitting: false, isWithinEmployeeEditWindow: false, isPayrollFinalized: false, current: state.current }),
+    ).toEqual({ allowed: true, isResubmission: true });
+
+    const fields = getEmployeeSubmissionVersionFields([legacy], EMP);
+    expect(fields).toMatchObject({ versionNumber: 2, parentTimecardId: legacy.id, versionReason: 'EMPLOYEE_RESUBMISSION' });
+
+    const resubmitted = card({
+      id: 'tc-legacy-resubmitted',
+      submittedAt: '2026-10-15T15:00:00.000Z',
+      versionNumber: fields.versionNumber,
+      parentTimecardId: fields.parentTimecardId,
+      submissionAcknowledgement: { submissionAction: 'RESUBMITTED' },
+    });
+    const queues = buildSupervisorTimecardQueues([legacy, resubmitted]);
+    expect(queues.resubmitted.map((r) => r.id)).toEqual([resubmitted.id]);
+    expect(queues.awaitingEmployeeResubmission).toEqual([]);
+
+    const approved = buildSupervisorTimecardQueues([legacy, { ...resubmitted, status: 'APPROVED' }]);
+    expect(approved.approvedForPayroll.map((r) => r.id)).toEqual([resubmitted.id]);
+  });
+
+  it('a legacy RETURNED record already replaced by a resubmission is history only', () => {
+    const later = card({ id: 'tc-later', submittedAt: '2026-10-03T15:00:00.000Z', status: 'APPROVED' });
+    const state = getEmployeeTimecardState([legacy, later], EMP, PERIOD);
+    expect(state.current?.id).toBe(later.id);
+    expect(state.returnedRecord).toBeNull();
+    expect(getReturnedTimecardsForEmployee([legacy, later], EMP)).toEqual([]);
+  });
+});

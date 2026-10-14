@@ -608,10 +608,14 @@ export type RestoreAction = 'NONE' | 'MARKER_ONLY' | 'COPY_ROWS_AND_MARKER';
  */
 export function decideReturnedTimecardRestore(input: {
   markerExists: boolean;
+  /** The employee has at least one saved (non-marker) row for the period. */
+  hasSavedRows: boolean;
   latestSavedRowUpdatedAt: string | null | undefined;
   returnedReviewedAt: string | null | undefined;
 }): RestoreAction {
   if (input.markerExists) return 'NONE';
+  // Legacy return with no return time: any saved row may be a correction.
+  if (!Number.isFinite(timestampValue(input.returnedReviewedAt)) && input.hasSavedRows) return 'MARKER_ONLY';
   if (savedRowsChangedAfterReturn(input.latestSavedRowUpdatedAt, input.returnedReviewedAt)) return 'MARKER_ONLY';
   return 'COPY_ROWS_AND_MARKER';
 }

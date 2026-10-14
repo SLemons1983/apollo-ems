@@ -11,6 +11,7 @@ production). Nothing here has been deployed or applied to production.
 | Resubmission | Employee submissions now also write `version_number`, `parent_timecard_id`, `version_reason`, `created_by_role` and `created_by_employee_id`. Resubmissions always appear under **Resubmitted**. Previously hidden resubmissions reappear without any data change. |
 | Approved packet | Exactly one current approved record per employee and period. Superseded approvals are listed separately and excluded from totals. |
 | Corrections | Saved rows load for whichever period is selected. A returned card is copied into the editable table once (`restore_returned_timecard_rows`) and never over newer corrections. The database identifies the caller from `auth.uid()` and restores only that employee's own RETURNED card, using the stored return time; client-supplied ids and times are verified, never trusted. |
+| Legacy returned cards | Cards returned before return times were recorded (`reviewed_at` NULL) open, edit and resubmit normally. If the employee has any saved rows for that period they are kept untouched (only the marker is written). Otherwise the returned shifts are copied in, never over a row. No timestamp is invented and no timecard is modified. |
 | Signature | Matches the signed-in employee's own first and last name, ignoring case, accents, spacing and punctuation. Messages are clear. "Submitting…" can no longer get stuck. |
 | Finalized payroll | Employees cannot submit into a finalized period and are told how to get it reopened. Supervisor payroll locks now apply to every period. |
 | Self-approval | A supervisor cannot approve their own timecard. The old check compared against a constant and never matched. |
@@ -40,6 +41,13 @@ build fails safely and the live site stays on `96bfd8d`. Then either turn it on
 or add `APOLLO_DEPLOYMENT_ENVIRONMENT=production` (Production only).
 Existing `NEXT_PUBLIC_SUPABASE_*` variables need no changes. In production,
 any one that is missing falls back to the current production value.
+
+**Legacy returned cards (optional, read-only):** to see which of the
+RETURNED cards without `reviewed_at` still need employee action, run
+`supabase/production/legacy-returned-impact-readonly.sql` (one `SELECT`, counts
+and pay-period keys only). *Historical* cards were already replaced by a later
+submission and are never touched. *Finalized* cards are read-only until payroll
+is reopened. *Active* cards are the ones employees will open and resubmit.
 
 ## Release sequence
 
@@ -95,8 +103,8 @@ previous restore method. Applying the migration first is recommended.
 | Check | Result |
 |---|---|
 | `npm run typecheck` | pass |
-| `npm test` (workflow, lifecycle/payroll invariants, restore, pay periods, environment, integration guards) | 121 pass |
-| `npm run test:db` on PostgreSQL 16.15 and 17.10 (local) | 96 pass each (includes the security tests) |
+| `npm test` (workflow, lifecycle/payroll invariants, restore, pay periods, environment, integration guards) | 126 pass |
+| `npm run test:db` on PostgreSQL 16.15 and 17.10 (local) | 112 pass each (includes the security and legacy-return tests) |
 | `VERCEL_ENV=production npm run build`, with no Supabase variables set | pass; production URL inlined into 44 server bundles; no staging reference in the output |
 | `npx eslint src` | 122 errors / 109 warnings, all pre-existing (`main`: 123 / 110) |
 | `readiness-readonly.sql` on PostgreSQL 16 and 17 rehearsal schemas | all PASS; a deliberately broken schema produces the expected FAILs, without errors |
