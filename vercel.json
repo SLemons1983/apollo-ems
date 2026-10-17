@@ -12,7 +12,6 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
-      "claude/supervisor-split-*": true,
       "claude/bold-hawking-idxk8h": false
     }
   }
