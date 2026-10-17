@@ -15,6 +15,36 @@ export type EmployeeOption = {
   certifications?: EmployeeCertificationRecord | null;
 };
 
+export type ImportantLink = {
+  id: string;
+  label: string;
+  url: string;
+};
+
+export type GeofenceConfig = {
+  id: string;
+  shiftLabel: string;
+  locationLabel: string;
+  latitude: number;
+  longitude: number;
+  radiusFeet: number;
+};
+
+export type SystemConfig = {
+  companyName: string;
+  logoDataUrl: string;
+  importantLinks: ImportantLink[];
+  geofences: GeofenceConfig[];
+};
+
+export type AuditLogEntry = {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: string;
+  details: string;
+};
+
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'numeric',
