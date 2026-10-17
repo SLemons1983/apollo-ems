@@ -2,6 +2,19 @@ import { useCallback, useEffect, useRef } from 'react';
 
 // Helpers shared by the supervisor page and its tile components.
 
+export type EmployeeCertificationRecord = Record<string, string>;
+
+export type EmployeeOption = {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Paramedic' | 'EMT' | 'Supervisor';
+  scope: 'ALS' | 'BLS';
+  employeeType: string;
+  status: string;
+  certifications?: EmployeeCertificationRecord | null;
+};
+
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'numeric',
