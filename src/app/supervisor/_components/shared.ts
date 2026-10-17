@@ -45,6 +45,52 @@ export type AuditLogEntry = {
   details: string;
 };
 
+export type ApolloMessageRecipient = {
+  employeeId: string;
+  deliveredAt: string;
+  readAt: string | null;
+};
+
+export type ApolloMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  recipients: ApolloMessageRecipient[];
+  audienceLabel: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  relatedType?: string;
+  relatedId?: string;
+  priority: 'NORMAL' | 'IMPORTANT' | 'URGENT';
+};
+
+export type IncidentReport = {
+  id: string;
+  incident_number: string;
+  created_at: string;
+  employee_name: string;
+  employee_phone: string | null;
+  employee_email: string | null;
+  category: string;
+  supervisor_notified: string | null;
+  supervisor_name: string | null;
+  assigned_supervisor: string | null;
+  narrative: string;
+  status: string;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  attachment_path: string | null;
+  supervisor_notes: string | null;
+  updated_at: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+};
+
+export const CURRENT_SUPERVISOR_ID = 'supervisor-001';
+
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'numeric',
