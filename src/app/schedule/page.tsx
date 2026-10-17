@@ -5722,6 +5722,13 @@ export default function SchedulePage() {
           </div>
         )}
 
+        {!mounted && (
+          <div role="status" className="mb-3 flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-900">
+            <span className="h-3 w-3 animate-pulse rounded-full bg-blue-600" aria-hidden="true" />
+            Loading schedule…
+          </div>
+        )}
+
         <div ref={scheduleScrollRef} className="space-y-6">
           {[dates.slice(0, 7), dates.slice(7, 14)].map((gridDates, gridIndex) => (
             <section key={`${visiblePayPeriodStartKey}-${gridIndex}`} className="space-y-2">
