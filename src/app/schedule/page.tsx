@@ -1214,14 +1214,28 @@ function getVehicleConflictMessages(day: DaySchedule, target: AssignmentRef): st
   return Array.from(new Set(messages));
 }
 
-function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: string): Record<string, EmployeeDaySummary> {
-  const summary: Record<string, EmployeeDaySummary> = {};
+// Schedules held in page state are never edited in place (every edit makes a new
+// copy), so lookups on them can be reused. Working copies that are edited in place,
+// like the mass change preview, are not marked and are always read fresh.
+const cacheableSchedules = new WeakSet<ScheduleData>();
+
+function markScheduleCacheable(scheduleData: ScheduleData) {
+  cacheableSchedules.add(scheduleData);
+}
+
+// Unit-shift hours per employee per day, built in one pass over the schedule.
+const employeeDailyUnitSummaryCache = new WeakMap<ScheduleData, Map<string, Record<string, EmployeeDaySummary>>>();
+
+function getEmployeeDailyUnitSummaries(scheduleData: ScheduleData): Map<string, Record<string, EmployeeDaySummary>> {
+  const cached = employeeDailyUnitSummaryCache.get(scheduleData);
+  if (cached) {
+    return cached;
+  }
+
+  const summaries = new Map<string, Record<string, EmployeeDaySummary>>();
 
   for (const dateKey of Object.keys(scheduleData)) {
     const day = getDaySchedule(scheduleData, dateKey);
-    let hours = 0;
-    let hasShift = false;
-    let hasExtendedApproval = false;
 
     for (const assignment of getAssignmentRefsForDay(day)) {
       if (assignment.category !== 'UNIT') {
@@ -1229,31 +1243,35 @@ function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: s
       }
 
       for (const slot of getAssignedSlotsForAssignment(assignment.category, assignment.shift)) {
-        if (slot.employeeId === employeeId) {
-          hasShift = true;
-          hours += calculateSlotHours(
-            slot.startTime,
-            slot.endTime,
-            isStandardTwentyFourHourShiftKey(assignment.key),
-            slot.heldOver,
-          );
-          if (assignment.shift.allowExtendedHours) {
-            hasExtendedApproval = true;
-          }
+        let summary = summaries.get(slot.employeeId);
+        if (!summary) {
+          summary = {};
+          summaries.set(slot.employeeId, summary);
+        }
+
+        const daySummary = summary[dateKey] ?? (summary[dateKey] = { hours: 0, hasShift: true, hasExtendedApproval: false });
+        daySummary.hours += calculateSlotHours(
+          slot.startTime,
+          slot.endTime,
+          isStandardTwentyFourHourShiftKey(assignment.key),
+          slot.heldOver,
+        );
+        if (assignment.shift.allowExtendedHours) {
+          daySummary.hasExtendedApproval = true;
         }
       }
     }
-
-    if (hasShift) {
-      summary[dateKey] = {
-        hours,
-        hasShift,
-        hasExtendedApproval,
-      };
-    }
   }
 
-  return summary;
+  if (cacheableSchedules.has(scheduleData)) {
+    employeeDailyUnitSummaryCache.set(scheduleData, summaries);
+  }
+  return summaries;
+}
+
+// Returns a fresh copy so callers can adjust it without touching the shared cache.
+function buildEmployeeDailyUnitSummary(scheduleData: ScheduleData, employeeId: string): Record<string, EmployeeDaySummary> {
+  return { ...getEmployeeDailyUnitSummaries(scheduleData).get(employeeId) };
 }
 
 function getChainHours(summary: Record<string, EmployeeDaySummary>, targetDateKey: string): { totalHours: number; hasApproval: boolean } {
@@ -1346,13 +1364,36 @@ function getCertificationMessages(target: AssignmentRef, employees: EmployeeOpti
   return Array.from(new Set(messages));
 }
 
+// Read-only day lookups for the hour checks.
+const readOnlyDayScheduleCache = new WeakMap<ScheduleData, Map<string, DaySchedule>>();
+
+function getReadOnlyDaySchedule(scheduleData: ScheduleData, dateKey: string): DaySchedule {
+  if (!cacheableSchedules.has(scheduleData)) {
+    return getDaySchedule(scheduleData, dateKey);
+  }
+
+  let days = readOnlyDayScheduleCache.get(scheduleData);
+  if (!days) {
+    days = new Map();
+    readOnlyDayScheduleCache.set(scheduleData, days);
+  }
+
+  let day = days.get(dateKey);
+  if (!day) {
+    day = getDaySchedule(scheduleData, dateKey);
+    days.set(dateKey, day);
+  }
+
+  return day;
+}
+
 function getAssignmentHoursForEmployeeOnDate(
   scheduleData: ScheduleData,
   dateKey: string,
   employeeId: string,
   excludedAssignmentKey?: string,
 ): number {
-  const day = getDaySchedule(scheduleData, dateKey);
+  const day = getReadOnlyDaySchedule(scheduleData, dateKey);
   let hours = 0;
 
   for (const assignment of getAssignmentRefsForDay(day)) {
@@ -1390,7 +1431,7 @@ function getEmployeePayPeriodHours(
 
   for (let cursor = new Date(payPeriod.start); cursor <= payPeriod.end; cursor = addDays(cursor, 1)) {
     const currentDateKey = toDateKey(cursor);
-    const day = getDaySchedule(scheduleData, currentDateKey);
+    const day = getReadOnlyDaySchedule(scheduleData, currentDateKey);
 
     for (const assignment of getAssignmentRefsForDay(day)) {
       if (excludedAssignmentKey && currentDateKey === dateKey && assignment.key === excludedAssignmentKey) {
@@ -3121,6 +3162,7 @@ export default function SchedulePage() {
     dateKey >= visiblePayPeriodStartKey && dateKey <= visiblePayPeriodEndKey;
 
   const employeePayPeriodHoursMap = useMemo(() => {
+    markScheduleCacheable(scheduleData);
     const result: Record<string, number> = {};
 
     for (const employee of employees) {
@@ -3136,6 +3178,7 @@ export default function SchedulePage() {
   }, [employees, scheduleData, visiblePayPeriodStartKey]);
 
   const assignmentEligibilityMaps = useMemo(() => {
+    markScheduleCacheable(scheduleData);
     const result: Record<string, Record<string, EligibilityResult>> = {};
 
     for (const date of dates) {
