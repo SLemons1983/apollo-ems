@@ -5059,6 +5059,9 @@ export default function SchedulePage() {
     );
   }
 
+  // Until the first load finishes, the status tag says so instead of the default "Schedule loaded."
+  const isShowingInitialLoadStatus = !mounted && saveStatus === 'Schedule loaded.';
+
   return (
     <div className="schedule-page min-h-screen bg-gradient-to-br from-[#071632] via-[#0b3f78] to-[#0795e6] px-4 py-6 md:px-6">
       <div className="mx-auto max-w-[1900px]">
@@ -5091,7 +5094,7 @@ export default function SchedulePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <div
                   className={`inline-flex rounded-xl px-3 py-2 text-xs font-semibold ${
-                    saveStatus.startsWith('Saving')
+                    saveStatus.startsWith('Saving') || isShowingInitialLoadStatus
                       ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-400'
                       : saveStatus.toLowerCase().includes('failed')
                         ? 'bg-red-50 text-red-700 ring-1 ring-red-400'
@@ -5100,7 +5103,7 @@ export default function SchedulePage() {
                           : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-400'
                   }`}
                 >
-                  {saveStatus}
+                  {isShowingInitialLoadStatus ? 'Loading schedule…' : saveStatus}
                 </div>
 
                 <button
