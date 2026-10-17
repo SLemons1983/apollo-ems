@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendApolloEmail } from '@/lib/email';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const RECIPIENT = 'kira.holley@sscems.org';
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -95,6 +96,9 @@ function createCheckRequestPdf(params: {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'employee');
+  if (access instanceof NextResponse) return access;
+
   try {
     const formData = await request.formData();
     const employeeName = String(formData.get('employeeName') ?? '').trim();

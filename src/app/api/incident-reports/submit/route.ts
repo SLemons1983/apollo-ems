@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const SUPABASE_URL = supabaseUrl;
 
@@ -39,6 +40,9 @@ function createIncidentNumber(dateKey: string, sequence: number) {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'employee');
+  if (access instanceof NextResponse) return access;
+
   try {
     const formData = await request.formData();
 

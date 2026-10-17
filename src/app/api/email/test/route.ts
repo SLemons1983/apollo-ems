@@ -1,7 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { Resend } from 'resend';
+import { apiAuthErrorResponse, requirePlatformOwnerApi } from '@/lib/supervisorApi';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  try {
+    await requirePlatformOwnerApi(request);
+  } catch (error) {
+    return apiAuthErrorResponse(error) ?? NextResponse.json({ error: 'Unable to verify access.' }, { status: 500 });
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.APOLLO_EMAIL_FROM || 'ApolloEMS <onboarding@resend.dev>';
   const testEmail = process.env.APOLLO_EMAIL_TEST_TO;

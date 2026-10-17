@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendApolloEmail } from '@/lib/email';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'supervisor');
+  if (access instanceof NextResponse) return access;
+
   try {
     const formData = await request.formData();
 

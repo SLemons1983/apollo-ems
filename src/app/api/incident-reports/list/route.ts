@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const SUPABASE_URL = supabaseUrl;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const access = await checkApiAccess(request, 'supervisor');
+  if (access instanceof NextResponse) return access;
+
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

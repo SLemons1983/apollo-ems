@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendApolloEmail } from '@/lib/email';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const SUPABASE_URL = supabaseUrl;
 
@@ -13,6 +14,9 @@ const ALLOWED_STATUSES = new Set([
 ]);
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'supervisor');
+  if (access instanceof NextResponse) return access;
+
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
