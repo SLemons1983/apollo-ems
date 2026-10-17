@@ -1050,6 +1050,11 @@ function getSenioritySortValue(seniorityLabel: string): number {
   return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY;
 }
 
+// Same ordering as String.localeCompare with these options, without rebuilding the
+// comparison rules on every call (the shift grid sorts hundreds of employee lists).
+const defaultNameCollator = new Intl.Collator();
+const employeeNameCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 function sortEmployeesByAwardPriority(
   list: EmployeeOption[],
   payPeriodHoursMap: Record<string, number>,
@@ -1067,7 +1072,7 @@ function sortEmployeesByAwardPriority(
     const bSeniority = getSenioritySortValue(b.seniorityLabel || 'Seniority Unassigned');
     if (aSeniority !== bSeniority) return aSeniority - bSeniority;
 
-    return a.name.localeCompare(b.name);
+    return defaultNameCollator.compare(a.name, b.name);
   });
 }
 
@@ -3928,7 +3933,7 @@ export default function SchedulePage() {
     const eligibleEmployees = [
       ...requestedEmployees,
       ...baseEligibleEmployees.filter((employee) => !requestedEmployeeIdSet.has(employee.id)),
-    ].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    ].sort((a, b) => employeeNameCollator.compare(a.name, b.name));
     const recommendedEmployee = baseEligibleEmployees.find((employee) => eligibilityMap[employee.id]?.eligible !== false) ?? null;
     const isOpenSlotSelection = isOpenShiftSlot(slot.employeeId);
     const selectedEmployee = slot.employeeId && !isOpenSlotSelection ? getEmployeeById(slot.employeeId, employees) : null;
@@ -3959,7 +3964,7 @@ export default function SchedulePage() {
         : '';
 
       const sortedEligibleEmployees = [...eligibleEmployees].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
+        employeeNameCollator.compare(a.name, b.name),
       );
 
       const handleCollapsedEmployeeChange = async (
