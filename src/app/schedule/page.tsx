@@ -1949,27 +1949,21 @@ export default function SchedulePage() {
             if (isActive) setEmployees(loadEmployeesFromProfiles());
           });
 
-        const { data: schedules, error: scheduleError } = await supabase
-          .from('schedules')
-          .select('id,date_key')
-          .order('date_key', { ascending: true });
-
-        if (scheduleError) {
-          throw scheduleError;
-        }
-
         const assignments: any[] = [];
         const assignmentPageSize = 1000;
         const assignmentBatchSize = 5;
 
-        const fetchAssignmentPage = async (pageStart: number) => {
-          const { data: assignmentPage, error: assignmentError } = await supabase
+        const queryAssignmentPage = (pageStart: number, withCount = false) =>
+          supabase
             .from('schedule_assignments')
-            .select('*')
+            .select('*', withCount ? { count: 'exact' } : undefined)
             .order('date_key', { ascending: true })
             .order('shift_key', { ascending: true })
             .order('slot_number', { ascending: true })
             .range(pageStart, pageStart + assignmentPageSize - 1);
+
+        const fetchAssignmentPage = async (pageStart: number) => {
+          const { data: assignmentPage, error: assignmentError } = await queryAssignmentPage(pageStart);
 
           if (assignmentError) {
             throw assignmentError;
@@ -1978,10 +1972,49 @@ export default function SchedulePage() {
           return assignmentPage ?? [];
         };
 
+        // Ask for the schedule days and the first page of assignments together. The first
+        // page also says how many assignments exist, so the remaining pages can all be
+        // requested at once instead of a few at a time.
+        const [
+          { data: schedules, error: scheduleError },
+          { data: firstAssignmentPage, error: firstAssignmentError, count: assignmentCount },
+        ] = await Promise.all([
+          supabase
+            .from('schedules')
+            .select('id,date_key')
+            .order('date_key', { ascending: true }),
+          queryAssignmentPage(0, true),
+        ]);
+
+        if (scheduleError) {
+          throw scheduleError;
+        }
+
+        if (firstAssignmentError) {
+          throw firstAssignmentError;
+        }
+
         let assignmentPageStart = 0;
-        let firstPage = await fetchAssignmentPage(assignmentPageStart);
+        let firstPage = firstAssignmentPage ?? [];
         assignments.push(...firstPage);
 
+        if (firstPage.length === assignmentPageSize && typeof assignmentCount === 'number') {
+          const remainingStarts: number[] = [];
+          for (let pageStart = assignmentPageSize; pageStart < assignmentCount; pageStart += assignmentPageSize) {
+            remainingStarts.push(pageStart);
+          }
+
+          const remainingPages = await Promise.all(remainingStarts.map(fetchAssignmentPage));
+          remainingPages.forEach((page) => assignments.push(...page));
+
+          if (remainingPages.length > 0) {
+            assignmentPageStart = remainingStarts[remainingStarts.length - 1];
+            firstPage = remainingPages[remainingPages.length - 1];
+          }
+        }
+
+        // Keep reading in batches while pages come back full (for example, if
+        // assignments were added while the page was loading).
         while (firstPage.length === assignmentPageSize) {
           const batchStarts = Array.from(
             { length: assignmentBatchSize },
@@ -5686,6 +5719,13 @@ export default function SchedulePage() {
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {!mounted && (
+          <div role="status" className="mb-3 flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-900">
+            <span className="h-3 w-3 animate-pulse rounded-full bg-blue-600" aria-hidden="true" />
+            Loading schedule…
           </div>
         )}
 
