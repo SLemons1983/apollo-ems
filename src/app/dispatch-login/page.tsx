@@ -7,14 +7,27 @@ export default function DispatchLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  function loginDispatch() {
-    if (username === 'Dispatch' && password === 'Sequoia') {
-      document.cookie = 'apollo_dispatch_session=active; path=/; max-age=43200; SameSite=Lax';
-      window.location.href = '/dispatch';
-      return;
-    }
+  const [submitting, setSubmitting] = useState(false);
 
-    setError('Invalid username or password.');
+  async function loginDispatch() {
+    setError('');
+    setSubmitting(true);
+    try {
+      const response = await fetch('/api/dispatch/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (response.ok) {
+        window.location.href = '/dispatch';
+        return;
+      }
+      setError('Invalid username or password.');
+    } catch {
+      setError('Unable to sign in. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -27,7 +40,7 @@ export default function DispatchLoginPage() {
           <input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500" />
           <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="Password" className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-500" />
 
-          <button type="button" onClick={loginDispatch} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700">
+          <button type="button" onClick={loginDispatch} disabled={submitting} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700">
             Login
           </button>
 

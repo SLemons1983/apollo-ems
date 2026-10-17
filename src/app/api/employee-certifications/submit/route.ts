@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendApolloEmail } from '@/lib/email';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const CERTIFICATION_REVIEW_EMAIL =
   process.env.CERTIFICATION_REVIEW_EMAIL?.trim() || 'certs@sscems.org';
@@ -28,6 +29,9 @@ function makeSubmissionNumber() {
 }
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'employee');
+  if (access instanceof NextResponse) return access;
+
   try {
     const formData = await request.formData();
 

@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const SUPABASE_URL = supabaseUrl;
 const CERTIFICATION_BUCKET = 'employee-certifications';
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'employee');
+  if (access instanceof NextResponse) return access;
+
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -22,6 +26,11 @@ export async function POST(request: NextRequest) {
 
     if (documentPath.includes('..') || documentPath.startsWith('/')) {
       return NextResponse.json({ error: 'Invalid certification document path.' }, { status: 400 });
+    }
+
+    // Employees may open only their own documents; supervisors may open any.
+    if (!access.isSupervisor && !documentPath.startsWith(`${access.employee.id}/`)) {
+      return NextResponse.json({ error: 'You do not have access to this document.' }, { status: 403 });
     }
 
     const supabase = createClient(SUPABASE_URL, serviceRoleKey);

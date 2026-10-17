@@ -10,7 +10,12 @@ export default function DispatchPage() {
 
   useEffect(() => {
     fetch('/api/dispatch/schedule')
-      .then((response) => response.json())
+      .then((response) => {
+        if (response.status === 401) {
+          window.location.href = '/dispatch-login';
+        }
+        return response.json();
+      })
       .then((data) => {
         setAssignments(data.assignments ?? []);
         setEmployees(data.employees ?? []);
@@ -18,6 +23,7 @@ export default function DispatchPage() {
   }, []);
 
   async function handleLogout() {
+    await fetch('/api/dispatch/login', { method: 'DELETE' }).catch(() => undefined);
     await supabase.auth.signOut();
     window.location.href = '/dispatch-login';
   }

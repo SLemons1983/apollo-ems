@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { DISPATCH_COOKIE, isValidDispatchSession } from '@/lib/dispatchSession';
 
 export async function GET() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -11,9 +12,9 @@ export async function GET() {
   }
 
   const cookieStore = await cookies();
-  const session = cookieStore.get('apollo_dispatch_session');
+  const session = cookieStore.get(DISPATCH_COOKIE);
 
-  if (!session || session.value !== 'active') {
+  if (!isValidDispatchSession(session?.value)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseUrl } from '@/lib/supabaseConfig';
+import { checkApiAccess } from '@/lib/supervisorApi';
 
 const SUPABASE_URL = supabaseUrl;
 const CERTIFICATION_BUCKET = 'employee-certifications';
@@ -30,6 +31,9 @@ type RemoveCertificationRequest = {
 };
 
 export async function POST(request: NextRequest) {
+  const access = await checkApiAccess(request, 'supervisor');
+  if (access instanceof NextResponse) return access;
+
   try {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
